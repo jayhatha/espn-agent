@@ -1,0 +1,230 @@
+import type { Logger } from "pino";
+import type { Kysely } from "kysely";
+import type { Database } from "../db/schema.js";
+import type { Category, StatComponents } from "@espn-fantasy/shared";
+import { StandingsProjectionAgent } from "./standings-projection.js";
+
+/**
+ * Waiver Recommendation Agent
+ * Per AGENTS.md §5
+ *
+ * Recommends add/drop moves that maximize projected standings improvement
+ */
+
+export interface WaiverRecommendation {
+  addPlayerId: number;
+  addPlayerName: string;
+  dropPlayerId: number;
+  dropPlayerName: string;
+  deltaOverallPoints: number;
+  categoryImpacts: Array<{
+    categoryId: string;
+    categoryName: string;
+    deltaRank: number;
+    deltaPoints: number;
+  }>;
+  explanation: string;
+  isLegal: boolean;
+  legalityIssues?: string[];
+}
+
+export class WaiverRecommendationAgent {
+  constructor(
+    private db: Kysely<Database>,
+    private standingsAgent: StandingsProjectionAgent,
+    private logger?: Logger,
+  ) {}
+
+  /**
+   * Get waiver recommendations for a team
+   */
+  async getRecommendations(
+    leagueId: number,
+    teamId: number,
+    snapshotDate: string,
+    options?: {
+      maxRecommendations?: number;
+      freeAgentPlayerIds?: number[];
+    },
+  ): Promise<WaiverRecommendation[]> {
+    const { maxRecommendations = 10, freeAgentPlayerIds } = options || {};
+
+    this.logger?.info(
+      { leagueId, teamId, snapshotDate },
+      "Generating waiver recommendations",
+    );
+
+    // Get current roster
+    const roster = await this.db
+      .selectFrom("team_roster_snapshot")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .where("team_id", "=", teamId)
+      .execute();
+
+    // Get free agents (or use provided list)
+    let freeAgents: number[];
+    if (freeAgentPlayerIds) {
+      freeAgents = freeAgentPlayerIds;
+    } else {
+      // In a real implementation, this would query ESPN for free agents
+      freeAgents = [];
+    }
+
+    // Get baseline projections
+    const baseline = await this.db
+      .selectFrom("team_daily_projected_overall")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .where("team_id", "=", teamId)
+      .executeTakeFirst();
+
+    if (!baseline) {
+      this.logger?.warn({ teamId }, "No baseline projections found");
+      return [];
+    }
+
+    // Simulate add/drops
+    const recommendations: WaiverRecommendation[] = [];
+
+    for (const addPlayerId of freeAgents) {
+      for (const rosterPlayer of roster) {
+        const dropPlayerId = rosterPlayer.player_id;
+
+        // Skip if same player
+        if (addPlayerId === dropPlayerId) continue;
+
+        // Simulate swap and compute delta
+        const delta = await this.simulateSwap(
+          leagueId,
+          teamId,
+          snapshotDate,
+          addPlayerId,
+          dropPlayerId,
+          baseline.projected_overall_points,
+        );
+
+        if (delta && delta.deltaOverallPoints > 0) {
+          const addPlayer = await this.db
+            .selectFrom("player")
+            .select(["id", "name"])
+            .where("id", "=", addPlayerId)
+            .executeTakeFirst();
+
+          const dropPlayer = await this.db
+            .selectFrom("player")
+            .select(["id", "name"])
+            .where("id", "=", dropPlayerId)
+            .executeTakeFirst();
+
+          if (addPlayer && dropPlayer) {
+            recommendations.push({
+              addPlayerId,
+              addPlayerName: addPlayer.name,
+              dropPlayerId,
+              dropPlayerName: dropPlayer.name,
+              deltaOverallPoints: delta.deltaOverallPoints,
+              categoryImpacts: delta.categoryImpacts,
+              explanation: this.generateExplanation(delta),
+              isLegal: true, // Simplified: full implementation checks roster rules
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by delta and return top N
+    recommendations.sort((a, b) => b.deltaOverallPoints - a.deltaOverallPoints);
+    return recommendations.slice(0, maxRecommendations);
+  }
+
+  private async simulateSwap(
+    leagueId: number,
+    teamId: number,
+    snapshotDate: string,
+    addPlayerId: number,
+    dropPlayerId: number,
+    baselinePoints: number,
+  ): Promise<{
+    deltaOverallPoints: number;
+    categoryImpacts: Array<{
+      categoryId: string;
+      categoryName: string;
+      deltaRank: number;
+      deltaPoints: number;
+    }>;
+  } | null> {
+    // Get projections for both players
+    const snapshot = await this.db
+      .selectFrom("league_daily_snapshot")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    if (!snapshot || !snapshot.projections_run_id) {
+      return null;
+    }
+
+    const addProjection = await this.db
+      .selectFrom("player_projection")
+      .selectAll()
+      .where("projections_run_id", "=", snapshot.projections_run_id)
+      .where("player_id", "=", addPlayerId)
+      .executeTakeFirst();
+
+    const dropProjection = await this.db
+      .selectFrom("player_projection")
+      .selectAll()
+      .where("projections_run_id", "=", snapshot.projections_run_id)
+      .where("player_id", "=", dropPlayerId)
+      .executeTakeFirst();
+
+    if (!addProjection || !dropProjection) {
+      return null;
+    }
+
+    // Compute delta components
+    const addComponents = addProjection.stat_components_json as StatComponents;
+    const dropComponents =
+      dropProjection.stat_components_json as StatComponents;
+
+    // Simplified: compute delta for counting stats only
+    // Full implementation would recalculate rate stats properly
+    const deltaOverallPoints = 0.5; // Placeholder
+    const categoryImpacts: Array<{
+      categoryId: string;
+      categoryName: string;
+      deltaRank: number;
+      deltaPoints: number;
+    }> = [];
+
+    return {
+      deltaOverallPoints,
+      categoryImpacts,
+    };
+  }
+
+  private generateExplanation(delta: {
+    deltaOverallPoints: number;
+    categoryImpacts: Array<{
+      categoryId: string;
+      categoryName: string;
+      deltaRank: number;
+      deltaPoints: number;
+    }>;
+  }): string {
+    const topImpacts = delta.categoryImpacts
+      .filter((i) => Math.abs(i.deltaPoints) > 0)
+      .slice(0, 3)
+      .map(
+        (i) =>
+          `${i.categoryName} (${i.deltaPoints > 0 ? "+" : ""}${i.deltaPoints.toFixed(1)})`,
+      )
+      .join(", ");
+
+    return `Gain ${delta.deltaOverallPoints.toFixed(1)} projected points. Top impacts: ${topImpacts || "minimal category changes"}.`;
+  }
+}

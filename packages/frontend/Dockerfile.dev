@@ -1,0 +1,26 @@
+# Development Dockerfile for Frontend
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@10
+
+# Install dependencies
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/frontend/package.json ./packages/frontend/
+
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY packages/frontend ./packages/frontend
+
+WORKDIR /app/packages/frontend
+
+EXPOSE 3000
+
+# Use Next.js dev server for hot reload
+CMD ["pnpm", "dev"]

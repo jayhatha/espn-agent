@@ -1,0 +1,33 @@
+# Development Dockerfile for Backend
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm (same version as host)
+RUN npm install -g pnpm@10
+
+# Install dependencies
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/backend/package.json ./packages/backend/
+
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY packages/backend ./packages/backend
+
+# Make startup scripts executable
+RUN chmod +x /app/packages/backend/scripts/*.sh
+
+# Build shared package (needed for imports)
+WORKDIR /app/packages/shared
+RUN pnpm build
+
+WORKDIR /app/packages/backend
+
+EXPOSE 3001
+
+# Default command (can be overridden in docker-compose)
+CMD ["/app/packages/backend/scripts/start-dev.sh"]

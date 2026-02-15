@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "packages/backend/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "node dist/workers/snapshot-worker.js & node dist/workers/morning-report-worker.js & node dist/workers/slack-approval-worker.js & wait",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

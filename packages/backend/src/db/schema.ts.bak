@@ -1,0 +1,50 @@
+import type {
+  League,
+  Team,
+  Player,
+  LeagueSettings,
+  LeagueDailySnapshot,
+  TeamDailyCategoryTotals,
+  TeamDailyCategoryRanks,
+  TeamDailyOverall,
+  TeamDailyProjectedCategory,
+  TeamDailyProjectedOverall,
+  TeamRosterSnapshot,
+  LeagueTransactionEvent,
+  LeagueRawPayload,
+  ProjectionsRun,
+  PlayerProjection,
+  PlayerIdentityMap,
+} from "@espn-fantasy/shared";
+
+/**
+ * Database schema definition using Kysely
+ * Based on DESIGN_DOC.md §4
+ */
+
+export interface Database {
+  league: League;
+  league_settings_version: LeagueSettingsVersion;
+  team: Team;
+  player: Player;
+  player_identity_map: PlayerIdentityMap;
+  league_raw_payload: LeagueRawPayload;
+  league_daily_snapshot: LeagueDailySnapshot;
+  team_daily_category_totals: TeamDailyCategoryTotals;
+  team_daily_category_ranks: TeamDailyCategoryRanks;
+  team_daily_overall: TeamDailyOverall;
+  team_daily_projected_category: TeamDailyProjectedCategory;
+  team_daily_projected_overall: TeamDailyProjectedOverall;
+  team_roster_snapshot: TeamRosterSnapshot;
+  league_transaction_event: LeagueTransactionEvent;
+  projections_run: ProjectionsRun;
+  player_projection: PlayerProjection;
+}
+
+export interface LeagueSettingsVersion {
+  id: number;
+  league_id: number;
+  effective_date: string; // DATE
+  settings_json: LeagueSettings;
+  created_at: Date;
+}

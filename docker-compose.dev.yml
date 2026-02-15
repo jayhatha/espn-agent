@@ -1,0 +1,131 @@
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: espn-postgres
+    environment:
+      POSTGRES_DB: espn_fantasy
+      POSTGRES_USER: espn_user
+      POSTGRES_PASSWORD: espn_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U espn_user -d espn_fantasy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - espn-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: espn-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - espn-network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile.dev
+    container_name: espn-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://espn_user:espn_password@postgres:5432/espn_fantasy
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/shared:/app/packages/shared
+      - backend-node-modules:/app/node_modules
+      - backend-package-node-modules:/app/packages/backend/node_modules
+    command: ["/app/packages/backend/scripts/start-dev.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - espn-network
+    restart: unless-stopped
+
+  # Backend Worker (for background jobs)
+  worker:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile.dev
+    container_name: espn-worker
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://espn_user:espn_password@postgres:5432/espn_fantasy
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+    volumes:
+      - ./packages/backend:/app/packages/backend
+      - ./packages/shared:/app/packages/shared
+      - worker-node-modules:/app/node_modules
+      - worker-package-node-modules:/app/packages/backend/node_modules
+    command: ["/app/packages/backend/scripts/start-worker.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - espn-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile.dev
+    container_name: espn-frontend
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./packages/frontend/src:/app/packages/frontend/src
+      - ./packages/shared:/app/packages/shared
+      - frontend-node-modules:/app/node_modules
+      - frontend-package-node-modules:/app/packages/frontend/node_modules
+      - /app/packages/frontend/.next
+    depends_on:
+      - backend
+    networks:
+      - espn-network
+    restart: unless-stopped
+
+networks:
+  espn-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  backend-node-modules:
+  backend-package-node-modules:
+  worker-node-modules:
+  worker-package-node-modules:
+  frontend-node-modules:
+  frontend-package-node-modules:
