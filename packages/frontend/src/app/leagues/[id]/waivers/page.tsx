@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 interface WaiverRecommendation {
   addPlayerId: number;
@@ -31,6 +32,7 @@ interface FreeAgent {
   projections: {
     [key: string]: number;
   } | null;
+  pctOwned: number;
 }
 
 interface RosterPlayer {
@@ -81,6 +83,8 @@ export default function WaiversPage() {
   const [selectedRosterPlayerId, setSelectedRosterPlayerId] = useState<number | null>(null);
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("pct_owned");
+  const [positionFilter, setPositionFilter] = useState<string[]>([]);
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -98,15 +102,7 @@ export default function WaiversPage() {
         throw new Error("No team selected");
       }
 
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/waivers/recommendations`,
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch waiver recommendations");
-      }
-
-      return response.json() as Promise<{
+      return api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId) as Promise<{
         recommendations: WaiverRecommendation[];
         snapshotDate: string;
       }>;
@@ -116,17 +112,12 @@ export default function WaiversPage() {
 
   // Free agents query
   const { data: freeAgentsData, isLoading: freeAgentsLoading } = useQuery({
-    queryKey: ["free-agents", leagueId],
+    queryKey: ["free-agents", leagueId, sortBy, positionFilter.join(",")],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/free-agents`,
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch free agents");
-      }
-
-      return response.json() as Promise<{
+      return api.getFreeAgents(parseInt(leagueId, 10), {
+        sortBy,
+        ...(positionFilter.length > 0 && { position: positionFilter.join(",") }),
+      }) as Promise<{
         freeAgents: FreeAgent[];
         snapshotDate: string;
       }>;
@@ -142,15 +133,7 @@ export default function WaiversPage() {
         throw new Error("No team selected");
       }
 
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/roster`,
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch roster");
-      }
-
-      return response.json() as Promise<{
+      return api.getTeamRoster(parseInt(leagueId, 10), selectedTeamId) as Promise<{
         roster: RosterPlayer[];
         snapshotDate: string;
       }>;
@@ -168,25 +151,10 @@ export default function WaiversPage() {
     setEvaluationResult(null);
 
     try {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/waivers/evaluate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            addPlayerId: selectedFreeAgentId,
-            dropPlayerId: selectedRosterPlayerId,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to evaluate add/drop");
-      }
-
-      const result = await response.json() as EvaluationResult;
+      const result = await api.evaluateWaiver(parseInt(leagueId, 10), selectedTeamId, {
+        addPlayerId: selectedFreeAgentId,
+        dropPlayerId: selectedRosterPlayerId,
+      }) as EvaluationResult;
       setEvaluationResult(result);
     } catch (error) {
       console.error("Evaluation error:", error);
@@ -546,17 +514,11 @@ export default function WaiversPage() {
                   <li>
                     All available players would hurt your team's standings
                   </li>
-                  <li>Projections haven't been uploaded yet</li>
+                  <li>Projections haven't been uploaded by administrator yet</li>
                   <li>A snapshot needs to be created</li>
                 </ul>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link
-                  href={`/leagues/${leagueId}/projections`}
-                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Upload Projections
-                </Link>
                 <Link
                   href={`/leagues/${leagueId}`}
                   className="inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700"
@@ -585,9 +547,57 @@ export default function WaiversPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Free Agents Column */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Add from Waiver Wire
-                  </label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Add from Waiver Wire
+                    </label>
+                    <div className="flex gap-2">
+                      {/* Sort Selector */}
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="text-xs border border-gray-300 rounded px-2 py-1"
+                      >
+                        <option value="pct_owned">% Rostered ↓</option>
+                        <option value="name">Name A-Z</option>
+                      </select>
+
+                      {/* Position Filter */}
+                      <select
+                        multiple
+                        value={positionFilter}
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                          setPositionFilter(selected);
+                        }}
+                        className="text-xs border border-gray-300 rounded px-2 py-1 max-h-8"
+                        size={1}
+                        title="Hold Ctrl/Cmd to select multiple positions"
+                      >
+                        <option value="">All Positions</option>
+                        <option value="C">C</option>
+                        <option value="1B">1B</option>
+                        <option value="2B">2B</option>
+                        <option value="3B">3B</option>
+                        <option value="SS">SS</option>
+                        <option value="OF">OF</option>
+                        <option value="DH">DH</option>
+                        <option value="SP">SP</option>
+                        <option value="RP">RP</option>
+                      </select>
+                    </div>
+                  </div>
+                  {positionFilter.length > 0 && (
+                    <div className="text-xs text-gray-600 mb-2">
+                      Filtering: {positionFilter.join(", ")}
+                      <button
+                        onClick={() => setPositionFilter([])}
+                        className="ml-2 text-blue-600 hover:text-blue-800"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
                   <div className="border border-gray-300 rounded-lg max-h-96 overflow-y-auto">
                     {freeAgentsData?.freeAgents && freeAgentsData.freeAgents.length > 0 ? (
                       <div className="divide-y divide-gray-200">
@@ -609,8 +619,13 @@ export default function WaiversPage() {
                               className="h-4 w-4 text-green-600 focus:ring-green-500"
                             />
                             <div className="ml-3 flex-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                {player.playerName}
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {player.playerName}
+                                </div>
+                                <div className="text-xs font-semibold text-blue-600">
+                                  {player.pctOwned.toFixed(1)}%
+                                </div>
                               </div>
                               <div className="text-xs text-gray-500">
                                 {player.positions.join(", ")}

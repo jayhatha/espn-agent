@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { api } from "@/lib/api";
 
 interface OverallDataPoint {
   league_id: number;
@@ -89,9 +90,7 @@ export default function TrendsPage() {
   const { data: teamsData } = useQuery({
     queryKey: ["teams", leagueId],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:3001/api/leagues/${leagueId}/teams`);
-      if (!response.ok) throw new Error("Failed to fetch teams");
-      return response.json() as Promise<{ teams: Team[] }>;
+      return api.getTeams(parseInt(leagueId, 10)) as Promise<{ teams: Team[] }>;
     },
     enabled: !!leagueId,
   });
@@ -100,11 +99,7 @@ export default function TrendsPage() {
   const { data: overallData, isLoading: overallLoading } = useQuery({
     queryKey: ["timeseries-overall", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/timeseries/overall`
-      );
-      if (!response.ok) throw new Error("Failed to fetch overall standings");
-      return response.json() as Promise<{ series: OverallDataPoint[] }>;
+      return api.getOverallTimeSeries(parseInt(leagueId, 10)) as Promise<{ series: OverallDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "overall",
   });
@@ -113,11 +108,7 @@ export default function TrendsPage() {
   const { data: categoryData, isLoading: categoryLoading } = useQuery({
     queryKey: ["timeseries-category", leagueId, selectedCategory],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/timeseries/category-rank?categoryId=${selectedCategory}`
-      );
-      if (!response.ok) throw new Error("Failed to fetch category ranks");
-      return response.json() as Promise<{ series: CategoryRankDataPoint[] }>;
+      return api.getCategoryRankTimeSeries(parseInt(leagueId, 10), selectedCategory) as Promise<{ series: CategoryRankDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "category",
   });
@@ -126,11 +117,7 @@ export default function TrendsPage() {
   const { data: projectedData, isLoading: projectedLoading } = useQuery({
     queryKey: ["timeseries-projected", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/timeseries/projected-overall`
-      );
-      if (!response.ok) throw new Error("Failed to fetch projected standings");
-      return response.json() as Promise<{ series: ProjectedOverallDataPoint[] }>;
+      return api.getProjectedOverallTimeSeries(parseInt(leagueId, 10)) as Promise<{ series: ProjectedOverallDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "projected",
   });
@@ -139,11 +126,7 @@ export default function TrendsPage() {
   const { data: annotationsData } = useQuery({
     queryKey: ["annotations", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/timeseries/annotations`
-      );
-      if (!response.ok) throw new Error("Failed to fetch annotations");
-      return response.json() as Promise<{ annotations: TransactionAnnotation[] }>;
+      return api.getAnnotations(parseInt(leagueId, 10)) as Promise<{ annotations: TransactionAnnotation[] }>;
     },
     enabled: !!leagueId,
   });

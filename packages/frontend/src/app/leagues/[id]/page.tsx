@@ -2,8 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { api } from "@/lib/api";
 
 interface Team {
   id: number;
@@ -65,24 +67,30 @@ interface TeamOverviewData {
 }
 
 export default function LeagueDetailPage() {
+  return (
+    <ProtectedRoute>
+      <LeagueDetailPageContent />
+    </ProtectedRoute>
+  );
+}
+
+function LeagueDetailPageContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const leagueId = params.id as string;
   const queryClient = useQueryClient();
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authSwid, setAuthSwid] = useState("");
   const [authS2, setAuthS2] = useState("");
+  const [showSnapshotBanner, setShowSnapshotBanner] = useState(
+    searchParams?.get("snapshotting") === "true"
+  );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["league", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/status`,
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch league status");
-      }
-      return response.json() as Promise<LeagueStatus>;
+      return api.getLeagueStatus(parseInt(leagueId, 10)) as Promise<LeagueStatus>;
     },
   });
 
@@ -116,31 +124,13 @@ export default function LeagueDetailPage() {
   } = useQuery({
     queryKey: ["league-teams", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams`,
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch teams");
-      }
-      return response.json() as Promise<{ teams: Team[] }>;
+      return api.getTeams(parseInt(leagueId, 10)) as Promise<{ teams: Team[] }>;
     },
   });
 
   const updateAuthMutation = useMutation({
     mutationFn: async (auth: { SWID: string; espn_s2: string }) => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/auth`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(auth),
-        },
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update authentication");
-      }
-      return response.json();
+      return api.updateLeagueAuth(parseInt(leagueId, 10), auth);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
@@ -153,17 +143,7 @@ export default function LeagueDetailPage() {
 
   const createSnapshotMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/snapshot`,
-        {
-          method: "POST",
-        },
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create snapshot");
-      }
-      return response.json();
+      return api.triggerSnapshot(parseInt(leagueId, 10));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
@@ -180,13 +160,7 @@ export default function LeagueDetailPage() {
   } = useQuery({
     queryKey: ["team-overview", leagueId, selectedTeamId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/overview`,
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch team overview");
-      }
-      return response.json() as Promise<TeamOverviewData>;
+      return api.getTeamOverview(parseInt(leagueId, 10), selectedTeamId!) as Promise<TeamOverviewData>;
     },
     enabled: !!selectedTeamId,
   });
@@ -293,6 +267,49 @@ export default function LeagueDetailPage() {
           ← Back to Leagues
         </Link>
       </div>
+
+      {/* Initial Snapshot Banner */}
+      {showSnapshotBanner && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <svg
+              className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-blue-800">
+                Initial snapshot in progress
+              </h3>
+              <p className="mt-1 text-sm text-blue-700">
+                We're fetching your league data from ESPN. This may take a minute.
+                The page will update automatically when complete.
+              </p>
+              <button
+                onClick={() => setShowSnapshotBanner(false)}
+                className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{league.name}</h1>
@@ -747,28 +764,6 @@ export default function LeagueDetailPage() {
             <span className="font-medium text-gray-900">Trade Analyzer</span>
           </Link>
 
-          <Link
-            href={`/leagues/${leagueId}/projections`}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg
-              className="h-6 w-6 text-orange-600 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <span className="font-medium text-gray-900">
-              Upload Projections
-            </span>
-          </Link>
         </div>
       </div>
 

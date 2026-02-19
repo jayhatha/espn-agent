@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 interface Category {
   category_id: string;
@@ -80,13 +81,7 @@ export default function StandingsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["standings", leagueId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/standings/projected`,
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch standings");
-      }
-      return response.json() as Promise<StandingsData>;
+      return api.getProjectedStandings(parseInt(leagueId, 10)) as Promise<StandingsData>;
     },
   });
 
@@ -520,17 +515,10 @@ export default function StandingsPage() {
                   No projected standings available
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Projected standings will appear after you upload projections
-                  and create a snapshot.
+                  Projected standings will appear after projections are uploaded
+                  and a snapshot is created. Contact your administrator if projections
+                  are needed.
                 </p>
-                <div className="mt-4 flex justify-center space-x-3">
-                  <Link
-                    href={`/leagues/${leagueId}/projections`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    Upload Projections
-                  </Link>
-                </div>
               </div>
             </div>
           ) : null}

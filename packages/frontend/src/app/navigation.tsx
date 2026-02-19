@@ -1,21 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user: authContextUser, logout: authLogout } = useAuth();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Check if user is logged in
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem("auth_token"));
+  }, [pathname, authContextUser]);
+
+  // Get current user data
+  const { data: userData } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      if (!token) return null;
+
+      try {
+        return await api.getProfile();
+      } catch {
+        return null;
+      }
+    },
+    enabled: isLoggedIn,
+  });
+
+  const isAdmin = userData?.role === "admin";
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
     return pathname.startsWith(path);
   };
 
+  const handleLogout = () => {
+    authLogout();
+  };
+
   const navLinks = [
     { href: "/", label: "Home" },
-    { href: "/leagues", label: "Leagues" },
+    ...(isLoggedIn ? [{ href: "/leagues", label: "Leagues" }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   return (
@@ -23,7 +58,7 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo/Brand */}
-          <div className="flex items-center">
+          <div className="flex items-center space-x-3">
             <Link href="/" className="flex items-center space-x-2">
               <span className="text-2xl">⚾</span>
               <span className="text-lg sm:text-xl font-bold text-gray-900 hidden sm:inline">
@@ -33,6 +68,23 @@ export function Navigation() {
                 Fantasy BB
               </span>
             </Link>
+            {isAdmin && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                <svg
+                  className="mr-1 h-3 w-3"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Admin
+              </span>
+            )}
           </div>
 
           {/* Desktop Navigation */}
@@ -50,6 +102,20 @@ export function Navigation() {
                 {link.label}
               </Link>
             ))}
+            {isLoggedIn && (
+              <>
+                <div className="border-l border-gray-300"></div>
+                <span className="text-sm text-gray-600">
+                  {userData?.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -115,6 +181,22 @@ export function Navigation() {
                 {link.label}
               </Link>
             ))}
+            {isLoggedIn && (
+              <>
+                <div className="px-3 py-2 border-t border-gray-200 text-xs text-gray-500">
+                  {userData?.email}
+                </div>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { api } from "@/lib/api";
 
 interface ProposedTrade {
   givePlayers: Array<{ playerId: number; playerName: string }>;
@@ -81,11 +82,7 @@ export default function TradesPage() {
   const { data: partnersData } = useQuery({
     queryKey: ["trade-partners", leagueId, selectedTeamId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/trades/partners`,
-      );
-      if (!response.ok) throw new Error("Failed to fetch trade partners");
-      return response.json() as Promise<{ partners: Team[] }>;
+      return api.getTradePartners(parseInt(leagueId, 10), selectedTeamId!) as Promise<{ partners: Team[] }>;
     },
     enabled: !!selectedTeamId,
   });
@@ -94,11 +91,7 @@ export default function TradesPage() {
   const { data: rostersData, isLoading: rostersLoading } = useQuery({
     queryKey: ["trade-rosters", leagueId, selectedTeamId, selectedPartnerId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/trades/partners/${selectedPartnerId}/rosters`,
-      );
-      if (!response.ok) throw new Error("Failed to fetch rosters");
-      return response.json() as Promise<{
+      return api.getTradeRosters(parseInt(leagueId, 10), selectedTeamId!, selectedPartnerId!) as Promise<{
         snapshotDate: string;
         userTeam: { id: number; name: string; roster: RosterPlayer[] };
         partnerTeam: { id: number; name: string; roster: RosterPlayer[] };
@@ -114,30 +107,17 @@ export default function TradesPage() {
   } = useQuery({
     queryKey: ["trade-candidates", leagueId, selectedTeamId],
     queryFn: async () => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/trades/recommendations`,
-      );
-      if (!response.ok) throw new Error("Failed to fetch trade candidates");
-      return response.json() as Promise<{ candidates: TradeCandidate[] }>;
+      return api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!) as Promise<{ candidates: TradeCandidate[] }>;
     },
     enabled: !!selectedTeamId && !showAnalyzer,
   });
 
   const analyzeTradeM = useMutation({
     mutationFn: async (trade: ProposedTrade) => {
-      const response = await fetch(
-        `http://localhost:3001/api/leagues/${leagueId}/teams/${selectedTeamId}/trades/impact`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ trade }),
-        },
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to analyze trade");
-      }
-      return response.json() as Promise<{ analysis: TradeImpactAnalysis }>;
+      return api.analyzeTradeImpact(parseInt(leagueId, 10), selectedTeamId!, {
+        givePlayers: trade.givePlayers.map(p => p.playerId),
+        receivePlayers: trade.receivePlayers.map(p => p.playerId),
+      }) as Promise<{ analysis: TradeImpactAnalysis }>;
     },
     onSuccess: (data) => {
       setTradeAnalysis(data.analysis);
@@ -280,13 +260,13 @@ export default function TradesPage() {
           </div>
 
           {/* Trade Builder */}
-          {selectedPartnerId && rostersData && (
+          {selectedPartnerId && (
             <div className="bg-white shadow rounded-lg p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">
                 Build Trade
               </h2>
 
-              {rostersLoading ? (
+              {rostersLoading || !rostersData ? (
                 <div className="animate-pulse space-y-4">
                   <div className="h-64 bg-gray-200 rounded"></div>
                 </div>
@@ -418,7 +398,7 @@ export default function TradesPage() {
                       {(analyzeTradeM.error as Error).message.includes("projected standings") && (
                         <div className="mt-3">
                           <p className="text-sm text-red-700 mb-3">
-                            Trade analysis requires projections. Please upload projections and run a snapshot first.
+                            Trade analysis requires projections. Please contact your administrator to upload projections.
                           </p>
                           <Link
                             href={`/leagues/${leagueId}`}
@@ -598,7 +578,7 @@ export default function TradesPage() {
                   {(candidatesError as Error).message.includes("projected standings") && (
                     <div className="mt-4">
                       <p className="text-sm text-red-700 mb-3">
-                        Trade suggestions require projections. Please upload projections and run a snapshot first.
+                        Trade suggestions require projections. Please contact your administrator to upload projections.
                       </p>
                       <Link
                         href={`/leagues/${leagueId}`}
