@@ -1,0 +1,125 @@
+# Requirements: ESPN Fantasy Baseball Command Center
+
+**Defined:** 2026-02-19
+**Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
+
+## v1 Requirements
+
+Requirements for initial release. Each maps to roadmap phases.
+
+### Authentication
+
+- [ ] **AUTH-01**: User can create account with email and password
+- [ ] **AUTH-02**: User can log in and stay logged in across sessions (JWT)
+- [ ] **AUTH-03**: User can log in via Google OAuth
+- [ ] **AUTH-04**: User can log in via GitHub OAuth
+- [ ] **AUTH-05**: New user sees guided onboarding (connect league → upload projections → view dashboard)
+
+### Data Quality
+
+- [ ] **DATA-01**: ESPN auth cookies encrypted at rest in database
+- [ ] **DATA-02**: PlayerIdentityResolution wired into projections ingest with fuzzy matching
+- [ ] **DATA-03**: Free agent pool fetched from ESPN and available for recommendations
+- [ ] **DATA-04**: Rate stat component math works correctly in trade simulations
+- [ ] **DATA-05**: ESPN API calls retry with exponential backoff on failure
+- [ ] **DATA-06**: League transactions ingested from ESPN and stored in timeline
+
+### Dashboard
+
+- [ ] **DASH-01**: User sees team dashboard with health overview, strengths, and weaknesses
+- [ ] **DASH-02**: User sees category trend charts (Recharts) instead of tables
+- [ ] **DASH-03**: User sees daily action items with ESPN deep links
+- [ ] **DASH-04**: User sees category scarcity analysis (surplus/deficit per category)
+- [ ] **DASH-05**: Frontend uses shared component library (no duplicated UI)
+- [ ] **DASH-06**: Frontend uses centralized API client (no hardcoded localhost)
+
+### Recommendations
+
+- [ ] **RECC-01**: User sees waiver add/drop recommendations using real free agent pool
+- [ ] **RECC-02**: User sees 1-for-1 trade candidates with accurate projected impact
+- [ ] **RECC-03**: User sees daily lineup optimization (start/sit recommendations)
+- [ ] **RECC-04**: User sees streaming pitcher suggestions for favorable matchups
+
+### Draft
+
+- [ ] **DRFT-01**: User sees pre-draft rankings with positional scarcity analysis
+- [ ] **DRFT-02**: User sees auction valuations based on projected stats
+
+### Infrastructure
+
+- [ ] **INFR-01**: All API routes enforce authentication and league ownership
+- [ ] **INFR-02**: API has rate limiting to prevent abuse
+- [ ] **INFR-03**: Snapshot orchestrator has job locking to prevent concurrent runs
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Historical Analysis
+
+- **HIST-01**: Past season data backfilled from ESPN
+- **HIST-02**: Season replay timeline (week-by-week standings evolution)
+- **HIST-03**: What-if counterfactual analysis (what if I kept Player X?)
+- **HIST-04**: Trade retrospective (how did past trades impact final standings?)
+
+### Advanced Features
+
+- **ADVF-01**: Multi-player trade scenarios (2-for-2, 3-for-1)
+- **ADVF-02**: Custom stat category support (QS, K/9, OPS+)
+- **ADVF-03**: Points league support
+- **ADVF-04**: Player news feed aggregation (injuries, lineup changes)
+- **ADVF-05**: Custom alerts (email/push when player hits waivers)
+- **ADVF-06**: Keeper/dynasty valuations
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Automated ESPN roster moves | ESPN has no official write API; ToS risk |
+| Cross-platform (Yahoo, Fantrax) | ESPN-only keeps scope manageable for v1 |
+| Native mobile app | Responsive web covers mobile; PWA sufficient |
+| In-app chat / social features | ESPN already has league message boards |
+| Real-time live scoring | ESPN doesn't expose real-time feeds reliably |
+| Dynasty/keeper features | Different paradigm; defer to v2 if demand exists |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | TBD | Pending |
+| AUTH-02 | TBD | Pending |
+| AUTH-03 | TBD | Pending |
+| AUTH-04 | TBD | Pending |
+| AUTH-05 | TBD | Pending |
+| DATA-01 | TBD | Pending |
+| DATA-02 | TBD | Pending |
+| DATA-03 | TBD | Pending |
+| DATA-04 | TBD | Pending |
+| DATA-05 | TBD | Pending |
+| DATA-06 | TBD | Pending |
+| DASH-01 | TBD | Pending |
+| DASH-02 | TBD | Pending |
+| DASH-03 | TBD | Pending |
+| DASH-04 | TBD | Pending |
+| DASH-05 | TBD | Pending |
+| DASH-06 | TBD | Pending |
+| RECC-01 | TBD | Pending |
+| RECC-02 | TBD | Pending |
+| RECC-03 | TBD | Pending |
+| RECC-04 | TBD | Pending |
+| DRFT-01 | TBD | Pending |
+| DRFT-02 | TBD | Pending |
+| INFR-01 | TBD | Pending |
+| INFR-02 | TBD | Pending |
+| INFR-03 | TBD | Pending |
+
+**Coverage:**
+- v1 requirements: 26 total
+- Mapped to phases: 0
+- Unmapped: 26 ⚠️
+
+---
+*Requirements defined: 2026-02-19*
+*Last updated: 2026-02-19 after initial definition*
