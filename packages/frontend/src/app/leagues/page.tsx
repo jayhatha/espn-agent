@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { api } from "@/lib/api";
 
 interface League {
   id: number;
@@ -15,13 +16,7 @@ interface League {
 export default function LeaguesPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["leagues"],
-    queryFn: async () => {
-      const response = await fetch("http://localhost:3001/api/leagues");
-      if (!response.ok) {
-        throw new Error("Failed to fetch leagues");
-      }
-      return response.json() as Promise<{ leagues: League[] }>;
-    },
+    queryFn: () => api.getLeagues() as Promise<{ leagues: League[] }>,
   });
 
   if (isLoading) {

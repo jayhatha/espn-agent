@@ -5,6 +5,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 export default function ProjectionsUploadPage() {
   const params = useParams();
   const router = useRouter();
@@ -19,7 +21,7 @@ export default function ProjectionsUploadPage() {
       formData.append("file", file);
 
       const response = await fetch(
-        `http://localhost:3001/api/projections/upload`,
+        `${API_URL}/api/projections/upload`,
         {
           method: "POST",
           body: formData,

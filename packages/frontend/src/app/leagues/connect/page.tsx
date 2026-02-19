@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { api } from "@/lib/api";
 
 interface ConnectLeagueForm {
   espnLeagueId: string;
@@ -43,23 +44,7 @@ export default function ConnectLeaguePage() {
         };
       }
 
-      const response = await fetch(
-        "http://localhost:3001/api/leagues/connect",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        const message =
-          error.details || error.error || "Failed to connect league";
-        throw new Error(message);
-      }
-
-      return response.json();
+      return api.connectLeague(body);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
