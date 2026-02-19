@@ -71,6 +71,22 @@ export interface ESPNFreeAgent {
   pctStarted: number;
 }
 
+export interface ESPNTransactionItem {
+  playerId: number;
+  playerName: string;
+  fromTeamId: number | null;
+  toTeamId: number | null;
+  action: "ADD" | "DROP" | "TRADE_IN" | "TRADE_OUT";
+}
+
+export interface ESPNTransaction {
+  transactionId: string;
+  type: "ADD" | "DROP" | "TRADE" | "WAIVER" | "OTHER";
+  timestamp: number; // Unix ms
+  items: ESPNTransactionItem[];
+  bidAmount?: number;
+}
+
 export interface ESPNLeagueData {
   settings: {
     name: string;
@@ -185,6 +201,24 @@ const ESPN_PRO_TEAM_MAP: Record<number, string> = {
   16: "CHC", 17: "CIN", 18: "HOU", 19: "LAD", 20: "WSH",
   21: "NYM", 22: "PHI", 23: "PIT", 24: "STL", 25: "SD",
   26: "SF", 27: "COL", 28: "MIA", 29: "ARI", 30: "TB",
+};
+
+/** Position name → ESPN slot ID (for free agent filtering) */
+const ESPN_POSITION_TO_SLOT: Record<string, number> = {
+  C: 0, "1B": 1, "2B": 2, "3B": 3, SS: 4,
+  LF: 5, CF: 6, RF: 7, OF: 5, DH: 9,
+  UTIL: 12, SP: 13, RP: 14, P: 13,
+};
+
+/** All position slot IDs for unfiltered free agent queries */
+const ALL_POSITION_SLOT_IDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 24];
+
+/** ESPN transaction type ID → canonical type */
+const ESPN_TRANSACTION_TYPE_MAP: Record<number, ESPNTransaction["type"]> = {
+  1: "ADD",
+  2: "DROP",
+  3: "TRADE",
+  4: "WAIVER",
 };
 
 export class ESPNAdapter {
@@ -330,20 +364,39 @@ export class ESPNAdapter {
 
   /**
    * Fetch free agents from ESPN with ownership data
+   * Uses x-fantasy-filter with filterStatus FREEAGENT/WAIVERS and filterSlotIds
    */
   async fetchFreeAgents(options: {
     leagueId: number;
     season: number;
     auth?: ESPNAuthCookies;
     limit?: number;
-    position?: string;
+    positions?: string[];
   }): Promise<ESPNFreeAgent[]> {
-    const { leagueId, season, auth, limit = 200 } = options;
+    const { leagueId, season, auth, limit = 300, positions } = options;
 
     try {
       const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
-      const params: Record<string, unknown> = {
-        view: ["kona_player_info"],
+
+      // Determine slot IDs from position filter, or use all positions
+      const filterSlotIds = positions && positions.length > 0
+        ? positions.map((pos) => ESPN_POSITION_TO_SLOT[pos]).filter((id): id is number => id !== undefined)
+        : ALL_POSITION_SLOT_IDS;
+
+      const xFantasyFilter = {
+        players: {
+          filterStatus: {
+            value: ["FREEAGENT", "WAIVERS"],
+          },
+          filterSlotIds: {
+            value: filterSlotIds,
+          },
+          sortPercOwned: {
+            sortPriority: 1,
+            sortAsc: false,
+          },
+          limit,
+        },
       };
 
       const headers: Record<string, string> = {};
@@ -351,22 +404,14 @@ export class ESPNAdapter {
         headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
       }
 
-      // Filter for free agents only, sorted by percent owned descending
-      headers["x-fantasy-filter"] = JSON.stringify({
-        players: {
-          filterStatus: {
-            value: ["FREEAGENT", "WAIVERS"],
-          },
-          limit,
-          sortPercOwned: {
-            sortPriority: 1,
-            sortAsc: false,
-          },
-        },
-      });
+      // Pass filter as x-fantasy-filter URL parameter (JSON stringified)
+      const params: Record<string, unknown> = {
+        view: ["kona_player_info"],
+        "x-fantasy-filter": JSON.stringify(xFantasyFilter),
+      };
 
       this.logger?.info(
-        { leagueId, season, limit },
+        { leagueId, season, limit, positions },
         "Fetching ESPN free agents",
       );
 
@@ -415,6 +460,116 @@ export class ESPNAdapter {
       this.logger?.error(
         { error, leagueId },
         "Failed to fetch free agents",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch league transactions (adds, drops, trades, waivers) from ESPN activity feed
+   */
+  async fetchTransactions(options: {
+    leagueId: number;
+    season: number;
+    auth?: ESPNAuthCookies;
+  }): Promise<ESPNTransaction[]> {
+    const { leagueId, season, auth } = options;
+
+    try {
+      const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
+      const params: Record<string, unknown> = {
+        view: ["mTransactions2"],
+      };
+
+      const headers: Record<string, string> = {};
+      if (auth?.SWID && auth?.espn_s2) {
+        headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
+      }
+
+      this.logger?.info(
+        { leagueId, season },
+        "Fetching ESPN transactions",
+      );
+
+      const response = await this.client.get(url, {
+        params,
+        headers,
+        validateStatus: (status) => status < 500,
+      });
+
+      if (response.status !== 200) {
+        throw new Error(
+          `ESPN API returned status ${response.status}`,
+        );
+      }
+
+      const rawTransactions = (response.data?.transactions as any[]) || [];
+
+      if (rawTransactions.length === 0) {
+        this.logger?.info({ leagueId }, "No transactions found in ESPN response");
+        return [];
+      }
+
+      const transactions: ESPNTransaction[] = [];
+
+      for (const txn of rawTransactions) {
+        const typeId = txn.type as number;
+        const type = ESPN_TRANSACTION_TYPE_MAP[typeId] || "OTHER";
+        const transactionId = String(txn.id);
+        const timestamp = txn.proposedDate || txn.processDate || txn.acceptedDate || 0;
+        const bidAmount = txn.bidAmount ?? undefined;
+
+        const items: ESPNTransactionItem[] = [];
+        const txnItems = (txn.items as any[]) || [];
+
+        for (const item of txnItems) {
+          const playerId = item.playerId as number;
+          const playerName = item.player?.fullName || item.player?.lastName || `Player ${playerId}`;
+          const fromTeamId = item.fromTeamId === 0 ? null : (item.fromTeamId as number | null);
+          const toTeamId = item.toTeamId === 0 ? null : (item.toTeamId as number | null);
+
+          // Determine action based on from/to team and transaction type
+          let action: ESPNTransactionItem["action"];
+          if (type === "TRADE") {
+            action = toTeamId ? "TRADE_IN" : "TRADE_OUT";
+          } else if (fromTeamId === null && toTeamId !== null) {
+            action = "ADD";
+          } else if (fromTeamId !== null && toTeamId === null) {
+            action = "DROP";
+          } else {
+            action = "ADD";
+          }
+
+          items.push({
+            playerId,
+            playerName,
+            fromTeamId,
+            toTeamId,
+            action,
+          });
+        }
+
+        if (items.length > 0) {
+          transactions.push({
+            transactionId,
+            type,
+            timestamp,
+            items,
+            bidAmount,
+          });
+        }
+      }
+
+      this.logger?.info(
+        { leagueId, transactionCount: transactions.length },
+        "Transactions fetched",
+      );
+
+      return transactions;
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId },
+        "Failed to fetch transactions",
       );
       throw error;
     }
