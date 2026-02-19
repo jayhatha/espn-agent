@@ -1,17 +1,47 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+function getAuthHeaders() {
+  const token = localStorage.getItem('auth_token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  };
+}
+
+async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      ...getAuthHeaders(),
+      ...options.headers,
+    },
+  });
+
+  if (res.status === 401) {
+    // Token expired or invalid, redirect to login
+    localStorage.removeItem('auth_token');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Unauthorized');
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || 'Request failed');
+  }
+
+  return res.json();
+}
+
 export const api = {
   // Leagues
   async getLeagues() {
-    const res = await fetch(`${API_URL}/api/leagues`);
-    if (!res.ok) throw new Error("Failed to fetch leagues");
-    return res.json();
+    return fetchAPI('/api/leagues');
   },
 
   async getLeagueStatus(leagueId: number) {
-    const res = await fetch(`${API_URL}/api/leagues/${leagueId}/status`);
-    if (!res.ok) throw new Error("Failed to fetch league status");
-    return res.json();
+    return fetchAPI(`/api/leagues/${leagueId}/status`);
   },
 
   async connectLeague(data: {
@@ -21,13 +51,10 @@ export const api = {
     name?: string;
     timezone?: string;
   }) {
-    const res = await fetch(`${API_URL}/api/leagues/connect`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return fetchAPI('/api/leagues/connect', {
+      method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error("Failed to connect league");
-    return res.json();
   },
 
   // Projections
@@ -36,19 +63,14 @@ export const api = {
     pitchersCsv?: string;
     asOfDate: string;
   }) {
-    const res = await fetch(`${API_URL}/api/projections/upload`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    return fetchAPI('/api/projections/upload', {
+      method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error("Failed to upload projections");
-    return res.json();
   },
 
   async getProjections(limit = 20) {
-    const res = await fetch(`${API_URL}/api/projections?limit=${limit}`);
-    if (!res.ok) throw new Error("Failed to fetch projections");
-    return res.json();
+    return fetchAPI(`/api/projections?limit=${limit}`);
   },
 
   // Time series
@@ -57,11 +79,7 @@ export const api = {
     params?: { from?: string; to?: string; teamIds?: string },
   ) {
     const query = new URLSearchParams(params as any).toString();
-    const res = await fetch(
-      `${API_URL}/api/leagues/${leagueId}/timeseries/overall?${query}`,
-    );
-    if (!res.ok) throw new Error("Failed to fetch time series");
-    return res.json();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/overall?${query}`);
   },
 
   async getCategoryRankTimeSeries(
@@ -73,11 +91,7 @@ export const api = {
       ...params,
       categoryId,
     } as any).toString();
-    const res = await fetch(
-      `${API_URL}/api/leagues/${leagueId}/timeseries/category-rank?${query}`,
-    );
-    if (!res.ok) throw new Error("Failed to fetch category rank time series");
-    return res.json();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/category-rank?${query}`);
   },
 
   async getProjectedOverallTimeSeries(
@@ -85,11 +99,7 @@ export const api = {
     params?: { from?: string; to?: string; teamIds?: string },
   ) {
     const query = new URLSearchParams(params as any).toString();
-    const res = await fetch(
-      `${API_URL}/api/leagues/${leagueId}/timeseries/projected-overall?${query}`,
-    );
-    if (!res.ok) throw new Error("Failed to fetch projected time series");
-    return res.json();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/projected-overall?${query}`);
   },
 
   // Recommendations
@@ -99,10 +109,119 @@ export const api = {
     params?: { snapshotDate?: string; maxRecommendations?: number },
   ) {
     const query = new URLSearchParams(params as any).toString();
-    const res = await fetch(
-      `${API_URL}/api/leagues/${leagueId}/teams/${teamId}/waivers/recommendations?${query}`,
-    );
-    if (!res.ok) throw new Error("Failed to fetch waiver recommendations");
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/waivers/recommendations?${query}`);
+  },
+
+  // Teams
+  async getTeams(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams`);
+  },
+
+  // Snapshots
+  async triggerSnapshot(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/snapshot`, {
+      method: 'POST',
+    });
+  },
+
+  // Projected standings
+  async getProjectedStandings(leagueId: number, params?: { snapshotDate?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/standings/projected${query ? '?' + query : ''}`);
+  },
+
+  // Free agents
+  async getFreeAgents(leagueId: number, params?: { limit?: number; sortBy?: string; position?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/free-agents${query ? '?' + query : ''}`);
+  },
+
+  // Waiver evaluation
+  async evaluateWaiver(leagueId: number, teamId: number, data: { addPlayerId: number; dropPlayerId?: number }) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/waivers/evaluate`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Trades
+  async getTradePartners(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/partners`);
+  },
+
+  async getTradeRosters(leagueId: number, teamId: number, partnerTeamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/partners/${partnerTeamId}/rosters`);
+  },
+
+  async analyzeTradeImpact(leagueId: number, teamId: number, data: { givePlayers: number[]; receivePlayers: number[] }) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/impact`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getTradeRecommendations(leagueId: number, teamId: number, params?: { partnerTeamId?: number }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/recommendations${query ? '?' + query : ''}`);
+  },
+
+  // Team overview
+  async getTeamOverview(leagueId: number, teamId: number, params?: { snapshotDate?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/overview${query ? '?' + query : ''}`);
+  },
+
+  // Team roster
+  async getTeamRoster(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/roster`);
+  },
+
+  // League auth
+  async updateLeagueAuth(leagueId: number, auth: { SWID?: string; espn_s2?: string }) {
+    return fetchAPI(`/api/leagues/${leagueId}/auth`, {
+      method: 'PATCH',
+      body: JSON.stringify(auth),
+    });
+  },
+
+  // Annotations
+  async getAnnotations(leagueId: number, params?: { from?: string; to?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/annotations${query ? '?' + query : ''}`);
+  },
+
+  // Auth (pre-auth endpoints - don't use fetchAPI as it will redirect on 401)
+  async login(email: string, password: string) {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Login failed' }));
+      throw new Error(error.error || 'Login failed');
+    }
+
     return res.json();
+  },
+
+  async signup(email: string, password: string, displayName?: string) {
+    const res = await fetch(`${API_URL}/api/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, displayName }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Signup failed' }));
+      throw new Error(error.error || 'Signup failed');
+    }
+
+    return res.json();
+  },
+
+  async getProfile() {
+    return fetchAPI('/api/auth/me');
   },
 };
