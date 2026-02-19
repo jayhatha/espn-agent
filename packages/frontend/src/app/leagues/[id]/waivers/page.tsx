@@ -5,6 +5,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { PlayerRow } from "@/components/league/PlayerRow";
 
 interface WaiverRecommendation {
   addPlayerId: number;
@@ -79,9 +83,14 @@ export default function WaiversPage() {
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("ai");
-  const [selectedFreeAgentId, setSelectedFreeAgentId] = useState<number | null>(null);
-  const [selectedRosterPlayerId, setSelectedRosterPlayerId] = useState<number | null>(null);
-  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [selectedFreeAgentId, setSelectedFreeAgentId] = useState<number | null>(
+    null,
+  );
+  const [selectedRosterPlayerId, setSelectedRosterPlayerId] = useState<
+    number | null
+  >(null);
+  const [evaluationResult, setEvaluationResult] =
+    useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [sortBy, setSortBy] = useState<string>("pct_owned");
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
@@ -95,14 +104,21 @@ export default function WaiversPage() {
   }, [leagueId]);
 
   // AI Recommendations query
-  const { data: aiData, isLoading: aiLoading, error: aiError } = useQuery({
+  const {
+    data: aiData,
+    isLoading: aiLoading,
+    error: aiError,
+  } = useQuery({
     queryKey: ["waivers", leagueId, selectedTeamId],
     queryFn: async () => {
       if (!selectedTeamId) {
         throw new Error("No team selected");
       }
 
-      return api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId) as Promise<{
+      return api.getWaiverRecommendations(
+        parseInt(leagueId, 10),
+        selectedTeamId,
+      ) as Promise<{
         recommendations: WaiverRecommendation[];
         snapshotDate: string;
       }>;
@@ -116,7 +132,9 @@ export default function WaiversPage() {
     queryFn: async () => {
       return api.getFreeAgents(parseInt(leagueId, 10), {
         sortBy,
-        ...(positionFilter.length > 0 && { position: positionFilter.join(",") }),
+        ...(positionFilter.length > 0 && {
+          position: positionFilter.join(","),
+        }),
       }) as Promise<{
         freeAgents: FreeAgent[];
         snapshotDate: string;
@@ -133,7 +151,10 @@ export default function WaiversPage() {
         throw new Error("No team selected");
       }
 
-      return api.getTeamRoster(parseInt(leagueId, 10), selectedTeamId) as Promise<{
+      return api.getTeamRoster(
+        parseInt(leagueId, 10),
+        selectedTeamId,
+      ) as Promise<{
         roster: RosterPlayer[];
         snapshotDate: string;
       }>;
@@ -151,10 +172,14 @@ export default function WaiversPage() {
     setEvaluationResult(null);
 
     try {
-      const result = await api.evaluateWaiver(parseInt(leagueId, 10), selectedTeamId, {
-        addPlayerId: selectedFreeAgentId,
-        dropPlayerId: selectedRosterPlayerId,
-      }) as EvaluationResult;
+      const result = (await api.evaluateWaiver(
+        parseInt(leagueId, 10),
+        selectedTeamId,
+        {
+          addPlayerId: selectedFreeAgentId,
+          dropPlayerId: selectedRosterPlayerId,
+        },
+      )) as EvaluationResult;
       setEvaluationResult(result);
     } catch (error) {
       console.error("Evaluation error:", error);
@@ -164,40 +189,172 @@ export default function WaiversPage() {
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <div className="mb-4 sm:mb-6">
-        <Link
-          href={`/leagues/${leagueId}`}
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+  const renderDeltaValue = (value: number, suffix = "") => (
+    <span
+      className={`font-semibold ${
+        value > 0
+          ? "text-green-600"
+          : value < 0
+            ? "text-red-600"
+            : "text-gray-500"
+      }`}
+    >
+      {value > 0 ? "+" : ""}
+      {value === 0 ? "\u2014" : `${value}${suffix}`}
+    </span>
+  );
+
+  const renderCategoryImpactTable = (
+    impacts: Array<{
+      categoryId: string;
+      categoryName: string;
+      deltaRank: number;
+      deltaPoints: number;
+    }>,
+  ) => (
+    <div className="mt-3 border-t border-gray-200 pt-3 overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead>
+          <tr>
+            <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+              Category
+            </th>
+            <th className="px-2 sm:px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+              Rank Change
+            </th>
+            <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+              Points
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {impacts
+            .filter((impact) => impact.deltaPoints !== 0)
+            .sort(
+              (a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints),
+            )
+            .map((impact) => (
+              <tr key={impact.categoryId}>
+                <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">
+                  {impact.categoryName}
+                </td>
+                <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm text-center whitespace-nowrap">
+                  {renderDeltaValue(impact.deltaRank)}
+                </td>
+                <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm text-right whitespace-nowrap">
+                  {renderDeltaValue(impact.deltaPoints, "")}
+                  {impact.deltaPoints !== 0 && (
+                    <span className={impact.deltaPoints > 0 ? "text-green-600" : "text-red-600"}>
+                      {impact.deltaPoints > 0 ? "+" : ""}{impact.deltaPoints.toFixed(1)}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const renderLegalityWarning = (issues: string[]) => (
+    <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+      <div className="flex">
+        <svg
+          className="h-5 w-5 text-yellow-400 flex-shrink-0"
+          fill="currentColor"
+          viewBox="0 0 20 20"
         >
-          <svg
-            className="w-4 h-4 mr-1"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to League
-        </Link>
+          <path
+            fillRule="evenodd"
+            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <div className="ml-3 flex-1">
+          <h4 className="text-sm font-medium text-yellow-800">
+            Roster Constraints
+          </h4>
+          <ul className="mt-1 text-xs sm:text-sm text-yellow-700 list-disc list-inside space-y-1">
+            {issues.map((issue, i) => (
+              <li key={i}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSwapVisualization = (
+    dropName: string,
+    addName: string,
+    dropPositions?: string[],
+    addPositions?: string[],
+  ) => (
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 mb-4">
+      {/* Drop Player */}
+      <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 sm:p-4">
+        <div className="flex items-center mb-2">
+          <span className="text-red-600 font-semibold text-xs uppercase tracking-wide">
+            Drop
+          </span>
+        </div>
+        <div className="text-base sm:text-lg font-bold text-gray-900 truncate">
+          {dropName}
+        </div>
+        {dropPositions && (
+          <div className="text-xs text-gray-500 mt-1">
+            {dropPositions.join(", ")}
+          </div>
+        )}
       </div>
 
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Waiver Wire
-        </h1>
-        <p className="text-sm sm:text-base text-gray-600">
-          {viewMode === "ai"
-            ? "AI-generated add/drop moves that could maximize your roto points."
-            : "Manually evaluate the impact of any add/drop move."}
-        </p>
+      {/* Arrow */}
+      <div className="flex items-center justify-center sm:px-2">
+        <svg
+          className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 rotate-90 sm:rotate-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M14 5l7 7m0 0l-7 7m7-7H3"
+          />
+        </svg>
       </div>
+
+      {/* Add Player */}
+      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
+        <div className="flex items-center mb-2">
+          <span className="text-green-600 font-semibold text-xs uppercase tracking-wide">
+            Add
+          </span>
+        </div>
+        <div className="text-base sm:text-lg font-bold text-gray-900 truncate">
+          {addName}
+        </div>
+        {addPositions && (
+          <div className="text-xs text-gray-500 mt-1">
+            {addPositions.join(", ")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <PageHeader
+        title="Waiver Wire"
+        subtitle={
+          viewMode === "ai"
+            ? "AI-generated add/drop moves that could maximize your roto points."
+            : "Manually evaluate the impact of any add/drop move."
+        }
+        backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
+      />
 
       {/* Mode Switcher */}
       {selectedTeamId && (
@@ -228,61 +385,23 @@ export default function WaiversPage() {
       )}
 
       {!selectedTeamId ? (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-yellow-400"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-medium text-yellow-800">
-                Team Selection Required
-              </h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>
-                  Please{" "}
-                  <Link
-                    href={`/leagues/${leagueId}`}
-                    className="font-medium underline hover:text-yellow-600"
-                  >
-                    go back to the league page
-                  </Link>{" "}
-                  and select your team to view waiver recommendations.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ErrorAlert
+          variant="warning"
+          message="Please go back to the league page and select your team to view waiver recommendations."
+          backLink={{
+            href: `/leagues/${leagueId}`,
+            label: "Go to League Page",
+          }}
+        />
       ) : viewMode === "ai" ? (
         <div className="bg-white shadow-lg rounded-xl border border-gray-200">
           {aiLoading ? (
             <div className="p-4 sm:p-6">
-              <div className="animate-pulse space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-32 sm:h-40 bg-gray-200 rounded-lg"></div>
-                ))}
-              </div>
+              <LoadingSkeleton lines={3} />
             </div>
           ) : aiError ? (
             <div className="p-4 sm:p-6">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h3 className="text-red-800 font-medium">
-                  Error loading recommendations
-                </h3>
-                <p className="text-red-600 text-sm mt-1">
-                  {(aiError as Error).message}
-                </p>
-              </div>
+              <ErrorAlert message={(aiError as Error).message} />
             </div>
           ) : aiData && aiData.recommendations.length > 0 ? (
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -310,7 +429,6 @@ export default function WaiversPage() {
                       </div>
                     </div>
 
-                    {/* Action button (future) */}
                     <button
                       className="w-full sm:w-auto px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                       disabled
@@ -321,55 +439,17 @@ export default function WaiversPage() {
                   </div>
 
                   {/* Swap Visualization */}
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 mb-4">
-                    {/* Drop Player */}
-                    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-center mb-2">
-                        <span className="text-red-600 font-semibold text-xs uppercase tracking-wide">
-                          Drop
-                        </span>
-                      </div>
-                      <div className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                        {rec.dropPlayerName}
-                      </div>
-                    </div>
-
-                    {/* Arrow */}
-                    <div className="flex items-center justify-center sm:px-2">
-                      <svg
-                        className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 rotate-90 sm:rotate-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                        />
-                      </svg>
-                    </div>
-
-                    {/* Add Player */}
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-center mb-2">
-                        <span className="text-green-600 font-semibold text-xs uppercase tracking-wide">
-                          Add
-                        </span>
-                      </div>
-                      <div className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                        {rec.addPlayerName}
-                      </div>
-                    </div>
-                  </div>
+                  {renderSwapVisualization(
+                    rec.dropPlayerName,
+                    rec.addPlayerName,
+                  )}
 
                   {/* Explanation */}
                   <p className="text-xs sm:text-sm text-gray-600 mb-3 leading-relaxed">
                     {rec.explanation}
                   </p>
 
-                  {/* Category Breakdown - Expandable */}
+                  {/* Category Breakdown */}
                   {rec.categoryImpacts.length > 0 && (
                     <details className="group">
                       <summary className="cursor-pointer text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center py-2">
@@ -388,102 +468,15 @@ export default function WaiversPage() {
                           />
                         </svg>
                       </summary>
-
-                      <div className="mt-3 border-t border-gray-200 pt-3 overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead>
-                            <tr>
-                              <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                Category
-                              </th>
-                              <th className="px-2 sm:px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                                Rank Δ
-                              </th>
-                              <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                                Points
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {rec.categoryImpacts
-                              .filter((impact) => impact.deltaPoints !== 0)
-                              .sort(
-                                (a, b) =>
-                                  Math.abs(b.deltaPoints) -
-                                  Math.abs(a.deltaPoints),
-                              )
-                              .map((impact) => (
-                                <tr key={impact.categoryId}>
-                                  <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">
-                                    {impact.categoryName}
-                                  </td>
-                                  <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm text-center whitespace-nowrap">
-                                    <span
-                                      className={
-                                        impact.deltaRank < 0
-                                          ? "text-green-600 font-semibold"
-                                          : impact.deltaRank > 0
-                                          ? "text-red-600 font-semibold"
-                                          : "text-gray-500"
-                                      }
-                                    >
-                                      {impact.deltaRank === 0
-                                        ? "—"
-                                        : `${impact.deltaRank > 0 ? "+" : ""}${impact.deltaRank}`}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 sm:px-3 py-2 text-xs sm:text-sm text-right whitespace-nowrap">
-                                    <span
-                                      className={
-                                        impact.deltaPoints > 0
-                                          ? "text-green-600 font-semibold"
-                                          : impact.deltaPoints < 0
-                                          ? "text-red-600 font-semibold"
-                                          : "text-gray-500"
-                                      }
-                                    >
-                                      {impact.deltaPoints > 0 ? "+" : ""}
-                                      {impact.deltaPoints.toFixed(1)}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      {renderCategoryImpactTable(rec.categoryImpacts)}
                     </details>
                   )}
 
-                  {/* Legality Issues (if any) */}
+                  {/* Legality Issues */}
                   {!rec.isLegal &&
                     rec.legalityIssues &&
-                    rec.legalityIssues.length > 0 && (
-                      <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <div className="flex">
-                          <svg
-                            className="h-5 w-5 text-yellow-400 flex-shrink-0"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <div className="ml-3 flex-1">
-                            <h4 className="text-sm font-medium text-yellow-800">
-                              Roster Constraints
-                            </h4>
-                            <ul className="mt-1 text-xs sm:text-sm text-yellow-700 list-disc list-inside space-y-1">
-                              {rec.legalityIssues.map((issue, i) => (
-                                <li key={i}>{issue}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    rec.legalityIssues.length > 0 &&
+                    renderLegalityWarning(rec.legalityIssues)}
                 </div>
               ))}
             </div>
@@ -514,7 +507,9 @@ export default function WaiversPage() {
                   <li>
                     All available players would hurt your team's standings
                   </li>
-                  <li>Projections haven't been uploaded by administrator yet</li>
+                  <li>
+                    Projections haven't been uploaded by administrator yet
+                  </li>
                   <li>A snapshot needs to be created</li>
                 </ul>
               </div>
@@ -539,10 +534,7 @@ export default function WaiversPage() {
             </h2>
 
             {freeAgentsLoading || rosterLoading ? (
-              <div className="animate-pulse space-y-4">
-                <div className="h-48 bg-gray-200 rounded-lg"></div>
-                <div className="h-48 bg-gray-200 rounded-lg"></div>
-              </div>
+              <LoadingSkeleton lines={2} />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Free Agents Column */}
@@ -552,22 +544,21 @@ export default function WaiversPage() {
                       Add from Waiver Wire
                     </label>
                     <div className="flex gap-2">
-                      {/* Sort Selector */}
                       <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
                         className="text-xs border border-gray-300 rounded px-2 py-1"
                       >
-                        <option value="pct_owned">% Rostered ↓</option>
+                        <option value="pct_owned">% Rostered</option>
                         <option value="name">Name A-Z</option>
                       </select>
-
-                      {/* Position Filter */}
                       <select
                         multiple
                         value={positionFilter}
                         onChange={(e) => {
-                          const selected = Array.from(e.target.selectedOptions).map(opt => opt.value);
+                          const selected = Array.from(
+                            e.target.selectedOptions,
+                          ).map((opt) => opt.value);
                           setPositionFilter(selected);
                         }}
                         className="text-xs border border-gray-300 rounded px-2 py-1 max-h-8"
@@ -575,15 +566,13 @@ export default function WaiversPage() {
                         title="Hold Ctrl/Cmd to select multiple positions"
                       >
                         <option value="">All Positions</option>
-                        <option value="C">C</option>
-                        <option value="1B">1B</option>
-                        <option value="2B">2B</option>
-                        <option value="3B">3B</option>
-                        <option value="SS">SS</option>
-                        <option value="OF">OF</option>
-                        <option value="DH">DH</option>
-                        <option value="SP">SP</option>
-                        <option value="RP">RP</option>
+                        {["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"].map(
+                          (pos) => (
+                            <option key={pos} value={pos}>
+                              {pos}
+                            </option>
+                          ),
+                        )}
                       </select>
                     </div>
                   </div>
@@ -599,38 +588,46 @@ export default function WaiversPage() {
                     </div>
                   )}
                   <div className="border border-gray-300 rounded-lg max-h-96 overflow-y-auto">
-                    {freeAgentsData?.freeAgents && freeAgentsData.freeAgents.length > 0 ? (
+                    {freeAgentsData?.freeAgents &&
+                    freeAgentsData.freeAgents.length > 0 ? (
                       <div className="divide-y divide-gray-200">
                         {freeAgentsData.freeAgents.map((player) => (
                           <label
                             key={player.playerId}
-                            className={`flex items-center p-3 cursor-pointer hover:bg-green-50 transition-colors ${
-                              selectedFreeAgentId === player.playerId
-                                ? "bg-green-100 border-l-4 border-green-600"
-                                : ""
-                            }`}
+                            className="flex items-center cursor-pointer"
                           >
-                            <input
-                              type="radio"
-                              name="freeAgent"
-                              value={player.playerId}
-                              checked={selectedFreeAgentId === player.playerId}
-                              onChange={() => setSelectedFreeAgentId(player.playerId)}
-                              className="h-4 w-4 text-green-600 focus:ring-green-500"
-                            />
-                            <div className="ml-3 flex-1">
-                              <div className="flex items-center justify-between">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {player.playerName}
-                                </div>
-                                <div className="text-xs font-semibold text-blue-600">
-                                  {player.pctOwned.toFixed(1)}%
-                                </div>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {player.positions.join(", ")}
-                                {player.mlbTeam && ` • ${player.mlbTeam}`}
-                              </div>
+                            <div className="pl-3">
+                              <input
+                                type="radio"
+                                name="freeAgent"
+                                value={player.playerId}
+                                checked={
+                                  selectedFreeAgentId === player.playerId
+                                }
+                                onChange={() =>
+                                  setSelectedFreeAgentId(player.playerId)
+                                }
+                                className="h-4 w-4 text-green-600 focus:ring-green-500"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <PlayerRow
+                                player={{
+                                  id: player.playerId,
+                                  name: player.playerName,
+                                  position: player.positions.join(", "),
+                                  team: player.mlbTeam,
+                                }}
+                                variant="add"
+                                selected={
+                                  selectedFreeAgentId === player.playerId
+                                }
+                                actions={
+                                  <span className="text-xs font-semibold text-blue-600">
+                                    {player.pctOwned.toFixed(1)}%
+                                  </span>
+                                }
+                              />
                             </div>
                           </label>
                         ))}
@@ -654,29 +651,36 @@ export default function WaiversPage() {
                         {rosterData.roster.map((player) => (
                           <label
                             key={player.playerId}
-                            className={`flex items-center p-3 cursor-pointer hover:bg-red-50 transition-colors ${
-                              selectedRosterPlayerId === player.playerId
-                                ? "bg-red-100 border-l-4 border-red-600"
-                                : ""
-                            }`}
+                            className="flex items-center cursor-pointer"
                           >
-                            <input
-                              type="radio"
-                              name="rosterPlayer"
-                              value={player.playerId}
-                              checked={selectedRosterPlayerId === player.playerId}
-                              onChange={() => setSelectedRosterPlayerId(player.playerId)}
-                              className="h-4 w-4 text-red-600 focus:ring-red-500"
-                            />
-                            <div className="ml-3 flex-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                {player.playerName}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {player.positions.join(", ")}
-                                {player.mlbTeam && ` • ${player.mlbTeam}`}
-                                {player.rosterSlot && ` • ${player.rosterSlot}`}
-                              </div>
+                            <div className="pl-3">
+                              <input
+                                type="radio"
+                                name="rosterPlayer"
+                                value={player.playerId}
+                                checked={
+                                  selectedRosterPlayerId === player.playerId
+                                }
+                                onChange={() =>
+                                  setSelectedRosterPlayerId(player.playerId)
+                                }
+                                className="h-4 w-4 text-red-600 focus:ring-red-500"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <PlayerRow
+                                player={{
+                                  id: player.playerId,
+                                  name: player.playerName,
+                                  position: player.positions.join(", "),
+                                  team: player.mlbTeam,
+                                  rosterSlot: player.rosterSlot,
+                                }}
+                                variant="drop"
+                                selected={
+                                  selectedRosterPlayerId === player.playerId
+                                }
+                              />
                             </div>
                           </label>
                         ))}
@@ -714,55 +718,12 @@ export default function WaiversPage() {
                 Evaluation Result
               </h2>
 
-              {/* Swap Visualization */}
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 mb-4">
-                {/* Drop Player */}
-                <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <span className="text-red-600 font-semibold text-xs uppercase tracking-wide">
-                      Drop
-                    </span>
-                  </div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {evaluationResult.dropPlayer.name}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {evaluationResult.dropPlayer.positions.join(", ")}
-                  </div>
-                </div>
-
-                {/* Arrow */}
-                <div className="flex items-center justify-center sm:px-2">
-                  <svg
-                    className="w-8 h-8 text-gray-400 rotate-90 sm:rotate-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M14 5l7 7m0 0l-7 7m7-7H3"
-                    />
-                  </svg>
-                </div>
-
-                {/* Add Player */}
-                <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <span className="text-green-600 font-semibold text-xs uppercase tracking-wide">
-                      Add
-                    </span>
-                  </div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {evaluationResult.addPlayer.name}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {evaluationResult.addPlayer.positions.join(", ")}
-                  </div>
-                </div>
-              </div>
+              {renderSwapVisualization(
+                evaluationResult.dropPlayer.name,
+                evaluationResult.addPlayer.name,
+                evaluationResult.dropPlayer.positions,
+                evaluationResult.addPlayer.positions,
+              )}
 
               {/* Impact Summary */}
               <div className="mb-4">
@@ -774,8 +735,8 @@ export default function WaiversPage() {
                     evaluationResult.deltaOverallPoints > 0
                       ? "text-green-600"
                       : evaluationResult.deltaOverallPoints < 0
-                      ? "text-red-600"
-                      : "text-gray-600"
+                        ? "text-red-600"
+                        : "text-gray-600"
                   }`}
                 >
                   {evaluationResult.deltaOverallPoints > 0 ? "+" : ""}
@@ -807,101 +768,17 @@ export default function WaiversPage() {
                       />
                     </svg>
                   </summary>
-
-                  <div className="mt-3 border-t border-gray-200 pt-3 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead>
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            Category
-                          </th>
-                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                            Rank Δ
-                          </th>
-                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">
-                            Points
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {evaluationResult.categoryImpacts
-                          .filter((impact) => impact.deltaPoints !== 0)
-                          .sort(
-                            (a, b) =>
-                              Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints),
-                          )
-                          .map((impact) => (
-                            <tr key={impact.categoryId}>
-                              <td className="px-3 py-2 text-sm font-medium text-gray-900 whitespace-nowrap">
-                                {impact.categoryName}
-                              </td>
-                              <td className="px-3 py-2 text-sm text-center whitespace-nowrap">
-                                <span
-                                  className={
-                                    impact.deltaRank < 0
-                                      ? "text-green-600 font-semibold"
-                                      : impact.deltaRank > 0
-                                      ? "text-red-600 font-semibold"
-                                      : "text-gray-500"
-                                  }
-                                >
-                                  {impact.deltaRank === 0
-                                    ? "—"
-                                    : `${impact.deltaRank > 0 ? "+" : ""}${impact.deltaRank}`}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-sm text-right whitespace-nowrap">
-                                <span
-                                  className={
-                                    impact.deltaPoints > 0
-                                      ? "text-green-600 font-semibold"
-                                      : impact.deltaPoints < 0
-                                      ? "text-red-600 font-semibold"
-                                      : "text-gray-500"
-                                  }
-                                >
-                                  {impact.deltaPoints > 0 ? "+" : ""}
-                                  {impact.deltaPoints.toFixed(1)}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {renderCategoryImpactTable(
+                    evaluationResult.categoryImpacts,
+                  )}
                 </details>
               )}
 
               {/* Legality Issues */}
               {!evaluationResult.isLegal &&
                 evaluationResult.legalityIssues &&
-                evaluationResult.legalityIssues.length > 0 && (
-                  <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex">
-                      <svg
-                        className="h-5 w-5 text-yellow-400 flex-shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <div className="ml-3 flex-1">
-                        <h4 className="text-sm font-medium text-yellow-800">
-                          Roster Constraints
-                        </h4>
-                        <ul className="mt-1 text-sm text-yellow-700 list-disc list-inside space-y-1">
-                          {evaluationResult.legalityIssues.map((issue, i) => (
-                            <li key={i}>{issue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                evaluationResult.legalityIssues.length > 0 &&
+                renderLegalityWarning(evaluationResult.legalityIssues)}
             </div>
           )}
         </div>

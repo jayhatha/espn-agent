@@ -5,6 +5,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { LoadingSkeleton } from "@/components/ui/LoadingSpinner";
+import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { PlayerRow } from "@/components/league/PlayerRow";
 
 interface ProposedTrade {
   givePlayers: Array<{ playerId: number; playerName: string }>;
@@ -65,10 +69,13 @@ export default function TradesPage() {
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [showAnalyzer, setShowAnalyzer] = useState(true);
-  const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(
+    null,
+  );
   const [givePlayerIds, setGivePlayerIds] = useState<number[]>([]);
   const [receivePlayerIds, setReceivePlayerIds] = useState<number[]>([]);
-  const [tradeAnalysis, setTradeAnalysis] = useState<TradeImpactAnalysis | null>(null);
+  const [tradeAnalysis, setTradeAnalysis] =
+    useState<TradeImpactAnalysis | null>(null);
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -82,7 +89,10 @@ export default function TradesPage() {
   const { data: partnersData } = useQuery({
     queryKey: ["trade-partners", leagueId, selectedTeamId],
     queryFn: async () => {
-      return api.getTradePartners(parseInt(leagueId, 10), selectedTeamId!) as Promise<{ partners: Team[] }>;
+      return api.getTradePartners(
+        parseInt(leagueId, 10),
+        selectedTeamId!,
+      ) as Promise<{ partners: Team[] }>;
     },
     enabled: !!selectedTeamId,
   });
@@ -91,7 +101,11 @@ export default function TradesPage() {
   const { data: rostersData, isLoading: rostersLoading } = useQuery({
     queryKey: ["trade-rosters", leagueId, selectedTeamId, selectedPartnerId],
     queryFn: async () => {
-      return api.getTradeRosters(parseInt(leagueId, 10), selectedTeamId!, selectedPartnerId!) as Promise<{
+      return api.getTradeRosters(
+        parseInt(leagueId, 10),
+        selectedTeamId!,
+        selectedPartnerId!,
+      ) as Promise<{
         snapshotDate: string;
         userTeam: { id: number; name: string; roster: RosterPlayer[] };
         partnerTeam: { id: number; name: string; roster: RosterPlayer[] };
@@ -107,17 +121,24 @@ export default function TradesPage() {
   } = useQuery({
     queryKey: ["trade-candidates", leagueId, selectedTeamId],
     queryFn: async () => {
-      return api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!) as Promise<{ candidates: TradeCandidate[] }>;
+      return api.getTradeRecommendations(
+        parseInt(leagueId, 10),
+        selectedTeamId!,
+      ) as Promise<{ candidates: TradeCandidate[] }>;
     },
     enabled: !!selectedTeamId && !showAnalyzer,
   });
 
   const analyzeTradeM = useMutation({
     mutationFn: async (trade: ProposedTrade) => {
-      return api.analyzeTradeImpact(parseInt(leagueId, 10), selectedTeamId!, {
-        givePlayers: trade.givePlayers.map(p => p.playerId),
-        receivePlayers: trade.receivePlayers.map(p => p.playerId),
-      }) as Promise<{ analysis: TradeImpactAnalysis }>;
+      return api.analyzeTradeImpact(
+        parseInt(leagueId, 10),
+        selectedTeamId!,
+        {
+          givePlayers: trade.givePlayers.map((p) => p.playerId),
+          receivePlayers: trade.receivePlayers.map((p) => p.playerId),
+        },
+      ) as Promise<{ analysis: TradeImpactAnalysis }>;
     },
     onSuccess: (data) => {
       setTradeAnalysis(data.analysis);
@@ -125,13 +146,19 @@ export default function TradesPage() {
   });
 
   const handleAnalyzeTrade = () => {
-    if (!rostersData || givePlayerIds.length === 0 || receivePlayerIds.length === 0) {
+    if (
+      !rostersData ||
+      givePlayerIds.length === 0 ||
+      receivePlayerIds.length === 0
+    ) {
       alert("Please select at least one player to give and receive");
       return;
     }
 
     const givePlayers = givePlayerIds.map((id) => {
-      const player = rostersData.userTeam.roster.find((p) => p.playerId === id);
+      const player = rostersData.userTeam.roster.find(
+        (p) => p.playerId === id,
+      );
       return {
         playerId: id,
         playerName: player?.playerName || `Player ${id}`,
@@ -139,7 +166,9 @@ export default function TradesPage() {
     });
 
     const receivePlayers = receivePlayerIds.map((id) => {
-      const player = rostersData.partnerTeam.roster.find((p) => p.playerId === id);
+      const player = rostersData.partnerTeam.roster.find(
+        (p) => p.playerId === id,
+      );
       return {
         playerId: id,
         playerName: player?.playerName || `Player ${id}`,
@@ -149,8 +178,11 @@ export default function TradesPage() {
     analyzeTradeM.mutate({ givePlayers, receivePlayers });
   };
 
-  const getRecommendationColor = (rec: "accept" | "decline" | "consider") => {
-    if (rec === "accept") return "bg-green-100 text-green-800 border-green-300";
+  const getRecommendationColor = (
+    rec: "accept" | "decline" | "consider",
+  ) => {
+    if (rec === "accept")
+      return "bg-green-100 text-green-800 border-green-300";
     if (rec === "decline") return "bg-red-100 text-red-800 border-red-300";
     return "bg-yellow-100 text-yellow-800 border-yellow-300";
   };
@@ -161,45 +193,35 @@ export default function TradesPage() {
     return "text-red-600";
   };
 
+  const renderDeltaColor = (value: number) =>
+    value > 0
+      ? "text-green-600"
+      : value < 0
+        ? "text-red-600"
+        : "text-gray-600";
+
   if (!selectedTeamId) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="text-yellow-800 font-medium mb-2">Team Not Selected</h3>
-          <p className="text-yellow-700 text-sm mb-4">
-            Please select your team on the league page to access trade analysis.
-          </p>
-          <Link
-            href={`/leagues/${leagueId}`}
-            className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-          >
-            Go to League Page
-          </Link>
-        </div>
+        <ErrorAlert
+          variant="warning"
+          message="Please select your team on the league page to access trade analysis."
+          backLink={{
+            href: `/leagues/${leagueId}`,
+            label: "Go to League Page",
+          }}
+        />
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href={`/leagues/${leagueId}`}
-          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-        >
-          ← Back to League
-        </Link>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          Trade Analyzer
-        </h1>
-        <p className="text-sm sm:text-base text-gray-600 mt-1">
-          Analyze trade impacts and discover beneficial trade opportunities
-        </p>
-      </div>
+      <PageHeader
+        title="Trade Analyzer"
+        subtitle="Analyze trade impacts and discover beneficial trade opportunities"
+        backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
+      />
 
       {/* Mode Toggle */}
       <div className="mb-6 bg-white shadow rounded-lg p-4">
@@ -243,7 +265,9 @@ export default function TradesPage() {
             <select
               value={selectedPartnerId || ""}
               onChange={(e) => {
-                setSelectedPartnerId(e.target.value ? parseInt(e.target.value, 10) : null);
+                setSelectedPartnerId(
+                  e.target.value ? parseInt(e.target.value, 10) : null,
+                );
                 setGivePlayerIds([]);
                 setReceivePlayerIds([]);
                 setTradeAnalysis(null);
@@ -267,9 +291,7 @@ export default function TradesPage() {
               </h2>
 
               {rostersLoading || !rostersData ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-64 bg-gray-200 rounded"></div>
-                </div>
+                <LoadingSkeleton lines={1} />
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Your Team */}
@@ -281,31 +303,43 @@ export default function TradesPage() {
                       {rostersData.userTeam.roster.map((player) => (
                         <label
                           key={player.playerId}
-                          className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors"
+                          className="flex items-center border border-gray-200 rounded-lg cursor-pointer"
                         >
-                          <input
-                            type="checkbox"
-                            checked={givePlayerIds.includes(player.playerId)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setGivePlayerIds([...givePlayerIds, player.playerId]);
-                              } else {
-                                setGivePlayerIds(
-                                  givePlayerIds.filter((id) => id !== player.playerId),
-                                );
-                              }
-                              setTradeAnalysis(null);
-                            }}
-                            className="mr-3 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate">
-                              {player.playerName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {player.positions.join(", ")}
-                              {player.mlbTeam && ` • ${player.mlbTeam}`}
-                            </div>
+                          <div className="pl-3">
+                            <input
+                              type="checkbox"
+                              checked={givePlayerIds.includes(player.playerId)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setGivePlayerIds([
+                                    ...givePlayerIds,
+                                    player.playerId,
+                                  ]);
+                                } else {
+                                  setGivePlayerIds(
+                                    givePlayerIds.filter(
+                                      (id) => id !== player.playerId,
+                                    ),
+                                  );
+                                }
+                                setTradeAnalysis(null);
+                              }}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <PlayerRow
+                              player={{
+                                id: player.playerId,
+                                name: player.playerName,
+                                position: player.positions.join(", "),
+                                team: player.mlbTeam,
+                              }}
+                              selected={givePlayerIds.includes(
+                                player.playerId,
+                              )}
+                              variant="drop"
+                            />
                           </div>
                         </label>
                       ))}
@@ -324,31 +358,45 @@ export default function TradesPage() {
                       {rostersData.partnerTeam.roster.map((player) => (
                         <label
                           key={player.playerId}
-                          className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-green-50 cursor-pointer transition-colors"
+                          className="flex items-center border border-gray-200 rounded-lg cursor-pointer"
                         >
-                          <input
-                            type="checkbox"
-                            checked={receivePlayerIds.includes(player.playerId)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setReceivePlayerIds([...receivePlayerIds, player.playerId]);
-                              } else {
-                                setReceivePlayerIds(
-                                  receivePlayerIds.filter((id) => id !== player.playerId),
-                                );
-                              }
-                              setTradeAnalysis(null);
-                            }}
-                            className="mr-3 h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate">
-                              {player.playerName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {player.positions.join(", ")}
-                              {player.mlbTeam && ` • ${player.mlbTeam}`}
-                            </div>
+                          <div className="pl-3">
+                            <input
+                              type="checkbox"
+                              checked={receivePlayerIds.includes(
+                                player.playerId,
+                              )}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setReceivePlayerIds([
+                                    ...receivePlayerIds,
+                                    player.playerId,
+                                  ]);
+                                } else {
+                                  setReceivePlayerIds(
+                                    receivePlayerIds.filter(
+                                      (id) => id !== player.playerId,
+                                    ),
+                                  );
+                                }
+                                setTradeAnalysis(null);
+                              }}
+                              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <PlayerRow
+                              player={{
+                                id: player.playerId,
+                                name: player.playerName,
+                                position: player.positions.join(", "),
+                                team: player.mlbTeam,
+                              }}
+                              selected={receivePlayerIds.includes(
+                                player.playerId,
+                              )}
+                              variant="add"
+                            />
                           </div>
                         </label>
                       ))}
@@ -375,41 +423,26 @@ export default function TradesPage() {
               </div>
 
               {analyzeTradeM.isError && (
-                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <svg
-                      className="h-5 w-5 text-red-400 mt-0.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <div className="ml-3 flex-1">
-                      <h3 className="text-sm font-medium text-red-800 mb-2">
-                        Trade Analysis Failed
-                      </h3>
-                      <p className="text-sm text-red-700">
-                        {(analyzeTradeM.error as Error).message}
+                <div className="mt-4">
+                  <ErrorAlert
+                    message={(analyzeTradeM.error as Error).message}
+                  />
+                  {(analyzeTradeM.error as Error).message.includes(
+                    "projected standings",
+                  ) && (
+                    <div className="mt-3">
+                      <p className="text-sm text-red-700 mb-3">
+                        Trade analysis requires projections. Please contact your
+                        administrator to upload projections.
                       </p>
-                      {(analyzeTradeM.error as Error).message.includes("projected standings") && (
-                        <div className="mt-3">
-                          <p className="text-sm text-red-700 mb-3">
-                            Trade analysis requires projections. Please contact your administrator to upload projections.
-                          </p>
-                          <Link
-                            href={`/leagues/${leagueId}`}
-                            className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            Go to League Page
-                          </Link>
-                        </div>
-                      )}
+                      <Link
+                        href={`/leagues/${leagueId}`}
+                        className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        Go to League Page
+                      </Link>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -430,19 +463,13 @@ export default function TradesPage() {
                       Overall Point Change
                     </div>
                     <div
-                      className={`text-3xl font-bold ${
-                        tradeAnalysis.deltaOverallPoints > 0
-                          ? "text-green-600"
-                          : tradeAnalysis.deltaOverallPoints < 0
-                            ? "text-red-600"
-                            : "text-gray-600"
-                      }`}
+                      className={`text-3xl font-bold ${renderDeltaColor(tradeAnalysis.deltaOverallPoints)}`}
                     >
                       {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
                       {tradeAnalysis.deltaOverallPoints.toFixed(1)} pts
                     </div>
                     <div className="text-sm text-gray-500 mt-1">
-                      {tradeAnalysis.currentOverallPoints.toFixed(1)} →{" "}
+                      {tradeAnalysis.currentOverallPoints.toFixed(1)} &rarr;{" "}
                       {tradeAnalysis.projectedOverallPoints.toFixed(1)}
                     </div>
                   </div>
@@ -500,28 +527,16 @@ export default function TradesPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-center">
                             <span
-                              className={`font-semibold ${
-                                cat.deltaRank < 0
-                                  ? "text-green-600"
-                                  : cat.deltaRank > 0
-                                    ? "text-red-600"
-                                    : "text-gray-600"
-                              }`}
+                              className={`font-semibold ${renderDeltaColor(cat.deltaRank * -1)}`}
                             >
-                              {cat.currentRank} → {cat.projectedRank}
+                              {cat.currentRank} &rarr; {cat.projectedRank}
                               {cat.deltaRank !== 0 &&
                                 ` (${cat.deltaRank > 0 ? "+" : ""}${cat.deltaRank})`}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
                             <span
-                              className={`font-semibold ${
-                                cat.deltaPoints > 0
-                                  ? "text-green-600"
-                                  : cat.deltaPoints < 0
-                                    ? "text-red-600"
-                                    : "text-gray-600"
-                              }`}
+                              className={`font-semibold ${renderDeltaColor(cat.deltaPoints)}`}
                             >
                               {cat.deltaPoints > 0 ? "+" : ""}
                               {cat.deltaPoints.toFixed(1)} pts
@@ -549,47 +564,26 @@ export default function TradesPage() {
           </p>
 
           {candidatesLoading ? (
-            <div className="animate-pulse space-y-4">
-              <div className="h-32 bg-gray-200 rounded"></div>
-              <div className="h-32 bg-gray-200 rounded"></div>
-              <div className="h-32 bg-gray-200 rounded"></div>
-            </div>
+            <LoadingSkeleton lines={3} />
           ) : candidatesError ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-              <div className="flex items-start">
-                <svg
-                  className="h-5 w-5 text-red-400 mt-0.5"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <div className="ml-3 flex-1">
-                  <h3 className="text-sm font-medium text-red-800 mb-2">
-                    Unable to Generate Trade Suggestions
-                  </h3>
-                  <p className="text-sm text-red-700 mb-4">
-                    {(candidatesError as Error).message}
+            <div>
+              <ErrorAlert message={(candidatesError as Error).message} />
+              {(candidatesError as Error).message.includes(
+                "projected standings",
+              ) && (
+                <div className="mt-4">
+                  <p className="text-sm text-red-700 mb-3">
+                    Trade suggestions require projections. Please contact your
+                    administrator to upload projections.
                   </p>
-                  {(candidatesError as Error).message.includes("projected standings") && (
-                    <div className="mt-4">
-                      <p className="text-sm text-red-700 mb-3">
-                        Trade suggestions require projections. Please contact your administrator to upload projections.
-                      </p>
-                      <Link
-                        href={`/leagues/${leagueId}`}
-                        className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        Go to League Page
-                      </Link>
-                    </div>
-                  )}
+                  <Link
+                    href={`/leagues/${leagueId}`}
+                    className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Go to League Page
+                  </Link>
                 </div>
-              </div>
+              )}
             </div>
           ) : candidatesData && candidatesData.candidates.length > 0 ? (
             <div className="space-y-4">
@@ -601,13 +595,17 @@ export default function TradesPage() {
                   {/* Header */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div>
-                      <div className="text-sm text-gray-500">Trade Partner</div>
+                      <div className="text-sm text-gray-500">
+                        Trade Partner
+                      </div>
                       <div className="text-lg font-bold text-gray-900">
                         {candidate.partnerTeamName}
                       </div>
                     </div>
                     <div className="text-left sm:text-right">
-                      <div className="text-sm text-gray-500">Projected Gain</div>
+                      <div className="text-sm text-gray-500">
+                        Projected Gain
+                      </div>
                       <div className="text-xl font-bold text-green-600">
                         +{candidate.deltaOverallPoints.toFixed(1)} pts
                       </div>
@@ -621,7 +619,10 @@ export default function TradesPage() {
                         You Give
                       </div>
                       {candidate.trade.givePlayers.map((p, i) => (
-                        <div key={i} className="text-sm font-medium text-gray-900 truncate">
+                        <div
+                          key={i}
+                          className="text-sm font-medium text-gray-900 truncate"
+                        >
                           {p.playerName}
                         </div>
                       ))}
@@ -648,7 +649,10 @@ export default function TradesPage() {
                         You Get
                       </div>
                       {candidate.trade.receivePlayers.map((p, i) => (
-                        <div key={i} className="text-sm font-medium text-gray-900 truncate">
+                        <div
+                          key={i}
+                          className="text-sm font-medium text-gray-900 truncate"
+                        >
                           {p.playerName}
                         </div>
                       ))}
@@ -658,7 +662,9 @@ export default function TradesPage() {
                   {/* Metadata */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
                     <div>
-                      <span className="text-gray-500">Acceptance Likelihood: </span>
+                      <span className="text-gray-500">
+                        Acceptance Likelihood:{" "}
+                      </span>
                       <span
                         className={`font-semibold ${getLikelihoodColor(candidate.likelihood)}`}
                       >

@@ -2,7 +2,6 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import {
   LineChart,
@@ -16,6 +15,8 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface OverallDataPoint {
   league_id: number;
@@ -90,7 +91,9 @@ export default function TrendsPage() {
   const { data: teamsData } = useQuery({
     queryKey: ["teams", leagueId],
     queryFn: async () => {
-      return api.getTeams(parseInt(leagueId, 10)) as Promise<{ teams: Team[] }>;
+      return api.getTeams(parseInt(leagueId, 10)) as Promise<{
+        teams: Team[];
+      }>;
     },
     enabled: !!leagueId,
   });
@@ -99,7 +102,9 @@ export default function TrendsPage() {
   const { data: overallData, isLoading: overallLoading } = useQuery({
     queryKey: ["timeseries-overall", leagueId],
     queryFn: async () => {
-      return api.getOverallTimeSeries(parseInt(leagueId, 10)) as Promise<{ series: OverallDataPoint[] }>;
+      return api.getOverallTimeSeries(parseInt(leagueId, 10)) as Promise<{
+        series: OverallDataPoint[];
+      }>;
     },
     enabled: !!leagueId && viewMode === "overall",
   });
@@ -108,7 +113,10 @@ export default function TrendsPage() {
   const { data: categoryData, isLoading: categoryLoading } = useQuery({
     queryKey: ["timeseries-category", leagueId, selectedCategory],
     queryFn: async () => {
-      return api.getCategoryRankTimeSeries(parseInt(leagueId, 10), selectedCategory) as Promise<{ series: CategoryRankDataPoint[] }>;
+      return api.getCategoryRankTimeSeries(
+        parseInt(leagueId, 10),
+        selectedCategory,
+      ) as Promise<{ series: CategoryRankDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "category",
   });
@@ -117,7 +125,9 @@ export default function TrendsPage() {
   const { data: projectedData, isLoading: projectedLoading } = useQuery({
     queryKey: ["timeseries-projected", leagueId],
     queryFn: async () => {
-      return api.getProjectedOverallTimeSeries(parseInt(leagueId, 10)) as Promise<{ series: ProjectedOverallDataPoint[] }>;
+      return api.getProjectedOverallTimeSeries(
+        parseInt(leagueId, 10),
+      ) as Promise<{ series: ProjectedOverallDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "projected",
   });
@@ -126,7 +136,9 @@ export default function TrendsPage() {
   const { data: annotationsData } = useQuery({
     queryKey: ["annotations", leagueId],
     queryFn: async () => {
-      return api.getAnnotations(parseInt(leagueId, 10)) as Promise<{ annotations: TransactionAnnotation[] }>;
+      return api.getAnnotations(parseInt(leagueId, 10)) as Promise<{
+        annotations: TransactionAnnotation[];
+      }>;
     },
     enabled: !!leagueId,
   });
@@ -151,36 +163,45 @@ export default function TrendsPage() {
   // Transform data for charts
   const getChartData = () => {
     if (viewMode === "overall" && overallData) {
-      // Group by date
       const dateMap = new Map<string, any>();
       overallData.series.forEach((point) => {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName =
+          teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.overall_rank;
       });
-      return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      return Array.from(dateMap.values()).sort((a, b) =>
+        a.date.localeCompare(b.date),
+      );
     } else if (viewMode === "category" && categoryData) {
       const dateMap = new Map<string, any>();
       categoryData.series.forEach((point) => {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName =
+          teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.rank;
       });
-      return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      return Array.from(dateMap.values()).sort((a, b) =>
+        a.date.localeCompare(b.date),
+      );
     } else if (viewMode === "projected" && projectedData) {
       const dateMap = new Map<string, any>();
       projectedData.series.forEach((point) => {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
-        dateMap.get(point.snapshot_date)[teamName] = point.projected_overall_rank;
+        const teamName =
+          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        dateMap.get(point.snapshot_date)[teamName] =
+          point.projected_overall_rank;
       });
-      return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      return Array.from(dateMap.values()).sort((a, b) =>
+        a.date.localeCompare(b.date),
+      );
     }
     return [];
   };
@@ -188,31 +209,20 @@ export default function TrendsPage() {
   const chartData = getChartData();
   const isLoading = overallLoading || categoryLoading || projectedLoading;
 
-  // Get unique team names from chart data
-  const teamNames = chartData.length > 0
-    ? Object.keys(chartData[0]).filter((k) => k !== "date")
-    : [];
+  const teamNames =
+    chartData.length > 0
+      ? Object.keys(chartData[0]).filter((k) => k !== "date")
+      : [];
 
-  // Get annotations for current view
   const relevantAnnotations = annotationsData?.annotations || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <Link
-          href={`/leagues/${leagueId}`}
-          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-        >
-          ← Back to League
-        </Link>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Performance Trends</h1>
-        <p className="mt-2 text-gray-600">
-          Track standings and category performance over time for all teams in your league.
-        </p>
-      </div>
+      <PageHeader
+        title="Performance Trends"
+        subtitle="Track standings and category performance over time for all teams in your league."
+        backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
+      />
 
       {/* View Mode Tabs */}
       <div className="bg-white shadow rounded-lg mb-6">
@@ -279,11 +289,7 @@ export default function TrendsPage() {
       {/* Chart Display */}
       <div className="bg-white shadow rounded-lg p-6">
         {isLoading ? (
-          <div className="space-y-4">
-            <div className="animate-pulse">
-              <div className="h-96 bg-gray-200 rounded"></div>
-            </div>
-          </div>
+          <LoadingSpinner message="Loading chart data..." />
         ) : chartData.length > 0 ? (
           <div>
             <h2 className="text-lg font-medium text-gray-900 mb-4">
@@ -312,7 +318,11 @@ export default function TrendsPage() {
                   <YAxis
                     reversed
                     domain={[1, teamNames.length]}
-                    label={{ value: "Rank", angle: -90, position: "insideLeft" }}
+                    label={{
+                      value: "Rank",
+                      angle: -90,
+                      position: "insideLeft",
+                    }}
                   />
                   <Tooltip
                     labelFormatter={(date) =>
@@ -327,7 +337,9 @@ export default function TrendsPage() {
                   <Legend />
 
                   {teamNames.map((teamName, index) => {
-                    const isSelected = selectedTeamId && teamMap.get(selectedTeamId) === teamName;
+                    const isSelected =
+                      selectedTeamId &&
+                      teamMap.get(selectedTeamId) === teamName;
                     return (
                       <Line
                         key={teamName}
@@ -343,7 +355,7 @@ export default function TrendsPage() {
                   })}
 
                   {/* Transaction annotations */}
-                  {relevantAnnotations.map((annotation, idx) => (
+                  {relevantAnnotations.map((annotation) => (
                     <ReferenceLine
                       key={annotation.id}
                       x={annotation.event_date}
@@ -362,8 +374,10 @@ export default function TrendsPage() {
 
             <div className="mt-6 text-xs text-gray-500">
               <p>
-                <strong>Note:</strong> Lower rank numbers are better (1st place = rank 1).
-                {selectedTeamId && " Your team is highlighted with a thicker line."}
+                <strong>Note:</strong> Lower rank numbers are better (1st place
+                = rank 1).
+                {selectedTeamId &&
+                  " Your team is highlighted with a thicker line."}
               </p>
             </div>
           </div>
@@ -387,7 +401,8 @@ export default function TrendsPage() {
               No trend data available
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Trend data will appear after snapshots have been created for your league.
+              Trend data will appear after snapshots have been created for your
+              league.
             </p>
           </div>
         )}
