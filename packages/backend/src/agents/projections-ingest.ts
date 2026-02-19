@@ -25,13 +25,24 @@ export interface IngestOptions {
   leagueId?: number; // Optional: validate against league categories
 }
 
+export interface MatchStatistics {
+  exactMatches: number;
+  fuzzyMatches: number;
+  unmatched: number;
+  total: number;
+}
+
 export interface ValidationReport {
   requiredColumnsPresent: boolean;
   missingColumns: string[];
   rowsParsed: number;
   unmatchedPlayers: string[];
   mappingCoverage: number;
+  matchStats: MatchStatistics;
 }
+
+/** Minimum confidence threshold for fuzzy matches during projections ingest */
+const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.8;
 
 export class ProjectionsIngestAgent {
   private identityAgent: PlayerIdentityResolutionAgent;
@@ -55,36 +66,38 @@ export class ProjectionsIngestAgent {
 
   /**
    * Match a FanGraphs player to a database player using identity resolution
-   * @returns player ID if matched, null otherwise
+   * Uses cached identity map first, then fuzzy matching with confidence threshold
+   * @returns { playerId, matchType } if matched, null otherwise
    */
   private async matchPlayer(
     playerName: string,
     team?: string,
     positions?: string[],
-  ): Promise<number | null> {
+  ): Promise<{ playerId: number; matchType: "exact" | "fuzzy" } | null> {
     // Create FanGraphs key from name (normalized)
     const fangraphsKey = playerName
       .toLowerCase()
       .replace(/[^a-z]/g, "")
       .trim();
 
-    // 1. Check existing identity map
+    // 1. Check existing identity map (cached exact or fuzzy match)
     const existingMap = await this.db
       .selectFrom("player_identity_map")
       .innerJoin("player", "player.id", "player_identity_map.player_id")
-      .select(["player_identity_map.player_id", "player_identity_map.confidence"])
+      .select(["player_identity_map.player_id", "player_identity_map.confidence", "player_identity_map.resolution_method"])
       .where("player_identity_map.fangraphs_key", "=", fangraphsKey)
       .executeTakeFirst();
 
     if (existingMap) {
+      const matchType = existingMap.resolution_method === "exact_match" ? "exact" as const : "fuzzy" as const;
       this.logger?.debug(
-        { playerName, playerId: existingMap.player_id, confidence: existingMap.confidence },
+        { playerName, playerId: existingMap.player_id, confidence: existingMap.confidence, matchType },
         "Using cached identity mapping",
       );
-      return existingMap.player_id;
+      return { playerId: existingMap.player_id, matchType };
     }
 
-    // 2. Find best match using identity resolution agent
+    // 2. Find best match using PlayerIdentityResolutionAgent (fuzzy matching fallback)
     const match = await this.identityAgent.findBestMatch(
       fangraphsKey,
       playerName,
@@ -97,7 +110,16 @@ export class ProjectionsIngestAgent {
       return null;
     }
 
-    // 3. Store the mapping for future use
+    // 3. Apply confidence threshold for fuzzy matches
+    if (match.confidence < FUZZY_MATCH_CONFIDENCE_THRESHOLD) {
+      this.logger?.warn(
+        { playerName, matchedId: match.playerId, confidence: match.confidence, threshold: FUZZY_MATCH_CONFIDENCE_THRESHOLD },
+        "Fuzzy match below confidence threshold, rejecting",
+      );
+      return null;
+    }
+
+    // 4. Store the mapping for future use
     await this.db
       .insertInto("player_identity_map")
       .values({
@@ -117,12 +139,13 @@ export class ProjectionsIngestAgent {
       )
       .execute();
 
-    this.logger?.info(
-      { playerName, playerId: match.playerId, confidence: match.confidence, method: match.method },
-      "New player identity mapping created",
+    const matchType = match.method === "exact_match" ? "exact" as const : "fuzzy" as const;
+    this.logger?.debug(
+      { playerName, matchedId: match.playerId, confidence: match.confidence, method: match.method },
+      "New player identity mapping created via fuzzy matching",
     );
 
-    return match.playerId;
+    return { playerId: match.playerId, matchType };
   }
 
   /**
@@ -184,10 +207,57 @@ export class ProjectionsIngestAgent {
     const hasCompleteBatters = reports.battersReport !== undefined;
     const hasCompletePitchers = reports.pitchersReport !== undefined;
 
+    // Aggregate match statistics across batters and pitchers
+    const allUnmatched: string[] = [];
+    const aggregateStats: MatchStatistics = { exactMatches: 0, fuzzyMatches: 0, unmatched: 0, total: 0 };
+
+    if (reports.battersReport) {
+      aggregateStats.exactMatches += reports.battersReport.matchStats.exactMatches;
+      aggregateStats.fuzzyMatches += reports.battersReport.matchStats.fuzzyMatches;
+      aggregateStats.unmatched += reports.battersReport.matchStats.unmatched;
+      aggregateStats.total += reports.battersReport.matchStats.total;
+      allUnmatched.push(...reports.battersReport.unmatchedPlayers);
+    }
+    if (reports.pitchersReport) {
+      aggregateStats.exactMatches += reports.pitchersReport.matchStats.exactMatches;
+      aggregateStats.fuzzyMatches += reports.pitchersReport.matchStats.fuzzyMatches;
+      aggregateStats.unmatched += reports.pitchersReport.matchStats.unmatched;
+      aggregateStats.total += reports.pitchersReport.matchStats.total;
+      allUnmatched.push(...reports.pitchersReport.unmatchedPlayers);
+    }
+
+    // Log match summary
+    this.logger?.info(
+      {
+        projectionsRunId: projectionsRun.id,
+        ...aggregateStats,
+        unmatchedPlayerNames: allUnmatched.length <= 20 ? allUnmatched : allUnmatched.slice(0, 20).concat([`...and ${allUnmatched.length - 20} more`]),
+      },
+      "Projections ingest match summary",
+    );
+
+    // Store unmatched player names and match stats in projections_run artifacts
+    const artifacts = {
+      ...(projectionsRun.artifacts_json || {}),
+      matchStatistics: aggregateStats,
+      unmatchedPlayers: allUnmatched,
+    };
+
     if (hasCompleteBatters && hasCompletePitchers) {
       await this.db
         .updateTable("projections_run")
-        .set({ staleness: "fresh" })
+        .set({
+          staleness: "fresh",
+          artifacts_json: artifacts as any,
+        })
+        .where("id", "=", projectionsRun.id)
+        .execute();
+    } else {
+      await this.db
+        .updateTable("projections_run")
+        .set({
+          artifacts_json: artifacts as any,
+        })
         .where("id", "=", projectionsRun.id)
         .execute();
     }
@@ -225,12 +295,15 @@ export class ProjectionsIngestAgent {
     const missing = required.filter((col) => !(col in rows[0]));
 
     const unmatchedPlayers: string[] = [];
-    let matched = 0;
+    let exactMatches = 0;
+    let fuzzyMatches = 0;
+    let totalProcessed = 0;
 
     for (const row of rows) {
       const playerName = this.getPlayerName(row);
       if (!playerName) continue;
 
+      totalProcessed++;
       const team = (row.Team as string) || undefined;
 
       const components: StatComponents = {
@@ -249,12 +322,19 @@ export class ProjectionsIngestAgent {
         CS: parseFloat(row.CS as string) || 0,
       };
 
-      // Match player using identity resolution
-      const playerId = await this.matchPlayer(playerName, team);
+      // Match player using identity resolution with fuzzy matching fallback
+      const matchResult = await this.matchPlayer(playerName, team);
 
-      if (!playerId) {
+      if (!matchResult) {
         unmatchedPlayers.push(playerName);
         continue;
+      }
+
+      // Track match type
+      if (matchResult.matchType === "exact") {
+        exactMatches++;
+      } else {
+        fuzzyMatches++;
       }
 
       // Upsert projection
@@ -262,7 +342,7 @@ export class ProjectionsIngestAgent {
         .insertInto("player_projection")
         .values({
           projections_run_id: projectionsRunId,
-          player_id: playerId,
+          player_id: matchResult.playerId,
           stat_components_json: components,
         })
         .onConflict((oc) =>
@@ -271,9 +351,20 @@ export class ProjectionsIngestAgent {
           }),
         )
         .execute();
-
-      matched++;
     }
+
+    const matched = exactMatches + fuzzyMatches;
+    const matchStats: MatchStatistics = {
+      exactMatches,
+      fuzzyMatches,
+      unmatched: unmatchedPlayers.length,
+      total: totalProcessed,
+    };
+
+    this.logger?.info(
+      { projectionsRunId, type: "batters", ...matchStats },
+      "Batters ingest match statistics",
+    );
 
     return {
       requiredColumnsPresent: missing.length === 0,
@@ -281,6 +372,7 @@ export class ProjectionsIngestAgent {
       rowsParsed: rows.length,
       unmatchedPlayers,
       mappingCoverage: rows.length > 0 ? matched / rows.length : 0,
+      matchStats,
     };
   }
 
@@ -306,12 +398,15 @@ export class ProjectionsIngestAgent {
     }
 
     const unmatchedPlayers: string[] = [];
-    let matched = 0;
+    let exactMatches = 0;
+    let fuzzyMatches = 0;
+    let totalProcessed = 0;
 
     for (const row of rows) {
       const playerName = this.getPlayerName(row);
       if (!playerName) continue;
 
+      totalProcessed++;
       const team = (row.Team as string) || undefined;
 
       const strikeouts = hasK
@@ -331,19 +426,26 @@ export class ProjectionsIngestAgent {
         QS: parseFloat((row.QS as string) || "0") || 0,
       };
 
-      // Match player using identity resolution
-      const playerId = await this.matchPlayer(playerName, team);
+      // Match player using identity resolution with fuzzy matching fallback
+      const matchResult = await this.matchPlayer(playerName, team);
 
-      if (!playerId) {
+      if (!matchResult) {
         unmatchedPlayers.push(playerName);
         continue;
+      }
+
+      // Track match type
+      if (matchResult.matchType === "exact") {
+        exactMatches++;
+      } else {
+        fuzzyMatches++;
       }
 
       await this.db
         .insertInto("player_projection")
         .values({
           projections_run_id: projectionsRunId,
-          player_id: playerId,
+          player_id: matchResult.playerId,
           stat_components_json: components,
         })
         .onConflict((oc) =>
@@ -352,9 +454,20 @@ export class ProjectionsIngestAgent {
           }),
         )
         .execute();
-
-      matched++;
     }
+
+    const matched = exactMatches + fuzzyMatches;
+    const matchStats: MatchStatistics = {
+      exactMatches,
+      fuzzyMatches,
+      unmatched: unmatchedPlayers.length,
+      total: totalProcessed,
+    };
+
+    this.logger?.info(
+      { projectionsRunId, type: "pitchers", ...matchStats },
+      "Pitchers ingest match statistics",
+    );
 
     return {
       requiredColumnsPresent: missing.length === 0,
@@ -362,6 +475,7 @@ export class ProjectionsIngestAgent {
       rowsParsed: rows.length,
       unmatchedPlayers,
       mappingCoverage: rows.length > 0 ? matched / rows.length : 0,
+      matchStats,
     };
   }
 }
