@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
-**Current focus:** Phase 1 - Foundation & Critical Fixes
+**Current focus:** Phase 2 - Authentication & Onboarding
 
 ## Current Position
 
@@ -71,7 +71,7 @@ None yet.
 - ~~Free agent pool never fetched from ESPN~~ — RESOLVED in 01-04 (fetchFreeAgents with filterSlotIds and position filtering)
 - ~~ESPN cookies stored plaintext~~ — RESOLVED in 01-02 (encryption at rest with AES-256-GCM)
 - ~~Multi-tenant data leakage risk~~ — RESOLVED in 01-02 (JWT auth on all routes, league membership verification)
-- Rate stat simulation math broken — requires component-based calculations (3 days estimated)
+- ~~Rate stat simulation math broken~~ — RESOLVED in 01-03 (component-based calculations for all 6 rate stats with TDD)
 - ~~Frontend hardcoded localhost URLs~~ — RESOLVED in 01-05 (centralized API client with environment-based base URL)
 
 **Research Flags for Future Phases:**
@@ -86,4 +86,4 @@ Stopped at: Completed 01-06-PLAN.md (Shared Frontend Components) - Phase 1 compl
 Resume file: None
 
 ---
-*Next step: Phase 1 complete. Proceed to Phase 2 planning or verification.*
+*Next step: Phase 1 complete. Run `/gsd:plan-phase 2` to plan Phase 2 (Authentication & Onboarding).*
