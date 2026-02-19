@@ -21,7 +21,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DATA-02**: PlayerIdentityResolution wired into projections ingest with fuzzy matching
 - [ ] **DATA-03**: Free agent pool fetched from ESPN and available for recommendations
 - [ ] **DATA-04**: Rate stat component math works correctly in trade simulations
-- [ ] **DATA-05**: ESPN API calls retry with exponential backoff on failure
+- [x] **DATA-05**: ESPN API calls retry with exponential backoff on failure
 - [ ] **DATA-06**: League transactions ingested from ESPN and stored in timeline
 
 ### Dashboard
@@ -48,8 +48,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Infrastructure
 
 - [ ] **INFR-01**: All API routes enforce authentication and league ownership
-- [ ] **INFR-02**: API has rate limiting to prevent abuse
-- [ ] **INFR-03**: Snapshot orchestrator has job locking to prevent concurrent runs
+- [x] **INFR-02**: API has rate limiting to prevent abuse
+- [x] **INFR-03**: Snapshot orchestrator has job locking to prevent concurrent runs
 
 ## v2 Requirements
 
@@ -97,7 +97,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-02 | Phase 1 | Pending |
 | DATA-03 | Phase 1 | Pending |
 | DATA-04 | Phase 1 | Pending |
-| DATA-05 | Phase 1 | Pending |
+| DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Pending |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
@@ -112,8 +112,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRFT-01 | Phase 4 | Pending |
 | DRFT-02 | Phase 4 | Pending |
 | INFR-01 | Phase 1 | Pending |
-| INFR-02 | Phase 1 | Pending |
-| INFR-03 | Phase 1 | Pending |
+| INFR-02 | Phase 1 | Complete |
+| INFR-03 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total
