@@ -10,26 +10,29 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 1 of 4 (Foundation & Critical Fixes)
-Plan: 2 of 6 completed
+Plan: 5 of 6 completed
 Status: In progress
-Last activity: 2026-02-19 — Completed 01-02-PLAN.md (Secure ESPN Credentials & Enforce API Authentication)
+Last activity: 2026-02-19 — Completed 01-04-PLAN.md (ESPN Data Gaps)
 
-Progress: [███░░░░░░░] 33%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 17 minutes
-- Total execution time: 34 minutes
+- Total plans completed: 5
+- Average duration: 11 minutes
+- Total execution time: 56 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 2 | 34min | 17min |
+| 01 | 5 | 56min | 11min |
 
 **Recent Executions:**
+- Phase 01 Plan 04: 5min (3 tasks, 3 files)
+- Phase 01 Plan 05: 11min (3 tasks, 8 files)
+- Phase 01 Plan 03: 11min (2 tasks, 4 files)
 - Phase 01 Plan 02: 17min (2 tasks, 11 files)
 - Phase 01 Plan 01: 17min (2 tasks, 8 files)
 
@@ -50,6 +53,9 @@ Recent decisions affecting current work:
 - [Phase 01-02]: Graceful degradation with hasEncryptionKey() for development without encryption
 - [Phase 01-02]: Middleware reads leagueId/teamId from request.params instead of closure pattern
 - [Phase 01-02]: Filter GET /api/leagues to user's leagues instead of global list
+- [Phase 01-04]: ESPN free agent filter passed as x-fantasy-filter URL parameter with filterSlotIds
+- [Phase 01-04]: Fuzzy match confidence threshold 0.8 in projections ingest, 0.7 in identity agent
+- [Phase 01-04]: Transaction deduplication via SHA-256 payload hash on unique constraint
 
 ### Pending Todos
 
@@ -58,7 +64,7 @@ None yet.
 ### Blockers/Concerns
 
 **From Research (Phase 1 Critical Items):**
-- Free agent pool never fetched from ESPN — requires reverse engineering ESPN API params (2 weeks estimated)
+- ~~Free agent pool never fetched from ESPN~~ — RESOLVED in 01-04 (fetchFreeAgents with filterSlotIds and position filtering)
 - ~~ESPN cookies stored plaintext~~ — RESOLVED in 01-02 (encryption at rest with AES-256-GCM)
 - ~~Multi-tenant data leakage risk~~ — RESOLVED in 01-02 (JWT auth on all routes, league membership verification)
 - Rate stat simulation math broken — requires component-based calculations (3 days estimated)
@@ -72,7 +78,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19 (plan execution)
-Stopped at: Completed 01-02-PLAN.md (Secure ESPN Credentials & Enforce API Authentication)
+Stopped at: Completed 01-04-PLAN.md (ESPN Data Gaps)
 Resume file: None
 
 ---

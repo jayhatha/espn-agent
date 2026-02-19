@@ -18,11 +18,11 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Data Quality
 
 - [x] **DATA-01**: ESPN auth cookies encrypted at rest in database
-- [ ] **DATA-02**: PlayerIdentityResolution wired into projections ingest with fuzzy matching
-- [ ] **DATA-03**: Free agent pool fetched from ESPN and available for recommendations
+- [x] **DATA-02**: PlayerIdentityResolution wired into projections ingest with fuzzy matching
+- [x] **DATA-03**: Free agent pool fetched from ESPN and available for recommendations
 - [x] **DATA-04**: Rate stat component math works correctly in trade simulations
 - [x] **DATA-05**: ESPN API calls retry with exponential backoff on failure
-- [ ] **DATA-06**: League transactions ingested from ESPN and stored in timeline
+- [x] **DATA-06**: League transactions ingested from ESPN and stored in timeline
 
 ### Dashboard
 
@@ -94,11 +94,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-04 | Phase 2 | Pending |
 | AUTH-05 | Phase 2 | Pending |
 | DATA-01 | Phase 1 | Complete |
-| DATA-02 | Phase 1 | Pending |
-| DATA-03 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Complete |
+| DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete |
-| DATA-06 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Complete |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |
