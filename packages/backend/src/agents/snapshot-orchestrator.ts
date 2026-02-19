@@ -1,7 +1,8 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
+import crypto from "crypto";
+import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, type ESPNFreeAgent, type ESPNTransaction } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
@@ -207,6 +208,50 @@ export class SnapshotOrchestratorAgent {
           leagueId,
           snapshotDate,
           projectionsRun.id,
+        );
+      }
+
+      // 8. Fetch free agents and transactions in parallel (non-blocking)
+      // Build espnTeamIdToDbId map outside the transaction for use here
+      const teamIdMap = new Map<number, number>();
+      for (const team of normalized.teams) {
+        const dbTeam = await this.db
+          .selectFrom("team")
+          .select("id")
+          .where("league_id", "=", leagueId)
+          .where("espn_team_id", "=", team.id)
+          .executeTakeFirst();
+        if (dbTeam) teamIdMap.set(team.id, dbTeam.id);
+      }
+
+      const [freeAgentResult, transactionResult] = await Promise.allSettled([
+        this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate),
+        this.fetchAndStoreTransactions(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate, teamIdMap),
+      ]);
+
+      // If free agent fetch failed, mark snapshot as degraded
+      if (freeAgentResult.status === "rejected") {
+        this.logger?.warn(
+          { error: freeAgentResult.reason, leagueId },
+          "Free agent fetch failed, marking snapshot as degraded",
+        );
+        const currentReasons = [...degradedReasons, "free_agents_failed"];
+        await this.db
+          .updateTable("league_daily_snapshot")
+          .set({
+            is_degraded: true,
+            degraded_reasons: currentReasons,
+          })
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .execute();
+      }
+
+      // If transaction fetch failed, just log a warning (non-blocking)
+      if (transactionResult.status === "rejected") {
+        this.logger?.warn(
+          { error: transactionResult.reason, leagueId },
+          "Transaction fetch failed, continuing without transactions",
         );
       }
 
@@ -496,5 +541,170 @@ export class SnapshotOrchestratorAgent {
     }
 
     this.logger?.info({ freeAgentCount: freeAgents.length }, "Free agent players written");
+  }
+
+  /**
+   * Fetch free agents from ESPN and store in player table with ownership data
+   * Non-blocking: failure does not stop the snapshot pipeline
+   */
+  private async fetchAndStoreFreeAgents(
+    espnLeagueId: number,
+    season: number,
+    auth: ESPNAuthCookies | undefined,
+    leagueId: number,
+    snapshotDate: string,
+  ): Promise<void> {
+    const freeAgents = await this.espnAdapter.fetchFreeAgents({
+      leagueId: espnLeagueId,
+      season,
+      auth,
+      limit: 300,
+    });
+
+    // Store free agent players in the player table
+    for (const fa of freeAgents) {
+      await this.db
+        .insertInto("player")
+        .values({
+          espn_player_id: fa.playerId,
+          name: fa.name,
+          mlb_team: fa.mlbTeam,
+          positions: fa.positions,
+          created_at: new Date(),
+        })
+        .onConflict((oc) =>
+          oc.column("espn_player_id").doUpdateSet({
+            name: fa.name,
+            mlb_team: fa.mlbTeam,
+            positions: fa.positions,
+          }),
+        )
+        .execute();
+    }
+
+    this.logger?.info(
+      { leagueId, snapshotDate, freeAgentCount: freeAgents.length },
+      "Free agents fetched and stored",
+    );
+  }
+
+  /**
+   * Fetch transactions from ESPN and upsert into league_transaction_event
+   * Non-blocking: failure does not stop the snapshot pipeline
+   */
+  private async fetchAndStoreTransactions(
+    espnLeagueId: number,
+    season: number,
+    auth: ESPNAuthCookies | undefined,
+    leagueId: number,
+    snapshotDate: string,
+    espnTeamIdToDbId: Map<number, number>,
+  ): Promise<void> {
+    const transactions = await this.espnAdapter.fetchTransactions({
+      leagueId: espnLeagueId,
+      season,
+      auth,
+    });
+
+    if (transactions.length === 0) {
+      this.logger?.info({ leagueId }, "No transactions to ingest");
+      return;
+    }
+
+    let newTransactions = 0;
+
+    for (const txn of transactions) {
+      // Determine primary team from first item's toTeamId or fromTeamId
+      const primaryItem = txn.items[0];
+      if (!primaryItem) continue;
+
+      const primaryEspnTeamId = primaryItem.toTeamId ?? primaryItem.fromTeamId;
+      if (primaryEspnTeamId === null) continue;
+
+      const dbTeamId = espnTeamIdToDbId.get(primaryEspnTeamId);
+      if (!dbTeamId) {
+        this.logger?.debug(
+          { espnTeamId: primaryEspnTeamId, transactionId: txn.transactionId },
+          "Skipping transaction: team not found in league",
+        );
+        continue;
+      }
+
+      // Map event type to schema format
+      const eventType = txn.type.toLowerCase() as "add" | "drop" | "trade" | "waiver" | "other";
+
+      // Determine counterparty for trades
+      let counterpartyDbTeamId: number | null = null;
+      if (txn.type === "TRADE") {
+        for (const item of txn.items) {
+          const otherTeamId = item.fromTeamId !== primaryEspnTeamId
+            ? item.fromTeamId
+            : item.toTeamId;
+          if (otherTeamId !== null && otherTeamId !== primaryEspnTeamId) {
+            counterpartyDbTeamId = espnTeamIdToDbId.get(otherTeamId) ?? null;
+            break;
+          }
+        }
+      }
+
+      // Collect player IDs for added/dropped
+      const playersAdded = txn.items
+        .filter((i) => i.action === "ADD" || i.action === "TRADE_IN")
+        .map((i) => i.playerId);
+      const playersDropped = txn.items
+        .filter((i) => i.action === "DROP" || i.action === "TRADE_OUT")
+        .map((i) => i.playerId);
+
+      const eventTime = new Date(txn.timestamp);
+      const eventDate = eventTime.toISOString().split("T")[0];
+      const rawEventJson = {
+        transactionId: txn.transactionId,
+        type: txn.type,
+        items: txn.items,
+        bidAmount: txn.bidAmount,
+      };
+      const payloadHash = crypto
+        .createHash("sha256")
+        .update(JSON.stringify(rawEventJson))
+        .digest("hex")
+        .substring(0, 16);
+
+      try {
+        await this.db
+          .insertInto("league_transaction_event")
+          .values({
+            league_id: leagueId,
+            event_time: eventTime,
+            event_date: eventDate,
+            event_type: eventType,
+            team_id: dbTeamId,
+            counterparty_team_id: counterpartyDbTeamId,
+            players_added: playersAdded,
+            players_dropped: playersDropped,
+            espn_event_id: txn.transactionId,
+            payload_hash: payloadHash,
+            raw_event_json: rawEventJson as any,
+          })
+          .onConflict((oc) =>
+            oc
+              .columns(["league_id", "event_time", "team_id", "payload_hash"])
+              .doNothing(),
+          )
+          .execute();
+
+        newTransactions++;
+      } catch (err) {
+        // Log individual transaction insert failures but continue
+        this.logger?.debug(
+          { err, transactionId: txn.transactionId },
+          "Failed to insert transaction (may already exist)",
+        );
+      }
+    }
+
+    this.logger?.info(
+      { leagueId, snapshotDate, totalTransactions: transactions.length, newTransactions },
+      "Transactions ingested",
+    );
   }
 }
