@@ -3,6 +3,7 @@ import { getDb } from "../db/connection.js";
 import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 
 /**
  * Leagues API Routes
@@ -490,6 +491,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
           }
         }
 
+        // Manual snapshot triggers execute directly (not via queue)
+        // Queue-based deduplication in snapshot-worker.ts covers scheduled snapshots
         await orchestrator.executeSnapshot({
           leagueId,
           snapshotDate: today,

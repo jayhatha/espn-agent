@@ -81,26 +81,41 @@ export async function scheduleDailySnapshots() {
   const today = new Date().toISOString().split("T")[0];
 
   for (const league of leagues) {
-    await snapshotQueue.add(
+    const jobId = `snapshot-${league.id}-${today}`;
+    const job = await snapshotQueue.add(
       `snapshot-${league.id}-${today}`,
       {
         leagueId: league.id,
         snapshotDate: today,
       },
       {
-        jobId: `snapshot-${league.id}-${today}`,
+        jobId,
         attempts: 3,
         backoff: {
           type: "exponential",
-          delay: 60000, // 1 minute
+          delay: 5000, // 5s base delay (5s, 10s, 20s with exponential backoff)
+        },
+        // Deduplication: prevent duplicate jobs for same league+date within 24 hours
+        removeOnComplete: {
+          age: 86400, // Keep completed jobs for 24 hours (in seconds)
+        },
+        removeOnFail: {
+          age: 86400, // Keep failed jobs for 24 hours (in seconds)
         },
       },
     );
 
-    logger.info(
-      { leagueId: league.id, snapshotDate: today },
-      "Scheduled snapshot job",
-    );
+    if (job) {
+      logger.info(
+        { leagueId: league.id, snapshotDate: today, jobId },
+        "Scheduled snapshot job",
+      );
+    } else {
+      logger.info(
+        { leagueId: league.id, snapshotDate: today, jobId },
+        "Snapshot job already exists (deduplication)",
+      );
+    }
   }
 }
 
