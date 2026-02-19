@@ -29,10 +29,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Trade simulation math uses component formulas (AVG = H/AB, not averaged rates) and returns correct deltas
   4. Frontend pages use centralized API client with environment-based URLs (no hardcoded localhost:3001)
   5. All API routes require authentication and verify league ownership (no data leakage)
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- TBD
+- [ ] 01-01-PLAN.md — Backend infrastructure: ESPN API retry, rate limiting, snapshot job dedup
+- [ ] 01-02-PLAN.md — Security: ESPN cookie encryption at rest, auth enforcement on all routes
+- [ ] 01-03-PLAN.md — Rate stat component math in trade simulations (TDD)
+- [ ] 01-04-PLAN.md — ESPN data gaps: free agents, transactions, player identity wiring
+- [ ] 01-05-PLAN.md — Frontend API client migration (eliminate hardcoded localhost)
+- [ ] 01-06-PLAN.md — Frontend shared component library extraction
 
 ### Phase 2: Authentication & Onboarding
 **Goal**: Enable user registration, login with OAuth providers, and guided onboarding flow for new users
@@ -85,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Critical Fixes | 0/TBD | Not started | - |
+| 1. Foundation & Critical Fixes | 0/6 | Planning complete | - |
 | 2. Authentication & Onboarding | 0/TBD | Not started | - |
 | 3. Core Dashboard & Recommendations | 0/TBD | Not started | - |
 | 4. Advanced Features & Polish | 0/TBD | Not started | - |
