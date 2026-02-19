@@ -18,6 +18,14 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Overall standings over time
   app.get(
     "/api/leagues/:leagueId/timeseries/overall",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };

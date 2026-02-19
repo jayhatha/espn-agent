@@ -19,13 +19,14 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
-        Querystring: { snapshotDate?: string; limit?: string };
+        Querystring: { snapshotDate?: string; limit?: string; sortBy?: string; position?: string };
       }>,
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { snapshotDate, limit } = request.query;
-      const maxPlayers = limit ? parseInt(limit, 10) : 100;
+      const { snapshotDate, limit, sortBy, position } = request.query;
+      const maxPlayers = limit ? parseInt(limit, 10) : 200;
+      const positionFilter = position?.split(",").map((p) => p.trim()).filter(Boolean) || [];
 
       // Get latest snapshot date if not provided
       let date = snapshotDate;
@@ -46,30 +47,85 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Get latest ESPN payload to extract free agents
-        const latestPayload = await db
-          .selectFrom("league_raw_payload")
-          .select("response_json")
-          .where("league_id", "=", leagueId)
-          .orderBy("fetched_at", "desc")
+        // Fetch league auth info
+        const league = await db
+          .selectFrom("league")
+          .select(["espn_league_id", "season", "espn_swid", "espn_s2"])
+          .where("id", "=", leagueId)
           .executeTakeFirst();
 
-        if (!latestPayload) {
-          return reply.code(404).send({ error: "No league data found" });
+        if (!league) {
+          return reply.code(404).send({ error: "League not found" });
         }
 
-        const espnAdapter = new ESPNAdapter(request.log);
-        const normalized = espnAdapter.normalizeLeagueData(
-          latestPayload.response_json as Record<string, unknown>,
-        );
+        const auth = league.espn_swid && league.espn_s2
+          ? { SWID: league.espn_swid, espn_s2: league.espn_s2 }
+          : undefined;
 
-        const espnPlayerIds = normalized.freeAgents?.map((fa) => fa.playerId) || [];
+        // Fetch free agents live from ESPN with ownership data
+        const espnAdapter = new ESPNAdapter(request.log as any);
+        let espnFreeAgents = await espnAdapter.fetchFreeAgents({
+          leagueId: league.espn_league_id,
+          season: league.season,
+          auth,
+          limit: maxPlayers,
+        });
 
-        if (espnPlayerIds.length === 0) {
+        if (espnFreeAgents.length === 0) {
           return { freeAgents: [], snapshotDate: date };
         }
 
-        // Get player details and projections
+        // Apply position filter if specified
+        if (positionFilter.length > 0) {
+          espnFreeAgents = espnFreeAgents.filter((fa) =>
+            fa.positions.some((pos) => positionFilter.includes(pos))
+          );
+        }
+
+        // Build a map of ESPN player ID → ownership data
+        const ownershipMap = new Map(
+          espnFreeAgents.map((fa) => [fa.playerId, { pctOwned: fa.pctOwned, pctStarted: fa.pctStarted }])
+        );
+
+        const espnPlayerIds = espnFreeAgents.map((fa) => fa.playerId);
+
+        // Upsert free agent players into the player table
+        for (const fa of espnFreeAgents) {
+          await db
+            .insertInto("player")
+            .values({
+              espn_player_id: fa.playerId,
+              name: fa.name,
+              mlb_team: fa.mlbTeam,
+              positions: fa.positions,
+              created_at: new Date(),
+            })
+            .onConflict((oc) =>
+              oc.column("espn_player_id").doUpdateSet({
+                name: fa.name,
+                mlb_team: fa.mlbTeam,
+                positions: fa.positions,
+              }),
+            )
+            .execute();
+        }
+
+        // Get player DB IDs
+        const freeAgents = espnPlayerIds.length > 0
+          ? await db
+              .selectFrom("player as p")
+              .select([
+                "p.id as player_id",
+                "p.espn_player_id",
+                "p.name as player_name",
+                "p.mlb_team",
+                "p.positions",
+              ])
+              .where("p.espn_player_id", "in", espnPlayerIds)
+              .execute()
+          : [];
+
+        // Get projections if available
         const snapshot = await db
           .selectFrom("league_daily_snapshot")
           .selectAll()
@@ -77,53 +133,42 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .where("snapshot_date", "=", date)
           .executeTakeFirst();
 
-        const freeAgents = await db
-          .selectFrom("player as p")
-          .select([
-            "p.id as player_id",
-            "p.espn_player_id",
-            "p.name as player_name",
-            "p.mlb_team",
-            "p.positions",
-          ])
-          .where("p.espn_player_id", "in", espnPlayerIds.slice(0, maxPlayers))
-          .orderBy("p.name", "asc")
-          .execute();
-
-        // Enrich with projections if available
+        const projMap = new Map<number, Record<string, unknown>>();
         if (snapshot?.projections_run_id && freeAgents.length > 0) {
           const playerIds = freeAgents.map((fa) => fa.player_id);
-          const projections = await db
-            .selectFrom("player_projection")
-            .select(["player_id", "stat_components_json"])
-            .where("projections_run_id", "=", snapshot.projections_run_id)
-            .where("player_id", "in", playerIds)
-            .execute();
+          const projections = playerIds.length > 0
+            ? await db
+                .selectFrom("player_projection")
+                .select(["player_id", "stat_components_json"])
+                .where("projections_run_id", "=", snapshot.projections_run_id)
+                .where("player_id", "in", playerIds)
+                .execute()
+            : [];
 
-          const projMap = new Map(
-            projections.map((p) => [p.player_id, p.stat_components_json]),
-          );
+          for (const p of projections) {
+            projMap.set(p.player_id, p.stat_components_json as Record<string, unknown>);
+          }
+        }
 
-          const enriched = freeAgents.map((fa) => ({
+        let enriched = freeAgents.map((fa) => {
+          const ownership = ownershipMap.get(fa.espn_player_id);
+          return {
             playerId: fa.player_id,
             espnPlayerId: fa.espn_player_id,
             playerName: fa.player_name,
             mlbTeam: fa.mlb_team,
             positions: fa.positions,
             projections: projMap.get(fa.player_id) || null,
-          }));
+            pctOwned: ownership?.pctOwned ?? 0,
+          };
+        });
 
-          return { freeAgents: enriched, snapshotDate: date };
+        // Apply sorting
+        if (sortBy === "pct_owned" || !sortBy) {
+          enriched.sort((a, b) => b.pctOwned - a.pctOwned);
+        } else if (sortBy === "name") {
+          enriched.sort((a, b) => a.playerName.localeCompare(b.playerName));
         }
-
-        const enriched = freeAgents.map((fa) => ({
-          playerId: fa.player_id,
-          espnPlayerId: fa.espn_player_id,
-          playerName: fa.player_name,
-          mlbTeam: fa.mlb_team,
-          positions: fa.positions,
-          projections: null,
-        }));
 
         return { freeAgents: enriched, snapshotDate: date };
       } catch (error) {
@@ -196,7 +241,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           playerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.run_id", "run.id")
+                .innerJoin("projections_run as run", "run.id", "proj.projections_run_id")
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",
@@ -242,6 +287,14 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Evaluate add/drop impact
   app.post(
     "/api/leagues/:leagueId/teams/:teamId/waivers/evaluate",
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -272,13 +325,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const espnAdapter = new ESPNAdapter(request.log);
-        const standingsAgent = new StandingsProjectionAgent(db, request.log);
+        const espnAdapter = new ESPNAdapter(request.log as any);
+        const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
         const waiverAgent = new WaiverRecommendationAgent(
           db,
           standingsAgent,
           espnAdapter,
-          request.log,
+          request.log as any,
         );
 
         // Get player names
@@ -412,13 +465,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const espnAdapter = new ESPNAdapter(request.log);
-      const standingsAgent = new StandingsProjectionAgent(db, request.log);
+      const espnAdapter = new ESPNAdapter(request.log as any);
+      const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
       const waiverAgent = new WaiverRecommendationAgent(
         db,
         standingsAgent,
         espnAdapter,
-        request.log,
+        request.log as any,
       );
 
       const recommendations = await waiverAgent.getRecommendations(
@@ -474,7 +527,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
 
       try {
         const analysis = await tradeAgent.analyzeTradeImpact(
@@ -527,7 +580,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
 
       try {
         const candidates = await tradeAgent.generateTradeCandidates(
@@ -656,7 +709,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           allPlayerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.run_id", "run.id")
+                .innerJoin("projections_run as run", "run.id", "proj.projections_run_id")
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",

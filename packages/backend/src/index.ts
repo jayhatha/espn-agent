@@ -1,7 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import redis from "@fastify/redis";
+import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
+import fastifyJwt from "@fastify/jwt";
 import { getDb } from "./db/connection.js";
 import { leaguesRoutes } from "./api/leagues.js";
 import { projectionsRoutes } from "./api/projections.js";
@@ -9,6 +11,9 @@ import { timeSeriesRoutes } from "./api/timeseries.js";
 import { recommendationsRoutes } from "./api/recommendations.js";
 import { slackRoutes } from "./api/slack.js";
 import { internalRoutes } from "./api/internal.js";
+import { authRoutes } from "./api/auth.js";
+import { setupOAuth } from "./api/auth-oauth.js";
+import { authenticate, requireAdmin } from "./middleware/auth.js";
 import { getFeatureFlags } from "./utils/feature-flags.js";
 import type { FastifyInstance } from "fastify";
 
@@ -35,7 +40,20 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Register plugins
   await server.register(cors, {
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
   });
+
+  // Register JWT plugin for authentication
+  await server.register(fastifyJwt, {
+    secret: process.env.JWT_SECRET || 'development-secret-change-in-production',
+    sign: {
+      expiresIn: process.env.JWT_EXPIRATION || '7d',
+    },
+  });
+
+  // Decorate fastify instance with auth methods
+  server.decorate('authenticate', authenticate);
+  server.decorate('requireAdmin', requireAdmin);
 
   await server.register(multipart, {
     limits: {
@@ -43,12 +61,23 @@ export async function buildServer(): Promise<FastifyInstance> {
     },
   });
 
+  // Register Redis (optional for caching and rate limiting)
   if (process.env.REDIS_URL) {
     await server.register(redis, {
       url: process.env.REDIS_URL,
       closeClient: true,
     });
+    server.log.info("Redis connected - using for rate limiting storage");
   }
+
+  // Register rate limiting plugin (uses Redis if available, otherwise in-memory)
+  await server.register(rateLimit, {
+    global: false, // Per-route configuration
+    redis: process.env.REDIS_URL ? server.redis : undefined,
+    nameSpace: "espn-agent-rl:",
+    continueExceeding: true,
+    skipOnError: false,
+  });
 
   // Add raw body parser for Slack signature verification
   // Slack sends form-encoded payloads that need raw body for HMAC
@@ -80,6 +109,15 @@ export async function buildServer(): Promise<FastifyInstance> {
       features: getFeatureFlags(),
     };
   });
+
+  // Auth routes (must be registered before protected routes)
+  await server.register(authRoutes);
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GITHUB_CLIENT_ID) {
+    await server.register(setupOAuth);
+    server.log.info("OAuth providers (Google, GitHub) enabled");
+  } else {
+    server.log.warn("OAuth not configured - set GOOGLE_CLIENT_ID and GITHUB_CLIENT_ID to enable");
+  }
 
   await server.register(leaguesRoutes);
   await server.register(projectionsRoutes);
