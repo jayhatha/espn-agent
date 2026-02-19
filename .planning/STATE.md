@@ -10,29 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 1 of 4 (Foundation & Critical Fixes)
-Plan: 3 of 6 completed
+Plan: 2 of 6 completed
 Status: In progress
-Last activity: 2026-02-19 — Completed 01-03-PLAN.md (Rate Stat Component Math)
+Last activity: 2026-02-19 — Completed 01-02-PLAN.md (Secure ESPN Credentials & Enforce API Authentication)
 
-Progress: [█████░░░░░] 50%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 13.7 minutes
-- Total execution time: 41 minutes
+- Total plans completed: 2
+- Average duration: 17 minutes
+- Total execution time: 34 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 3 | 41min | 13.7min |
+| 01 | 2 | 34min | 17min |
 
 **Recent Executions:**
-- Phase 01 Plan 03: 15min (2 tasks, 2 files)
-- Phase 01 Plan 02: 11min (1 task, 1 file)
-- Phase 01 Plan 01: 15min (5 tasks, 5 files)
+- Phase 01 Plan 02: 17min (2 tasks, 11 files)
+- Phase 01 Plan 01: 17min (2 tasks, 8 files)
 
 *Updated after each plan completion*
 
@@ -47,11 +46,10 @@ Recent decisions affecting current work:
 - Recommendations only, no ESPN write actions — ESPN has no official write API
 - Current-season history first, backfill later — nail current experience before investing in historical data
 - Roto category leagues only for v1 — simplifies scoring model
-- [Phase 01]: Use axios-retry with exponential backoff instead of custom retry logic
-- [Phase 01]: Redis-backed rate limiting with in-memory fallback for dev environments
-- [Phase 01]: BullMQ removeOnComplete/removeOnFail for deduplication instead of custom locking
-- [Phase 01-05]: Keep OAuth redirects and file uploads using direct API_URL constant — OAuth requires full URL, file uploads need FormData without Content-Type header
-- [Phase 01-03]: Component-based rate stat calculations for trade simulations
+- [Phase 01-02]: Generic ENCRYPTION_KEY instead of service-specific keys for easier configuration
+- [Phase 01-02]: Graceful degradation with hasEncryptionKey() for development without encryption
+- [Phase 01-02]: Middleware reads leagueId/teamId from request.params instead of closure pattern
+- [Phase 01-02]: Filter GET /api/leagues to user's leagues instead of global list
 
 ### Pending Todos
 
@@ -62,9 +60,9 @@ None yet.
 **From Research (Phase 1 Critical Items):**
 - Free agent pool never fetched from ESPN — requires reverse engineering ESPN API params (2 weeks estimated)
 - ~~ESPN cookies stored plaintext~~ — RESOLVED in 01-02 (encryption at rest with AES-256-GCM)
-- ~~Rate stat simulation math broken~~ — RESOLVED in 01-03 (component-based calculations)
-- Multi-tenant data leakage risk — no auth enforcement on API routes (2 weeks estimated)
-- ~~Frontend hardcoded localhost URLs~~ — RESOLVED in 01-05
+- ~~Multi-tenant data leakage risk~~ — RESOLVED in 01-02 (JWT auth on all routes, league membership verification)
+- Rate stat simulation math broken — requires component-based calculations (3 days estimated)
+- Frontend hardcoded localhost URLs — will break in production deployment (2 days estimated)
 
 **Research Flags for Future Phases:**
 - Phase 3: Multi-player trade combinatorics may need constraint solver research
@@ -74,7 +72,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19 (plan execution)
-Stopped at: Completed 01-03-PLAN.md (Rate Stat Component Math)
+Stopped at: Completed 01-02-PLAN.md (Secure ESPN Credentials & Enforce API Authentication)
 Resume file: None
 
 ---

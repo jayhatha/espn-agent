@@ -17,7 +17,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Data Quality
 
-- [ ] **DATA-01**: ESPN auth cookies encrypted at rest in database
+- [x] **DATA-01**: ESPN auth cookies encrypted at rest in database
 - [ ] **DATA-02**: PlayerIdentityResolution wired into projections ingest with fuzzy matching
 - [ ] **DATA-03**: Free agent pool fetched from ESPN and available for recommendations
 - [x] **DATA-04**: Rate stat component math works correctly in trade simulations
@@ -47,7 +47,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFR-01**: All API routes enforce authentication and league ownership
+- [x] **INFR-01**: All API routes enforce authentication and league ownership
 - [x] **INFR-02**: API has rate limiting to prevent abuse
 - [x] **INFR-03**: Snapshot orchestrator has job locking to prevent concurrent runs
 
@@ -93,7 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-03 | Phase 2 | Pending |
 | AUTH-04 | Phase 2 | Pending |
 | AUTH-05 | Phase 2 | Pending |
-| DATA-01 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Pending |
 | DATA-03 | Phase 1 | Pending |
 | DATA-04 | Phase 1 | Complete |
@@ -111,7 +111,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECC-04 | Phase 4 | Pending |
 | DRFT-01 | Phase 4 | Pending |
 | DRFT-02 | Phase 4 | Pending |
-| INFR-01 | Phase 1 | Pending |
+| INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 1 | Complete |
 | INFR-03 | Phase 1 | Complete |
 
