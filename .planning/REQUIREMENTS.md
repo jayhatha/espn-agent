@@ -31,7 +31,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DASH-03**: User sees daily action items with ESPN deep links
 - [ ] **DASH-04**: User sees category scarcity analysis (surplus/deficit per category)
 - [ ] **DASH-05**: Frontend uses shared component library (no duplicated UI)
-- [ ] **DASH-06**: Frontend uses centralized API client (no hardcoded localhost)
+- [x] **DASH-06**: Frontend uses centralized API client (no hardcoded localhost)
 
 ### Recommendations
 
@@ -104,7 +104,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-03 | Phase 3 | Pending |
 | DASH-04 | Phase 3 | Pending |
 | DASH-05 | Phase 1 | Pending |
-| DASH-06 | Phase 1 | Pending |
+| DASH-06 | Phase 1 | Complete |
 | RECC-01 | Phase 3 | Pending |
 | RECC-02 | Phase 3 | Pending |
 | RECC-03 | Phase 4 | Pending |
