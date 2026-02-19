@@ -1,6 +1,7 @@
-import axios, { type AxiosInstance } from "axios";
+import { type AxiosInstance } from "axios";
 import crypto from "crypto";
 import type { Logger } from "pino";
+import { createRetryableAxios } from "../utils/retry.js";
 
 /**
  * ESPN Adapter Agent
@@ -59,6 +60,15 @@ export interface ESPNTeamData {
   roster: ESPNRosterEntry[];
   primaryOwner?: string; // SWID of primary owner
   owners?: string[]; // Array of SWIDs
+}
+
+export interface ESPNFreeAgent {
+  playerId: number;
+  name: string;
+  positions: string[];
+  mlbTeam: string;
+  pctOwned: number;
+  pctStarted: number;
 }
 
 export interface ESPNLeagueData {
@@ -183,27 +193,25 @@ export class ESPNAdapter {
   private cache?: Map<string, { data: unknown; expiresAt: number }>;
 
   constructor(logger?: Logger) {
-    this.client = axios.create({
-      baseURL: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb",
-      timeout: 30000,
-      headers: {
-        "User-Agent": "ESPN-Fantasy-Assistant/0.1.0",
-      },
-      // ESPN expects repeated params: view=mTeam&view=mRoster (not view[]=...)
-      paramsSerializer: (params) => {
-        const parts: string[] = [];
-        for (const [key, value] of Object.entries(params)) {
-          if (Array.isArray(value)) {
-            for (const v of value) {
-              parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
-            }
-          } else if (value !== undefined && value !== null) {
-            parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+    this.client = createRetryableAxios(logger);
+    // Configure ESPN-specific settings
+    this.client.defaults.baseURL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb";
+    this.client.defaults.timeout = 30000;
+    this.client.defaults.headers["User-Agent"] = "ESPN-Fantasy-Assistant/0.1.0";
+    // ESPN expects repeated params: view=mTeam&view=mRoster (not view[]=...)
+    this.client.defaults.paramsSerializer = (params) => {
+      const parts: string[] = [];
+      for (const [key, value] of Object.entries(params)) {
+        if (Array.isArray(value)) {
+          for (const v of value) {
+            parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`);
           }
+        } else if (value !== undefined && value !== null) {
+          parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
         }
-        return parts.join("&");
-      },
-    });
+      }
+      return parts.join("&");
+    };
     this.logger = logger;
     this.cache = new Map();
   }
@@ -317,6 +325,98 @@ export class ESPNAdapter {
         throw error;
       }
       throw new Error(`Failed to fetch ESPN league data: ${error}`);
+    }
+  }
+
+  /**
+   * Fetch free agents from ESPN with ownership data
+   */
+  async fetchFreeAgents(options: {
+    leagueId: number;
+    season: number;
+    auth?: ESPNAuthCookies;
+    limit?: number;
+    position?: string;
+  }): Promise<ESPNFreeAgent[]> {
+    const { leagueId, season, auth, limit = 200 } = options;
+
+    try {
+      const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
+      const params: Record<string, unknown> = {
+        view: ["kona_player_info"],
+      };
+
+      const headers: Record<string, string> = {};
+      if (auth?.SWID && auth?.espn_s2) {
+        headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
+      }
+
+      // Filter for free agents only, sorted by percent owned descending
+      headers["x-fantasy-filter"] = JSON.stringify({
+        players: {
+          filterStatus: {
+            value: ["FREEAGENT", "WAIVERS"],
+          },
+          limit,
+          sortPercOwned: {
+            sortPriority: 1,
+            sortAsc: false,
+          },
+        },
+      });
+
+      this.logger?.info(
+        { leagueId, season, limit },
+        "Fetching ESPN free agents",
+      );
+
+      const response = await this.client.get(url, {
+        params,
+        headers,
+        validateStatus: (status) => status < 500,
+      });
+
+      if (response.status !== 200) {
+        throw new Error(
+          `ESPN API returned status ${response.status}`,
+        );
+      }
+
+      const players = (response.data?.players as any[]) || [];
+      const freeAgents: ESPNFreeAgent[] = [];
+
+      for (const entry of players) {
+        const player = entry.player;
+        if (!player) continue;
+
+        const eligibleSlots = (player.eligibleSlots || [])
+          .filter((s: number) => s <= 15 && s !== 12)
+          .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`);
+
+        const ownership = player.ownership || {};
+
+        freeAgents.push({
+          playerId: entry.id,
+          name: player.fullName || `Player ${entry.id}`,
+          positions: [...new Set(eligibleSlots)] as string[],
+          mlbTeam: ESPN_PRO_TEAM_MAP[player.proTeamId] || `team_${player.proTeamId}`,
+          pctOwned: ownership.percentOwned ?? 0,
+          pctStarted: ownership.percentStarted ?? 0,
+        });
+      }
+
+      this.logger?.info(
+        { leagueId, freeAgentCount: freeAgents.length },
+        "Free agents fetched",
+      );
+
+      return freeAgents;
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId },
+        "Failed to fetch free agents",
+      );
+      throw error;
     }
   }
 
@@ -444,7 +544,7 @@ export class ESPNAdapter {
         freeAgents.push({
           playerId: player.id,
           name: player.player?.fullName || player.fullName || `Player ${player.id}`,
-          positions: [...new Set(positions)], // Deduplicate positions
+          positions: [...new Set(positions)] as string[], // Deduplicate positions
         });
       }
     }
