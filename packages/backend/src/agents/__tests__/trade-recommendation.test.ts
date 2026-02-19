@@ -236,13 +236,15 @@ function createMockDb(): any {
   };
 
   // Create a chainable query builder that can handle unlimited .where() calls
-  const createChainable = (table: string, joinTable?: string): any => {
+  const createChainable = (table: string, joinTables: string[] = []): any => {
     const normalizedTable = normalizeTable(table);
-    const normalizedJoinTable = joinTable ? normalizeTable(joinTable) : undefined;
-    const key = normalizedJoinTable ? `${normalizedTable}_${normalizedJoinTable}` : normalizedTable;
+    const normalizedJoinTables = joinTables.map(normalizeTable);
+
+    // Create key from table and all join tables
+    const key = [normalizedTable, ...normalizedJoinTables].join("_");
 
     const builder: any = {
-      where: (...args: any[]) => createChainable(table, joinTable),
+      where: (...args: any[]) => createChainable(table, joinTables),
       execute: () => mockResults.get(`${key}_list`) || [],
       executeTakeFirst: () => mockResults.get(`${key}_single`),
       executeTakeFirstOrThrow: () => {
@@ -250,10 +252,10 @@ function createMockDb(): any {
         if (!result) throw new Error(`No result for ${key}_single`);
         return result;
       },
-      orderBy: (...args: any[]) => createChainable(table, joinTable),
-      select: (fields: any) => createChainable(table, joinTable),
-      selectAll: (prefix?: string) => createChainable(table, joinTable),
-      innerJoin: (jTable: string, ...args: any[]) => createChainable(table, jTable),
+      orderBy: (...args: any[]) => createChainable(table, joinTables),
+      select: (fields: any) => createChainable(table, joinTables),
+      selectAll: (prefix?: string) => createChainable(table, joinTables),
+      innerJoin: (jTable: string, ...args: any[]) => createChainable(table, [...joinTables, jTable]),
     };
 
     return builder;
@@ -320,10 +322,12 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 101, player_name: "Traded Away Player", positions: ["OF"], roster_status: "active" },
   ]);
 
-  // Player projections
+  // Player projections - note: complex query with multiple joins
+  // The query uses selectFrom("player_projection as proj").innerJoin("projections_run").innerJoin("player")
+  // Mock key includes all tables: player_projection_projections_run_player_list
   // Player 101 (traded away): H=50, AB=200
   // Player 102 (acquired): H=70, AB=200
-  mockDb._setMockResult("player_projection_list", [
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
     {
       player_id: 101,
       projections_run_id: 1,
@@ -385,7 +389,7 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 201, player_name: "Traded Pitcher", positions: ["SP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_list", [
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
     {
       player_id: 201,
       projections_run_id: 2,
@@ -447,7 +451,7 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 301, player_name: "Player Out", positions: ["1B"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_list", [
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
     {
       player_id: 301,
       projections_run_id: 3,
@@ -514,7 +518,7 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
     { player_id: 401, player_name: "Pitcher Out", positions: ["RP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_list", [
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
     {
       player_id: 401,
       projections_run_id: 4,
@@ -576,7 +580,7 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
     { player_id: 501, player_name: "Same Player", positions: ["OF"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_list", [
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
     {
       player_id: 501,
       projections_run_id: 5,
@@ -630,5 +634,5 @@ function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamI
   ]);
 
   // Empty projections list (no projections found)
-  mockDb._setMockResult("player_projection_list", []);
+  mockDb._setMockResult("player_projection_projections_run_player_list", []);
 }

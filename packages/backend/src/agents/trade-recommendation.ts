@@ -1,6 +1,14 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
+import {
+  calculateAVG,
+  calculateOBP,
+  calculateSLG,
+  calculateOPS,
+  calculateERA,
+  calculateWHIP,
+} from "../../../shared/dist/index.js";
 
 /**
  * Trade Recommendation Agent
@@ -507,8 +515,8 @@ export class TradeRecommendationAgent {
 
     const projections = await this.db
       .selectFrom("player_projection as proj")
-      .innerJoin("projections_run as run", "proj.run_id", "run.id")
-      .innerJoin("player", "proj.player_id", "player.id")
+      .innerJoin("projections_run as run", "run.id", "proj.projections_run_id")
+      .innerJoin("player", "player.id", "proj.player_id")
       .selectAll("proj")
       .where("run.as_of_date", "<=", asOfDate)
       .where(
@@ -588,6 +596,14 @@ export class TradeRecommendationAgent {
     // Calculate the delta for the user's team
     const userTeamCategories = teamCategoryValues.get(teamId) || new Map();
 
+    // Store original values before modifications (for currentValue in CategoryImpact)
+    const originalValues = new Map<string, number>();
+    for (const category of categories) {
+      const catId = category.statKey;
+      const current = userTeamCategories.get(catId);
+      originalValues.set(catId, current?.value || 0);
+    }
+
     // Apply trade adjustments to user team's projected category values
     for (const category of categories) {
       const catId = category.statKey;
@@ -608,11 +624,63 @@ export class TradeRecommendationAgent {
         // - Subtract rest-of-season components for traded-away players
         // - Add rest-of-season components for acquired players
         // - Recalculate rate from adjusted components
-        // TODO: Implement proper component-based rate stat calculations
-        // For now, keep the projected value unchanged
+
+        // Start with a copy of current components (or empty object if none)
+        const adjustedComponents: Record<string, number> = current.components
+          ? { ...current.components }
+          : {};
+
+        // Subtract components from players being traded away
+        for (const givePlayer of trade.givePlayers) {
+          const proj = projections.get(givePlayer.playerId);
+          if (proj && this.isCategoryRelevant(category, proj)) {
+            const playerComponents = proj.stat_components_json as Record<string, number>;
+            for (const [key, value] of Object.entries(playerComponents)) {
+              adjustedComponents[key] = (adjustedComponents[key] || 0) - (value || 0);
+            }
+          }
+        }
+
+        // Add components from players being acquired
+        for (const receivePlayer of trade.receivePlayers) {
+          const proj = projections.get(receivePlayer.playerId);
+          if (proj && this.isCategoryRelevant(category, proj)) {
+            const playerComponents = proj.stat_components_json as Record<string, number>;
+            for (const [key, value] of Object.entries(playerComponents)) {
+              adjustedComponents[key] = (adjustedComponents[key] || 0) + (value || 0);
+            }
+          }
+        }
+
+        // Calculate the new rate from adjusted components
+        let projectedValue: number;
+        switch (catId) {
+          case "AVG":
+            projectedValue = calculateAVG(adjustedComponents);
+            break;
+          case "OBP":
+            projectedValue = calculateOBP(adjustedComponents);
+            break;
+          case "SLG":
+            projectedValue = calculateSLG(adjustedComponents);
+            break;
+          case "OPS":
+            projectedValue = calculateOPS(adjustedComponents);
+            break;
+          case "ERA":
+            projectedValue = calculateERA(adjustedComponents);
+            break;
+          case "WHIP":
+            projectedValue = calculateWHIP(adjustedComponents);
+            break;
+          default:
+            // Fallback: preserve current value for unknown rate stats
+            projectedValue = current.value;
+        }
+
         userTeamCategories.set(catId, {
-          value: current.value,
-          components: current.components,
+          value: projectedValue,
+          components: adjustedComponents,
         });
       } else {
         // For counting stats, we can directly add/subtract
@@ -690,7 +758,7 @@ export class TradeRecommendationAgent {
       newCategoryImpacts.push({
         categoryId: catId,
         categoryName: category.name,
-        currentValue: userTeamCategories.get(catId)?.value || 0,
+        currentValue: originalValues.get(catId) || 0,
         projectedValue: userTeamCategories.get(catId)?.value || 0,
         currentRank: currentRank,
         projectedRank: projectedRank,
