@@ -1,25 +1,34 @@
 import crypto from "crypto";
 
 /**
- * Encryption utilities for Slack tokens
+ * Encryption utilities for sensitive credentials
  * Uses AES-256-GCM for authenticated encryption
  *
- * SLACK_ENCRYPTION_KEY must be 64 hex characters (32 bytes)
+ * ENCRYPTION_KEY must be 64 hex characters (32 bytes)
  * Generate with: openssl rand -hex 32
  */
 
 const ALGORITHM = "aes-256-gcm";
 
 /**
+ * Check if encryption key is configured
+ * Useful for graceful degradation during development
+ */
+export function hasEncryptionKey(): boolean {
+  const key = process.env.ENCRYPTION_KEY;
+  return !!(key && key.length === 64);
+}
+
+/**
  * Get encryption key from environment variable
  * Validates on first use (lazy initialization)
  */
 function getEncryptionKey(): Buffer {
-  const ENCRYPTION_KEY = process.env.SLACK_ENCRYPTION_KEY;
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
   if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
     throw new Error(
-      "SLACK_ENCRYPTION_KEY must be set and be 64 hex characters (32 bytes). Generate with: openssl rand -hex 32",
+      "ENCRYPTION_KEY must be set and be 64 hex characters (32 bytes). Generate with: openssl rand -hex 32",
     );
   }
 

@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
 import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
+import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
+import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Leagues API Routes
@@ -21,6 +23,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Connect to a league
   app.post(
     "/api/leagues/connect",
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Body: ConnectLeagueBody }>,
       reply: FastifyReply,
@@ -42,7 +52,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Fetch league data to validate and find user's team
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = new ESPNAdapter(request.log as any);
         const espnData = await espnAdapter.fetchLeague({
           leagueId: espnLeagueId,
           season,
@@ -117,6 +127,27 @@ export async function leaguesRoutes(app: FastifyInstance) {
           return { league, isNew: false, userTeamDetected: userTeamDbId !== null };
         }
 
+        // Encrypt ESPN cookies if encryption key is configured
+        let espnSwidEncrypted: Buffer | null = null;
+        let espnS2Encrypted: Buffer | null = null;
+
+        if (auth?.SWID || auth?.espn_s2) {
+          try {
+            if (hasEncryptionKey()) {
+              if (auth?.SWID) {
+                espnSwidEncrypted = encryptToken(auth.SWID);
+              }
+              if (auth?.espn_s2) {
+                espnS2Encrypted = encryptToken(auth.espn_s2);
+              }
+            } else {
+              request.log.warn("ENCRYPTION_KEY not configured - storing ESPN cookies in plaintext (dev mode)");
+            }
+          } catch (error) {
+            request.log.error({ error }, "Failed to encrypt ESPN cookies - storing in plaintext");
+          }
+        }
+
         // Create league
         league = await db
           .insertInto("league")
@@ -128,6 +159,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
             timezone: timezone || "America/New_York",
             espn_swid: auth?.SWID || null,
             espn_s2: auth?.espn_s2 || null,
+            espn_swid_encrypted: espnSwidEncrypted,
+            espn_s2_encrypted: espnS2Encrypted,
             created_at: new Date(),
           })
           .returningAll()
@@ -173,6 +206,30 @@ export async function leaguesRoutes(app: FastifyInstance) {
             .executeTakeFirstOrThrow();
         }
 
+        // Trigger initial snapshot for newly connected league
+        try {
+          request.log.info({ leagueId: league.id }, "Triggering initial snapshot for new league");
+          const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+          const today = new Date().toISOString().split("T")[0];
+
+          // Run snapshot in background (don't await)
+          orchestrator
+            .executeSnapshot({
+              leagueId: league.id,
+              snapshotDate: today,
+              espnAuth: auth,
+            })
+            .then(() => {
+              request.log.info({ leagueId: league.id }, "Initial snapshot completed");
+            })
+            .catch((err) => {
+              request.log.error({ error: err, leagueId: league.id }, "Initial snapshot failed");
+            });
+        } catch (error) {
+          // Log but don't fail the connection if snapshot fails
+          request.log.error({ error, leagueId: league.id }, "Failed to trigger initial snapshot");
+        }
+
         return { league, isNew: true, userTeamDetected: userTeamDbId !== null };
       } catch (error) {
         request.log.error({ error }, "Failed to connect league");
@@ -188,6 +245,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Get league status
   app.get(
     "/api/leagues/:leagueId/status",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Params: { leagueId: string } }>,
       reply: FastifyReply,
@@ -228,7 +293,17 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // List leagues
-  app.get("/api/leagues", async (request, reply) => {
+  app.get(
+    "/api/leagues",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
     const leagues = await db
       .selectFrom("league")
       .selectAll()
@@ -241,6 +316,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Get teams in a league
   app.get(
     "/api/leagues/:leagueId/teams",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Params: { leagueId: string } }>,
       reply: FastifyReply,
@@ -271,6 +354,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Update league authentication
   app.patch(
     "/api/leagues/:leagueId/auth",
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
@@ -292,11 +383,34 @@ export async function leaguesRoutes(app: FastifyInstance) {
       }
 
       try {
+        // Encrypt ESPN cookies if encryption key is configured
+        let espnSwidEncrypted: Buffer | null = null;
+        let espnS2Encrypted: Buffer | null = null;
+
+        if (SWID || espn_s2) {
+          try {
+            if (hasEncryptionKey()) {
+              if (SWID) {
+                espnSwidEncrypted = encryptToken(SWID);
+              }
+              if (espn_s2) {
+                espnS2Encrypted = encryptToken(espn_s2);
+              }
+            } else {
+              request.log.warn("ENCRYPTION_KEY not configured - storing ESPN cookies in plaintext (dev mode)");
+            }
+          } catch (error) {
+            request.log.error({ error }, "Failed to encrypt ESPN cookies - storing in plaintext");
+          }
+        }
+
         const updatedLeague = await db
           .updateTable("league")
           .set({
             espn_swid: SWID || null,
             espn_s2: espn_s2 || null,
+            espn_swid_encrypted: espnSwidEncrypted,
+            espn_s2_encrypted: espnS2Encrypted,
           })
           .where("id", "=", leagueId)
           .returningAll()
@@ -315,6 +429,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Trigger manual snapshot for a league
   app.post(
     "/api/leagues/:leagueId/snapshot",
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 hour",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Params: { leagueId: string } }>,
       reply: FastifyReply,
@@ -336,18 +458,37 @@ export async function leaguesRoutes(app: FastifyInstance) {
         const { SnapshotOrchestratorAgent } = await import(
           "../agents/snapshot-orchestrator.js"
         );
-        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
+        const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
 
         const today = new Date().toISOString().split("T")[0];
 
-        // Build auth cookies from stored credentials
-        const auth: ESPNAuthCookies | undefined =
-          league.espn_swid && league.espn_s2
-            ? {
-                SWID: league.espn_swid,
-                espn_s2: league.espn_s2,
-              }
-            : undefined;
+        // Build auth cookies from stored credentials - prefer encrypted, fallback to plaintext
+        let auth: ESPNAuthCookies | undefined;
+
+        try {
+          if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
+            // Decrypt from encrypted columns
+            auth = {
+              SWID: decryptToken(league.espn_swid_encrypted),
+              espn_s2: decryptToken(league.espn_s2_encrypted),
+            };
+          } else if (league.espn_swid && league.espn_s2) {
+            // Fallback to plaintext columns
+            auth = {
+              SWID: league.espn_swid,
+              espn_s2: league.espn_s2,
+            };
+          }
+        } catch (error) {
+          request.log.error({ error }, "Failed to decrypt ESPN cookies - falling back to plaintext");
+          // Fallback to plaintext if decryption fails
+          if (league.espn_swid && league.espn_s2) {
+            auth = {
+              SWID: league.espn_swid,
+              espn_s2: league.espn_s2,
+            };
+          }
+        }
 
         await orchestrator.executeSnapshot({
           leagueId,

@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
+import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Snapshot Orchestrator Agent

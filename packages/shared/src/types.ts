@@ -1,7 +1,5 @@
 // Core type definitions for ESPN Fantasy Baseball Assistant
 
-import type { Generated } from "kysely";
-
 export type Provider = "espn";
 
 export type ScoringFormat = "roto" | "h2h_category" | "points";
@@ -75,7 +73,7 @@ export interface StatComponents {
 
 // Player
 export interface Player {
-  id: Generated<number>;
+  id: number;
   espn_player_id: number;
   name: string;
   mlb_team: string | null;
@@ -86,7 +84,7 @@ export interface Player {
 
 // Team
 export interface Team {
-  id: Generated<number>;
+  id: number;
   league_id: number;
   espn_team_id: number;
   name: string;
@@ -95,7 +93,7 @@ export interface Team {
 
 // League
 export interface League {
-  id: Generated<number>;
+  id: number;
   provider: Provider;
   espn_league_id: number;
   season: number;
@@ -103,6 +101,8 @@ export interface League {
   timezone: string;
   espn_swid: string | null;
   espn_s2: string | null;
+  espn_swid_encrypted: Buffer | null;
+  espn_s2_encrypted: Buffer | null;
   user_team_id: number | null;
   created_at: Date;
 }
@@ -120,7 +120,7 @@ export interface LeagueDailySnapshot {
 
 // Projections run
 export interface ProjectionsRun {
-  id: Generated<number>;
+  id: number;
   source: string;
   system: string;
   as_of_date: string; // DATE in ISO format
@@ -232,4 +232,30 @@ export interface PlayerIdentityMap {
   confidence: number;
   resolution_method: ResolutionMethod;
   updated_at: Date;
+}
+
+// Authentication & User types
+export interface User {
+  id: number;
+  email: string;
+  role: 'user' | 'admin';
+  displayName: string | null;
+  avatarUrl: string | null;
+  createdAt: Date;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SignupRequest {
+  email: string;
+  password: string;
+  displayName?: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: Omit<User, 'createdAt'>;
 }

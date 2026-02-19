@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
 import { ProjectionsIngestAgent } from "../agents/projections-ingest.js";
+import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Projections API Routes
@@ -17,9 +18,28 @@ interface UploadProjectionsBody {
 export async function projectionsRoutes(app: FastifyInstance) {
   const db = getDb();
 
-  // Upload projections
+  // Upload projections (admin only - projections are shared across all users/leagues)
   app.post(
     "/api/projections/upload",
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 hour",
+        },
+      },
+      preHandler: [
+        app.authenticate,
+        async (request: any, reply: FastifyReply) => {
+          if (request.user.role !== "admin") {
+            return reply.code(403).send({
+              error: "Forbidden",
+              message: "Only administrators can upload projections. Projections are shared across all leagues.",
+            });
+          }
+        },
+      ],
+    },
     async (
       request: FastifyRequest,
       reply: FastifyReply,
@@ -35,7 +55,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         const buffer = await data.toBuffer();
         const csvContent = buffer.toString("utf-8");
 
-        const agent = new ProjectionsIngestAgent(db, request.log);
+        const agent = new ProjectionsIngestAgent(db, request.log as any);
 
         const today = new Date().toISOString().split("T")[0];
 
@@ -57,12 +77,24 @@ export async function projectionsRoutes(app: FastifyInstance) {
         const degradedLeagues = await db
           .selectFrom("league")
           .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
-          .select(["league.id", "league.espn_swid", "league.espn_s2"])
+          .select([
+            "league.id",
+            "league.espn_swid",
+            "league.espn_s2",
+            "league.espn_swid_encrypted",
+            "league.espn_s2_encrypted",
+          ])
           .where("league_daily_snapshot.is_degraded", "=", true)
           .where(
-            sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])`
+            sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
           )
-          .groupBy(["league.id", "league.espn_swid", "league.espn_s2"])
+          .groupBy([
+            "league.id",
+            "league.espn_swid",
+            "league.espn_s2",
+            "league.espn_swid_encrypted",
+            "league.espn_s2_encrypted",
+          ])
           .execute();
 
         if (degradedLeagues.length > 0) {
@@ -80,11 +112,25 @@ export async function projectionsRoutes(app: FastifyInstance) {
           Promise.all(
             degradedLeagues.map(async (league) => {
               try {
-                const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
-                const auth =
-                  league.espn_swid && league.espn_s2
-                    ? { SWID: league.espn_swid, espn_s2: league.espn_s2 }
-                    : undefined;
+                const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+
+                // Decrypt ESPN cookies - prefer encrypted, fallback to plaintext
+                let auth: { SWID: string; espn_s2: string } | undefined;
+                try {
+                  if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
+                    auth = {
+                      SWID: decryptToken(league.espn_swid_encrypted),
+                      espn_s2: decryptToken(league.espn_s2_encrypted),
+                    };
+                  } else if (league.espn_swid && league.espn_s2) {
+                    auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
+                  }
+                } catch (error) {
+                  request.log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
+                  if (league.espn_swid && league.espn_s2) {
+                    auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
+                  }
+                }
 
                 await orchestrator.executeSnapshot({
                   leagueId: league.id,
@@ -120,6 +166,14 @@ export async function projectionsRoutes(app: FastifyInstance) {
   // Get projections run
   app.get(
     "/api/projections/:runId",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Params: { runId: string } }>,
       reply: FastifyReply,
@@ -143,6 +197,14 @@ export async function projectionsRoutes(app: FastifyInstance) {
   // List projections runs
   app.get(
     "/api/projections",
+    {
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
     async (
       request: FastifyRequest<{ Querystring: { limit?: string } }>,
       reply: FastifyReply,
