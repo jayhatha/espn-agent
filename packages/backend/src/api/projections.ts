@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
 import { ProjectionsIngestAgent } from "../agents/projections-ingest.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { authenticate } from "../middleware/auth.js";
 
 /**
  * Projections API Routes
@@ -29,7 +30,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         },
       },
       preHandler: [
-        app.authenticate,
+        authenticate,
         async (request: any, reply: FastifyReply) => {
           if (request.user.role !== "admin") {
             return reply.code(403).send({
@@ -167,6 +168,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
   app.get(
     "/api/projections/:runId",
     {
+      onRequest: [authenticate],
       config: {
         rateLimit: {
           max: 100,
@@ -198,6 +200,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
   app.get(
     "/api/projections",
     {
+      onRequest: [authenticate],
       config: {
         rateLimit: {
           max: 100,

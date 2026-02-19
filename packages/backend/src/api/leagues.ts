@@ -25,6 +25,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   app.post(
     "/api/leagues/connect",
     {
+      onRequest: [authenticate],
       config: {
         rateLimit: {
           max: 30,
@@ -247,6 +248,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
   app.get(
     "/api/leagues/:leagueId/status",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
       config: {
         rateLimit: {
           max: 100,
@@ -297,6 +300,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   app.get(
     "/api/leagues",
     {
+      onRequest: [authenticate],
       config: {
         rateLimit: {
           max: 100,
@@ -305,19 +309,25 @@ export async function leaguesRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-    const leagues = await db
-      .selectFrom("league")
-      .selectAll()
-      .orderBy("created_at", "desc")
-      .execute();
+      // Only return leagues where the user has a team
+      const leagues = await db
+        .selectFrom("league")
+        .innerJoin("team", "team.league_id", "league.id")
+        .selectAll("league")
+        .where("team.user_id", "=", request.user.userId)
+        .orderBy("league.created_at", "desc")
+        .execute();
 
-    return { leagues };
-  });
+      return { leagues };
+    },
+  );
 
   // Get teams in a league
   app.get(
     "/api/leagues/:leagueId/teams",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
       config: {
         rateLimit: {
           max: 100,
@@ -356,6 +366,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
   app.patch(
     "/api/leagues/:leagueId/auth",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
       config: {
         rateLimit: {
           max: 30,
@@ -431,6 +443,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
   app.post(
     "/api/leagues/:leagueId/snapshot",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
       config: {
         rateLimit: {
           max: 10,
@@ -517,6 +531,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
   // Team overview (roster + stats + standings)
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/overview",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };

@@ -88,6 +88,7 @@ export interface Team {
   league_id: number;
   espn_team_id: number;
   name: string;
+  user_id: number | null;
   created_at: Date;
 }
 

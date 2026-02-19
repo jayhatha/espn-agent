@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
+import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 
 /**
  * Time Series API Routes
@@ -19,6 +20,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   app.get(
     "/api/leagues/:leagueId/timeseries/overall",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
       config: {
         rateLimit: {
           max: 100,
@@ -61,6 +64,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Category rank over time
   app.get(
     "/api/leagues/:leagueId/timeseries/category-rank",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
@@ -101,6 +108,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Projected overall over time
   app.get(
     "/api/leagues/:leagueId/timeseries/projected-overall",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
@@ -136,6 +147,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Projected standings for latest snapshot (by category)
   app.get(
     "/api/leagues/:leagueId/standings/projected",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
@@ -276,6 +291,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Transaction annotations
   app.get(
     "/api/leagues/:leagueId/timeseries/annotations",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };

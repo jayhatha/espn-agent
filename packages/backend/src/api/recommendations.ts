@@ -4,6 +4,7 @@ import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
 import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-recommendation.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
 
 /**
  * Recommendations API Routes
@@ -16,6 +17,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // List available free agents
   app.get(
     "/api/leagues/:leagueId/free-agents",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
@@ -184,6 +189,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Get team roster
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/roster",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -288,6 +297,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   app.post(
     "/api/leagues/:leagueId/teams/:teamId/waivers/evaluate",
     {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
       config: {
         rateLimit: {
           max: 30,
@@ -436,6 +447,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Waiver recommendations
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/waivers/recommendations",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -492,6 +507,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Trade impact analysis
   app.post(
     "/api/leagues/:leagueId/teams/:teamId/trades/impact",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -551,6 +570,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Trade candidate generation
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/trades/recommendations",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -604,6 +627,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Get rosters for manual trade building
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/trades/partners/:partnerTeamId/rosters",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: {
@@ -778,6 +805,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // List potential trade partners
   app.get(
     "/api/leagues/:leagueId/teams/:teamId/trades/partners",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
@@ -811,6 +842,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Draft recommendations (placeholder)
   app.get(
     "/api/leagues/:leagueId/draft/recommendations",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
     async (request, reply) => {
       return { message: "Draft recommendations - to be implemented" };
     },
