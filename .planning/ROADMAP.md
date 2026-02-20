@@ -15,7 +15,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation & Critical Fixes** - Fix broken data systems and security vulnerabilities before building features (completed 2026-02-19)
 - [x] **Phase 2: Authentication & Onboarding** - Enable user accounts with OAuth and guided first-run experience (completed 2026-02-19)
 - [x] **Phase 3: Core Dashboard & Recommendations** - Deliver main value with visualizations and AI-powered insights (completed 2026-02-20)
-- [ ] **Phase 4: Advanced Features & Polish** - Add lineup optimizer, draft assistant, and engagement features (in progress)
+- [x] **Phase 4: Advanced Features & Polish** - Add lineup optimizer, draft assistant, and engagement features (completed 2026-02-20)
+- [ ] **Phase 5: Admin UI** - Admin dashboard for projections upload, user management, and system health monitoring
 
 ## Phase Details
 
@@ -90,10 +91,25 @@ Plans:
 - [x] 04-03-PLAN.md — Draft API routes + draft rankings and auction frontend pages
 - [x] 04-04-PLAN.md — Lineup/streaming API routes + lineup optimizer and streaming pitcher frontend pages
 
+### Phase 5: Admin UI
+**Goal:** Give admin users a simple dashboard to upload projections, view/manage users, and see basic system health
+**Depends on:** Phase 4
+**Requirements:** ADMIN-01, ADMIN-02, ADMIN-03
+**Success Criteria** (what must be TRUE):
+  1. Admin can see system health KPIs (user count, league count, snapshot success rate, projection status)
+  2. Admin can view all users and toggle their role between user and admin
+  3. Admin can upload batter and pitcher projections CSVs in a single flow
+  4. Admin can see league health overview showing which leagues are healthy, degraded, or missing snapshots
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Backend admin API routes: users, stats, leagues, batch upload
+- [ ] 05-02-PLAN.md — Frontend admin dashboard: KPIs, user table, role toggle, two-file upload, league health
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -101,3 +117,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
 | 3. Core Dashboard & Recommendations | 3/3 | Complete | 2026-02-20 |
 | 4. Advanced Features & Polish | 4/4 | Complete | 2026-02-20 |
+| 5. Admin UI | 0/2 | In Progress | — |
