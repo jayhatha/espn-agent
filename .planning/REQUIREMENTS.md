@@ -42,8 +42,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Draft
 
-- [ ] **DRFT-01**: User sees pre-draft rankings with positional scarcity analysis
-- [ ] **DRFT-02**: User sees auction valuations based on projected stats
+- [x] **DRFT-01**: User sees pre-draft rankings with positional scarcity analysis
+- [x] **DRFT-02**: User sees auction valuations based on projected stats
 
 ### Infrastructure
 
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECC-02 | Phase 3 | Complete |
 | RECC-03 | Phase 4 | Pending |
 | RECC-04 | Phase 4 | Pending |
-| DRFT-01 | Phase 4 | Pending |
-| DRFT-02 | Phase 4 | Pending |
+| DRFT-01 | Phase 4 | Complete |
+| DRFT-02 | Phase 4 | Complete |
 | INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 1 | Complete |
 | INFR-03 | Phase 1 | Complete |

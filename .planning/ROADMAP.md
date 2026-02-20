@@ -14,8 +14,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Critical Fixes** - Fix broken data systems and security vulnerabilities before building features (completed 2026-02-19)
 - [x] **Phase 2: Authentication & Onboarding** - Enable user accounts with OAuth and guided first-run experience (completed 2026-02-19)
-- [ ] **Phase 3: Core Dashboard & Recommendations** - Deliver main value with visualizations and AI-powered insights
-- [ ] **Phase 4: Advanced Features & Polish** - Add lineup optimizer, draft assistant, and engagement features
+- [x] **Phase 3: Core Dashboard & Recommendations** - Deliver main value with visualizations and AI-powered insights (completed 2026-02-20)
+- [ ] **Phase 4: Advanced Features & Polish** - Add lineup optimizer, draft assistant, and engagement features (in progress)
 
 ## Phase Details
 
@@ -69,9 +69,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Dashboard components: TeamHealthOverview, ScarcityBadge, CategoryMiniChart
-- [ ] 03-02-PLAN.md — Action items, ESPN deep links, waiver/trade page enhancements
-- [ ] 03-03-PLAN.md — Dashboard assembly: wire components into league detail page
+- [x] 03-01-PLAN.md — Dashboard components: TeamHealthOverview, ScarcityBadge, CategoryMiniChart
+- [x] 03-02-PLAN.md — Action items, ESPN deep links, waiver/trade page enhancements
+- [x] 03-03-PLAN.md — Dashboard assembly: wire components into league detail page
 
 ### Phase 4: Advanced Features & Polish
 **Goal**: Add engagement features (lineup optimizer, streaming suggestions) and seasonal acquisition tools (draft assistant)
@@ -85,7 +85,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — VBD/SGP draft math + DraftRankingsAgent + AuctionValuationAgent
+- [x] 04-01-PLAN.md — VBD/SGP draft math + DraftRankingsAgent + AuctionValuationAgent
 - [ ] 04-02-PLAN.md — MLB StatsAPI adapter + LineupOptimizerAgent + StreamingPitcherAgent
 - [ ] 04-03-PLAN.md — Draft API routes + draft rankings and auction frontend pages
 - [ ] 04-04-PLAN.md — Lineup/streaming API routes + lineup optimizer and streaming pitcher frontend pages
@@ -99,5 +99,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
-| 3. Core Dashboard & Recommendations | 0/3 | Not started | - |
-| 4. Advanced Features & Polish | 0/4 | Not started | - |
+| 3. Core Dashboard & Recommendations | 3/3 | Complete | 2026-02-20 |
+| 4. Advanced Features & Polish | 1/4 | In Progress | - |
