@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -12,6 +12,10 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { StatCard } from "@/components/ui/StatCard";
 import { TeamSelector } from "@/components/league/TeamSelector";
 import { CategoryStatsTable } from "@/components/league/CategoryStatsTable";
+import { TeamHealthOverview } from "@/components/league/TeamHealthOverview";
+import { CategoryMiniChart } from "@/components/league/CategoryMiniChart";
+import { ActionItemsList, type ActionItem } from "@/components/league/ActionItemsList";
+import { getESPNFreeAgentsUrl, getESPNTradeUrl } from "@/lib/espn-links";
 
 interface Team {
   id: number;
@@ -159,6 +163,80 @@ function LeagueDetailPageContent() {
     },
     enabled: !!selectedTeamId,
   });
+
+  // Waiver recommendations for dashboard
+  const { data: waiverRecs } = useQuery({
+    queryKey: ['dashboard-waivers', leagueId, selectedTeamId],
+    queryFn: () => api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId!, { maxRecommendations: 3 }),
+    enabled: !!selectedTeamId,
+  });
+
+  // Trade candidates for dashboard
+  const { data: tradeCandidates } = useQuery({
+    queryKey: ['dashboard-trades', leagueId, selectedTeamId],
+    queryFn: () => api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!),
+    enabled: !!selectedTeamId,
+  });
+
+  // Overall timeseries for mini chart
+  const { data: overallTimeseries } = useQuery({
+    queryKey: ['dashboard-timeseries', leagueId],
+    queryFn: () => api.getOverallTimeSeries(parseInt(leagueId, 10)),
+    enabled: !!leagueId,
+  });
+
+  // Transform recommendations into action items
+  const actionItems = useMemo(() => {
+    const items: ActionItem[] = [];
+    const espnLeagueId = data?.league?.espn_league_id;
+    const season = data?.league?.season;
+
+    // Add top waiver recommendations
+    if (waiverRecs?.recommendations) {
+      for (const rec of waiverRecs.recommendations.slice(0, 3)) {
+        items.push({
+          id: `waiver-${rec.addPlayerId}-${rec.dropPlayerId}`,
+          type: 'waiver',
+          priority: rec.deltaOverallPoints >= 2 ? 'high' : rec.deltaOverallPoints >= 1 ? 'medium' : 'low',
+          title: `Add ${rec.addPlayerName}, Drop ${rec.dropPlayerName}`,
+          description: rec.explanation,
+          impact: `+${rec.deltaOverallPoints.toFixed(1)} pts`,
+          espnLink: espnLeagueId && season ? getESPNFreeAgentsUrl(espnLeagueId, season) : undefined,
+          internalLink: `/leagues/${leagueId}/waivers`,
+        });
+      }
+    }
+
+    // Add top trade candidates
+    if (tradeCandidates?.candidates) {
+      for (const cand of tradeCandidates.candidates.slice(0, 2)) {
+        const giveName = cand.trade.givePlayers.map((p: any) => p.playerName).join(', ');
+        const getName = cand.trade.receivePlayers.map((p: any) => p.playerName).join(', ');
+        items.push({
+          id: `trade-${cand.partnerTeamId}-${giveName}`,
+          type: 'trade',
+          priority: cand.deltaOverallPoints >= 3 ? 'high' : cand.deltaOverallPoints >= 1.5 ? 'medium' : 'low',
+          title: `Trade ${giveName} for ${getName}`,
+          description: `${cand.partnerTeamName}: ${cand.explanation}`,
+          impact: `+${cand.deltaOverallPoints.toFixed(1)} pts`,
+          espnLink: espnLeagueId && season ? getESPNTradeUrl(espnLeagueId, season) : undefined,
+          internalLink: `/leagues/${leagueId}/trades`,
+        });
+      }
+    }
+
+    // Sort by impact descending
+    return items.sort((a, b) => parseFloat(b.impact) - parseFloat(a.impact));
+  }, [waiverRecs, tradeCandidates, data, leagueId]);
+
+  // Transform timeseries data for mini chart
+  const miniChartData = useMemo(() => {
+    if (!overallTimeseries?.series || !selectedTeamId) return [];
+    return overallTimeseries.series
+      .filter((p: any) => p.team_id === selectedTeamId)
+      .map((p: any) => ({ date: p.snapshot_date, rank: p.overall_rank }))
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+  }, [overallTimeseries, selectedTeamId]);
 
   const SLOT_ORDER = [
     "C",
@@ -404,70 +482,6 @@ function LeagueDetailPageContent() {
         )}
       </div>
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard
-          label="Total Snapshots"
-          value={snapshotCount}
-          icon={
-            <svg
-              className="h-8 w-8 text-blue-600"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Latest Snapshot"
-          value={latestSnapshot ? latestSnapshot.snapshot_date : "None"}
-          icon={
-            <svg
-              className={`h-8 w-8 ${latestSnapshot ? "text-green-600" : "text-gray-400"}`}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Status"
-          value={latestSnapshot?.is_degraded ? "Degraded" : "Healthy"}
-          icon={
-            <svg
-              className={`h-8 w-8 ${latestSnapshot?.is_degraded ? "text-yellow-600" : "text-green-600"}`}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-          }
-        />
-      </div>
-
       {/* Degraded Warning */}
       {latestSnapshot?.is_degraded &&
         latestSnapshot.degraded_reasons.length > 0 && (
@@ -483,98 +497,6 @@ function LeagueDetailPageContent() {
             />
           </div>
         )}
-
-      {/* Quick Actions */}
-      <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Link
-            href={`/leagues/${leagueId}/standings`}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg
-              className="h-6 w-6 text-indigo-600 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <span className="font-medium text-gray-900">Standings</span>
-          </Link>
-
-          <Link
-            href={`/leagues/${leagueId}/trends`}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg
-              className="h-6 w-6 text-blue-600 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-              />
-            </svg>
-            <span className="font-medium text-gray-900">View Trends</span>
-          </Link>
-
-          <Link
-            href={`/leagues/${leagueId}/waivers`}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg
-              className="h-6 w-6 text-green-600 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            <span className="font-medium text-gray-900">Waivers</span>
-          </Link>
-
-          <Link
-            href={`/leagues/${leagueId}/trades`}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg
-              className="h-6 w-6 text-purple-600 mr-3"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
-            <span className="font-medium text-gray-900">Trade Analyzer</span>
-          </Link>
-        </div>
-      </div>
 
       {/* Team Overview - only when team is selected */}
       {selectedTeamId && (
@@ -627,6 +549,98 @@ function LeagueDetailPageContent() {
                 </div>
               )}
 
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <StatCard
+                  label="Total Snapshots"
+                  value={snapshotCount}
+                  icon={
+                    <svg
+                      className="h-8 w-8 text-blue-600"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  }
+                />
+                <StatCard
+                  label="Latest Snapshot"
+                  value={latestSnapshot ? latestSnapshot.snapshot_date : "None"}
+                  icon={
+                    <svg
+                      className={`h-8 w-8 ${latestSnapshot ? "text-green-600" : "text-gray-400"}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  }
+                />
+                <StatCard
+                  label="Status"
+                  value={latestSnapshot?.is_degraded ? "Degraded" : "Healthy"}
+                  icon={
+                    <svg
+                      className={`h-8 w-8 ${latestSnapshot?.is_degraded ? "text-yellow-600" : "text-green-600"}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                  }
+                />
+              </div>
+
+              {/* Health Overview + Mini Chart - Two-column grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div className="lg:col-span-2">
+                  <TeamHealthOverview
+                    categories={teamOverview.categories}
+                    totalTeams={teamOverview.overall?.total_teams ?? 10}
+                  />
+                </div>
+                <div className="bg-white shadow rounded-lg p-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-4">Standings Trend</h3>
+                  <CategoryMiniChart data={miniChartData} label="Standings Trend" />
+                </div>
+              </div>
+
+              {/* Action Items */}
+              {actionItems.length > 0 && (
+                <div className="bg-white shadow rounded-lg p-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium text-gray-900">Recommended Actions</h2>
+                    <div className="flex gap-2">
+                      <Link href={`/leagues/${leagueId}/waivers`} className="text-sm text-blue-600 hover:text-blue-700">All Waivers →</Link>
+                      <Link href={`/leagues/${leagueId}/trades`} className="text-sm text-blue-600 hover:text-blue-700">All Trades →</Link>
+                    </div>
+                  </div>
+                  <ActionItemsList items={actionItems} maxItems={5} />
+                </div>
+              )}
+
               {/* Category Stats Table */}
               <div className="bg-white shadow rounded-lg p-6 mb-6">
                 <CategoryStatsTable
@@ -634,6 +648,98 @@ function LeagueDetailPageContent() {
                   categories={teamOverview.categories}
                   totalTeams={teamOverview.overall?.total_teams ?? 10}
                 />
+              </div>
+
+              {/* Quick Actions - moved below category table */}
+              <div className="bg-white shadow rounded-lg p-6 mb-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">
+                  Quick Actions
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Link
+                    href={`/leagues/${leagueId}/standings`}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6 text-indigo-600 mr-3"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span className="font-medium text-gray-900">Standings</span>
+                  </Link>
+
+                  <Link
+                    href={`/leagues/${leagueId}/trends`}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6 text-blue-600 mr-3"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
+                      />
+                    </svg>
+                    <span className="font-medium text-gray-900">View Trends</span>
+                  </Link>
+
+                  <Link
+                    href={`/leagues/${leagueId}/waivers`}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6 text-green-600 mr-3"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    <span className="font-medium text-gray-900">Waivers</span>
+                  </Link>
+
+                  <Link
+                    href={`/leagues/${leagueId}/trades`}
+                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6 text-purple-600 mr-3"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
+                    </svg>
+                    <span className="font-medium text-gray-900">Trade Analyzer</span>
+                  </Link>
+                </div>
               </div>
 
               {/* Roster Section */}
