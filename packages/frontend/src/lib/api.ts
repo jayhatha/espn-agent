@@ -69,6 +69,11 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 }
 
 export const api = {
+  // Generic GET method for arbitrary endpoints
+  async get(endpoint: string) {
+    return fetchAPI(endpoint);
+  },
+
   // Leagues
   async getLeagues() {
     return fetchAPI('/api/leagues');
@@ -209,6 +214,18 @@ export const api = {
   // Team roster
   async getTeamRoster(leagueId: number, teamId: number) {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/roster`);
+  },
+
+  // Lineup optimizer
+  async getLineupRecommendations(leagueId: number, teamId: number, params?: { snapshotDate?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/lineup/recommendations${query ? '?' + query : ''}`);
+  },
+
+  // Streaming pitchers
+  async getStreamingPitchers(leagueId: number, params?: { teamId?: number; startDate?: string; lookAheadDays?: number; limit?: number }) {
+    const query = new URLSearchParams(params as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/streaming-pitchers${query ? '?' + query : ''}`);
   },
 
   // League auth
