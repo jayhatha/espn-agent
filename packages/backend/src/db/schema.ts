@@ -1,3 +1,4 @@
+import type { Generated } from "kysely";
 import type {
   League,
   Team,
@@ -39,6 +40,9 @@ export interface Database {
   league_transaction_event: LeagueTransactionEvent;
   projections_run: ProjectionsRun;
   player_projection: PlayerProjection;
+  // Auth tables
+  users: UsersTable;
+  refresh_tokens: RefreshTokensTable;
   // Slack integration tables
   slack_installation: SlackInstallation;
   slack_user_link: SlackUserLink;
@@ -55,6 +59,34 @@ export interface LeagueSettingsVersion {
   effective_date: string; // DATE
   settings_json: LeagueSettings;
   created_at: Date;
+}
+
+/**
+ * Auth table interfaces
+ */
+
+export interface UsersTable {
+  id: Generated<number>;
+  email: string;
+  email_verified: Generated<boolean>;
+  password_hash: string | null;
+  role: Generated<string>;
+  google_id: string | null;
+  github_id: string | null;
+  oauth_provider: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  last_login_at: Date | null;
+}
+
+export interface RefreshTokensTable {
+  id: Generated<number>;
+  user_id: number;
+  token_hash: string;
+  expires_at: Date;
+  created_at: Generated<Date>;
 }
 
 /**

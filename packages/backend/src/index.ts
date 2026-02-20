@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import cookie from "@fastify/cookie";
 import redis from "@fastify/redis";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
@@ -43,11 +44,20 @@ export async function buildServer(): Promise<FastifyInstance> {
     credentials: true,
   });
 
-  // Register JWT plugin for authentication
+  // Register cookie plugin (must be before JWT)
+  await server.register(cookie, {
+    secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET || 'development-secret',
+  });
+
+  // Register JWT plugin for authentication (reads from accessToken cookie or Authorization header)
   await server.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || 'development-secret-change-in-production',
     sign: {
-      expiresIn: process.env.JWT_EXPIRATION || '7d',
+      expiresIn: '15m',
+    },
+    cookie: {
+      cookieName: 'accessToken',
+      signed: false,
     },
   });
 

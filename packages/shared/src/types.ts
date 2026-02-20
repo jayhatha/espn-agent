@@ -257,6 +257,5 @@ export interface SignupRequest {
 }
 
 export interface AuthResponse {
-  token: string;
   user: Omit<User, 'createdAt'>;
 }
