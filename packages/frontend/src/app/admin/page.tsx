@@ -44,15 +44,9 @@ function AdminPageContent() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {};
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
       const response = await fetch(`${API_URL}/api/projections/upload`, {
         method: "POST",
-        headers,
+        credentials: "include",
         body: formData,
       });
 

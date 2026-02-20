@@ -1,42 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
 
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const { user: authContextUser, logout: authLogout } = useAuth();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { user, logout: authLogout } = useAuth();
 
-  // Check if user is logged in
-  useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem("auth_token"));
-  }, [pathname, authContextUser]);
-
-  // Get current user data
-  const { data: userData } = useQuery({
-    queryKey: ["currentUser"],
-    queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
-      if (!token) return null;
-
-      try {
-        return await api.getProfile();
-      } catch {
-        return null;
-      }
-    },
-    enabled: isLoggedIn,
-  });
-
-  const isAdmin = userData?.role === "admin";
+  const isLoggedIn = !!user;
+  const isAdmin = user?.role === "admin";
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
@@ -60,7 +35,7 @@ export function Navigation() {
           {/* Logo/Brand */}
           <div className="flex items-center space-x-3">
             <Link href="/" className="flex items-center space-x-2">
-              <span className="text-2xl">⚾</span>
+              <span className="text-2xl">&#9918;</span>
               <span className="text-lg sm:text-xl font-bold text-gray-900 hidden sm:inline">
                 ESPN Fantasy Baseball Assistant
               </span>
@@ -106,7 +81,7 @@ export function Navigation() {
               <>
                 <div className="border-l border-gray-300"></div>
                 <span className="text-sm text-gray-600">
-                  {userData?.email}
+                  {user?.displayName || user?.email}
                 </span>
                 <button
                   onClick={handleLogout}
@@ -184,7 +159,7 @@ export function Navigation() {
             {isLoggedIn && (
               <>
                 <div className="px-3 py-2 border-t border-gray-200 text-xs text-gray-500">
-                  {userData?.email}
+                  {user?.displayName || user?.email}
                 </div>
                 <button
                   onClick={() => {
