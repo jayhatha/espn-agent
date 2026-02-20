@@ -2,6 +2,13 @@ import { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/connection.js";
 import { authenticate } from "../middleware/auth.js";
+import {
+  setAuthCookies,
+  clearAuthCookies,
+  issueTokenPair,
+} from "../utils/auth-cookies.js";
+
+const PASSWORD_HASH_ROUNDS = 13;
 
 export async function authRoutes(fastify: FastifyInstance) {
   // POST /api/auth/signup - User registration
@@ -34,25 +41,28 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
     }
 
+    // Lowercase email for case-insensitive uniqueness
+    const normalizedEmail = email.toLowerCase();
+
     // Check if user exists
     const existing = await getDb()
       .selectFrom("users")
       .select("id")
-      .where("email", "=", email)
+      .where("email", "=", normalizedEmail)
       .executeTakeFirst();
 
     if (existing) {
       return reply.code(409).send({ error: "Email already registered" });
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Hash password with 13 rounds
+    const passwordHash = await bcrypt.hash(password, PASSWORD_HASH_ROUNDS);
 
     // Create user
     const user = await getDb()
       .insertInto("users")
       .values({
-        email,
+        email: normalizedEmail,
         password_hash: passwordHash,
         display_name: displayName || null,
         oauth_provider: "local",
@@ -61,15 +71,15 @@ export async function authRoutes(fastify: FastifyInstance) {
       .returning(["id", "email", "role", "display_name", "avatar_url"])
       .executeTakeFirstOrThrow();
 
-    // Generate JWT
-    const token = fastify.jwt.sign({
-      userId: user.id,
+    // Issue token pair and set cookies
+    const tokens = await issueTokenPair(fastify, {
+      id: user.id,
       email: user.email,
       role: user.role,
     });
+    setAuthCookies(reply, tokens.accessToken, tokens.refreshToken);
 
     return reply.send({
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -87,6 +97,9 @@ export async function authRoutes(fastify: FastifyInstance) {
       password: string;
     };
 
+    // Lowercase email for lookup
+    const normalizedEmail = email.toLowerCase();
+
     // Find user
     const user = await getDb()
       .selectFrom("users")
@@ -98,7 +111,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         "display_name",
         "avatar_url",
       ])
-      .where("email", "=", email)
+      .where("email", "=", normalizedEmail)
       .executeTakeFirst();
 
     if (!user || !user.password_hash) {
@@ -118,15 +131,15 @@ export async function authRoutes(fastify: FastifyInstance) {
       .where("id", "=", user.id)
       .execute();
 
-    // Generate JWT
-    const token = fastify.jwt.sign({
-      userId: user.id,
+    // Issue token pair and set cookies
+    const tokens = await issueTokenPair(fastify, {
+      id: user.id,
       email: user.email,
       role: user.role,
     });
+    setAuthCookies(reply, tokens.accessToken, tokens.refreshToken);
 
     return reply.send({
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -135,6 +148,90 @@ export async function authRoutes(fastify: FastifyInstance) {
         avatarUrl: user.avatar_url,
       },
     });
+  });
+
+  // POST /api/auth/refresh - Rotate refresh token
+  fastify.post("/api/auth/refresh", async (request, reply) => {
+    const refreshTokenValue = request.cookies?.refreshToken;
+
+    if (!refreshTokenValue) {
+      return reply.code(401).send({ error: "No refresh token" });
+    }
+
+    // Verify JWT signature and check type
+    let payload: { userId: number; type?: string };
+    try {
+      payload = fastify.jwt.verify<{ userId: number; type?: string }>(
+        refreshTokenValue,
+      );
+    } catch {
+      return reply.code(401).send({ error: "Invalid refresh token" });
+    }
+
+    if (payload.type !== "refresh") {
+      return reply.code(401).send({ error: "Invalid token type" });
+    }
+
+    // Look up valid refresh tokens for this user
+    const storedTokens = await getDb()
+      .selectFrom("refresh_tokens")
+      .selectAll()
+      .where("user_id", "=", payload.userId)
+      .where("expires_at", ">", new Date())
+      .execute();
+
+    // Check if any stored token matches the presented one
+    let matchedToken: (typeof storedTokens)[0] | null = null;
+    for (const stored of storedTokens) {
+      const matches = await bcrypt.compare(
+        refreshTokenValue,
+        stored.token_hash,
+      );
+      if (matches) {
+        matchedToken = stored;
+        break;
+      }
+    }
+
+    if (!matchedToken) {
+      // Potential token reuse attack - delete ALL refresh tokens for this user
+      await getDb()
+        .deleteFrom("refresh_tokens")
+        .where("user_id", "=", payload.userId)
+        .execute();
+      clearAuthCookies(reply);
+      return reply
+        .code(401)
+        .send({ error: "Invalid refresh token - all sessions revoked" });
+    }
+
+    // Delete the old refresh token
+    await getDb()
+      .deleteFrom("refresh_tokens")
+      .where("id", "=", matchedToken.id)
+      .execute();
+
+    // Fetch user info for new tokens
+    const user = await getDb()
+      .selectFrom("users")
+      .select(["id", "email", "role"])
+      .where("id", "=", payload.userId)
+      .executeTakeFirst();
+
+    if (!user) {
+      clearAuthCookies(reply);
+      return reply.code(401).send({ error: "User not found" });
+    }
+
+    // Issue new token pair and set cookies
+    const tokens = await issueTokenPair(fastify, {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
+    setAuthCookies(reply, tokens.accessToken, tokens.refreshToken);
+
+    return reply.send({ success: true });
   });
 
   // GET /api/auth/me - Get current user
@@ -174,16 +271,21 @@ export async function authRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // POST /api/auth/logout
-  fastify.post(
-    "/api/auth/logout",
-    {
-      onRequest: [authenticate],
-    },
-    async (request, reply) => {
-      // JWT is stateless, so we just return success
-      // Frontend will delete the token from localStorage
-      return reply.send({ success: true });
-    },
-  );
+  // POST /api/auth/logout - Clear auth cookies and delete refresh tokens
+  fastify.post("/api/auth/logout", async (request, reply) => {
+    // Try to authenticate, but don't fail if token is invalid/missing
+    try {
+      await request.jwtVerify();
+      // Delete ALL refresh tokens for the authenticated user
+      await getDb()
+        .deleteFrom("refresh_tokens")
+        .where("user_id", "=", request.user.userId)
+        .execute();
+    } catch {
+      // No valid token - still clear cookies
+    }
+
+    clearAuthCookies(reply);
+    return reply.send({ success: true });
+  });
 }
