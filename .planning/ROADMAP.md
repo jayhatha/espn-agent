@@ -66,10 +66,12 @@ Plans:
   3. User sees daily action items with ESPN deep links for recommended actions
   4. User sees waiver recommendations using real free agent pool with projected standings impact
   5. User sees 1-for-1 trade candidates with accurate delta calculations using fixed rate stat math
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- TBD
+- [ ] 03-01-PLAN.md — Dashboard components: TeamHealthOverview, ScarcityBadge, CategoryMiniChart
+- [ ] 03-02-PLAN.md — Action items, ESPN deep links, waiver/trade page enhancements
+- [ ] 03-03-PLAN.md — Dashboard assembly: wire components into league detail page
 
 ### Phase 4: Advanced Features & Polish
 **Goal**: Add engagement features (lineup optimizer, streaming suggestions) and seasonal acquisition tools (draft assistant)
@@ -94,5 +96,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
-| 3. Core Dashboard & Recommendations | 0/TBD | Not started | - |
+| 3. Core Dashboard & Recommendations | 0/3 | Not started | - |
 | 4. Advanced Features & Polish | 0/TBD | Not started | - |
