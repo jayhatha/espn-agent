@@ -26,10 +26,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: User sees team dashboard with health overview, strengths, and weaknesses
-- [ ] **DASH-02**: User sees category trend charts (Recharts) instead of tables
+- [x] **DASH-01**: User sees team dashboard with health overview, strengths, and weaknesses
+- [x] **DASH-02**: User sees category trend charts (Recharts) instead of tables
 - [ ] **DASH-03**: User sees daily action items with ESPN deep links
-- [ ] **DASH-04**: User sees category scarcity analysis (surplus/deficit per category)
+- [x] **DASH-04**: User sees category scarcity analysis (surplus/deficit per category)
 - [x] **DASH-05**: Frontend uses shared component library (no duplicated UI)
 - [x] **DASH-06**: Frontend uses centralized API client (no hardcoded localhost)
 
@@ -99,10 +99,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Complete |
-| DASH-01 | Phase 3 | Pending |
-| DASH-02 | Phase 3 | Pending |
+| DASH-01 | Phase 3 | Complete |
+| DASH-02 | Phase 3 | Complete |
 | DASH-03 | Phase 3 | Pending |
-| DASH-04 | Phase 3 | Pending |
+| DASH-04 | Phase 3 | Complete |
 | DASH-05 | Phase 1 | Complete |
 | DASH-06 | Phase 1 | Complete |
 | RECC-01 | Phase 3 | Pending |
