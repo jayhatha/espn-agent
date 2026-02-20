@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
-**Current focus:** Phase 2 - Authentication & Onboarding
+**Current focus:** Phase 2 - Authentication & Onboarding (COMPLETE)
 
 ## Current Position
 
 Phase: 2 of 4 (Authentication & Onboarding)
-Plan: 2 of 3 completed
-Status: Executing
-Last activity: 2026-02-19 — Completed 02-02-PLAN.md (Frontend Auth Integration)
+Plan: 3 of 3 completed
+Status: Phase Complete
+Last activity: 2026-02-19 — Completed 02-03-PLAN.md (Onboarding Flow)
 
-Progress: [██████----] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 10 minutes
-- Total execution time: 81 minutes
+- Total plans completed: 9
+- Average duration: 9 minutes
+- Total execution time: 84 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 6 | 74min | 12min |
-| 02 | 2 | 7min | 4min |
+| 02 | 3 | 10min | 3min |
 
 **Recent Executions:**
+- Phase 02 Plan 03: 3min (2 tasks, 2 files)
 - Phase 02 Plan 02: 3min (2 tasks, 6 files)
 - Phase 02 Plan 01: 4min (2 tasks, 9 files)
 - Phase 01 Plan 06: 18min (2 tasks, 13 files)
@@ -67,6 +68,8 @@ Recent decisions affecting current work:
 - [Phase 02-01]: Bcrypt 10 rounds for refresh token hashing (speed) vs 13 rounds for passwords (security)
 - [Phase 02-01]: Graceful logout clears cookies even with invalid/expired JWT
 - [Phase 02-02]: Navigation displays user.displayName with email fallback instead of just email
+- [Phase 02-03]: Wizard state is in-memory only -- navigating away resets to step 0 (simplicity over persistence)
+- [Phase 02-03]: Feature card hrefs on landing page point to /signup instead of /leagues for unauthenticated users
 
 ### Pending Todos
 
@@ -89,8 +92,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19 (plan execution)
-Stopped at: Completed 02-02-PLAN.md (Frontend Auth Integration)
+Stopped at: Completed 02-03-PLAN.md (Onboarding Flow) -- Phase 2 complete
 Resume file: None
 
 ---
-*Next step: Execute 02-03-PLAN.md (Onboarding Flow)*
+*Next step: Research and plan Phase 3 (Advanced Analysis & Trade Engine)*

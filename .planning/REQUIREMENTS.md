@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **AUTH-02**: User can log in and stay logged in across sessions (JWT)
 - [x] **AUTH-03**: User can log in via Google OAuth
 - [x] **AUTH-04**: User can log in via GitHub OAuth
-- [ ] **AUTH-05**: New user sees guided onboarding (connect league → upload projections → view dashboard)
+- [x] **AUTH-05**: New user sees guided onboarding (connect league → upload projections → view dashboard)
 
 ### Data Quality
 
@@ -92,7 +92,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 2 | Complete |
 | AUTH-03 | Phase 2 | Complete |
 | AUTH-04 | Phase 2 | Complete |
-| AUTH-05 | Phase 2 | Pending |
+| AUTH-05 | Phase 2 | Complete |
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
 | DATA-03 | Phase 1 | Complete |
