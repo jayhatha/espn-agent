@@ -49,10 +49,12 @@ Plans:
   3. User can log in via GitHub OAuth without creating separate password
   4. New user sees guided onboarding (connect league → upload projections → view dashboard)
   5. User stays logged in across browser sessions with JWT token refresh
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- TBD
+- [ ] 02-01-PLAN.md — Backend auth hardening: HttpOnly cookies, refresh token rotation, bcrypt 13 rounds
+- [ ] 02-02-PLAN.md — Frontend cookie migration: API client, AuthContext, route protection middleware
+- [ ] 02-03-PLAN.md — Onboarding wizard: 4-step guided flow for new users
 
 ### Phase 3: Core Dashboard & Recommendations
 **Goal**: Deliver main product value through team dashboard with trend charts, category analysis, and actionable recommendations
@@ -91,6 +93,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
-| 2. Authentication & Onboarding | 0/TBD | Not started | - |
+| 2. Authentication & Onboarding | 0/3 | Not started | - |
 | 3. Core Dashboard & Recommendations | 0/TBD | Not started | - |
 | 4. Advanced Features & Polish | 0/TBD | Not started | - |
