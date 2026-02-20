@@ -86,9 +86,9 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md — VBD/SGP draft math + DraftRankingsAgent + AuctionValuationAgent
-- [ ] 04-02-PLAN.md — MLB StatsAPI adapter + LineupOptimizerAgent + StreamingPitcherAgent
-- [ ] 04-03-PLAN.md — Draft API routes + draft rankings and auction frontend pages
-- [ ] 04-04-PLAN.md — Lineup/streaming API routes + lineup optimizer and streaming pitcher frontend pages
+- [x] 04-02-PLAN.md — MLB StatsAPI adapter + LineupOptimizerAgent + StreamingPitcherAgent
+- [x] 04-03-PLAN.md — Draft API routes + draft rankings and auction frontend pages
+- [x] 04-04-PLAN.md — Lineup/streaming API routes + lineup optimizer and streaming pitcher frontend pages
 
 ## Progress
 
@@ -100,4 +100,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
 | 3. Core Dashboard & Recommendations | 3/3 | Complete | 2026-02-20 |
-| 4. Advanced Features & Polish | 1/4 | In Progress | - |
+| 4. Advanced Features & Polish | 4/4 | Complete | 2026-02-20 |
