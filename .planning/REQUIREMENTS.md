@@ -37,8 +37,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **RECC-01**: User sees waiver add/drop recommendations using real free agent pool
 - [x] **RECC-02**: User sees 1-for-1 trade candidates with accurate projected impact
-- [ ] **RECC-03**: User sees daily lineup optimization (start/sit recommendations)
-- [ ] **RECC-04**: User sees streaming pitcher suggestions for favorable matchups
+- [x] **RECC-03**: User sees daily lineup optimization (start/sit recommendations)
+- [x] **RECC-04**: User sees streaming pitcher suggestions for favorable matchups
 
 ### Draft
 
@@ -107,8 +107,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-06 | Phase 1 | Complete |
 | RECC-01 | Phase 3 | Complete |
 | RECC-02 | Phase 3 | Complete |
-| RECC-03 | Phase 4 | Pending |
-| RECC-04 | Phase 4 | Pending |
+| RECC-03 | Phase 4 | Complete |
+| RECC-04 | Phase 4 | Complete |
 | DRFT-01 | Phase 4 | Complete |
 | DRFT-02 | Phase 4 | Complete |
 | INFR-01 | Phase 1 | Complete |
