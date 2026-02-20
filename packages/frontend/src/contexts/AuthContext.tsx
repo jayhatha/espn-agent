@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
@@ -31,48 +31,85 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+// Refresh interval: 14 minutes (access token expires at 15 min)
+const REFRESH_INTERVAL_MS = 14 * 60 * 1000;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Check if user is logged in on mount
-  useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      api.getProfile()
-        .then((userData) => {
-          setUser(userData);
-          setLoading(false);
-        })
-        .catch(() => {
-          localStorage.removeItem("auth_token");
-          setLoading(false);
+  // Start auto-refresh timer when user is logged in
+  const startRefreshTimer = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
         });
-    } else {
-      setLoading(false);
+        if (!res.ok) {
+          // Refresh failed - session expired
+          if (refreshTimerRef.current) {
+            clearInterval(refreshTimerRef.current);
+            refreshTimerRef.current = null;
+          }
+          setUser(null);
+        }
+      } catch {
+        // Network error - stop refreshing
+        if (refreshTimerRef.current) {
+          clearInterval(refreshTimerRef.current);
+          refreshTimerRef.current = null;
+        }
+        setUser(null);
+      }
+    }, REFRESH_INTERVAL_MS);
+  }, []);
+
+  const stopRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearInterval(refreshTimerRef.current);
+      refreshTimerRef.current = null;
     }
   }, []);
 
-  // Listen for storage changes (logout from other tabs or components)
+  // Check session on mount via /api/auth/me (cookies sent automatically)
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "auth_token" && !e.newValue) {
-        // Token was removed
+    api.getProfile()
+      .then((userData) => {
+        setUser(userData);
+        setLoading(false);
+      })
+      .catch(() => {
         setUser(null);
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+        setLoading(false);
+      });
   }, []);
+
+  // Manage refresh timer based on user state
+  useEffect(() => {
+    if (user) {
+      startRefreshTimer();
+    } else {
+      stopRefreshTimer();
+    }
+
+    return () => {
+      stopRefreshTimer();
+    };
+  }, [user, startRefreshTimer, stopRefreshTimer]);
 
   const login = async (email: string, password: string) => {
     setError(null);
     try {
-      const { token, user: userData } = await api.login(email, password);
-      localStorage.setItem("auth_token", token);
+      const { user: userData } = await api.login(email, password);
       setUser(userData);
     } catch (err) {
       setError((err as Error).message);
@@ -87,8 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setError(null);
     try {
-      const { token, user: userData } = await api.signup(email, password, displayName);
-      localStorage.setItem("auth_token", token);
+      const { user: userData } = await api.signup(email, password, displayName);
       setUser(userData);
     } catch (err) {
       setError((err as Error).message);
@@ -96,8 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("auth_token");
+  const logout = async () => {
+    await api.logout();
     setUser(null);
     router.push("/");
   };

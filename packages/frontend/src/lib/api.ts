@@ -1,25 +1,56 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-function getAuthHeaders() {
-  const token = localStorage.getItem('auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+// Mutex for refresh token rotation - prevents multiple concurrent refresh calls
+let refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
 }
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
+    credentials: 'include',
     headers: {
-      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
       ...options.headers,
     },
   });
 
   if (res.status === 401) {
-    // Token expired or invalid, redirect to login
-    localStorage.removeItem('auth_token');
+    // Attempt silent refresh before giving up
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      // Retry original request with fresh tokens
+      const retryRes = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      if (retryRes.ok) {
+        return retryRes.json();
+      }
+    }
+
+    // Refresh failed or retry failed - redirect to login
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
@@ -190,10 +221,11 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/annotations${query ? '?' + query : ''}`);
   },
 
-  // Auth (pre-auth endpoints - don't use fetchAPI as it will redirect on 401)
+  // Auth
   async login(email: string, password: string) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
@@ -209,6 +241,7 @@ export const api = {
   async signup(email: string, password: string, displayName?: string) {
     const res = await fetch(`${API_URL}/api/auth/signup`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, displayName }),
     });
@@ -219,6 +252,13 @@ export const api = {
     }
 
     return res.json();
+  },
+
+  async logout() {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
   },
 
   async getProfile() {
