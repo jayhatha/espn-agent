@@ -1,6 +1,77 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/lib/api";
 
 export default function HomePage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
+    // User is logged in -- check if they have leagues
+    setRedirecting(true);
+    api
+      .getLeagues()
+      .then((leagues: { id: number }[]) => {
+        if (leagues.length === 0) {
+          router.push("/onboarding");
+        } else {
+          router.push(`/leagues/${leagues[0].id}`);
+        }
+      })
+      .catch(() => {
+        // If league fetch fails, stay on home page
+        setRedirecting(false);
+      });
+  }, [user, authLoading, router]);
+
+  // Show loading spinner while checking auth or redirecting
+  if (authLoading || redirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <svg
+            className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthenticated users see the landing page
+  if (!user) {
+    return <LandingPage />;
+  }
+
+  return null;
+}
+
+function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
@@ -15,7 +86,7 @@ export default function HomePage() {
             rest-of-season projections powered by FanGraphs data
           </p>
           <Link
-            href="/leagues"
+            href="/signup"
             className="inline-flex items-center px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl"
           >
             Get Started
@@ -40,29 +111,29 @@ export default function HomePage() {
           <FeatureCard
             title="Leagues"
             description="Connect to your ESPN leagues and view standings"
-            href="/leagues"
-            icon="🏆"
+            href="/signup"
+            icon="&#127942;"
             color="blue"
           />
           <FeatureCard
             title="Projections"
             description="Upload FanGraphs projections for accurate forecasts"
-            href="/leagues"
-            icon="📊"
+            href="/signup"
+            icon="&#128202;"
             color="green"
           />
           <FeatureCard
             title="Waivers"
             description="Get recommendations on who to add and drop"
-            href="/leagues"
-            icon="🔄"
+            href="/signup"
+            icon="&#128260;"
             color="purple"
           />
           <FeatureCard
             title="Trends"
             description="View historical performance and projections"
-            href="/leagues"
-            icon="📈"
+            href="/signup"
+            icon="&#128200;"
             color="orange"
           />
         </div>
@@ -101,17 +172,17 @@ export default function HomePage() {
         {/* Features Grid */}
         <div className="mt-12 sm:mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           <FeatureHighlight
-            icon="⚡"
+            icon="&#9889;"
             title="Real-time Analysis"
             description="Get instant insights based on current league standings and projections"
           />
           <FeatureHighlight
-            icon="🎯"
+            icon="&#127919;"
             title="Smart Recommendations"
             description="AI-powered suggestions for optimal roster management"
           />
           <FeatureHighlight
-            icon="📱"
+            icon="&#128241;"
             title="Mobile Friendly"
             description="Access your insights anywhere, anytime on any device"
           />
@@ -149,9 +220,10 @@ function FeatureCard({
       <div
         className={`h-full p-6 sm:p-8 bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]} rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer`}
       >
-        <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 filter drop-shadow-lg">
-          {icon}
-        </div>
+        <div
+          className="text-4xl sm:text-5xl mb-3 sm:mb-4 filter drop-shadow-lg"
+          dangerouslySetInnerHTML={{ __html: icon }}
+        />
         <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
           {title}
         </h3>
@@ -200,7 +272,10 @@ function FeatureHighlight({
 }) {
   return (
     <div className="text-center p-6 sm:p-8 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
-      <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">{icon}</div>
+      <div
+        className="text-4xl sm:text-5xl mb-3 sm:mb-4"
+        dangerouslySetInnerHTML={{ __html: icon }}
+      />
       <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
         {title}
       </h3>
