@@ -16,6 +16,7 @@ interface ConnectLeagueBody {
   auth?: ESPNAuthCookies;
   name?: string;
   timezone?: string;
+  teamEspnId?: number;
 }
 
 export async function leaguesRoutes(app: FastifyInstance) {
@@ -37,7 +38,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
       request: FastifyRequest<{ Body: ConnectLeagueBody }>,
       reply: FastifyReply,
     ) => {
-      const { espnLeagueId, season, auth, name, timezone } = request.body;
+      const { espnLeagueId, season, auth, name, timezone, teamEspnId } = request.body;
 
       try {
         // Check if league already exists
@@ -64,9 +65,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         const normalized = espnAdapter.normalizeLeagueData(espnData.data);
 
-        // Find user's team by matching SWID
-        let userTeamEspnId: number | null = null;
-        if (auth?.SWID) {
+        // Find user's team by matching SWID or explicit teamEspnId
+        let userTeamEspnId: number | null = teamEspnId || null;
+        if (!userTeamEspnId && auth?.SWID) {
           const userTeam = normalized.teams.find((team) =>
             team.primaryOwner === auth.SWID ||
             (team.owners && team.owners.includes(auth.SWID))
@@ -111,22 +112,36 @@ export async function leaguesRoutes(app: FastifyInstance) {
             }
           }
 
-          // Update league with user_team_id if detected
-          if (userTeamDbId) {
-            await db
-              .updateTable("league")
-              .set({ user_team_id: userTeamDbId })
-              .where("id", "=", league.id)
-              .execute();
-
-            league = await db
-              .selectFrom("league")
-              .selectAll()
-              .where("id", "=", league.id)
-              .executeTakeFirstOrThrow();
+          // If no team detected, return team list for user to pick
+          if (!userTeamDbId) {
+            return {
+              league,
+              isNew: false,
+              userTeamDetected: false,
+              teams: normalized.teams.map((t) => ({ espnTeamId: t.id, name: t.name })),
+            };
           }
 
-          return { league, isNew: false, userTeamDetected: userTeamDbId !== null };
+          // Update league with user_team_id and set user_id on team
+          await db
+            .updateTable("league")
+            .set({ user_team_id: userTeamDbId })
+            .where("id", "=", league.id)
+            .execute();
+
+          await db
+            .updateTable("team")
+            .set({ user_id: request.user.userId })
+            .where("id", "=", userTeamDbId)
+            .execute();
+
+          league = await db
+            .selectFrom("league")
+            .selectAll()
+            .where("id", "=", league.id)
+            .executeTakeFirstOrThrow();
+
+          return { league, isNew: false, userTeamDetected: true };
         }
 
         // Encrypt ESPN cookies if encryption key is configured
@@ -192,21 +207,35 @@ export async function leaguesRoutes(app: FastifyInstance) {
           }
         }
 
-        // Update league with user_team_id if detected
-        if (userTeamDbId) {
-          await db
-            .updateTable("league")
-            .set({ user_team_id: userTeamDbId })
-            .where("id", "=", league.id)
-            .execute();
-
-          // Refetch league with updated user_team_id
-          league = await db
-            .selectFrom("league")
-            .selectAll()
-            .where("id", "=", league.id)
-            .executeTakeFirstOrThrow();
+        // If no team detected, return team list for user to pick
+        if (!userTeamDbId) {
+          return {
+            league,
+            isNew: true,
+            userTeamDetected: false,
+            teams: normalized.teams.map((t) => ({ espnTeamId: t.id, name: t.name })),
+          };
         }
+
+        // Update league with user_team_id and set user_id on team
+        await db
+          .updateTable("league")
+          .set({ user_team_id: userTeamDbId })
+          .where("id", "=", league.id)
+          .execute();
+
+        await db
+          .updateTable("team")
+          .set({ user_id: request.user.userId })
+          .where("id", "=", userTeamDbId)
+          .execute();
+
+        // Refetch league with updated user_team_id
+        league = await db
+          .selectFrom("league")
+          .selectAll()
+          .where("id", "=", league.id)
+          .executeTakeFirstOrThrow();
 
         // Trigger initial snapshot for newly connected league
         try {

@@ -15,10 +15,18 @@ interface ConnectLeagueForm {
   espn_s2?: string;
 }
 
+interface TeamOption {
+  espnTeamId: number;
+  name: string;
+}
+
 export default function ConnectLeaguePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [step, setStep] = useState<"form" | "pick-team">("form");
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [selectedTeamEspnId, setSelectedTeamEspnId] = useState<number | null>(null);
   const [formData, setFormData] = useState<ConnectLeagueForm>({
     espnLeagueId: "",
     season: new Date().getFullYear().toString(),
@@ -29,7 +37,7 @@ export default function ConnectLeaguePage() {
   });
 
   const connectMutation = useMutation({
-    mutationFn: async (data: ConnectLeagueForm) => {
+    mutationFn: async (data: ConnectLeagueForm & { teamEspnId?: number }) => {
       const body: any = {
         espnLeagueId: parseInt(data.espnLeagueId, 10),
         season: parseInt(data.season, 10),
@@ -43,10 +51,17 @@ export default function ConnectLeaguePage() {
           espn_s2: data.espn_s2,
         };
       }
+      if (data.teamEspnId) body.teamEspnId = data.teamEspnId;
 
       return api.connectLeague(body);
     },
     onSuccess: (data) => {
+      // If no team was auto-detected and we haven't picked yet, show team picker
+      if (!data.userTeamDetected && step === "form" && data.teams?.length > 0) {
+        setTeams(data.teams);
+        setStep("pick-team");
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["leagues"] });
       router.push(`/leagues/${data.league.id}`);
     },
@@ -55,6 +70,11 @@ export default function ConnectLeaguePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     connectMutation.mutate(formData);
+  };
+
+  const handleTeamSelect = () => {
+    if (!selectedTeamEspnId) return;
+    connectMutation.mutate({ ...formData, teamEspnId: selectedTeamEspnId });
   };
 
   const handleChange = (
@@ -66,6 +86,65 @@ export default function ConnectLeaguePage() {
     }));
   };
 
+  // Team selection step
+  if (step === "pick-team") {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white shadow rounded-lg p-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Select Your Team
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Which team is yours? We'll use this to personalize your dashboard and recommendations.
+          </p>
+
+          <div className="space-y-2">
+            {teams.map((team) => (
+              <button
+                key={team.espnTeamId}
+                type="button"
+                onClick={() => setSelectedTeamEspnId(team.espnTeamId)}
+                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-colors ${
+                  selectedTeamEspnId === team.espnTeamId
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span className="font-medium text-gray-900">{team.name}</span>
+              </button>
+            ))}
+          </div>
+
+          {connectMutation.isError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-600 text-sm">
+                {(connectMutation.error as Error).message}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => { setStep("form"); connectMutation.reset(); }}
+              className="text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleTeamSelect}
+              disabled={!selectedTeamEspnId || connectMutation.isPending}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {connectMutation.isPending ? "Connecting..." : "Confirm & Connect"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
@@ -73,7 +152,7 @@ export default function ConnectLeaguePage() {
           href="/leagues"
           className="text-blue-600 hover:text-blue-700 text-sm font-medium"
         >
-          ← Back to Leagues
+          &larr; Back to Leagues
         </Link>
       </div>
 
@@ -107,7 +186,7 @@ export default function ConnectLeaguePage() {
             />
             <p className="mt-1 text-sm text-gray-500">
               Find this in your league URL:
-              lm-api-reads.fantasy.espn.com/baseball/league?leagueId=
+              fantasy.espn.com/baseball/league?leagueId=
               <strong>123456</strong>
             </p>
           </div>
@@ -199,6 +278,9 @@ export default function ConnectLeaguePage() {
               </svg>
               Private League Authentication (Optional)
             </button>
+            <p className="mt-1 ml-7 text-sm text-gray-500">
+              Required for private leagues. For public leagues, we'll ask you to pick your team in the next step.
+            </p>
 
             {showAdvanced && (
               <div className="mt-4 space-y-4 bg-gray-50 p-4 rounded-md">
@@ -211,7 +293,7 @@ export default function ConnectLeaguePage() {
                     rel="noopener noreferrer"
                     className="ml-1 text-blue-600 hover:text-blue-700 underline"
                   >
-                    How to find these cookies →
+                    How to find these cookies &rarr;
                   </a>
                 </p>
 
@@ -332,16 +414,16 @@ export default function ConnectLeaguePage() {
         </h3>
         <ul className="mt-2 text-sm text-blue-700 space-y-1 ml-7">
           <li>
-            • We'll fetch your league settings and validate the connection
+            &bull; We'll fetch your league settings and validate the connection
           </li>
           <li>
-            • A daily snapshot will be created at 03:00 in your league's
+            &bull; A daily snapshot will be created at 03:00 in your league's
             timezone
           </li>
           <li>
-            • You can upload FanGraphs projections to get standings predictions
+            &bull; You can upload FanGraphs projections to get standings predictions
           </li>
-          <li>• View trends, get waiver recommendations, and analyze trades</li>
+          <li>&bull; View trends, get waiver recommendations, and analyze trades</li>
         </ul>
       </div>
     </div>

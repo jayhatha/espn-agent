@@ -623,7 +623,7 @@ function LeagueDetailPageContent() {
                 </div>
                 <div className="bg-white shadow rounded-lg p-6">
                   <h3 className="text-sm font-medium text-gray-900 mb-4">Standings Trend</h3>
-                  <CategoryMiniChart data={miniChartData} label="Standings Trend" />
+                  <CategoryMiniChart data={miniChartData} />
                 </div>
               </div>
 

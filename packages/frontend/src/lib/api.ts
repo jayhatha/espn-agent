@@ -50,9 +50,12 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       }
     }
 
-    // Refresh failed or retry failed - redirect to login
+    // Refresh failed or retry failed - redirect to login (unless already on an auth page)
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      const path = window.location.pathname;
+      if (path !== '/login' && path !== '/signup' && path !== '/') {
+        window.location.href = '/login';
+      }
     }
     throw new Error('Unauthorized');
   }
@@ -81,6 +84,7 @@ export const api = {
     auth?: { SWID?: string; espn_s2?: string };
     name?: string;
     timezone?: string;
+    teamEspnId?: number;
   }) {
     return fetchAPI('/api/leagues/connect', {
       method: 'POST',
