@@ -1,4 +1,4 @@
-import type { StatComponents } from "./types.js";
+import type { StatComponents, Category } from "./types.js";
 
 /**
  * Component-based formulas for rate statistics
@@ -115,4 +115,167 @@ export function getRequiredComponents(formulaId: string): string[] {
     default:
       return [];
   }
+}
+
+/**
+ * VBD (Value Based Drafting) and SGP (Standings Gain Points) functions
+ * Used for draft rankings and auction valuations
+ */
+
+/**
+ * Calculate Standings Gain Points (SGP) for a single stat value
+ * SGP = (value - mean) / stdDev
+ * Returns how many standard deviations above/below mean
+ */
+export function calculateCategorySGP(
+  statValue: number,
+  allPlayerValues: number[]
+): number {
+  if (allPlayerValues.length === 0) return 0;
+
+  // Calculate mean
+  const sum = allPlayerValues.reduce((acc, val) => acc + val, 0);
+  const mean = sum / allPlayerValues.length;
+
+  // Calculate population standard deviation
+  const squaredDiffs = allPlayerValues.map((val) => Math.pow(val - mean, 2));
+  const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / allPlayerValues.length;
+  const stdDev = Math.sqrt(variance);
+
+  // Avoid division by zero
+  if (stdDev === 0) return 0;
+
+  return (statValue - mean) / stdDev;
+}
+
+/**
+ * Calculate total SGP across all categories for a player
+ * Handles both COUNTING and RATE stats with proper direction handling
+ */
+export function calculateTotalSGP(
+  projection: StatComponents,
+  allProjections: StatComponents[],
+  categories: Array<{
+    stat_key: string;
+    type: "COUNTING" | "RATE" | "POINTS";
+    direction: "HIGHER_BETTER" | "LOWER_BETTER";
+    formula_id?: string;
+  }>
+): number {
+  let totalSGP = 0;
+
+  for (const category of categories) {
+    let statValue: number;
+    let allValues: number[];
+
+    if (category.type === "COUNTING") {
+      // Direct stat value for counting stats
+      statValue = projection[category.stat_key] || 0;
+      allValues = allProjections.map((p) => p[category.stat_key] || 0);
+    } else if (category.type === "RATE" && category.formula_id) {
+      // Calculate rate from components
+      try {
+        statValue = calculateFinalRate(category.formula_id, {}, projection);
+        allValues = allProjections.map((p) => {
+          try {
+            return calculateFinalRate(category.formula_id!, {}, p);
+          } catch {
+            return 0;
+          }
+        });
+      } catch {
+        // Skip this category if rate calculation fails
+        continue;
+      }
+    } else {
+      // Skip unsupported category types
+      continue;
+    }
+
+    // Calculate SGP for this category
+    let sgp = calculateCategorySGP(statValue, allValues);
+
+    // Invert SGP for LOWER_BETTER categories (ERA, WHIP)
+    if (category.direction === "LOWER_BETTER") {
+      sgp = -sgp;
+    }
+
+    totalSGP += sgp;
+  }
+
+  return totalSGP;
+}
+
+/**
+ * Calculate replacement level index for a position
+ * Returns the 1-based index of the replacement player
+ */
+export function getReplacementLevel(
+  position: string,
+  rosterSlots: Record<string, number>,
+  totalTeams: number
+): number {
+  // Get slot count for this position
+  let slotCount = rosterSlots[position] || 0;
+
+  // For shared/utility slots, prorate by typical usage
+  if (position === "UTIL") {
+    slotCount = (rosterSlots["UTIL"] || 0) * 0.2;
+  } else if (position === "IF" || position === "MI") {
+    slotCount = (rosterSlots[position] || 0) * 0.25;
+  } else if (position === "OF" || position === "CI") {
+    slotCount = (rosterSlots[position] || 0) * 0.33;
+  }
+
+  // Total players at this position that would be rostered
+  const totalRostered = slotCount * totalTeams;
+
+  // Replacement level is just after the last rostered player
+  return Math.ceil(totalRostered) + 1;
+}
+
+/**
+ * Calculate Value Based Drafting (VBD) score
+ * VBD = player SGP - replacement level SGP
+ * Returns 0 for players below replacement
+ */
+export function calculateVBD(
+  playerSGP: number,
+  replacementSGP: number
+): number {
+  const vbd = playerSGP - replacementSGP;
+  return Math.max(0, vbd);
+}
+
+/**
+ * Calculate total spending pool for auction drafts
+ * Total budget minus minimum bids for all roster spots
+ */
+export function calculateSpendingPool(
+  budget: number,
+  totalTeams: number,
+  rosterSize: number,
+  minBid: number
+): number {
+  const totalBudget = budget * totalTeams;
+  const minSpend = minBid * rosterSize * totalTeams;
+  return totalBudget - minSpend;
+}
+
+/**
+ * Convert VBD to auction dollar value
+ * Proportional share of spending pool plus minimum bid
+ */
+export function calculateAuctionDollarValue(
+  vbd: number,
+  totalVBD: number,
+  spendingPool: number,
+  minBid: number
+): number {
+  if (totalVBD === 0) return minBid;
+
+  const proportionalValue = (vbd / totalVBD) * spendingPool;
+  const dollarValue = Math.round(proportionalValue + minBid);
+
+  return Math.max(minBid, dollarValue);
 }

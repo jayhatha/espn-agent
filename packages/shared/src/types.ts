@@ -259,3 +259,35 @@ export interface SignupRequest {
 export interface AuthResponse {
   user: Omit<User, 'createdAt'>;
 }
+
+// Draft and auction types
+export interface DraftRanking {
+  playerId: number;
+  playerName: string;
+  positions: string[];
+  primaryPosition: string;
+  vbdScore: number;
+  sgpTotal: number;
+  categorySGPs: Record<string, number>;
+  projectedStats: StatComponents;
+  tier: number; // Players grouped into value tiers
+}
+
+export interface AuctionValue {
+  playerId: number;
+  playerName: string;
+  positions: string[];
+  primaryPosition: string;
+  dollarValue: number;
+  vbdScore: number;
+  sgpTotal: number;
+  inflationAdjustedValue?: number;
+}
+
+export interface DraftContext {
+  totalTeams: number;
+  rosterSlots: Record<string, number>;
+  categories: Category[];
+  budget?: number; // For auction (default 260)
+  minBid?: number; // For auction (default 1)
+}
