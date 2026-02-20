@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PlayerRow } from "@/components/league/PlayerRow";
+import { getESPNTradeUrl } from "@/lib/espn-links";
 
 interface ProposedTrade {
   givePlayers: Array<{ playerId: number; playerName: string }>;
@@ -84,6 +85,14 @@ export default function TradesPage() {
       setSelectedTeamId(parseInt(stored, 10));
     }
   }, [leagueId]);
+
+  // Fetch league status for ESPN links
+  const { data: leagueStatus } = useQuery({
+    queryKey: ['league', leagueId],
+    queryFn: () => api.getLeagueStatus(parseInt(leagueId, 10)),
+  });
+  const espnLeagueId = leagueStatus?.league?.espn_league_id;
+  const season = leagueStatus?.league?.season;
 
   // Fetch trade partners
   const { data: partnersData } = useQuery({
@@ -497,6 +506,23 @@ export default function TradesPage() {
                   </span>{" "}
                   (Range: -1 to 1, closer to 0 is more balanced)
                 </div>
+
+                {/* ESPN Link */}
+                {espnLeagueId && season && (
+                  <div className="mt-3">
+                    <a
+                      href={getESPNTradeUrl(espnLeagueId, season)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm gap-2"
+                    >
+                      Propose on ESPN
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                )}
               </div>
 
               {/* Category Breakdown */}
@@ -683,6 +709,23 @@ export default function TradesPage() {
                   <div className="mt-3 text-xs text-gray-600">
                     {candidate.explanation}
                   </div>
+
+                  {/* ESPN Link */}
+                  {espnLeagueId && season && (
+                    <div className="mt-3">
+                      <a
+                        href={getESPNTradeUrl(espnLeagueId, season)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm gap-2"
+                      >
+                        Propose on ESPN
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

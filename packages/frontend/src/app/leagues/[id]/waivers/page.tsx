@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PlayerRow } from "@/components/league/PlayerRow";
+import { getESPNFreeAgentsUrl } from "@/lib/espn-links";
 
 interface WaiverRecommendation {
   addPlayerId: number;
@@ -102,6 +103,14 @@ export default function WaiversPage() {
       setSelectedTeamId(parseInt(stored, 10));
     }
   }, [leagueId]);
+
+  // Fetch league status for ESPN links
+  const { data: leagueStatus } = useQuery({
+    queryKey: ['league', leagueId],
+    queryFn: () => api.getLeagueStatus(parseInt(leagueId, 10)),
+  });
+  const espnLeagueId = leagueStatus?.league?.espn_league_id;
+  const season = leagueStatus?.league?.season;
 
   // AI Recommendations query
   const {
@@ -429,13 +438,28 @@ export default function WaiversPage() {
                       </div>
                     </div>
 
-                    <button
-                      className="w-full sm:w-auto px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-                      disabled
-                      title="Waiver claim execution coming soon"
-                    >
-                      Add to Queue
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      <button
+                        className="px-4 py-2 sm:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                        disabled
+                        title="Waiver claim execution coming soon"
+                      >
+                        Add to Queue
+                      </button>
+                      {espnLeagueId && season && (
+                        <a
+                          href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 sm:py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm flex items-center justify-center gap-2 shadow-md"
+                        >
+                          Add on ESPN
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
                   {/* Swap Visualization */}
@@ -779,6 +803,23 @@ export default function WaiversPage() {
                 evaluationResult.legalityIssues &&
                 evaluationResult.legalityIssues.length > 0 &&
                 renderLegalityWarning(evaluationResult.legalityIssues)}
+
+              {/* ESPN Link */}
+              {espnLeagueId && season && (
+                <div className="mt-4">
+                  <a
+                    href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm gap-2"
+                  >
+                    View on ESPN
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>
