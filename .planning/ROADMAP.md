@@ -82,10 +82,13 @@ Plans:
   2. User sees streaming pitcher suggestions for favorable matchups with projected impact
   3. User sees pre-draft rankings with positional scarcity analysis (VBD methodology)
   4. User sees auction valuations based on projected stats and budget constraints
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- TBD
+- [ ] 04-01-PLAN.md — VBD/SGP draft math + DraftRankingsAgent + AuctionValuationAgent
+- [ ] 04-02-PLAN.md — MLB StatsAPI adapter + LineupOptimizerAgent + StreamingPitcherAgent
+- [ ] 04-03-PLAN.md — Draft API routes + draft rankings and auction frontend pages
+- [ ] 04-04-PLAN.md — Lineup/streaming API routes + lineup optimizer and streaming pitcher frontend pages
 
 ## Progress
 
@@ -97,4 +100,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
 | 3. Core Dashboard & Recommendations | 0/3 | Not started | - |
-| 4. Advanced Features & Polish | 0/TBD | Not started | - |
+| 4. Advanced Features & Polish | 0/4 | Not started | - |
