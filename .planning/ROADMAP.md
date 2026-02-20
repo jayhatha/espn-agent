@@ -13,7 +13,7 @@ Transform a working but broken backend into a production-ready fantasy baseball 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Critical Fixes** - Fix broken data systems and security vulnerabilities before building features (completed 2026-02-19)
-- [ ] **Phase 2: Authentication & Onboarding** - Enable user accounts with OAuth and guided first-run experience
+- [x] **Phase 2: Authentication & Onboarding** - Enable user accounts with OAuth and guided first-run experience (completed 2026-02-19)
 - [ ] **Phase 3: Core Dashboard & Recommendations** - Deliver main value with visualizations and AI-powered insights
 - [ ] **Phase 4: Advanced Features & Polish** - Add lineup optimizer, draft assistant, and engagement features
 
@@ -52,9 +52,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Backend auth hardening: HttpOnly cookies, refresh token rotation, bcrypt 13 rounds
-- [ ] 02-02-PLAN.md — Frontend cookie migration: API client, AuthContext, route protection middleware
-- [ ] 02-03-PLAN.md — Onboarding wizard: 4-step guided flow for new users
+- [x] 02-01-PLAN.md — Backend auth hardening: HttpOnly cookies, refresh token rotation, bcrypt 13 rounds
+- [x] 02-02-PLAN.md — Frontend cookie migration: API client, AuthContext, route protection middleware
+- [x] 02-03-PLAN.md — Onboarding wizard: 4-step guided flow for new users
 
 ### Phase 3: Core Dashboard & Recommendations
 **Goal**: Deliver main product value through team dashboard with trend charts, category analysis, and actionable recommendations
@@ -93,6 +93,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Critical Fixes | 6/6 | Complete   | 2026-02-19 |
-| 2. Authentication & Onboarding | 0/3 | Not started | - |
+| 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
 | 3. Core Dashboard & Recommendations | 0/TBD | Not started | - |
 | 4. Advanced Features & Polish | 0/TBD | Not started | - |
