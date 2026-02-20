@@ -10,10 +10,13 @@ import { leaguesRoutes } from "./api/leagues.js";
 import { projectionsRoutes } from "./api/projections.js";
 import { timeSeriesRoutes } from "./api/timeseries.js";
 import { recommendationsRoutes } from "./api/recommendations.js";
+import { draftRoutes } from "./api/draft.js";
 import { slackRoutes } from "./api/slack.js";
 import { internalRoutes } from "./api/internal.js";
 import { authRoutes } from "./api/auth.js";
 import { setupOAuth } from "./api/auth-oauth.js";
+import { lineupRoutes } from "./api/lineup.js";
+import { streamingRoutes } from "./api/streaming.js";
 import { authenticate, requireAdmin } from "./middleware/auth.js";
 import { getFeatureFlags } from "./utils/feature-flags.js";
 import type { FastifyInstance } from "fastify";
@@ -133,6 +136,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(projectionsRoutes);
   await server.register(timeSeriesRoutes);
   await server.register(recommendationsRoutes);
+  await server.register(draftRoutes);
+  await server.register(lineupRoutes);
+  await server.register(streamingRoutes);
 
   // Feature-flagged routes
   const flags = getFeatureFlags();
