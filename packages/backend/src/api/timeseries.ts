@@ -11,10 +11,39 @@ interface TimeSeriesQuery {
   from?: string;
   to?: string;
   teamIds?: string; // comma-separated
+  season?: string; // year filter
 }
 
 export async function timeSeriesRoutes(app: FastifyInstance) {
   const db = getDb();
+  const { sql } = await import("kysely");
+
+  // Available seasons for a league
+  app.get(
+    "/api/leagues/:leagueId/seasons",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { leagueId: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+
+      const result = await db
+        .selectFrom("league_daily_snapshot")
+        .select(sql<number>`DISTINCT EXTRACT(YEAR FROM snapshot_date::date)::integer`.as("season"))
+        .where("league_id", "=", leagueId)
+        .orderBy("season", "desc")
+        .execute();
+
+      const seasons = result.map((r) => r.season);
+      return { seasons };
+    },
+  );
 
   // Overall standings over time
   app.get(
@@ -37,12 +66,19 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { from, to, teamIds } = request.query;
+      const { from, to, teamIds, season } = request.query;
 
       let query = db
         .selectFrom("team_daily_overall")
         .selectAll()
         .where("league_id", "=", leagueId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+          .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+      }
 
       if (from) {
         query = query.where("snapshot_date", ">=", from);
@@ -76,7 +112,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { from, to, teamIds, categoryId } = request.query;
+      const { from, to, teamIds, categoryId, season } = request.query;
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -87,6 +123,13 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .selectAll()
         .where("league_id", "=", leagueId)
         .where("category_id", "=", categoryId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+          .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+      }
 
       if (from) {
         query = query.where("snapshot_date", ">=", from);
@@ -120,12 +163,19 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { from, to, teamIds } = request.query;
+      const { from, to, teamIds, season } = request.query;
 
       let query = db
         .selectFrom("team_daily_projected_overall")
         .selectAll()
         .where("league_id", "=", leagueId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+          .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+      }
 
       if (from) {
         query = query.where("snapshot_date", ">=", from);

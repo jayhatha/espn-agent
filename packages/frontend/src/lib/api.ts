@@ -116,7 +116,7 @@ export const api = {
   // Time series
   async getOverallTimeSeries(
     leagueId: number,
-    params?: { from?: string; to?: string; teamIds?: string },
+    params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
     const query = new URLSearchParams(params as any).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/overall?${query}`);
@@ -125,7 +125,7 @@ export const api = {
   async getCategoryRankTimeSeries(
     leagueId: number,
     categoryId: string,
-    params?: { from?: string; to?: string; teamIds?: string },
+    params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
     const query = new URLSearchParams({
       ...params,
@@ -136,10 +136,14 @@ export const api = {
 
   async getProjectedOverallTimeSeries(
     leagueId: number,
-    params?: { from?: string; to?: string; teamIds?: string },
+    params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
     const query = new URLSearchParams(params as any).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/projected-overall?${query}`);
+  },
+
+  async getLeagueSeasons(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/seasons`);
   },
 
   // Recommendations
