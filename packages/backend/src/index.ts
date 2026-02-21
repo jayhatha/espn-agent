@@ -17,6 +17,7 @@ import { authRoutes } from "./api/auth.js";
 import { setupOAuth } from "./api/auth-oauth.js";
 import { lineupRoutes } from "./api/lineup.js";
 import { streamingRoutes } from "./api/streaming.js";
+import { adminRoutes } from "./api/admin.js";
 import { authenticate, requireAdmin } from "./middleware/auth.js";
 import { getFeatureFlags } from "./utils/feature-flags.js";
 import type { FastifyInstance } from "fastify";
@@ -139,6 +140,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(draftRoutes);
   await server.register(lineupRoutes);
   await server.register(streamingRoutes);
+  await server.register(adminRoutes);
 
   // Feature-flagged routes
   const flags = getFeatureFlags();
