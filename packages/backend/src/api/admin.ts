@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { backfillQueue } from "../workers/backfill-worker.js";
+import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Admin API Routes
@@ -263,6 +265,249 @@ export async function adminRoutes(app: FastifyInstance) {
 
       return {
         leagues: leaguesWithStatus,
+      };
+    },
+  );
+
+  // POST /api/admin/leagues/:leagueId/backfill - Trigger historical backfill
+  app.post(
+    "/api/admin/leagues/:leagueId/backfill",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request: any, reply: any) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const { season, startWeek, endWeek } = request.body;
+
+      // Validate inputs
+      if (!season || typeof season !== "number") {
+        return reply.code(400).send({
+          error: "Invalid season",
+          message: "season must be a number",
+        });
+      }
+
+      const currentYear = new Date().getFullYear();
+      if (season < 2017 || season > currentYear) {
+        return reply.code(400).send({
+          error: "Invalid season",
+          message: `season must be between 2017 and ${currentYear}`,
+        });
+      }
+
+      const start = startWeek ?? 1;
+      const end = endWeek ?? 26;
+
+      if (start < 1 || end > 26 || start > end) {
+        return reply.code(400).send({
+          error: "Invalid week range",
+          message: "startWeek must be >= 1, endWeek must be <= 26, and startWeek <= endWeek",
+        });
+      }
+
+      // Look up league
+      const league = await db
+        .selectFrom("league")
+        .select([
+          "id",
+          "espn_league_id",
+          "espn_swid",
+          "espn_s2",
+          "espn_swid_encrypted",
+          "espn_s2_encrypted",
+          "name",
+        ])
+        .where("id", "=", leagueId)
+        .executeTakeFirst();
+
+      if (!league) {
+        return reply.code(404).send({
+          error: "League not found",
+        });
+      }
+
+      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      let espnAuth: { SWID?: string; espn_s2?: string } | undefined;
+      const swidSource = league.espn_swid_encrypted || league.espn_swid;
+      const s2Source = league.espn_s2_encrypted || league.espn_s2;
+
+      if (swidSource || s2Source) {
+        const SWID = swidSource
+          ? Buffer.isBuffer(swidSource) && hasEncryptionKey()
+            ? decryptToken(swidSource)
+            : Buffer.isBuffer(swidSource)
+              ? swidSource.toString()
+              : swidSource
+          : undefined;
+        const espn_s2 = s2Source
+          ? Buffer.isBuffer(s2Source) && hasEncryptionKey()
+            ? decryptToken(s2Source)
+            : Buffer.isBuffer(s2Source)
+              ? s2Source.toString()
+              : s2Source
+          : undefined;
+        espnAuth = { SWID, espn_s2 };
+      }
+
+      // Construct jobId for deduplication
+      const jobId = `backfill-${leagueId}-${season}`;
+
+      try {
+        // Add job to queue
+        const job = await backfillQueue.add(
+          jobId,
+          {
+            leagueId,
+            season,
+            startWeek: start,
+            endWeek: end,
+            espnAuth,
+          },
+          {
+            jobId,
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 10000,
+            },
+            removeOnComplete: {
+              age: 86400, // Keep for 24 hours
+            },
+            removeOnFail: {
+              age: 86400,
+            },
+          },
+        );
+
+        if (!job) {
+          return reply.code(409).send({
+            success: false,
+            error: "Backfill already in progress for this league/season",
+          });
+        }
+
+        request.log.info(
+          { leagueId, season, start, end, jobId },
+          "Backfill job started",
+        );
+
+        return {
+          success: true,
+          jobId,
+          message: `Backfill started: ${end - start + 1} weeks`,
+        };
+      } catch (error) {
+        request.log.error({ error, leagueId, season }, "Failed to start backfill");
+        return reply.code(500).send({
+          success: false,
+          error: "Failed to start backfill job",
+        });
+      }
+    },
+  );
+
+  // GET /api/admin/backfill-jobs/:jobId - Get backfill job status
+  app.get(
+    "/api/admin/backfill-jobs/:jobId",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request: any, reply: any) => {
+      const jobId = request.params.jobId;
+
+      const job = await backfillQueue.getJob(jobId);
+
+      if (!job) {
+        return reply.code(404).send({
+          error: "Job not found",
+        });
+      }
+
+      const state = await job.getState();
+      const progress = job.progress || { percentage: 0, stage: "pending" };
+
+      return {
+        id: job.id,
+        status: state,
+        progress,
+        data: {
+          leagueId: job.data.leagueId,
+          season: job.data.season,
+          startWeek: job.data.startWeek,
+          endWeek: job.data.endWeek,
+        },
+        createdAt: job.timestamp,
+        finishedAt: job.finishedOn,
+        failedReason: job.failedReason,
+        returnValue: job.returnvalue,
+      };
+    },
+  );
+
+  // GET /api/admin/backfill-jobs - List recent backfill jobs
+  app.get(
+    "/api/admin/backfill-jobs",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async () => {
+      // Get recent jobs from backfillQueue
+      const [active, waiting, completed, failed] = await Promise.all([
+        backfillQueue.getJobs(["active"], 0, 10),
+        backfillQueue.getJobs(["waiting"], 0, 10),
+        backfillQueue.getJobs(["completed"], 0, 10),
+        backfillQueue.getJobs(["failed"], 0, 10),
+      ]);
+
+      // Map jobs to response format
+      const mapJob = async (job: any) => {
+        const state = await job.getState();
+        return {
+          id: job.id,
+          status: state,
+          progress: job.progress || { percentage: 0, stage: "pending" },
+          data: {
+            leagueId: job.data.leagueId,
+            season: job.data.season,
+            startWeek: job.data.startWeek,
+            endWeek: job.data.endWeek,
+          },
+          createdAt: job.timestamp,
+          finishedAt: job.finishedOn,
+          failedReason: job.failedReason,
+        };
+      };
+
+      const allJobs = await Promise.all([
+        ...active.map(mapJob),
+        ...waiting.map(mapJob),
+        ...completed.map(mapJob),
+        ...failed.map(mapJob),
+      ]);
+
+      // Sort by createdAt desc
+      allJobs.sort((a, b) => b.createdAt - a.createdAt);
+
+      return {
+        jobs: allJobs,
       };
     },
   );
