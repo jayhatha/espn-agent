@@ -38,11 +38,11 @@
   2. User sees category-by-category impact breakdown (rank changes for HR, RBI, AVG, ERA, etc.)
   3. System prevents illegal trades by validating roster slot constraints before showing results
   4. Multi-player rate stats (AVG, OBP, ERA, WHIP) use component-based math (H/AB not averaged rates)
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Backend roster validation, 3-per-side enforcement, /trades/validate endpoint, and integration tests (TDD)
+- [ ] 06-02-PLAN.md — Frontend multi-player trade builder with selection limits, real-time validation, and category breakdown
 
 ### Phase 7: Historical Backfill & Timeline
 **Goal:** Users can view week-by-week standings progression for their league's current and past seasons
