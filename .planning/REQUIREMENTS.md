@@ -51,6 +51,12 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INFR-02**: API has rate limiting to prevent abuse
 - [x] **INFR-03**: Snapshot orchestrator has job locking to prevent concurrent runs
 
+### Admin
+
+- [x] **ADMIN-01**: Admin can view system health KPIs (user count, league count, snapshot success rate, projection status)
+- [x] **ADMIN-02**: Admin can view all users and toggle role between user and admin
+- [x] **ADMIN-03**: Admin can upload batter and pitcher projections CSVs in a single flow
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -114,12 +120,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFR-01 | Phase 1 | Complete |
 | INFR-02 | Phase 1 | Complete |
 | INFR-03 | Phase 1 | Complete |
+| ADMIN-01 | Phase 5 | Complete |
+| ADMIN-02 | Phase 5 | Complete |
+| ADMIN-03 | Phase 5 | Complete |
 
 **Coverage:**
-- v1 requirements: 26 total
-- Mapped to phases: 26
+- v1 requirements: 29 total
+- Mapped to phases: 29
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-19 after roadmap creation*
+*Last updated: 2026-02-20 after Phase 5 Plan 1 completion*

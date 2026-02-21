@@ -103,7 +103,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Backend admin API routes: users, stats, leagues, batch upload
+- [x] 05-01-PLAN.md — Backend admin API routes: users, stats, leagues, batch upload
 - [ ] 05-02-PLAN.md — Frontend admin dashboard: KPIs, user table, role toggle, two-file upload, league health
 
 ## Progress
@@ -117,4 +117,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Authentication & Onboarding | 3/3 | Complete | 2026-02-19 |
 | 3. Core Dashboard & Recommendations | 3/3 | Complete | 2026-02-20 |
 | 4. Advanced Features & Polish | 4/4 | Complete | 2026-02-20 |
+| 5. Admin UI | 1/2 | In Progress | — |
 | 5. Admin UI | 0/2 | In Progress | — |
