@@ -17,6 +17,8 @@ import {
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { TransactionMarker } from "@/components/league/TransactionMarker";
+import { DateRangeFilter } from "@/components/league/DateRangeFilter";
 
 interface OverallDataPoint {
   league_id: number;
@@ -50,6 +52,9 @@ interface TransactionAnnotation {
   event_date: string;
   event_type: string;
   description: string;
+  team_name?: string;
+  players_added_details?: { id: number; name: string }[];
+  players_dropped_details?: { id: number; name: string }[];
 }
 
 interface Team {
@@ -79,6 +84,9 @@ export default function TrendsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("overall");
   const [selectedCategory, setSelectedCategory] = useState<string>("AVG");
   const [selectedSeason, setSelectedSeason] = useState<string | undefined>(undefined);
+  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [fromDate, setFromDate] = useState<string | undefined>(undefined);
+  const [toDate, setToDate] = useState<string | undefined>(undefined);
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -106,11 +114,23 @@ export default function TrendsPage() {
     enabled: !!leagueId,
   });
 
+  // Update fromDate/toDate when season changes
+  useEffect(() => {
+    if (selectedSeason) {
+      setFromDate(`${selectedSeason}-01-01`);
+      setToDate(`${selectedSeason}-12-31`);
+    }
+  }, [selectedSeason]);
+
   // Fetch overall standings time series
   const { data: overallData, isLoading: overallLoading } = useQuery({
-    queryKey: ["timeseries-overall", leagueId, selectedSeason],
+    queryKey: ["timeseries-overall", leagueId, selectedSeason, fromDate, toDate],
     queryFn: async () => {
-      return api.getOverallTimeSeries(parseInt(leagueId, 10), { season: selectedSeason }) as Promise<{
+      return api.getOverallTimeSeries(parseInt(leagueId, 10), {
+        season: selectedSeason,
+        from: fromDate,
+        to: toDate,
+      }) as Promise<{
         series: OverallDataPoint[];
       }>;
     },
@@ -119,12 +139,16 @@ export default function TrendsPage() {
 
   // Fetch category rank time series
   const { data: categoryData, isLoading: categoryLoading } = useQuery({
-    queryKey: ["timeseries-category", leagueId, selectedCategory, selectedSeason],
+    queryKey: ["timeseries-category", leagueId, selectedCategory, selectedSeason, fromDate, toDate],
     queryFn: async () => {
       return api.getCategoryRankTimeSeries(
         parseInt(leagueId, 10),
         selectedCategory,
-        { season: selectedSeason },
+        {
+          season: selectedSeason,
+          from: fromDate,
+          to: toDate,
+        },
       ) as Promise<{ series: CategoryRankDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "category",
@@ -132,11 +156,15 @@ export default function TrendsPage() {
 
   // Fetch projected overall time series
   const { data: projectedData, isLoading: projectedLoading } = useQuery({
-    queryKey: ["timeseries-projected", leagueId, selectedSeason],
+    queryKey: ["timeseries-projected", leagueId, selectedSeason, fromDate, toDate],
     queryFn: async () => {
       return api.getProjectedOverallTimeSeries(
         parseInt(leagueId, 10),
-        { season: selectedSeason },
+        {
+          season: selectedSeason,
+          from: fromDate,
+          to: toDate,
+        },
       ) as Promise<{ series: ProjectedOverallDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "projected",
@@ -144,13 +172,18 @@ export default function TrendsPage() {
 
   // Fetch transaction annotations
   const { data: annotationsData } = useQuery({
-    queryKey: ["annotations", leagueId],
+    queryKey: ["annotations", leagueId, selectedTeamId, fromDate, toDate, selectedSeason],
     queryFn: async () => {
-      return api.getAnnotations(parseInt(leagueId, 10)) as Promise<{
+      return api.getAnnotations(parseInt(leagueId, 10), {
+        teamIds: selectedTeamId ? String(selectedTeamId) : undefined,
+        from: fromDate,
+        to: toDate,
+        season: selectedSeason,
+      }) as Promise<{
         annotations: TransactionAnnotation[];
       }>;
     },
-    enabled: !!leagueId,
+    enabled: showAnnotations && !!leagueId,
   });
 
   const teams = teamsData?.teams || [];
@@ -312,6 +345,40 @@ export default function TrendsPage() {
             </select>
           </div>
         )}
+
+        {/* Filter controls */}
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex flex-row gap-6 items-end">
+            <DateRangeFilter
+              onRangeChange={(from, to) => {
+                setFromDate(from);
+                setToDate(to);
+                // Clear selected season when manually setting date range
+                if (from || to) {
+                  setSelectedSeason(undefined);
+                }
+              }}
+              initialFrom={fromDate}
+              initialTo={toDate}
+            />
+
+            <div className="flex items-center">
+              <input
+                id="show-annotations"
+                type="checkbox"
+                checked={showAnnotations}
+                onChange={(e) => setShowAnnotations(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="show-annotations"
+                className="ml-2 block text-sm text-gray-700"
+              >
+                Show Transactions
+              </label>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Chart Display */}
@@ -383,17 +450,14 @@ export default function TrendsPage() {
                   })}
 
                   {/* Transaction annotations */}
-                  {relevantAnnotations.map((annotation) => (
+                  {showAnnotations && relevantAnnotations.map((annotation) => (
                     <ReferenceLine
                       key={annotation.id}
                       x={annotation.event_date}
-                      stroke="#9ca3af"
+                      stroke={annotation.event_type === 'trade' ? '#8b5cf6' : annotation.event_type === 'drop' ? '#ef4444' : '#10b981'}
                       strokeDasharray="3 3"
-                      label={{
-                        value: annotation.event_type,
-                        position: "top",
-                        fontSize: 10,
-                      }}
+                      strokeOpacity={0.5}
+                      label={<TransactionMarker annotation={annotation} />}
                     />
                   ))}
                 </LineChart>
