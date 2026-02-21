@@ -16,10 +16,10 @@ Requirements for v1.1 Trades & History milestone. Each maps to roadmap phases.
 
 ### Historical Data & Backfill
 
-- [ ] **HIST-01**: Admin can trigger historical data backfill from ESPN API for a league's past season
-- [ ] **HIST-02**: Backfill runs as background job with progress tracking (not blocking UI)
-- [ ] **HIST-03**: Backfill respects ESPN rate limits (throttled requests, exponential backoff on 429)
-- [ ] **HIST-04**: Transaction deduplication via hash prevents duplicate entries during backfill
+- [x] **HIST-01**: Admin can trigger historical data backfill from ESPN API for a league's past season
+- [x] **HIST-02**: Backfill runs as background job with progress tracking (not blocking UI)
+- [x] **HIST-03**: Backfill respects ESPN rate limits (throttled requests, exponential backoff on 429)
+- [x] **HIST-04**: Transaction deduplication via hash prevents duplicate entries during backfill
 
 ### Season Timeline & Replay
 
@@ -69,10 +69,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRADE-02 | Phase 6 | Complete |
 | TRADE-03 | Phase 6 | Complete |
 | TRADE-04 | Phase 6 | Complete |
-| HIST-01 | Phase 7 | Pending |
-| HIST-02 | Phase 7 | Pending |
-| HIST-03 | Phase 7 | Pending |
-| HIST-04 | Phase 7 | Pending |
+| HIST-01 | Phase 7 | Complete |
+| HIST-02 | Phase 7 | Complete |
+| HIST-03 | Phase 7 | Complete |
+| HIST-04 | Phase 7 | Complete |
 | TIME-01 | Phase 7 | Pending |
 | TIME-02 | Phase 8 | Pending |
 | TIME-03 | Phase 8 | Pending |

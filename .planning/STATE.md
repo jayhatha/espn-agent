@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 6 - Multi-Player Trade Foundation
+**Current focus:** Phase 7 - Historical Backfill Timeline
 
 ## Current Position
 
-Phase: 6 of 9 (Multi-Player Trade Foundation)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-02-21 — Completed 06-02-PLAN.md (multi-player trade builder UI)
+Phase: 7 of 9 (Historical Backfill Timeline)
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-02-21 — Completed 07-01-PLAN.md (historical backfill backend infrastructure)
 
-Progress: [█████░░░░░] 56% (5 of 9 phases complete)
+Progress: [██████░░░░] 61% (6 of 9 phases in progress)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [█████░░░░░] 56% (5 of 9 phases complete)
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 2
-- Plans remaining: 4 (estimated)
-- Current phase: 6 (Multi-Player Trade Foundation) - COMPLETE
+- Plans completed: 3
+- Plans remaining: 3 (estimated)
+- Current phase: 7 (Historical Backfill Timeline) - IN PROGRESS
 
 **By Phase (v1.1):**
 
@@ -44,8 +44,9 @@ Progress: [█████░░░░░] 56% (5 of 9 phases complete)
 |-------|------|----------|-------|-------|
 | 06 | P01 | 3min | 2 | 5 |
 | 06 | P02 | 2min | 1 | 2 |
+| 07 | P01 | 6min | 2 | 4 |
 
-*Updated: 2026-02-21 after 06-02 completion*
+*Updated: 2026-02-21 after 07-01 completion*
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 06]: Component math verification via formula tests proves correctness by composition
 - [Phase 06]: 300ms debounce on validation prevents excessive API calls during rapid checkbox toggling
 - [Phase 06]: Progressive disclosure pattern for max selection warnings (only shown when limit reached)
+- [Phase 07]: Separate BullMQ queue for backfills prevents starving daily snapshot processing
+- [Phase 07]: SHA-256 transaction deduplication prevents duplicate entries on overlapping backfills
 
 ### Pending Todos
 
@@ -87,5 +90,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 06-02-PLAN.md (multi-player trade builder UI with real-time validation)
+Stopped at: Completed 07-01-PLAN.md (historical backfill backend infrastructure)
 Resume file: None
