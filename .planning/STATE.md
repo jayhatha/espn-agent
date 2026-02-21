@@ -5,13 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.1 Trades & History — defining requirements
 
 ## Current Position
 
-Milestone: v1.0 MVP — SHIPPED 2026-02-21
-Status: Complete
-Last activity: 2026-02-21 — Milestone v1.0 archived
+Milestone: v1.1 Trades & History
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-21 — Milestone v1.1 started
 
 ## Performance Metrics
 
@@ -48,9 +50,9 @@ None — all v1.0 blockers resolved.
 
 ## Session Continuity
 
-Last session: 2026-02-21 (milestone completion)
-Stopped at: v1.0 milestone archived
+Last session: 2026-02-21 (new milestone)
+Stopped at: Defining v1.1 requirements
 Resume file: None
 
 ---
-*v1.0 MVP shipped. Use `/gsd:new-milestone` to start next version.*
+*v1.1 Trades & History milestone started.*

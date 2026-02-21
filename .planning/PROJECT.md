@@ -36,17 +36,29 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Active
 
-(None — next milestone requirements TBD)
+- [ ] Multi-player trade evaluation (user proposes N-for-N trades, sees projected standings impact)
+- [ ] Season replay (week-by-week standings evolution from collected snapshots and backfilled data)
+- [ ] Trade retrospectives (how past trades impacted standings based on actual outcomes)
+- [ ] Historical data backfill from ESPN API (pull season data from before league connection)
+
+## Current Milestone: v1.1 Trades & History
+
+**Goal:** Enable multi-player trade evaluation and historical season analysis with data backfill
+
+**Target features:**
+- Multi-player trade evaluation with projected standings impact
+- Season replay timeline (week-by-week standings evolution)
+- Trade retrospective analysis (actual outcomes vs projections at time of trade)
+- ESPN historical data backfill for full-season coverage
 
 ### Out of Scope
 
 - Automated roster moves via ESPN API — ESPN has no official write API; ToS risk
-- Past season backfill — v2 feature; track going forward first
-- What-if counterfactual analysis — v2 feature; requires historical backfill
+- What-if counterfactual analysis — v2 feature; requires more historical depth than v1.1 backfill provides
 - Mobile native app — web-first, responsive design covers mobile
 - Real-time live scoring — ESPN doesn't expose real-time feeds reliably
 - Points league support — roto category leagues only for v1
-- Multi-player trade scenarios (2-for-2, 3-for-1) — combinatorial complexity, defer to v2
+- Multi-player trade suggestion generation (AI finds optimal combos) — v1.1 focuses on user-proposed evaluation only
 - Custom stat categories (QS, K/9, OPS+) — standard categories only for v1
 - Automated FanGraphs data fetching — ToS compliance, manual CSV upload only
 
@@ -85,4 +97,4 @@ ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies
 | HttpOnly cookies for JWT (not localStorage) | XSS protection, automatic inclusion | ✓ Good |
 
 ---
-*Last updated: 2026-02-21 after v1.0 milestone*
+*Last updated: 2026-02-21 after v1.1 milestone start*
