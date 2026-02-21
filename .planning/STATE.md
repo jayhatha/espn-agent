@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 5 of 5 (Admin UI)
-Plan: 1 of 2 completed
-Status: In Progress
-Last activity: 2026-02-20 — Completed Phase 5 Plan 1 (Admin API Backend)
+Plan: 2 of 2 completed
+Status: Complete
+Last activity: 2026-02-20 — Completed Phase 5 Plan 2 (Admin Dashboard UI)
 
-Progress: [##########] 50%
+Progress: [####################] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: 7 minutes
-- Total execution time: 113 minutes
+- Total plans completed: 18
+- Average duration: 6 minutes
+- Total execution time: 115 minutes
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [##########] 50%
 | 02 | 3 | 10min | 3min |
 | 03 | 3 | 7min | 2min |
 | 04 | 4 | 17min | 4min |
-| 05 | 1 | 5min | 5min |
+| 05 | 2 | 7min | 3min |
 
 **Recent Executions:**
+- Phase 05 Plan 02: 2min (2 tasks, 2 files)
 - Phase 05 Plan 01: 5min (2 tasks, 3 files)
 - Phase 04 Plan 04: 6min (2 tasks, 6 files)
 - Phase 04 Plan 03: 5min (2 tasks, 4 files)
@@ -43,7 +44,6 @@ Progress: [##########] 50%
 - Phase 03 Plan 01: 1min (2 tasks, 3 files)
 - Phase 02 Plan 03: 3min (2 tasks, 2 files)
 - Phase 02 Plan 02: 3min (2 tasks, 6 files)
-- Phase 02 Plan 01: 4min (2 tasks, 9 files)
 
 *Updated after each plan completion*
 
@@ -83,6 +83,10 @@ Recent decisions affecting current work:
 - [Phase 04-01]: LOWER_BETTER categories (ERA, WHIP) invert SGP calculation for proper ranking
 - [Phase 04-01]: Multi-position players use maximum VBD across all eligible positions
 - [Phase 04-01]: Replacement level prorated for shared slots (UTIL=0.2, MI/IF=0.25, CI/OF=0.33 per team)
+- [Phase 05-01]: Extract re-snapshot logic into helper function to avoid duplication between single and batch upload endpoints
+- [Phase 05-01]: Auto-detect batter vs pitcher files by field name first, then fall back to header inspection
+- [Phase 05-02]: Remove redundant admin check in AdminPageContent (AdminRoute wrapper already handles this)
+- [Phase 05-02]: Poll system stats every 30 seconds for near-real-time KPI updates
 
 ### Pending Todos
 
@@ -109,8 +113,8 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20 (plan execution)
-Stopped at: Completed 05-01-PLAN.md (Admin API Backend) - Phase 5 in progress
+Stopped at: Completed 05-02-PLAN.md (Admin Dashboard UI) - Phase 5 complete
 Resume file: None
 
 ---
-*Phase 5 in progress. 1 of 2 plans complete.*
+*Phase 5 complete. All v1 requirements satisfied.*
