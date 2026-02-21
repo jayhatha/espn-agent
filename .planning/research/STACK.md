@@ -1,782 +1,543 @@
-# Stack Research: Fantasy Baseball Analysis Tools & Sports Dashboards (2025)
+# Technology Stack Additions
 
-**Research Date**: 2026-02-19
-**Target**: Enhancement stack for ESPN Fantasy Baseball command center
-**Scope**: Visualization, UI components, real-time patterns, ESPN-specific tooling
-
----
+**Project:** ESPN Fantasy Baseball Assistant - Multi-Player Trades & Historical Analysis
+**Researched:** 2026-02-20
+**Confidence:** HIGH
 
 ## Executive Summary
 
-Fantasy sports dashboards in 2025 converge on:
-- **Recharts** for sports-specific visualizations (already installed, should activate)
-- **shadcn/ui + Radix UI** for accessible, composable dashboard components
-- **TanStack Table v8** for complex stat tables with sorting/filtering
-- **TanStack Query v5** for data fetching (already in use, expand usage)
-- **Server-Sent Events (SSE)** for real-time updates (simpler than WebSockets for ESPN polling)
-- **Zod** for runtime validation (already in backend, extend to frontend)
+The existing stack (Fastify, Next.js 14, Kysely, BullMQ, Recharts) handles the NEW features with minimal additions. No new frameworks required. Three focused libraries plus existing infrastructure upgrades address:
 
-**Key Finding**: Your current stack (Fastify, Next.js 14, TanStack Query v5, Recharts, Tailwind) is aligned with 2025 best practices. Focus on **activating unused tools** (Recharts) and **filling component gaps** (shadcn/ui, TanStack Table).
+1. **Multi-player trade combinatorics** → js-combinatorics (already familiar pattern from your codebase)
+2. **Large free agent/candidate lists** → react-window (complement to existing Recharts)
+3. **Historical backfill orchestration** → BullMQ FlowProducer (already have BullMQ 5.1.5)
+4. **ESPN historical data** → Same adapter, new query params (no new library)
+
+**Key principle:** Leverage what you have. Kysely handles temporal queries natively. Recharts handles timeline visualization. BullMQ handles backfill jobs.
 
 ---
 
-## 1. Visualization Libraries
+## NEW Dependencies
 
-### Primary Recommendation: **Recharts 2.x** ✅ Already Installed
+### Backend: Combinatorial Trade Analysis
 
-**Current Version in Project**: `^2.10.4`
-**Latest Stable (Jan 2025)**: `2.12.x`
-**Confidence**: **HIGH** (95%) - Industry standard for React sports dashboards
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **js-combinatorics** | ^2.1.2 | N-for-N trade candidate generation | TypeScript-native (compiled from .ts), BigInt support for large combinations, proven in 132+ npm projects. Alternative considered: manual recursion (unmaintainable for 3-for-3+ trades). |
 
-#### Rationale
-- **Declarative React API** - Fits Next.js/React Server Components model
-- **Sports-optimized charts**: Line charts (trends), bar charts (standings), area charts (projections), scatter plots (trade analysis)
-- **Responsive by default** - Critical for mobile fantasy managers
-- **Large community** - Fantasy football/baseball examples abundant
-- **Recharts vs alternatives**:
-  - vs **Nivo**: Recharts has better TypeScript support, simpler API
-  - vs **Victory**: Recharts has better Next.js SSR compatibility
-  - vs **Chart.js + react-chartjs-2**: Recharts is more React-idiomatic
-  - vs **Tremor**: Too opinionated for custom sports UI
-  - vs **Visx (Airbnb)**: Too low-level, slower dev velocity
+**Installation:**
+```bash
+cd packages/backend
+pnpm add js-combinatorics
+```
 
-#### Action Items
-1. **Upgrade**: `pnpm add recharts@^2.12.0` in frontend package
-2. **Activate unused Recharts** - Currently installed but unused (per CLAUDE.md known issues)
-3. **Chart types needed**:
-   - **Line charts**: Category rank over time, projected standings trends
-   - **Bar charts**: Current standings, category totals
-   - **Area charts**: Cumulative stats over season
-   - **Scatter plots**: Trade impact analysis (X=category gain, Y=overall points delta)
-   - **Composed charts**: Combine actual + projected lines
+**Integration point:** New `MultiPlayerTradeAgent` in `packages/backend/src/agents/`. Uses `Combination` class to generate candidates, filters via projection delta simulation (reusing existing StandingsProjectionAgent component math).
 
-#### Example Use Cases
+**Why NOT add:**
+- ❌ **optimization-js** — Overkill. Assignment problem solvers (Hungarian algorithm) are for weighted bipartite matching. Fantasy trades aren't optimization problems; they're simulation + ranking.
+- ❌ **Custom recursive generators** — js-combinatorics handles edge cases (empty sets, large N), provides iterators (memory-efficient for 5-for-5 trades = 3,003 combinations from 15-player rosters).
+
+---
+
+### Frontend: Virtualized Lists
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **react-window** | ^2.2.3 | Virtualize 100+ free agent/candidate lists | Built-in TypeScript defs, 30KB smaller than react-virtualized, integrates with existing TanStack Query data fetching. Recharts handles charts; react-window handles tables. |
+| **@types/react-window** | (NOT needed) | N/A | react-window 2.2.3+ includes native TypeScript definitions. Installing @types would conflict. |
+
+**Installation:**
+```bash
+cd packages/frontend
+pnpm add react-window
+```
+
+**Integration point:**
+- `/leagues/[id]/free-agents` — FixedSizeList for player rows
+- `/leagues/[id]/teams/[teamId]/trades/recommendations` — VariableSizeList for multi-player trade candidates (varying row height based on N-for-N complexity)
+
+**Why NOT add:**
+- ❌ **react-virtuoso** — Infinite scroll focus. We need fixed-height tables with sorting (which you already handle via TanStack Query state).
+- ❌ **@tanstack/react-virtual** — Headless (no styled components). react-window provides <FixedSizeList> out-of-box, pairs with existing Tailwind classes.
+
+---
+
+## Existing Stack: UPGRADE Versions
+
+### BullMQ FlowProducer (Already Installed)
+
+| Current | Upgrade To | Purpose | Why Upgrade |
+|---------|------------|---------|-------------|
+| bullmq@5.1.5 | bullmq@^5.69.3 | Historical backfill job orchestration | FlowProducer dependency fixes (v5.20+), batch processing improvements (v5.40+), 68 patch releases of reliability fixes. |
+
+**Installation:**
+```bash
+cd packages/backend
+pnpm add bullmq@^5.69.3
+```
+
+**Integration point:** New `HistoricalBackfillOrchestrator` agent uses FlowProducer to create job trees:
+```
+Parent: BackfillSeason(2023)
+├─ Child: FetchWeek(1) → Child: SnapshotWeek(1)
+├─ Child: FetchWeek(2) → Child: SnapshotWeek(2)
+└─ Child: FetchWeek(26) → Child: SnapshotWeek(26)
+```
+
+FlowProducer guarantees fetch-before-snapshot ordering per week, parallelizes weeks, marks parent complete only when all 26 weeks succeed.
+
+**Why NOT add:**
+- ❌ **Temporal.io** — Workflow engine overkill. You have 16 tables, not 1000 microservices.
+- ❌ **Agenda** — MongoDB-backed. You're on PostgreSQL.
+
+**Configuration additions** (no new libraries):
 ```typescript
-// Category trend over time
-<LineChart data={categoryRankTimeSeries}>
-  <Line dataKey="avg_rank" stroke="#8884d8" name="AVG Rank" />
-  <Line dataKey="hr_rank" stroke="#82ca9d" name="HR Rank" />
-  <XAxis dataKey="snapshot_date" />
-  <YAxis reversed domain={[1, numTeams]} />
+// Existing BullMQ worker already supports batch processing (v5.1.5+)
+// Add to SnapshotOrchestratorAgent worker options:
+{
+  concurrency: 3, // Parallel weeks
+  limiter: {
+    max: 10,      // ESPN rate limit (existing pattern)
+    duration: 1000
+  }
+}
+```
+
+---
+
+## Existing Stack: NO Changes Needed
+
+### PostgreSQL + Kysely → Temporal Queries
+
+**Current:** Kysely 0.27.2
+**Action:** None. Already supports recursive CTEs, window functions, and "AS OF" query patterns.
+
+**Why no temporal_tables extension:**
+Your `league_daily_snapshot` table IS a temporal table (manually implemented):
+- snapshot_date = valid_from (inclusive)
+- Immutable inserts (no updates) = system-versioned
+- Primary key (league_id, snapshot_date) = bitemporal-ready
+
+**Season replay query** (pure Kysely, no new libraries):
+```typescript
+// Week-by-week standings from April 1 to Oct 1, 2023
+db.selectFrom('team_daily_overall')
+  .where('league_id', '=', leagueId)
+  .where('snapshot_date', '>=', '2023-04-01')
+  .where('snapshot_date', '<=', '2023-10-01')
+  .where(sql`EXTRACT(DOW FROM snapshot_date) = 0`) // Sundays only
+  .orderBy('snapshot_date', 'asc')
+```
+
+**Trade retrospective query** (joins existing tables):
+```typescript
+// Actual outcome vs projection at trade time
+db.selectFrom('league_transaction_event as t')
+  .innerJoin('team_daily_projected_overall as proj', (join) => join
+    .onRef('proj.team_id', '=', 't.team_id')
+    .onRef('proj.snapshot_date', '=', 't.timestamp::date') // "AS OF" trade date
+  )
+  .innerJoin('team_daily_overall as actual', (join) => join
+    .onRef('actual.team_id', '=', 't.team_id')
+    .on('actual.snapshot_date', '=', '2023-10-01') // End of season
+  )
+  .select([
+    'proj.total_points as projected_at_trade',
+    'actual.total_points as actual_final',
+    sql<number>`actual.total_points - proj.total_points`.as('delta')
+  ])
+```
+
+**Why NOT add:**
+- ❌ **temporal_tables extension** — Overkill. Adds trigger complexity for features you already have via immutable inserts.
+- ❌ **TimescaleDB** — Hypertable partitioning irrelevant. 182 snapshots/year/league × 10 leagues = 1,820 rows (tiny for PostgreSQL).
+
+---
+
+### Recharts → Timeline Visualization
+
+**Current:** Recharts 2.10.4
+**Action:** None. Already handles timeline charts.
+
+**Season replay visualization** (existing Recharts components):
+```tsx
+// Week-by-week standings race chart
+<LineChart data={weeklyStandings}>
+  <XAxis dataKey="week" label="Week" />
+  <YAxis label="Roto Points" />
   <Tooltip />
   <Legend />
+  {teams.map(team => (
+    <Line
+      key={team.id}
+      type="monotone"
+      dataKey={`team_${team.id}`}
+      stroke={teamColors[team.id]}
+      strokeWidth={2}
+    />
+  ))}
 </LineChart>
-
-// Projected vs actual standings
-<ComposedChart data={standingsData}>
-  <Bar dataKey="current_points" fill="#8884d8" name="Current" />
-  <Line dataKey="projected_points" stroke="#ff7300" name="Projected" />
-  <XAxis dataKey="team_name" />
-  <YAxis />
-</ComposedChart>
 ```
 
-#### Known Limitations
-- **Performance**: 500+ data points can lag (use sampling for long time series)
-- **Customization ceiling**: Deep customization requires dropping to D3.js
-- **Animation overhead**: Disable for real-time updating charts (`isAnimationActive={false}`)
+**Trade retrospective visualization** (stacked bar):
+```tsx
+// Projected vs Actual delta per category
+<BarChart data={tradeOutcomes}>
+  <XAxis dataKey="category" />
+  <YAxis label="Roto Point Delta" />
+  <Bar dataKey="projected_delta" fill="#8884d8" />
+  <Bar dataKey="actual_delta" fill="#82ca9d" />
+  <ReferenceLine y={0} stroke="#000" />
+</BarChart>
+```
+
+**Why NOT add:**
+- ❌ **D3.js** — 200KB unminified. Recharts (React wrapper over D3) is already installed, declarative (fits Next.js paradigm).
+- ❌ **Chart.js / react-chartjs-2** — Imperative API (canvas refs). Recharts is React-first (components as data).
+- ❌ **Visx** — Lower-level than Recharts. You'd rebuild what Recharts provides (axes, tooltips, legends).
+
+**Best practice from research:**
+- Limit data points for performance. For 182-day season, render every 7th point (26 weeks) unless user zooms.
+- Use React.memo on <LineChart> when parent re-renders (TanStack Query refetch).
 
 ---
 
-### Alternative Considered: **Observable Plot**
+## ESPN API: Historical Data Endpoints
 
-**Confidence**: **MEDIUM** (60%) - Emerging option for data-dense sports viz
+**New capability, NO new libraries.**
 
-#### Why NOT Recommended (Yet)
-- **React integration**: Requires `useEffect` + ref juggling (not declarative)
-- **Bundle size**: Includes full D3 (~200KB vs Recharts ~100KB)
-- **Community**: Smaller ecosystem for sports-specific examples
-- **Future consideration**: If you need publication-quality charts for marketing/blog
+### Historical Endpoint Structure
 
----
+ESPN Fantasy API supports historical seasons via two endpoints:
 
-## 2. Component Libraries
+| Season | Endpoint | Auth |
+|--------|----------|------|
+| 2018+ | `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/{YYYY}/segments/0/leagues/{leagueId}` | SWID + espn_s2 cookies |
+| 2017- | `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/leagueHistory/{leagueId}?seasonId={YYYY}` | SWID + espn_s2 cookies |
 
-### Primary Recommendation: **shadcn/ui + Radix UI**
-
-**Version**: shadcn/ui CLI latest (copies components, no version)
-**Radix UI**: `@radix-ui/react-*@^1.2.x`
-**Confidence**: **HIGH** (90%) - Fastest-growing pattern for data dashboards
-
-#### Rationale
-- **Copy-paste components**: No library dependency, full customization
-- **Accessibility**: WCAG 2.1 AA out-of-box (critical for public app)
-- **Tailwind-native**: Seamless integration with your existing Tailwind setup
-- **Composability**: Build complex dashboard layouts (tabs, dialogs, dropdowns, tooltips)
-- **Headless**: Style sports themes without fighting component opinions
-- **TypeScript**: Full type safety for props/variants
-
-#### Action Items
-1. **Install shadcn/ui CLI**: `pnpm dlx shadcn-ui@latest init` in frontend package
-2. **Core components to add** (via `pnpm dlx shadcn-ui@latest add <component>`):
-   - **Card**: Team cards, stat cards, player cards
-   - **Table**: Simple roster displays (defer to TanStack Table for complex)
-   - **Tabs**: Category tabs (hitting/pitching), view tabs (standings/trends/waivers)
-   - **Dialog**: Add/drop confirmations, trade proposal modals
-   - **Select**: Team picker, league picker, date range picker
-   - **Badge**: Status indicators (fresh/degraded, active/injured)
-   - **Tooltip**: Stat explanations, formula breakdowns
-   - **Separator**: Visual hierarchy in dense stat layouts
-   - **Skeleton**: Loading states for async data
-   - **Alert**: Degraded data warnings, stale projection notices
-3. **Custom components to build** (using Radix primitives):
-   - **PlayerCard**: Photo, name, team, position, key stats
-   - **TeamHealthWidget**: Roster status, injury indicators, category strengths
-   - **ActionItemCard**: Waiver/trade recommendation with CTA
-
-#### vs Alternatives
-- vs **Material-UI (MUI)**: Too heavy (bundle size), opinionated design doesn't fit sports aesthetic
-- vs **Chakra UI**: Good alternative, but less momentum than shadcn in 2025
-- vs **Ant Design**: Enterprise-focused, not sports-optimized
-- vs **Headless UI (Tailwind)**: Good, but shadcn provides more batteries-included
-- vs **Mantine**: Excellent, but CSS-in-JS approach conflicts with Tailwind
-
-#### Example Implementation
+**Query parameters for week-by-week backfill:**
 ```typescript
-// Team health dashboard widget
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-
-export function TeamHealthCard({ team, categories }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{team.name}</CardTitle>
-        <Badge variant={team.rank <= 3 ? "success" : "default"}>
-          Rank {team.rank}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        {categories.map(cat => (
-          <Tooltip key={cat.name}>
-            <TooltipTrigger>
-              <Badge variant={cat.rank <= numTeams/2 ? "success" : "destructive"}>
-                {cat.name}: {cat.rank}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              Current: {cat.current} | Projected: {cat.projected}
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </CardContent>
-    </Card>
-  )
+// Existing adapter: packages/backend/src/adapters/espn.ts
+// Add method:
+async fetchHistoricalWeek(
+  leagueId: number,
+  season: number,
+  scoringPeriodId: number // 1-26 for baseball (weekly scoring periods)
+): Promise<LeagueData> {
+  const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${season}/segments/0/leagues/${leagueId}`;
+  const params = {
+    view: ['mTeam', 'mRoster', 'mMatchup', 'mSettings'],
+    scoringPeriodId: scoringPeriodId, // NEW: fetches standings as-of this week
+  };
+  // Existing retry/backoff logic applies (axios-retry 4.5.0 already installed)
 }
 ```
 
+**Caveats from research:**
+- **Data retention:** ESPN may delete historical data. Pre-2018 boxscores often missing. Design doc's `is_degraded` flag handles this (mark snapshot degraded if ESPN returns partial data).
+- **Rate limiting:** Historical fetches count against same limits as current-season API. Your existing `@fastify/rate-limit` + backoff handles this.
+
+**Why NOT add:**
+- ❌ **espn-api (Python client)** — Wrong language. You're TypeScript.
+- ❌ **API client codegen** — ESPN API is undocumented, changes without notice. Hand-maintained adapter (existing pattern) allows quick fixes.
+
 ---
 
-## 3. Data Table Library
+## Architecture Patterns: Backfill Job Orchestration
 
-### Primary Recommendation: **TanStack Table v8**
+**Uses existing BullMQ (upgraded), NO new queue system.**
 
-**Current Version**: Not installed
-**Latest Stable**: `@tanstack/react-table@^8.20.x`
-**Confidence**: **HIGH** (95%) - Gold standard for sports stat tables
+### Job Tree Structure (BullMQ FlowProducer)
 
-#### Rationale
-- **Headless**: Full control over rendering (works with shadcn Table component)
-- **Performance**: Virtualizes 1000+ row tables (full roster/free agent lists)
-- **Sorting**: Multi-column (e.g., sort by HR then RBI)
-- **Filtering**: Client-side (position, team, availability) + server-side (search)
-- **Grouping**: By position, by team, by status
-- **Column pinning**: Keep player name visible while scrolling stats
-- **Row selection**: Multi-select for add/drop, trade builder
-- **TypeScript**: Fully typed column definitions
-- **TanStack ecosystem**: Works seamlessly with TanStack Query (already in use)
-
-#### Action Items
-1. **Install**: `pnpm add @tanstack/react-table@^8.20.0` in frontend
-2. **Use cases**:
-   - **Free agent table**: Filter by position, sort by projected stats, select for add
-   - **Roster table**: Group by position, sort by category impact, highlight injuries
-   - **Trade candidate table**: Sort by projected points delta, filter by position scarcity
-   - **Standings table**: Sort by category, highlight user's team
-   - **Transaction history**: Filter by type, sort by date
-
-#### Example Column Definition
 ```typescript
-import { createColumnHelper } from '@tanstack/react-table'
+// packages/backend/src/agents/historical-backfill-orchestrator.ts
+import { FlowProducer } from 'bullmq';
 
-const columnHelper = createColumnHelper<PlayerProjection>()
+const flowProducer = new FlowProducer({ connection: redisConnection });
 
-const columns = [
-  columnHelper.accessor('player_name', {
-    header: 'Player',
-    cell: info => <PlayerNameCell player={info.row.original} />,
-    enablePinning: true, // Keep visible while scrolling
-  }),
-  columnHelper.accessor('proj_hr', {
-    header: 'HR',
-    cell: info => info.getValue()?.toFixed(0),
-    sortingFn: 'basic',
-  }),
-  columnHelper.accessor('proj_rbi', {
-    header: 'RBI',
-    cell: info => info.getValue()?.toFixed(0),
-  }),
-  // Derived column for rate stats
-  columnHelper.display({
-    id: 'proj_avg',
-    header: 'AVG',
-    cell: ({ row }) => {
-      const { proj_ab, proj_h } = row.original
-      return proj_ab > 0 ? (proj_h / proj_ab).toFixed(3) : '---'
+await flowProducer.add({
+  name: `backfill-season-${season}`,
+  queueName: 'backfill-orchestrator',
+  data: { leagueId, season },
+  children: [
+    {
+      name: `fetch-week-1`,
+      queueName: 'espn-fetcher',
+      data: { leagueId, season, week: 1 },
+      children: [
+        {
+          name: `snapshot-week-1`,
+          queueName: 'snapshot-processor',
+          data: { leagueId, season, week: 1 },
+        }
+      ]
     },
-  }),
-]
+    // ... repeat for weeks 2-26
+  ]
+});
 ```
 
-#### vs Alternatives
-- vs **AG Grid**: Overkill (enterprise features you don't need), expensive for commercial
-- vs **react-data-grid**: Good, but less flexible than TanStack
-- vs **Mantine DataTable**: Tied to Mantine ecosystem
-- vs **HTML table + custom sorting**: Reinventing the wheel, accessibility issues
+**Guarantees:**
+- Fetch → Snapshot ordering per week (children run after parent)
+- Week parallelization (siblings run concurrently, respecting `concurrency: 3`)
+- Atomic failure handling (if fetch-week-5 fails, snapshot-week-5 never runs, parent marked failed)
 
----
-
-## 4. Real-Time Data Patterns
-
-### Primary Recommendation: **Server-Sent Events (SSE)**
-
-**Confidence**: **HIGH** (85%) - Best fit for ESPN API polling model
-
-#### Rationale
-- **ESPN API is poll-based**: No native WebSockets, so SSE matches your polling backend
-- **Simpler than WebSockets**: One-way server→client (perfect for score updates, transaction alerts)
-- **HTTP/2 friendly**: Reuses existing connections
-- **Automatic reconnection**: Browser handles reconnect logic
-- **Event types**: Name events for different updates (`snapshot-complete`, `transaction-new`, `projection-updated`)
-- **Fastify support**: `@fastify/sse` plugin available
-
-#### Action Items
-1. **Backend**: Install `@fastify/sse` (or manual implementation)
-2. **Endpoints to create**:
-   - `GET /api/leagues/:id/events` - Stream snapshot completions, transaction alerts
-   - `GET /api/teams/:teamId/events` - Stream waiver/trade notifications for user's team
-3. **Frontend**: Use native `EventSource` API (no library needed)
-4. **Fallback**: Polling with TanStack Query `refetchInterval` for browsers without SSE
-
-#### Example Implementation
+**Priority queue for user-triggered backfills:**
 ```typescript
-// Backend (Fastify)
-app.get('/api/leagues/:id/events', async (req, reply) => {
-  reply.raw.setHeader('Content-Type', 'text/event-stream')
-  reply.raw.setHeader('Cache-Control', 'no-cache')
-  reply.raw.setHeader('Connection', 'keep-alive')
-
-  const leagueId = req.params.id
-
-  // Listen to Redis pub/sub for league events
-  const subscriber = redis.duplicate()
-  await subscriber.subscribe(`league:${leagueId}:events`)
-
-  subscriber.on('message', (channel, message) => {
-    const event = JSON.parse(message)
-    reply.raw.write(`event: ${event.type}\n`)
-    reply.raw.write(`data: ${JSON.stringify(event.payload)}\n\n`)
-  })
-
-  req.raw.on('close', () => {
-    subscriber.unsubscribe()
-    subscriber.quit()
-  })
-})
-
-// Frontend (React)
-useEffect(() => {
-  const eventSource = new EventSource(`/api/leagues/${leagueId}/events`)
-
-  eventSource.addEventListener('snapshot-complete', (e) => {
-    const snapshot = JSON.parse(e.data)
-    queryClient.invalidateQueries({ queryKey: ['league', leagueId, 'standings'] })
-    toast.success('Standings updated!')
-  })
-
-  eventSource.addEventListener('transaction-new', (e) => {
-    const txn = JSON.parse(e.data)
-    if (txn.team_id === selectedTeamId) {
-      toast.info(`New transaction: ${txn.description}`)
-    }
-  })
-
-  return () => eventSource.close()
-}, [leagueId])
-```
-
-#### vs Alternatives
-- vs **WebSockets**: Overkill (you don't need client→server messaging), harder infrastructure (load balancing, sticky sessions)
-- vs **Polling only**: Works, but SSE reduces server load and improves UX latency
-- vs **Firebase Realtime DB**: Vendor lock-in, unnecessary for self-hosted data
-- vs **Pusher/Ably**: Same vendor lock-in concern
-
----
-
-### Secondary Pattern: **Optimistic Updates**
-
-**Confidence**: MEDIUM (70%) - Improves perceived performance
-
-#### Use Cases
-- **Add/drop waiver**: Immediately show player on roster before server confirms
-- **Lineup changes**: Update UI instantly, revert on error
-- **Trade proposals**: Show "pending" state before backend processes
-
-#### TanStack Query Integration
-```typescript
-const addPlayerMutation = useMutation({
-  mutationFn: (player) => api.addPlayer(leagueId, teamId, player),
-  onMutate: async (newPlayer) => {
-    // Cancel outgoing refetches
-    await queryClient.cancelQueries({ queryKey: ['roster', teamId] })
-
-    // Snapshot previous value
-    const previousRoster = queryClient.getQueryData(['roster', teamId])
-
-    // Optimistically update
-    queryClient.setQueryData(['roster', teamId], old => [...old, newPlayer])
-
-    return { previousRoster }
-  },
-  onError: (err, newPlayer, context) => {
-    // Revert on error
-    queryClient.setQueryData(['roster', teamId], context.previousRoster)
-  },
-  onSettled: () => {
-    // Refetch to sync with server
-    queryClient.invalidateQueries({ queryKey: ['roster', teamId] })
-  },
-})
-```
-
----
-
-## 5. Form & Validation
-
-### Primary Recommendation: **React Hook Form + Zod**
-
-**React Hook Form**: `^7.53.x`
-**Zod**: `^3.22.4` (already in backend)
-**Confidence**: **HIGH** (90%)
-
-#### Rationale
-- **Zod already in backend**: Reuse schema definitions frontend/backend
-- **Type safety**: Infer TypeScript types from Zod schemas
-- **Performance**: React Hook Form uses uncontrolled inputs (minimal re-renders)
-- **Integration**: `@hookform/resolvers` connects RHF + Zod seamlessly
-- **shadcn/ui compatibility**: Form component included in shadcn
-
-#### Action Items
-1. **Install frontend**: `pnpm add react-hook-form @hookform/resolvers`
-2. **Share Zod schemas**: Move schemas to `packages/shared/src/schemas.ts`
-3. **Use cases**:
-   - League connection form (ESPN league ID + cookies)
-   - Trade proposal builder (multi-select players)
-   - Filter forms (free agent search, date range)
-
-#### Example
-```typescript
-// shared/src/schemas.ts
-export const leagueConnectionSchema = z.object({
-  leagueId: z.string().regex(/^\d+$/, 'Must be numeric'),
-  swid: z.string().min(1, 'SWID required for private leagues').optional(),
-  espn_s2: z.string().min(1, 'espn_s2 required for private leagues').optional(),
-})
-
-// frontend form
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { leagueConnectionSchema } from '@espn-fantasy/shared/schemas'
-
-const form = useForm({
-  resolver: zodResolver(leagueConnectionSchema),
-})
-
-const onSubmit = form.handleSubmit(async (data) => {
-  await connectLeagueMutation.mutateAsync(data)
-})
-```
-
----
-
-## 6. Date/Time Handling
-
-### Primary Recommendation: **date-fns** ✅ Already Installed
-
-**Current Version**: Backend `^2.30.0`, Frontend `^3.0.6`
-**Latest Stable**: `^4.1.0`
-**Confidence**: **HIGH** (95%)
-
-#### Rationale
-- **Tree-shakeable**: Import only functions you need (vs Moment.js)
-- **Immutable**: No mutation bugs
-- **TypeScript**: Full type definitions
-- **Sports-specific needs**: Format game dates, calculate days until trade deadline, time since last update
-
-#### Action Items
-1. **Standardize version**: Upgrade backend to `^3.0.0` (breaking changes in v3)
-2. **Timezone handling**: Add `date-fns-tz` to frontend (already in backend)
-3. **Common utilities** in `packages/shared/src/date-utils.ts`:
-   ```typescript
-   export const formatGameDate = (date: Date) => format(date, 'MMM d, yyyy')
-   export const formatLastUpdated = (date: Date) => formatDistanceToNow(date, { addSuffix: true })
-   export const isWithinSeasonDates = (date: Date, season: { start: Date, end: Date }) =>
-     isWithinInterval(date, season)
-   ```
-
----
-
-## 7. Toast Notifications
-
-### Primary Recommendation: **sonner**
-
-**Version**: `^1.7.x`
-**Confidence**: **HIGH** (85%)
-
-#### Rationale
-- **Beautiful defaults**: Sports-appropriate design (no config needed)
-- **Promise toasts**: Perfect for mutations (`toast.promise(mutation, {...})`)
-- **Positioning**: Bottom-right (mobile-friendly, doesn't block stats)
-- **Action buttons**: "View trade", "Undo add/drop"
-- **Accessibility**: Screen reader support
-- **Lightweight**: ~4KB
-
-#### Use Cases
-- Snapshot completion: "Standings updated 2 minutes ago"
-- Waiver added: "Added Juan Soto to your roster"
-- Trade evaluated: "This trade improves your projected rank by 2 spots"
-- Error handling: "Failed to connect to ESPN. Check your cookies."
-- Degraded data: "Projections are stale. Upload new CSV to refresh."
-
-#### vs Alternatives
-- vs **react-hot-toast**: Sonner has better API, promise support
-- vs **react-toastify**: More config required, less modern
-- vs **Custom**: Reinventing the wheel
-
----
-
-## 8. State Management
-
-### Primary Recommendation: **TanStack Query + URL State** (No Global Store)
-
-**Confidence**: **HIGH** (90%)
-
-#### Rationale
-- **TanStack Query IS state management**: Server state in cache, sync/async mutations
-- **URL state for UI**: Selected team, active tab, date range (via Next.js `useSearchParams`)
-- **localStorage for preferences**: Theme, default team per league (already in use per CLAUDE.md)
-- **No Redux/Zustand needed**: Complexity not justified for current scope
-
-#### URL State Pattern
-```typescript
-// app/leagues/[id]/page.tsx
-import { useSearchParams } from 'next/navigation'
-
-export default function LeaguePage({ params }) {
-  const searchParams = useSearchParams()
-  const selectedTeamId = searchParams.get('team') || getStoredTeamId(params.id)
-  const activeTab = searchParams.get('tab') || 'standings'
-
-  // Update URL when team changes
-  const setSelectedTeam = (teamId: string) => {
-    const url = new URLSearchParams(searchParams)
-    url.set('team', teamId)
-    router.push(`?${url.toString()}`)
-    localStorage.setItem(`league_${params.id}_team`, teamId)
+// User clicks "Backfill 2023" button → high priority
+await flowProducer.add({
+  // ... same structure
+  opts: {
+    priority: 1, // Lower = higher priority (1-2,097,152 range)
   }
+});
 
-  return (
-    <Tabs value={activeTab} onValueChange={tab => router.push(`?tab=${tab}`)}>
-      <TabsList>
-        <TabsTrigger value="standings">Standings</TabsTrigger>
-        <TabsTrigger value="waivers">Waivers</TabsTrigger>
-        <TabsTrigger value="trades">Trades</TabsTrigger>
-      </TabsList>
-    </Tabs>
-  )
+// Nightly cron backfill → low priority
+await flowProducer.add({
+  // ... same structure
+  opts: {
+    priority: 1000,
+  }
+});
+```
+
+**Why NOT add:**
+- ❌ **Celery (Python)** — Wrong language, Redis-backed anyway (same infra).
+- ❌ **RabbitMQ** — Message broker overkill. BullMQ is job queue (state persistence, retries, priorities built-in). RabbitMQ would require rebuilding these features.
+
+---
+
+## Component Math: NO Changes
+
+Existing `packages/shared/src/formulas.ts` handles multi-player trades without modification.
+
+**Example: 3-for-2 trade simulation**
+```typescript
+// Team A trades: Player X, Y, Z
+// Team A receives: Player M, N
+
+// Team A's new AVG projection (component-based, existing formula):
+const teamA_new_AB = teamA_current_AB - (X.AB + Y.AB + Z.AB) + (M.AB + N.AB) + (X.proj_AB + Y.proj_AB + Z.proj_AB) - (M.proj_AB + N.proj_AB);
+const teamA_new_H = teamA_current_H - (X.H + Y.H + Z.H) + (M.H + N.H) + (X.proj_H + Y.proj_H + Z.proj_H) - (M.proj_H + N.proj_H);
+const teamA_new_AVG = teamA_new_H / teamA_new_AB; // Rate from components (correct)
+
+// Rank all 12 teams by new_AVG → assign roto points → sum across 12 categories
+```
+
+Component math scales to N-for-N trades. js-combinatorics generates candidates; existing projection logic evaluates them.
+
+---
+
+## Database Schema: NO New Tables
+
+Existing 16 tables support new features:
+
+| Feature | Tables Used | Query Pattern |
+|---------|-------------|---------------|
+| Multi-player trade evaluation | player_projection, team_daily_category_totals, team_daily_projected_overall | IN clause for N players, component aggregation (SUM) |
+| Season replay | league_daily_snapshot, team_daily_overall | WHERE snapshot_date BETWEEN start AND end |
+| Trade retrospectives | league_transaction_event, team_daily_projected_overall, team_daily_overall | JOIN on trade date (temporal point-in-time) |
+| Historical backfill | league_raw_payload, league_daily_snapshot (all snapshot tables) | INSERT with ON CONFLICT DO NOTHING (idempotent) |
+
+**Why NO temporal_tables extension:**
+- Existing schema already implements System-Versioned Temporal Tables pattern (SQL:2011 standard):
+  - `snapshot_date` = SysStartTime
+  - Immutable rows = automatic history
+  - No updates (only inserts) = no triggers needed
+
+---
+
+## Frontend Routing: NO Changes
+
+Next.js 14 App Router handles new routes with existing patterns:
+
+| Route | Pattern | Existing or New |
+|-------|---------|-----------------|
+| `/leagues/[id]/trades/evaluate` | Dynamic segment + query params | NEW page, existing pattern |
+| `/leagues/[id]/history?season=2023` | searchParams prop | NEW page, existing pattern |
+| `/leagues/[id]/history/trades/[tradeId]` | Nested dynamic segments | NEW page, existing pattern |
+
+**Query param handling (already supported):**
+```tsx
+// packages/frontend/src/app/leagues/[id]/history/page.tsx
+export default async function HistoryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ season?: string; week?: string }>;
+}) {
+  const { id } = await params;
+  const { season, week } = await searchParams;
+  // TanStack Query hook (existing pattern)
 }
 ```
 
-#### When to Add Zustand (Future)
-- **Cross-cutting UI state**: Global filters, multi-step wizards (draft assistant)
-- **Real-time collaboration**: Multiple users building trades together
-- **Offline mode**: Queue mutations for replay on reconnect
-
 ---
 
-## 9. ESPN-Specific Tooling
+## Development Tooling: NO Changes
 
-### Current Approach: Custom Adapter ✅
+Existing tools handle new features:
 
-**Confidence**: **HIGH** (95%) - Continue custom approach
+| Tool | Current | Needed For | Status |
+|------|---------|------------|--------|
+| tsx | 4.7.0 | Hot reload during agent development | ✓ Installed |
+| vitest | 1.1.1 | Unit tests for combinatorial logic | ✓ Installed |
+| TypeScript | 5.3.3 | Type safety for js-combinatorics generics | ✓ Installed |
 
-#### Rationale
-- **No official ESPN Fantasy API SDK**: ESPN doesn't provide official libraries
-- **Existing adapter works**: `packages/backend/src/adapters/espn.ts` is correct pattern
-- **Community libraries are stale**: Most ESPN fantasy wrappers (espn-fantasy-football-api, etc.) are outdated, football-focused
+**Test example (vitest, no new deps):**
+```typescript
+// packages/backend/src/agents/__tests__/multi-player-trade.test.ts
+import { describe, it, expect } from 'vitest';
+import { Combination } from 'js-combinatorics';
 
-#### Enhancements Needed
-1. **Retry logic**: Exponential backoff for rate limits
-   ```typescript
-   import { retry } from '@lifeomic/attempt' // or axios-retry
-
-   async fetchLeague(leagueId: string) {
-     return retry(async () => {
-       return axios.get(`${ESPN_BASE_URL}/...`, {
-         headers: { Cookie: `SWID=${swid}; espn_s2=${espn_s2}` },
-         timeout: 10000,
-       })
-     }, {
-       maxAttempts: 3,
-       delay: 1000,
-       factor: 2, // 1s, 2s, 4s
-       handleError: (err, context) => {
-         if (err.response?.status === 429) return // Retry rate limits
-         throw err // Don't retry client errors
-       }
-     })
-   }
-   ```
-
-2. **Redis caching**: Move from in-memory to Redis (already available via `@fastify/redis`)
-   ```typescript
-   const cacheKey = `espn:league:${leagueId}:${date}`
-   const cached = await redis.get(cacheKey)
-   if (cached) return JSON.parse(cached)
-
-   const data = await fetchFromESPN(leagueId)
-   await redis.setex(cacheKey, 300, JSON.stringify(data)) // 5 min TTL
-   return data
-   ```
-
-3. **Free agent fetching**: Implement missing endpoint
-   ```typescript
-   // ESPN API endpoint (discovered via browser DevTools)
-   GET /apis/v3/games/flb/seasons/2025/segments/0/leagues/{leagueId}/players?
-     scoringPeriodId={currentWeek}&
-     view=players_wl& // wl = waiver/free agents
-     limit=500
-   ```
-
-4. **Activity feed parsing**: For transaction annotations
-   ```typescript
-   GET /apis/v3/games/flb/seasons/2025/segments/0/leagues/{leagueId}?view=kona_league_communication
-   ```
-
----
-
-## 10. Error Monitoring
-
-### Primary Recommendation: **Sentry** (Future Production Must-Have)
-
-**Confidence**: **HIGH** (90%)
-
-#### Rationale
-- **Fantasy sports context**: Capture league ID, team ID, snapshot date on errors
-- **Performance monitoring**: Identify slow ESPN API calls, heavy chart renders
-- **User feedback**: "Report a bug" widget in dashboard
-- **Release tracking**: Tie errors to deployments
-- **Free tier**: 5K events/month sufficient for MVP
-
-#### Action Items (Post-MVP)
-1. Install: `@sentry/nextjs` (frontend), `@sentry/node` (backend)
-2. Configure context:
-   ```typescript
-   Sentry.setContext('fantasy', {
-     leagueId,
-     teamId,
-     snapshotDate,
-     isDegraded,
-   })
-   ```
-
-#### vs Alternatives
-- vs **LogRocket**: Better for session replay, overkill for backend errors
-- vs **Rollbar**: Good, but Sentry has better Next.js integration
-- vs **Console.log**: Not acceptable for production
-
----
-
-## 11. Testing (Existing Stack OK)
-
-### Current: **Vitest** ✅
-
-**Confidence**: **HIGH** (95%) - Keep Vitest
-
-#### Rationale
-- **Vite-powered**: Faster than Jest (important for TDD)
-- **ESM-native**: Matches backend `"type": "module"`
-- **Jest-compatible API**: Easy migration if needed
-
-#### Enhancements
-1. **Frontend testing**: Add Vitest + Testing Library
-   ```bash
-   pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom
-   ```
-2. **Component tests**: shadcn/ui components, Recharts charts (snapshot tests)
-3. **Integration tests**: TanStack Query hooks with MSW (Mock Service Worker)
-
----
-
-## 12. Build & Dev Tools (Existing Stack OK)
-
-### Current: **Turbo + pnpm** ✅
-
-**Confidence**: **HIGH** (100%) - Perfect for monorepo
-
-- **Turbo**: Best-in-class monorepo task runner (2025 standard)
-- **pnpm**: Fast, disk-efficient, strict peer deps
-- **tsx**: Fast TypeScript execution for backend dev
-
-**No changes needed.**
-
----
-
-## What NOT to Use
-
-### ❌ Avoid: GraphQL (Apollo, urql, tRPC)
-**Why**: REST endpoints are simple, typed with Zod. GraphQL overhead not justified for ~15 endpoints.
-**Exception**: If adding real-time multiplayer draft (then consider tRPC for type safety).
-
-### ❌ Avoid: Framer Motion
-**Why**: Animation library. Sports dashboards prioritize data density over motion. Use CSS transitions.
-**Exception**: Onboarding tour, celebration animations (post-MVP).
-
-### ❌ Avoid: Styled Components / Emotion
-**Why**: CSS-in-JS conflicts with Tailwind. Runtime cost. Stick to Tailwind + shadcn/ui.
-
-### ❌ Avoid: Lodash
-**Why**: Native ES6 methods + TypeScript cover 90% of use cases. Tree-shaking issues.
-**Exception**: `lodash-es` for specific utilities like `groupBy` (used sparingly).
-
-### ❌ Avoid: Moment.js
-**Why**: Deprecated, not tree-shakeable. You already use date-fns.
-
-### ❌ Avoid: Class Variance Authority (CVA) standalone
-**Why**: shadcn/ui includes CVA. Don't install separately.
-
-### ❌ Avoid: Axios (Long-term)
-**Why**: Backend already uses Axios, but consider migrating to native `fetch` (available in Node 18+).
-**Why Not Now**: Axios retry plugins are mature. Migrate post-MVP.
-
----
-
-## Recommended Package Additions (Summary)
-
-### Frontend (`packages/frontend`)
-```bash
-pnpm add @tanstack/react-table@^8.20.0
-pnpm add react-hook-form@^7.53.0 @hookform/resolvers@^3.9.0
-pnpm add sonner@^1.7.0
-pnpm add date-fns@^3.0.6 date-fns-tz@^2.0.0 # Upgrade from 3.0.6 to latest 3.x
-pnpm add recharts@^2.12.0 # Upgrade from 2.10.4
-
-# shadcn/ui (via CLI, not package.json)
-pnpm dlx shadcn-ui@latest init
-pnpm dlx shadcn-ui@latest add card table tabs dialog select badge tooltip separator skeleton alert
-```
-
-### Backend (`packages/backend`)
-```bash
-# Retry logic
-pnpm add @lifeomic/attempt@^4.0.0
-
-# SSE (optional, can implement manually)
-pnpm add @fastify/sse@^6.0.0
-
-# Upgrade date-fns to match frontend
-pnpm add date-fns@^3.0.0 date-fns-tz@^2.0.0
-```
-
-### Shared (`packages/shared`)
-```bash
-# No new dependencies - extend existing types.ts and formulas.ts
+describe('MultiPlayerTradeAgent', () => {
+  it('generates correct 2-for-2 candidates from 15-player roster', () => {
+    const roster = Array.from({ length: 15 }, (_, i) => ({ id: i }));
+    const combos = new Combination(roster, 2);
+    expect([...combos].length).toBe(105); // 15 choose 2
+  });
+});
 ```
 
 ---
 
-## Version Summary Table
+## Deployment: NO Changes
 
-| Library | Current | Recommended | Priority | Confidence |
-|---------|---------|-------------|----------|------------|
-| Recharts | 2.10.4 | 2.12.x | HIGH (activate unused) | 95% |
-| TanStack Table | - | 8.20.x | HIGH (free agents, rosters) | 95% |
-| shadcn/ui | - | Latest CLI | HIGH (dashboard UI) | 90% |
-| React Hook Form | - | 7.53.x | MEDIUM (forms) | 90% |
-| sonner | - | 1.7.x | MEDIUM (UX) | 85% |
-| date-fns | 2.30.0 (BE), 3.0.6 (FE) | 3.x (both) | LOW (standardize) | 95% |
-| @lifeomic/attempt | - | 4.0.x | MEDIUM (ESPN reliability) | 80% |
-| @fastify/sse | - | 6.0.x | LOW (real-time nice-to-have) | 70% |
+Railway config supports new features without modification:
 
----
+| Service | Existing | New Feature Support |
+|---------|----------|---------------------|
+| Backend | Fastify + 11 agents | +3 agents (MultiPlayerTrade, HistoricalBackfill, SeasonReplay) run in same process |
+| Workers | BullMQ workers (Redis) | FlowProducer uses same Redis, same worker pool (no separate service) |
+| Database | PostgreSQL (Railway) | Temporal queries use same indexes (snapshot_date already indexed per design doc) |
+| Frontend | Next.js 14 (Vercel/Railway) | react-window adds 30KB gzipped (negligible for bundle) |
 
-## Implementation Roadmap
-
-### Phase 1: Activate Existing Tools (Week 1)
-1. Upgrade Recharts to 2.12.x
-2. Build first chart: Category rank trends (line chart)
-3. Build second chart: Projected vs current standings (bar chart)
-4. Replace hardcoded `localhost:3001` with `lib/api.ts` client
-
-### Phase 2: Component Foundation (Week 2)
-1. Install shadcn/ui CLI
-2. Add core components: Card, Table, Tabs, Dialog, Select, Badge, Tooltip
-3. Build shared PlayerCard, TeamHealthWidget components
-4. Replace duplicated UI code in `app/leagues/[id]/*` pages
-
-### Phase 3: Data Tables (Week 3)
-1. Install TanStack Table
-2. Build FreeAgentTable with sorting, filtering, row selection
-3. Build RosterTable with grouping by position
-4. Build TradeRecommendationTable with delta sorting
-
-### Phase 4: Forms & UX (Week 4)
-1. Install React Hook Form + sonner
-2. Rebuild league connection form with validation
-3. Add toast notifications for mutations (add/drop, trades)
-4. Implement optimistic updates for waivers
-
-### Phase 5: Real-Time (Post-MVP)
-1. Implement SSE for snapshot completion events
-2. Add Redis caching to ESPN adapter
-3. Add retry logic with exponential backoff
-4. Implement free agent fetching from ESPN
+**Environment variables (NO new secrets):**
+```bash
+# Existing .env (no additions needed)
+ESPN_SWID=...          # Same cookie for historical API
+ESPN_S2=...            # Same cookie for historical API
+POSTGRES_URL=...       # Same DB for temporal queries
+REDIS_URL=...          # Same Redis for FlowProducer
+```
 
 ---
 
-## Confidence Levels Explained
+## Anti-Patterns to AVOID
 
-- **95-100% (HIGH)**: Industry standard, low risk, proven at scale (Recharts, TanStack Table, shadcn/ui)
-- **80-94% (MEDIUM-HIGH)**: Strong consensus, minor trade-offs (SSE, React Hook Form, sonner)
-- **60-79% (MEDIUM)**: Emerging best practice, needs validation (Observable Plot alternative)
-- **<60% (LOW)**: Experimental, wait-and-see
+### 1. Averaging Rate Stats
+**Wrong:**
+```typescript
+// 2-for-2 trade: average the AVGs
+const newAVG = (playerA.AVG + playerB.AVG - playerX.AVG - playerY.AVG) / 2;
+```
+
+**Correct (existing formulas.ts pattern):**
+```typescript
+const newAB = teamAB - (playerX.AB + playerY.AB) + (playerA.AB + playerB.AB);
+const newH = teamH - (playerX.H + playerY.H) + (playerA.H + playerB.H);
+const newAVG = newH / newAB; // Component-based rate
+```
+
+### 2. Separate Temporal Database
+**Wrong:** Add PostgreSQL extension temporal_tables or switch to TimescaleDB.
+
+**Correct:** Your existing schema (league_daily_snapshot with snapshot_date) IS a temporal table. Just query it.
+
+### 3. Client-Side Combinatorics
+**Wrong:** Generate 10,000 trade candidates in browser (blocks UI thread).
+
+**Correct:** js-combinatorics on backend, stream top 50 candidates to frontend (react-window renders).
+
+### 4. Real-Time Historical Backfill
+**Wrong:** User clicks "Backfill 2023" → blocks UI for 2 minutes fetching 26 weeks.
+
+**Correct:** BullMQ FlowProducer returns job ID immediately → frontend polls job status → shows progress bar.
 
 ---
 
-## Open Questions for Future Research
+## Migration Plan
 
-1. **Draft assistant real-time**: If adding live draft room, revisit WebSockets vs SSE
-2. **Mobile app**: If building React Native companion, evaluate Expo vs bare workflow
-3. **AI agent observability**: If expanding LLM usage (trade analysis, waiver reasoning), evaluate LangSmith vs Helicone
-4. **Caching strategy**: Evaluate SWR vs TanStack Query for offline-first mode
-5. **Chart performance**: If time series grows >1000 points, evaluate downsample libraries (e.g., `downsample`, `simplify-js`)
+### Phase 1: Upgrade Existing (Zero New Features)
+```bash
+cd packages/backend
+pnpm add bullmq@^5.69.3  # 68 patch releases of fixes
+pnpm test                # Ensure existing SnapshotOrchestrator still works
+```
+
+### Phase 2: Add Combinatorics (Backend Only)
+```bash
+pnpm add js-combinatorics@^2.1.2
+```
+Create `MultiPlayerTradeAgent` (mirrors existing `TradeRecommendationAgent` structure).
+
+### Phase 3: Add Virtualization (Frontend Only)
+```bash
+cd packages/frontend
+pnpm add react-window@^2.2.3
+```
+Refactor `/free-agents` table to `<FixedSizeList>`.
+
+### Phase 4: Historical Orchestration (Backend Only)
+Extend `ESPNAdapter` with `fetchHistoricalWeek` method.
+Create `HistoricalBackfillOrchestrator` using BullMQ FlowProducer.
+
+**Total new dependencies:** 2 (js-combinatorics, react-window)
+**Total upgrades:** 1 (bullmq)
 
 ---
 
-## References
+## Version Summary
 
-- Recharts docs: https://recharts.org/
-- shadcn/ui: https://ui.shadcn.com/
-- TanStack Table: https://tanstack.com/table/latest
-- TanStack Query: https://tanstack.com/query/latest
-- Radix UI: https://www.radix-ui.com/
-- React Hook Form: https://react-hook-form.com/
-- Zod: https://zod.dev/
-- date-fns: https://date-fns.org/
-- sonner: https://sonner.emilkowal.ski/
+| Library | Action | Version | Confidence |
+|---------|--------|---------|------------|
+| js-combinatorics | ADD | ^2.1.2 | HIGH (npm registry, 2 years stable) |
+| react-window | ADD | ^2.2.3 | HIGH (official docs, native TS) |
+| bullmq | UPGRADE | ^5.69.3 | HIGH (official docs, 4 days old) |
+| Kysely | NO CHANGE | 0.27.2 | HIGH (existing recursive CTE support) |
+| Recharts | NO CHANGE | 2.10.4 | HIGH (existing timeline examples) |
+| Next.js | NO CHANGE | 14.1.0 | HIGH (existing searchParams support) |
 
 ---
 
-**Research Completed**: 2026-02-19
-**Next Step**: Create roadmap milestone tasks based on Phase 1-5 implementation plan.
+## Sources
+
+### ESPN API Research
+- [Using ESPN's new Fantasy API (v3)](https://stmorse.github.io/journal/espn-fantasy-v3.html)
+- [ESPN Fantasy API GitHub (cwendt94)](https://github.com/cwendt94/espn-api)
+- [ESPN's Hidden API: How to Access Free Sports Data](https://scrapecreators.com/blog/espn-api-free-sports-data)
+
+### Combinatorics
+- [js-combinatorics - npm](https://www.npmjs.com/package/js-combinatorics)
+- [GitHub - dankogai/js-combinatorics](https://github.com/dankogai/js-combinatorics)
+
+### Virtualization
+- [react-window - npm](https://www.npmjs.com/package/react-window)
+- [Virtualize large lists with react-window](https://web.dev/articles/virtualize-long-lists-react-window)
+- [react-virtualized vs. react-window - LogRocket](https://blog.logrocket.com/react-virtualized-vs-react-window/)
+
+### BullMQ & Job Orchestration
+- [BullMQ - Flows](https://docs.bullmq.io/guide/flows)
+- [BullMQ - Prioritized Jobs](https://docs.bullmq.io/guide/jobs/prioritized)
+- [Untangling Job Dependencies with BullMQ's FlowProducer](https://seyiogunjuyigbe.medium.com/untangling-job-dependencies-with-bullmqs-flowproducer-76eec80a976c)
+- [How to Use BullMQ Flow Producer for Job Pipelines](https://oneuptime.com/blog/post/2026-01-21-bullmq-flow-producer-pipelines/view)
+
+### Recharts & Visualization
+- [Recharts Timeline Example](https://recharts.github.io/en-US/examples/TimelineExample/)
+- [Data Formatting Best Practices - Recharts](https://app.studyraid.com/en/read/11352/354981/data-formatting-best-practices)
+- [The Top 5 React Chart Libraries to Know in 2026](https://www.syncfusion.com/blogs/post/top-5-react-chart-libraries)
+
+### PostgreSQL Temporal Queries
+- [Saving Data Historically with Temporal Tables](https://www.red-gate.com/simple-talk/databases/postgresql/saving-data-historically-with-temporal-tables-part-1-queries/)
+- [Temporal Extensions - PostgreSQL wiki](https://wiki.postgresql.org/wiki/Temporal_Extensions)
+- [GitHub - arkhipov/temporal_tables](https://github.com/arkhipov/temporal_tables)
+
+### Kysely
+- [CTE | Kysely](https://kysely.dev/docs/category/cte)
+- [Simple selects | Kysely](https://kysely.dev/docs/examples/cte/simple-selects)
+
+### Next.js 14 App Router
+- [File-system conventions: Dynamic Segments | Next.js](https://nextjs.org/docs/app/building-your-application/routing/dynamic-routes)
+- [Functions: useSearchParams | Next.js](https://nextjs.org/docs/app/api-reference/functions/use-search-params)
+- [Functions: useParams | Next.js](https://nextjs.org/docs/app/api-reference/functions/use-params)

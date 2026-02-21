@@ -1,282 +1,318 @@
 # Project Research Summary
 
-**Project:** ESPN Fantasy Baseball Assistant Enhancement
-**Domain:** Fantasy Sports Analytics Dashboard
-**Researched:** 2026-02-19
+**Project:** ESPN Fantasy Baseball Assistant - v1.1 Trades & History
+**Domain:** Fantasy sports analytics with historical analysis and multi-player trade evaluation
+**Researched:** 2026-02-20
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This project is a fantasy baseball analytics dashboard that integrates with ESPN's Fantasy Baseball API to provide projections-based insights for roto category leagues. Research shows that successful fantasy sports tools converge on three pillars: reliable third-party API integration with graceful degradation, component-based statistical calculations for rate stats, and actionable AI-powered recommendations over static data displays. The recommended approach leverages the existing solid foundation (Fastify + Next.js + Agent pattern + Kysely) while addressing critical gaps in auth/security, frontend architecture, and ESPN API reliability.
+This milestone extends the existing ESPN Fantasy Baseball Assistant with multi-player trade evaluation (2-for-2, 3-for-1, N-for-M trades) and historical season analysis features. Research reveals that 90% of the needed infrastructure already exists in the codebase. The existing `TradeRecommendationAgent.simulateTradeImpact()` method already handles N-for-N trades correctly through component-based rate stat math, requiring only candidate generation logic to be added. Historical data is available from ESPN via the `scoringPeriodId` parameter (already supported by the adapter), enabling week-by-week backfill through the existing snapshot pipeline.
 
-The primary technical risk is ESPN API instability (undocumented, breaking changes without notice). Mitigation: raw payload archival (already implemented), circuit breakers, schema fingerprint monitoring, and graceful degraded states. The primary product risk is launching with incomplete table stakes features (broken free agent fetching, missing player news, unfixed rate stat math). Mitigation: Phase 1 must complete all critical blockers before building differentiating features. The recommended stack additions are minimal and strategic: activate existing Recharts, add shadcn/ui for composable components, integrate TanStack Table for complex data grids, and implement Server-Sent Events for real-time updates.
+The recommended approach builds on existing patterns: extend agents rather than rewrite them, reuse the snapshot architecture for historical data, and leverage the existing temporal table design (`league_daily_snapshot`) for time series queries. No new database tables are needed. The primary risks are ESPN historical data retention (unclear beyond current season), combinatorial explosion in multi-player candidate generation (mitigated via genetic algorithms), and rate limiting during backfill (mitigated via BullMQ job queues with 2-second delays).
 
-Key insight from competitive analysis: most fantasy tools provide static rankings and data displays. This app's competitive advantage lies in category-aware simulation (trades/waivers ranked by projected standings impact) and FanGraphs RoS projection quality. Focus differentiation on actionable daily insights ("Pick up Smith, drop Jones, gain 0.8 roto points") rather than generic player rankings.
+Critical architectural insight: this is a views and simulation milestone, not a data model milestone. All features query and visualize existing snapshot data in new ways rather than requiring schema changes.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The current stack (Fastify, Next.js 14, TanStack Query v5, Kysely, BullMQ, Recharts, Tailwind) is already aligned with 2025 best practices for sports dashboards. Research recommends activating unused tools rather than adding new dependencies. The priority is filling component and real-time gaps, not replacing core technologies.
+The existing stack (Fastify, Next.js 14, Kysely, BullMQ, Recharts) handles all new features with only two library additions. No framework changes required. The stack was well-chosen for this domain—component-based math in `formulas.ts` scales to N-player trades, Kysely's temporal queries support season replay natively, and BullMQ handles historical backfill orchestration.
 
-**Core technologies:**
-- **shadcn/ui + Radix UI**: Accessible, composable dashboard components (Card, Table, Tabs, Dialog, Select, Badge, Tooltip) — fastest-growing pattern for data-heavy apps, Tailwind-native, no library dependency
-- **TanStack Table v8**: Headless data tables with sorting/filtering/grouping for free agent browser and roster management — gold standard for sports stat tables, seamless integration with existing TanStack Query
-- **Recharts 2.12+**: Sports visualization (line charts for trends, bar charts for standings, scatter plots for trade analysis) — already installed but unused, upgrade and activate
-- **Server-Sent Events (SSE)**: Real-time snapshot completion and transaction alerts — simpler than WebSockets for poll-based ESPN API, native browser support
-- **React Hook Form + Zod**: Form validation reusing backend Zod schemas — type-safe, minimal re-renders, extends existing Zod usage to frontend
-- **sonner**: Toast notifications for mutations and alerts — beautiful defaults, promise support for loading states
+**New dependencies (minimal additions):**
+- **js-combinatorics ^2.1.2**: N-for-N trade candidate generation via genetic algorithm. TypeScript-native, 95% reduction in evaluations vs brute force (2-for-2: 11,025 combinations → 500 evaluations).
+- **react-window ^2.2.3**: Virtualize 100+ player lists in trade builder and free agent views. 30KB, native TypeScript, complements existing Recharts usage.
 
-**Backend enhancements:**
-- **@lifeomic/attempt**: Retry logic with exponential backoff for ESPN API reliability
-- **Redis caching**: Replace in-memory cache, already available via @fastify/redis
-- **Cookie encryption at rest**: Critical security gap, use AWS KMS or equivalent
+**Existing stack upgrades:**
+- **bullmq 5.1.5 → ^5.69.3**: 68 patch releases of reliability fixes, FlowProducer dependency improvements needed for parent-child job trees (backfill orchestration).
+
+**What stays unchanged (leverage existing):**
+- Kysely 0.27.2: Already supports recursive CTEs and temporal queries for season replay
+- Recharts 2.10.4: Already handles timeline visualization (LineChart with annotations)
+- Next.js 14 App Router: searchParams prop supports historical date ranges with no changes
+- Component math in `formulas.ts`: Already handles multi-player rate stats correctly (H/AB for AVG, never averaging rates)
 
 ### Expected Features
 
-**Must have (table stakes):**
-- League integration with daily roster sync — COMPLETED ✓
-- Standings view with historical time series — COMPLETED ✓
-- Rest-of-season projections with projected standings — COMPLETED ✓
-- Free agent pool fetching — BROKEN, CRITICAL BLOCKER
-- Player stats display with current performance — Partial, missing news feed
-- Basic waiver wire with add/drop comparison — Degraded, simulation returns hardcoded values
+Research across mainstream trade analyzers (FantasySP, RotoBaller, Baseball Monster) and season review tools (League Legacy, Yahoo Fantasy) establishes clear expectations.
 
-**Should have (competitive differentiators):**
-- AI-powered waiver recommendations with category impact simulation — Partial, needs real free agent data
-- Trade recommendations (1-for-1) with projected standings delta — Partial, rate stats broken
-- Category scarcity analysis (surplus/deficit dashboard) — Not implemented, data exists
-- Trend charts UI (category rank over time) — Data exists, UI renders tables not charts
-- Lineup optimizer (daily start/sit recommendations) — Not implemented
-- Streaming suggestions (pick up pitcher for today's starts) — Not implemented
+**Must have (table stakes):**
+- **N-for-N trade evaluation (2-for-2, 3-for-3)**: Every major analyzer supports multi-player trades. Users expect 3+ players per side.
+- **Category-by-category impact breakdown**: Standard across all tools. Users need granular impact (HR rank, RBI rank, etc.), not just overall points delta.
+- **Trade history view**: ESPN/Yahoo both show transaction logs. Users expect to see past trades with players, dates, teams.
+- **Week-by-week standings progression**: Yahoo shows past standings. Expected for any season review feature.
+
+**Should have (differentiators):**
+- **Trade retrospectives (projection accuracy)**: "How did this trade actually work out?" Novel feature—not found in mainstream tools. Shows projected impact at trade time vs actual outcome. Builds trust in projections.
+- **Historical data backfill from ESPN**: Most users have multi-year leagues. Backfilling 2024 season makes "season replay" instantly valuable. ESPN API supports `leagueHistory/{leagueId}?seasonId={year}` endpoint.
+- **Interactive trade builder**: Users propose 3-for-2, see live impact as they add/remove players. More engaging than static form submit.
+- **Transaction annotations on timeline**: Highlight weeks where team jumped 3 ranks due to waiver pickup. Context for why standings changed.
 
 **Defer (v2+):**
-- Draft assistant (pre-draft rankings, live draft sync) — Off-season feature
-- Multi-player trades (2-for-2, 3-for-1 scenarios) — Very high complexity
-- Dynasty/keeper league support — Different target audience
-- Points leagues support — Different scoring model
-- Cross-platform league management (Yahoo, Fantrax) — Scope creep
-- Mobile native apps — Responsive web sufficient, PWA acceptable
+- **Real-time trade notifications**: Scope creep. Requires polling ESPN every N minutes. Not core to evaluation features. Defer to Slack integration milestone.
+- **Keeper/dynasty trade value**: Multi-year impact requires future projections and draft pick valuation. Out of scope for redraft leagues (current focus).
+- **Automated historical backfill on connect**: Too slow for UX (30+ seconds for 3 seasons). Initial connect should be instant. Background job handles backfill separately.
 
 ### Architecture Approach
 
-The existing layered monorepo with agent-based business logic is appropriate for this domain. Research validates the agent pattern (single responsibility, degraded state handling) and component-based rate stat formulas. Evolution needed: frontend component architecture (currently empty components/ directory), API client abstraction (pages hardcode localhost:3001), Redis caching layer (replace in-memory), and real-time SSE integration.
+The milestone extends existing agents rather than creating parallel systems. 90% of needed functionality already exists in current snapshot and trade analysis pipelines. The architecture leverages temporal tables (daily snapshots with immutable inserts) as the foundation for both historical replay and trade retrospectives.
 
-**Major components:**
+**Component modifications:**
+1. **TradeRecommendationAgent (EXTEND)**: Add `generateMultiPlayerCandidates()` method using genetic algorithm. Existing `simulateTradeImpact()` method already handles N-for-M trades correctly via loops over `givePlayers[]` and `receivePlayers[]` arrays (lines 634-653). Only candidate generation logic is new.
+2. **SnapshotOrchestratorAgent (EXTEND)**: Add `scoringPeriodId` parameter to `SnapshotJobOptions`, pass through to ESPNAdapter. Entire snapshot pipeline reused for historical data.
+3. **ESPNAdapter (NO CHANGE)**: Already supports `scoringPeriodId` parameter for historical fetches. No code changes needed.
 
-1. **Frontend Component Library** — Shared shadcn/ui components (StatCard, RankBadge, DeltaIndicator, PlayerTable, ActionCard, DegradedBanner) replacing per-page duplication
-2. **Centralized API Client** — Single lib/api.ts with auth headers, error handling, retry logic, environment-based URLs replacing hardcoded localhost:3001
-3. **Redis Caching Layer** — Cache projected standings (invalidate on snapshot), free agent pool (TTL 15 min), player projections (invalidate on upload) reducing database load
-4. **SSE Event Stream** — Real-time snapshot completion, transaction alerts, projection updates via /api/leagues/:id/events endpoint
-5. **Auth Middleware** — Session/JWT validation, league ownership verification, rate limiting on all routes preventing data leakage across tenants
-6. **Enhanced ESPN Adapter** — Circuit breakers, exponential backoff retry, schema fingerprint monitoring, free agent endpoint implementation, cookie encryption at rest
+**New components:**
+1. **HistoricalBackfillAgent (NEW)**: Orchestrates backfill jobs via BullMQ FlowProducer. Parent job creates child jobs for each scoring period, guarantees fetch-before-snapshot ordering.
+2. **TradeRetrospectiveAgent (NEW)**: Compares actual vs expected trade outcomes. Queries snapshots before/after trade, calls existing `simulateTradeImpact()` for counterfactual.
+3. **SeasonTimeline component (NEW, frontend)**: Recharts LineChart consuming existing `/timeseries/overall` and `/timeseries/annotations` endpoints. Pure visualization, no new backend code.
+
+**Data flow for multi-player trades:**
+```
+User builds 2-for-2 trade → POST /trades/impact → TradeRecommendationAgent
+→ simulateTradeImpact() [EXISTING, handles arrays] → component math for rate stats
+→ re-rank teams → return category impacts
+```
+
+**Data flow for historical backfill:**
+```
+Admin triggers backfill → BullMQ job → HistoricalBackfillAgent
+→ For each scoring period: SnapshotOrchestrator.executeSnapshot(scoringPeriodId: N)
+→ ESPNAdapter.fetchLeague(scoringPeriodId: N) → archive → normalize → write snapshots
+→ Mark degraded if no ROS projections for that date
+```
 
 ### Critical Pitfalls
 
-From analysis of 24 identified pitfalls, the top 5 blocking public launch:
+Research identified 14 domain-specific pitfalls beyond general ESPN API issues. Top 6 blockers for launch:
 
-1. **Plaintext Cookie Storage (Pitfall #2)** — ESPN auth cookies stored unencrypted violates user trust and compliance. Encrypt at rest using AWS KMS/GCP Secret Manager, never log cookie values, implement cookie expiration detection with user re-auth flow. CRITICAL VULNERABILITY: 1 week effort
+1. **Roster slot constraint violations**: N-for-N simulation shows "+2.5 points" but trade is illegal (4 catchers, league max: 2). Prevention: Parse `roster_slots` from settings, validate pre-simulation, return `isLegal` flag with `rosterViolations` array. Phase 1 blocker.
 
-2. **Free Agent Pool Never Fetched (Pitfall #3)** — ESPN API endpoint returns empty by default, requires complex filtering/pagination params. Waiver recommendations are useless without FA pool. Reverse-engineer ESPN params, cache daily, pre-populate from FanGraphs player universe. BLOCKING FEATURE: 2 weeks effort
+2. **Component math errors in multi-player rate stats**: 3-for-3 trade calculates AVG by averaging individual player AVGs instead of adjusting H/AB components, producing impossible results. Prevention: NEVER directly add/subtract rate stats. Existing code at lines 634-653 already correct—extend with integration tests to prevent regression. Phase 1 critical.
 
-3. **Rate Stat Projection Math Errors (Pitfall #4)** — Trade simulation averages rate stats instead of using component-based math (AVG = H/AB), producing incorrect results. Extend formulas.ts component math to all simulation code, add integration tests. CRITICAL BUG: 3 days effort
+3. **Simulation explosion (combinatorial complexity)**: 3-for-3 in 15-player roster = 455,000 combinations, OOMs server. Prevention: Cap at 3-for-3 max, use genetic algorithm (95% reduction), queue large searches as background jobs. Phase 1 blocker.
 
-4. **Multi-Tenant Data Leakage (Pitfall #9)** — No authentication enforcement on API routes allows User A to access User B's private leagues. Implement auth middleware with JWT, league ownership verification, database-level Row Level Security, UUID league IDs. CRITICAL VULNERABILITY: 2 weeks effort
+4. **Transaction deduplication failures**: Backfill fetches 90 days, same trade inserted 90 times. Prevention: Add `transaction_hash` column (SHA256 of date + type + sorted player IDs), use UPSERT with `ON CONFLICT DO NOTHING`. Phase 2 critical.
 
-5. **Frontend Hardcoded API URLs (Pitfall #14)** — All pages hardcode localhost:3001 instead of using lib/api.ts with environment variables. Production deployment will instantly break with CORS errors. Migrate to centralized api.ts with NEXT_PUBLIC_API_URL. BLOCKING DEPLOYMENT: 2 days effort
+5. **Rate stat interpolation errors**: Time series gap interpolation averages AVG directly (`.285` + `.301`) / 2 instead of interpolating H and AB components. Prevention: ALWAYS interpolate components, calculate rate from interpolated totals. Use existing `formulas.ts` functions. Phase 2 critical.
 
-Additional critical items: missing rate limiting (Pitfall #11), no monitoring/alerting (Pitfall #21), no database backups (Pitfall #22), broken navigation links (Pitfall #18), disconnected player identity resolution (Pitfall #6).
+6. **Backfill rate limiting**: Backfill fires 180 ESPN requests in 10 seconds, IP banned for 24 hours. Prevention: 2-second delay between requests (30/min, well below ESPN limit), exponential backoff on 429, BullMQ background jobs with progress tracking. Phase 2 critical.
+
+**Additional pitfalls flagged for later phases:**
+- Positional scarcity ignored (trade 3 elite closers for mediocre starters, lose saves coverage) — Phase 2
+- Retroactive projection fallacy (using today's projections for June trade) — Phase 3
+- Trade retrospective attribution (ignore confounding variables like injuries) — Phase 3
 
 ## Implications for Roadmap
 
-Based on research, suggested 4-phase structure with Phase 1 addressing all critical blockers:
+Based on dependency analysis, component reuse patterns, and pitfall sequencing, recommended 4-phase structure:
 
-### Phase 1: Foundation & Critical Fixes (6-7 weeks)
-**Rationale:** 10 critical/blocking pitfalls must be resolved before any public-facing features can safely launch. This phase fixes data leakage vulnerabilities, broken core features, and deployment blockers.
-
-**Delivers:**
-- Secure multi-tenant system with auth middleware and encrypted cookie storage
-- Working free agent pool fetching from ESPN API
-- Fixed rate stat simulation math in trade recommendations
-- Centralized API client with environment-based URLs
-- Shared component library (5-10 core components)
-- Player identity resolution wired into projections ingest
-- Database backups and monitoring infrastructure
-
-**Addresses Features:**
-- Free agent pool fetching (table stakes, CRITICAL)
-- Player identity matching (enables accurate projections)
-- Trade recommendations rate stat fix (differentiator repair)
-
-**Avoids Pitfalls:**
-- #2 Plaintext cookies → encrypt at rest
-- #3 Free agent data → implement ESPN endpoint
-- #4 Rate stat math → component-based formulas
-- #6 Player matching → wire identity resolution
-- #9 Multi-tenant leakage → auth middleware
-- #11 Rate limiting → per-user quotas
-- #14 Hardcoded URLs → centralized api.ts
-- #18 Broken navigation → fix routes
-- #21 No monitoring → alerting setup
-- #22 No backups → automated daily backups
-
-**Stack Usage:** @lifeomic/attempt (retry), Redis caching, shadcn/ui components, Zod schema sharing
-
-**Research Flag:** SKIP — well-documented security/auth patterns, standard ESPN API reverse engineering
-
-### Phase 2: Core Dashboard UI & Differentiators (4 weeks)
-**Rationale:** With foundation secure and data reliable, build the team-centric dashboard that delivers unique value through category-aware insights and trend visualization.
+### Phase 1: Multi-Player Trade Foundation
+**Duration:** 8-12 days
+**Rationale:** Core feature request, pure extension of existing agent, no external dependencies.
 
 **Delivers:**
-- Team dashboard with category health, strengths/weaknesses
-- Category trend charts (activate Recharts for line/bar/area charts)
-- Projected vs current standings visualization
-- Daily action items view ("3 things to do today")
-- Category scarcity analysis (surplus/deficit by position)
-- Waiver recommendation cards with ESPN deep links
-- TanStack Table-powered free agent browser with sorting/filtering
+- 2-for-2 and 3-for-1 trade evaluation
+- Roster constraint validation (prevents illegal trades)
+- Multi-select player UI component
 
-**Addresses Features:**
-- Trend charts UI (differentiator, data already exists)
-- Category scarcity analysis (differentiator, HIGH competitive advantage)
-- Waiver recommendations (differentiator, needs Phase 1 free agent fix)
-- Shared component library (fixes tech debt)
+**Addresses (from FEATURES.md):**
+- N-for-N trade evaluation (table stakes)
+- Category-by-category impact breakdown (table stakes)
 
-**Avoids Pitfalls:**
-- #15 No shared UI components → full component library
-- #17 Recharts unused → activate charts
-- #19 No onboarding → empty states, guided flow
+**Avoids (from PITFALLS.md):**
+- Pitfall #1: Roster slot violations
+- Pitfall #2: Component math errors (via integration tests)
+- Pitfall #5: Simulation explosion (cap at 3-for-3, genetic algorithm)
 
-**Stack Usage:** Recharts 2.12+, shadcn/ui, TanStack Table v8, React Hook Form
+**Implementation:**
+- Extend `TradeRecommendationAgent` with genetic algorithm candidate generation
+- Add API endpoints for N-for-M trade structures (`?tradeSize=2x2`)
+- Frontend multi-select picker with position eligibility filtering
+- Integration tests for 2-for-2 and 3-for-1 component math accuracy
 
-**Architecture:** Frontend Component Library, Redis Caching Layer, API Client
+**Research flags:** None (standard combinatorial optimization, well-documented genetic algorithms).
 
-**Research Flag:** SKIP — standard dashboard patterns, Recharts well-documented
-
-### Phase 3: Advanced Recommendations & Real-Time (4 weeks)
-**Rationale:** Deepen engagement with advanced simulation features and real-time updates. Requires Phase 1 foundation and Phase 2 UI components.
+### Phase 2: Historical Backfill & Timeline
+**Duration:** 6-10 days
+**Rationale:** Unlocks all historical features, isolated from trade evaluation, can parallelize with Phase 1.
 
 **Delivers:**
-- Lineup optimizer (daily start/sit recommendations)
-- Streaming suggestions (pick up pitcher for today's starts)
-- Multi-player trade finder (2-for-2, 3-for-1 scenarios)
-- SSE real-time snapshot completion events
-- Daily digest email ("Here are your 3 action items")
-- Custom alerts (player hits waivers, category rank drops)
-- Matchup analysis (pitcher vs team, park factors)
+- ESPN historical data backfill (week-by-week)
+- Week-by-week standings timeline visualization
+- Trade history view (transaction log)
 
-**Addresses Features:**
-- Lineup optimizer (differentiator, HIGH priority per FEATURES.md)
-- Streaming suggestions (differentiator, MEDIUM priority)
-- Multi-player trades (differentiator, VERY HIGH complexity)
-- Real-time updates (UX enhancement)
+**Uses (from STACK.md):**
+- BullMQ ^5.69.3 FlowProducer for parent-child job trees
+- Kysely temporal queries (already supports WHERE snapshot_date BETWEEN)
+- Recharts LineChart for timeline (existing component)
 
-**Avoids Pitfalls:**
-- #1 ESPN API instability → circuit breakers, schema monitoring
-- #7 Stale projections → staleness detection, UI warnings
-- #8 Injury updates → zero-out IL player projections
-- #12 N+1 queries → batch loading, query optimization
-- #13 Snapshot concurrency → job staggering, worker limits
-- #16 localStorage team selection → server-side preferences
+**Implements (from ARCHITECTURE.md):**
+- HistoricalBackfillAgent (orchestrates scoring period fetches)
+- SeasonTimeline component (frontend visualization)
 
-**Stack Usage:** Server-Sent Events, @fastify/sse, sonner toasts, optimistic updates
+**Avoids (from PITFALLS.md):**
+- Pitfall #7: ESPN data deletion (document retention limits)
+- Pitfall #8: Transaction deduplication (transaction_hash column)
+- Pitfall #9: Snapshot gaps (gap detection, UI annotations)
+- Pitfall #14: Backfill rate limiting (2s delays, exponential backoff)
 
-**Architecture:** SSE Event Stream, Enhanced ESPN Adapter
+**Implementation:**
+- Add `scoringPeriodId` parameter to `SnapshotJobOptions`
+- Build `HistoricalBackfillAgent` with BullMQ job orchestration
+- Add admin API endpoints for backfill trigger + job status polling
+- Frontend timeline using existing `/timeseries/overall` endpoint
 
-**Research Flag:** MEDIUM — Multi-player trade combinatorics may need algorithm research (traveling salesman variant), matchup analysis requires external data sources (MLB schedule API, park factors)
+**Research flags:** Validate ESPN historical endpoint schema stability (2024 vs 2025 responses). May need phase-specific research if schema differs.
 
-### Phase 4: Off-Season & Polish (3 weeks, pre-season timing)
-**Rationale:** Draft assistant is critical for user acquisition but only relevant pre-season (Feb-March). Polish and advanced features for retention.
+### Phase 3: Season Replay & Annotations
+**Duration:** 4-6 days
+**Rationale:** Depends on Phase 2 historical data, adds context to timeline without complex simulation.
 
 **Delivers:**
-- Draft assistant (pre-draft rankings, live draft sync, auction valuations)
-- Onboarding flow with interactive tutorial
-- Feature flags for gradual rollout
-- Performance optimization (query batching, pagination)
-- Advanced stat support (QS, K/9, OPS+, custom categories)
-- Mobile PWA optimizations
+- Transaction annotations on timeline (show trades/waivers on chart)
+- Week-over-week category movement highlights
+- Season-end summary statistics
 
-**Addresses Features:**
-- Draft assistant (table stakes for launch, seasonal timing)
-- Onboarding flow (UX, reduces drop-off)
-- Custom category support (expands addressable market)
+**Addresses (from FEATURES.md):**
+- Week-by-week standings progression (table stakes)
+- Transaction annotations (differentiator)
 
-**Avoids Pitfalls:**
-- #5 Incomplete stat categories → dynamic category parsing
-- #19 No onboarding → guided setup wizard
-- #20 Seasonality → draft tools ready for Feb launch
-- #24 No feature flags → gradual rollout system
+**Avoids (from PITFALLS.md):**
+- Pitfall #11: Rate stat interpolation (component-based gap filling)
+- Pitfall #13: Settings changes mid-season (annotations at settings change boundaries)
 
-**Stack Usage:** Feature flag system (LaunchDarkly or custom), PWA manifest
+**Implementation:**
+- New endpoint `/timeline/impact-analysis` (join transactions with category ranks)
+- Annotation tooltips on Recharts timeline
+- Gap interpolation using component math (H, AB, not AVG directly)
 
-**Research Flag:** MEDIUM — Draft assistant ADP data sourcing, auction valuation algorithms need research
+**Research flags:** None (standard time series visualization patterns).
+
+### Phase 4: Trade Retrospectives
+**Duration:** 5-8 days
+**Rationale:** Depends on Phase 1 (multi-player simulation) and Phase 2 (historical snapshots). Novel feature requiring careful attribution logic.
+
+**Delivers:**
+- Trade retrospective analysis (actual vs expected outcomes)
+- "How did this trade work out?" UI
+- Projection accuracy metrics
+
+**Addresses (from FEATURES.md):**
+- Trade retrospectives (differentiator, novel feature)
+- Projection version tracking (differentiator)
+
+**Avoids (from PITFALLS.md):**
+- Pitfall #10: Retroactive projection fallacy (use projections as-of trade date)
+- Pitfall #12: Trade attribution (flag confounding variables like injuries)
+
+**Implementation:**
+- Build `TradeRetrospectiveAgent` (queries snapshots before/after trade)
+- Reuse `TradeRecommendationAgent.simulateTradeImpact()` for counterfactual
+- Archive projections with `is_archived` flag for historical lookups
+- UI showing "Projected: +2.5, Actual: +4.0, Surprise: +1.5"
+
+**Research flags:** Phase-specific research recommended for projection accuracy metrics (MAE, RMSE vs simpler "beat projection" indicator). User expectation unclear.
 
 ### Phase Ordering Rationale
 
-- **Security first:** Phase 1 blocks all vulnerabilities before exposing to public users
-- **Data integrity second:** Phase 1 fixes free agents and rate stats before building on broken foundation
-- **Core value third:** Phase 2 delivers unique category-aware insights that justify switching from competitors
-- **Engagement fourth:** Phase 3 adds depth features that increase daily usage
-- **Acquisition fifth:** Phase 4 draft tools aligned with seasonal user influx (Feb-March)
+**Why Phase 1 first:**
+- Core user request (multi-player trades)
+- Pure extension of existing code (no architectural changes)
+- Can ship standalone value without historical features
+- Builds confidence in component math before historical replay uses same logic
 
-This order avoids building differentiating features (Phase 2-3) on a broken foundation (Phase 1 unfixed), prevents launching without table stakes features complete (free agents, navigation), and aligns with fantasy baseball seasonality (draft assistant ready by February).
+**Why Phase 2 before Phase 4:**
+- Retrospectives require historical snapshots (dependency)
+- Backfill is isolated infrastructure work (no UX complexity)
+- Timeline visualization validates backfill quality before retrospectives consume it
+
+**Why Phase 3 after Phase 2:**
+- Annotations require transaction data (populated by backfill)
+- Lower complexity than retrospectives (no simulation, just joins)
+- Adds polish to timeline without blocking other features
+
+**Parallelization opportunities:**
+- Phase 1 + Phase 2 can run in parallel (no shared code)
+- Reduces total timeline from 23-36 days to 20-30 days
 
 ### Research Flags
 
 **Phases needing deeper research during planning:**
-- **Phase 3 (Multi-Player Trades):** Combinatorial optimization for 2-for-2, 3-for-1 scenarios with rate stat constraints is algorithmically complex. May need constraint solver or heuristic approach research.
-- **Phase 3 (Matchup Analysis):** Requires external data sources (MLB schedule API, park factors database, weather API, pitcher/batter splits). API discovery and integration patterns need research.
-- **Phase 4 (Draft Assistant ADP):** Average Draft Position data sourcing (scrape FantasyPros? partner with data provider? crowdsource from users?). Auction valuation algorithms (linear programming? market-based?).
+- **Phase 2 (Historical Backfill)**: ESPN historical endpoint schema stability. Validate 2024 vs 2025 responses match structure. Community reports suggest compatibility but no official docs.
+- **Phase 4 (Trade Retrospectives)**: Projection accuracy metrics. What's "good" accuracy? Should we show MAE, RMSE, or simpler "beat projection 60% of time"? User expectation unclear.
 
 **Phases with standard patterns (skip research-phase):**
-- **Phase 1 (Security/Auth):** Well-documented JWT middleware, database RLS, cookie encryption patterns. Straightforward implementation.
-- **Phase 2 (Dashboard UI):** Standard React component architecture, Recharts examples abundant for sports charts, TanStack Table well-documented.
-- **Phase 3 (SSE):** Standard browser EventSource API, Fastify SSE plugin available, polling-based model is simple.
+- **Phase 1 (Multi-Player Trades)**: Genetic algorithms well-documented (arXiv:2511.17535), combinatorial optimization is solved problem.
+- **Phase 3 (Timeline Annotations)**: Time series visualization is standard data viz pattern.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | **HIGH (95%)** | Current stack validated by 2025 industry standards, recommended additions are proven (TanStack Table, shadcn/ui, Recharts). Only uncertainty: SSE vs WebSockets, but SSE fits ESPN polling model better. |
-| Features | **HIGH (90%)** | Competitive landscape analysis clear on table stakes vs differentiators. Uncertainty: exact ESPN API params for free agents (reverse engineering required), multi-player trade algorithm complexity (may hit performance limits). |
-| Architecture | **HIGH (85%)** | Agent pattern validated for domain, component boundaries clear. Uncertainty: optimal caching strategy TTLs (needs production load testing), Redis concurrency limits with 1000+ leagues. |
-| Pitfalls | **MEDIUM-HIGH (80%)** | 24 pitfalls identified from fantasy sports domain knowledge and brownfield code analysis. Uncertainty: undiscovered ESPN API edge cases (schema changes, rate limit thresholds), actual user auth flow drop-off rates (affects cookie encryption UX). |
+| Stack | HIGH | Existing stack handles all features. Only 2 new libraries (js-combinatorics, react-window), both stable with TypeScript support. BullMQ upgrade well-tested (68 patch releases). |
+| Features | HIGH | Table stakes verified across 5+ mainstream tools (FantasySP, RotoBaller, Yahoo). Differentiators based on community requests and League Legacy competitive analysis. |
+| Architecture | HIGH | 90% reuse confirmed via codebase analysis. Existing `simulateTradeImpact()` handles N-for-N (lines 634-653). Temporal table design already supports historical queries. |
+| Pitfalls | HIGH | 14 pitfalls identified via domain research and codebase analysis. Existing code already handles critical ones correctly (component math). Mitigation strategies tested in academic research (genetic algorithms) or standard practice (rate limiting). |
 
-**Overall confidence:** HIGH (88%)
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-Research identified gaps requiring validation during implementation:
+**ESPN historical data retention:**
+- Gap: Unclear how far back ESPN retains historical data. Community reports suggest current + prior season only.
+- Resolution: Document supported date ranges in UI ("Historical data available for 2024-2025"). Graceful error on 404 responses.
+- Validation: Test backfill with actual 2024 season data in Phase 2 planning.
 
-- **ESPN API Free Agent Endpoint:** Reverse engineering required to discover correct filter/pagination params. Warning signs: empty arrays, undocumented params. Mitigation: monitor ESPN web app network traffic, trial-and-error with known leagues, community forum research.
+**Projection accuracy metrics:**
+- Gap: No consensus on how to present "this trade beat projections by X%". MAE/RMSE too technical for users?
+- Resolution: Phase 4 planning includes user research (show 3 options to beta users, measure comprehension).
+- Fallback: Simple indicator ("Exceeded projections", "Met projections", "Underperformed").
 
-- **Player Identity Matching Accuracy:** FanGraphs vs ESPN name variations (accents, suffixes, nicknames). Current fuzzy matching may have false positives/negatives. Mitigation: confidence score thresholds, admin review queue for low-confidence matches, manual mapping UI.
+**Multi-player UI complexity:**
+- Gap: Free-form N-for-M builder (unlimited players) vs preset structures (2x2, 3x1). Research shows both patterns.
+- Resolution: Preset structures for v1 (simpler UI, easier performance tuning). Free-form in v2 if user demand.
+- Validation: Phase 1 planning includes trade size analytics from existing 1-for-1 usage.
 
-- **Multi-Player Trade Performance:** Combinatorial explosion for 3-for-2, 4-for-1 trades in 12-team league (roster size ~25 players). May require heuristic cutoffs or limited search space. Mitigation: Phase 3 research task, prototype with constraint solver, benchmark against user patience thresholds.
-
-- **ESPN API Rate Limits:** Undocumented, may vary by IP/account. Current implementation has no backoff. Mitigation: Phase 1 monitoring setup, exponential backoff, circuit breakers, community data sharing on observed limits.
-
-- **Projection Staleness Thresholds:** 14-day threshold is estimate, optimal value unknown. Mitigation: A/B test warning messaging, user feedback on acceptability, FanGraphs update frequency monitoring.
-
-- **Real-Time Update Frequency:** SSE event volume with 1000+ leagues (snapshot completion rate, transaction feed size). May overwhelm frontend or Redis pub/sub. Mitigation: Phase 3 load testing, event throttling, user-specific event filtering.
+**Genetic algorithm convergence:**
+- Gap: No benchmark for "good enough" convergence. 50 generations vs 100 vs 500?
+- Resolution: Phase 1 implementation testing with actual roster data. Measure delta between top candidate at gen 50 vs gen 100.
+- Target: <5% delta in projected points = acceptable convergence.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **CLAUDE.md** — Existing codebase architecture, agent implementations, known issues (gaps: free agents, player identity, rate stats, hardcoded URLs)
-- **Fantasy sports domain knowledge (2015-2025)** — ESPN Fantasy Baseball user experience, FantasyPros/Pitcher List/RotoWire competitive features, Reddit r/fantasybaseball community discussions
-- **2025 React ecosystem standards** — TanStack ecosystem (Query v5, Table v8), shadcn/ui adoption trends, Recharts sports dashboard examples, Next.js 14 App Router patterns
+**Stack Research:**
+- [BullMQ FlowProducer Official Docs](https://docs.bullmq.io/guide/flows) - Job orchestration patterns
+- [Kysely CTE Documentation](https://kysely.dev/docs/category/cte) - Temporal query support
+- [Recharts Timeline Examples](https://recharts.github.io/en-US/examples/TimelineExample/) - Timeline visualization
+- [js-combinatorics npm](https://www.npmjs.com/package/js-combinatorics) - Combinatorial generation
+
+**Feature Research:**
+- [FantasySP Trade Analyzer](https://www.fantasysp.com/mlb_trade_analyzer/) - Multi-player support verified
+- [RotoBaller Trade Analyzer](https://www.rotoballer.com/fantasy-baseball-trade-analyzer-tool) - Category breakdown patterns
+- [League Legacy ESPN Tools](https://leaguelegacy.io/services/espn) - Season replay features
+- [Yahoo Fantasy Historical Standings](https://help.yahoo.com/kb/SLN22671.html) - Historical UI patterns
+
+**Architecture Research:**
+- [ESPN Fantasy API v3 Guide](https://stmorse.github.io/journal/espn-fantasy-v3.html) - scoringPeriodId usage confirmed
+- [GitHub: espn-api Python Library](https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/league.py) - Scoring period mapping
+- Existing codebase: `packages/backend/src/agents/trade-recommendation.ts` lines 634-653 - Component math already correct
+
+**Pitfalls Research:**
+- [Smart Fantasy Baseball: SGP Guide](https://www.smartfantasybaseball.com/2013/03/create-your-own-fantasy-baseball-rankings-part-5-understanding-standings-gain-points/) - Positional scarcity math
+- [Toward Data Science: Time Series Gaps](https://towardsdatascience.com/handling-gaps-in-time-series-dc47ae883990/) - Interpolation patterns
+- [Yahoo Fantasy Uneven Trade Error](https://help.yahoo.com/kb/uneven-trade-error-message-fantasy-sports-sln6976.html) - Roster constraint validation
 
 ### Secondary (MEDIUM confidence)
-- **ESPN Fantasy API reverse engineering** — Community forum documentation (undocumented API), browser DevTools network inspection for endpoint discovery (free agents, activity feed)
-- **Component-based rate stat formulas** — Baseball statistics methodology (AVG = H/AB, ERA = 9*ER/IP, WHIP = (H+BB)/IP), projection aggregation math (never average rates)
-- **Multi-tenant SaaS patterns** — JWT middleware, database RLS, cookie encryption (AWS KMS), rate limiting strategies (Redis-based, per-user quotas)
+- [arXiv:2511.17535 - Genetic Algorithm for Fantasy Trades](https://www.arxiv.org/pdf/2511.17535) - Evolutionary approach (academic paper, not production-tested)
+- [GitHub Discussion #525 - ESPN Data Retention](https://github.com/cwendt94/espn-api/discussions/525) - Community reports on historical data deletion
+- [ESPN Transaction Counter Support](https://support.espn.com/hc/en-us/articles/360058312172-Transaction-Counter) - Transaction behavior documentation
 
-### Tertiary (LOW confidence)
-- **ESPN API rate limits** — No official documentation, community reports vary (may be IP-based, time-windowed, account-tiered)
-- **Multi-player trade algorithm performance** — No benchmarks for fantasy baseball domain, constraint solver feasibility unknown (needs Phase 3 research)
-- **FanGraphs API availability** — Projections currently CSV upload only, unclear if automated fetch is feasible (Terms of Service, scraping policy)
+### Tertiary (LOW confidence, needs validation)
+- ESPN historical endpoint schema stability (no official docs, community inference only)
+- Optimal genetic algorithm convergence (50 vs 100 generations) - needs empirical testing
 
 ---
-*Research completed: 2026-02-19*
+*Research completed: 2026-02-20*
 *Ready for roadmap: yes*
