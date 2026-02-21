@@ -4,25 +4,26 @@
 
 See: .planning/PROJECT.md (updated 2026-02-21)
 
-**Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
-**Current focus:** v1.1 Trades & History — defining requirements
+**Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
+**Current focus:** Phase 6 - Multi-Player Trade Foundation
 
 ## Current Position
 
-Milestone: v1.1 Trades & History
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-21 — Milestone v1.1 started
+Phase: 6 of 9 (Multi-Player Trade Foundation)
+Plan: 0 of 2 in current phase
+Status: Ready to plan
+Last activity: 2026-02-21 — v1.1 roadmap created, starting Phase 6
+
+Progress: [█████░░░░░] 56% (5 of 9 phases complete)
 
 ## Performance Metrics
 
-**v1.0 Velocity:**
-- Total plans completed: 18
+**Velocity (v1.0 completed):**
+- Total plans completed: 18 plans
 - Average duration: 6 minutes
 - Total execution time: 115 minutes
 
-**By Phase:**
+**By Phase (v1.0):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
@@ -32,27 +33,48 @@ Last activity: 2026-02-21 — Milestone v1.1 started
 | 04 | 4 | 17min | 4min |
 | 05 | 2 | 7min | 3min |
 
-*Updated after each plan completion*
+**v1.1 Status:**
+- Plans completed: 0
+- Plans remaining: 6 (estimated)
+- Current phase: 6 (Multi-Player Trade Foundation)
+
+*Updated: 2026-02-21 after roadmap creation*
 
 ## Accumulated Context
 
 ### Decisions
 
-See PROJECT.md Key Decisions table for full history.
+Full decisions logged in PROJECT.md Key Decisions table.
+Recent decisions affecting v1.1 work:
+
+- Build on existing stack (Fastify + Next.js) — large working codebase saves time
+- Component-based rate stat math (never average rates) — critical for multi-player trade accuracy
+- Current-season history first, backfill later — v1.0 nailed current experience, v1.1 adds historical depth
+- Recommendations only, no ESPN write actions — deep links to ESPN.com work well
+- Manual FanGraphs CSV upload only — ToS compliance, no automated scraping
 
 ### Pending Todos
 
-None.
+None yet.
 
 ### Blockers/Concerns
 
-None — all v1.0 blockers resolved.
+**Phase 6 readiness:**
+- Existing TradeRecommendationAgent.simulateTradeImpact() already handles N-for-N trades correctly (lines 634-653)
+- Need to add genetic algorithm candidate generation to prevent combinatorial explosion
+- Integration tests required to prevent component math regression
+
+**Phase 7 readiness:**
+- ESPN historical data retention unclear — may only support current + prior season
+- Need to validate 2024 vs 2025 response schema compatibility
+- Rate limiting critical — 2-second throttle required to avoid IP ban
+
+**Phase 9 readiness:**
+- Depends on Phase 6 (multi-player simulation) + Phase 7 (historical snapshots)
+- Projection accuracy metrics need user research (MAE/RMSE vs simple indicator)
 
 ## Session Continuity
 
-Last session: 2026-02-21 (new milestone)
-Stopped at: Defining v1.1 requirements
+Last session: 2026-02-21
+Stopped at: Roadmap created for v1.1, ready to begin Phase 6 planning
 Resume file: None
-
----
-*v1.1 Trades & History milestone started.*

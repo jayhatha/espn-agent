@@ -65,26 +65,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TRADE-01 | — | Pending |
-| TRADE-02 | — | Pending |
-| TRADE-03 | — | Pending |
-| TRADE-04 | — | Pending |
-| HIST-01 | — | Pending |
-| HIST-02 | — | Pending |
-| HIST-03 | — | Pending |
-| HIST-04 | — | Pending |
-| TIME-01 | — | Pending |
-| TIME-02 | — | Pending |
-| TIME-03 | — | Pending |
-| RETRO-01 | — | Pending |
-| RETRO-02 | — | Pending |
-| RETRO-03 | — | Pending |
+| TRADE-01 | Phase 6 | Pending |
+| TRADE-02 | Phase 6 | Pending |
+| TRADE-03 | Phase 6 | Pending |
+| TRADE-04 | Phase 6 | Pending |
+| HIST-01 | Phase 7 | Pending |
+| HIST-02 | Phase 7 | Pending |
+| HIST-03 | Phase 7 | Pending |
+| HIST-04 | Phase 7 | Pending |
+| TIME-01 | Phase 7 | Pending |
+| TIME-02 | Phase 8 | Pending |
+| TIME-03 | Phase 8 | Pending |
+| RETRO-01 | Phase 9 | Pending |
+| RETRO-02 | Phase 9 | Pending |
+| RETRO-03 | Phase 9 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
+- Coverage: 100% ✓
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-21 after roadmap creation*
