@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 6 of 9 (Multi-Player Trade Foundation)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-02-21 — v1.1 roadmap created, starting Phase 6
+Plan: 1 of 2 in current phase
+Status: Executing
+Last activity: 2026-02-21 — Completed 06-01-PLAN.md (roster validation + tests)
 
 Progress: [█████░░░░░] 56% (5 of 9 phases complete)
 
@@ -34,11 +34,17 @@ Progress: [█████░░░░░] 56% (5 of 9 phases complete)
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 0
-- Plans remaining: 6 (estimated)
+- Plans completed: 1
+- Plans remaining: 5 (estimated)
 - Current phase: 6 (Multi-Player Trade Foundation)
 
-*Updated: 2026-02-21 after roadmap creation*
+**By Phase (v1.1):**
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 06 | P01 | 3min | 2 | 5 |
+
+*Updated: 2026-02-21 after 06-01 completion*
 
 ## Accumulated Context
 
@@ -52,6 +58,8 @@ Recent decisions affecting v1.1 work:
 - Current-season history first, backfill later — v1.0 nailed current experience, v1.1 adds historical depth
 - Recommendations only, no ESPN write actions — deep links to ESPN.com work well
 - Manual FanGraphs CSV upload only — ToS compliance, no automated scraping
+- [Phase 06]: Greedy slot assignment with specificity ordering prevents UTIL filling before C/1B slots
+- [Phase 06]: Component math verification via formula tests proves correctness by composition
 
 ### Pending Todos
 
@@ -76,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Roadmap created for v1.1, ready to begin Phase 6 planning
+Stopped at: Completed 06-01-PLAN.md (backend roster validation and integration tests)
 Resume file: None
