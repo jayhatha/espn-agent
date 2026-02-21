@@ -54,11 +54,11 @@ Plans:
   3. Backfill respects ESPN rate limits (2-second throttle, exponential backoff on 429 errors)
   4. Transaction deduplication prevents duplicate entries when backfilling overlapping date ranges
   5. User can view week-by-week standings progression as a line chart for any season with collected data
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — Backend backfill infrastructure: ESPN historical fetch, backfill agent with rate limiting and transaction dedup, BullMQ worker, admin API endpoints
+- [ ] 07-02-PLAN.md — Frontend backfill UI (admin trigger + progress tracking) and season-filtered timeline on trends page
 
 ### Phase 8: Season Replay & Annotations
 **Goal:** Users can see how transactions affected their standings over time with visual annotations
