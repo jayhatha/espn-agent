@@ -285,4 +285,24 @@ export const api = {
   async getProfile() {
     return fetchAPI('/api/auth/me');
   },
+
+  // Admin
+  async getAdminStats() {
+    return fetchAPI('/api/admin/stats');
+  },
+
+  async getAdminUsers(page = 1, limit = 50) {
+    return fetchAPI(`/api/admin/users?page=${page}&limit=${limit}`);
+  },
+
+  async updateUserRole(userId: number, role: 'user' | 'admin') {
+    return fetchAPI(`/api/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  async getAdminLeagues() {
+    return fetchAPI('/api/admin/leagues');
+  },
 };
