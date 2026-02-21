@@ -193,6 +193,13 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/partners/${partnerTeamId}/rosters`);
   },
 
+  async validateTrade(leagueId: number, teamId: number, data: { givePlayers: number[]; receivePlayers: number[] }) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/validate`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async analyzeTradeImpact(leagueId: number, teamId: number, data: { givePlayers: number[]; receivePlayers: number[] }) {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/impact`, {
       method: 'POST',

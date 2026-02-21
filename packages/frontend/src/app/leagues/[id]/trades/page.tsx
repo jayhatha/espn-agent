@@ -77,6 +77,11 @@ export default function TradesPage() {
   const [receivePlayerIds, setReceivePlayerIds] = useState<number[]>([]);
   const [tradeAnalysis, setTradeAnalysis] =
     useState<TradeImpactAnalysis | null>(null);
+  const [validationResult, setValidationResult] = useState<{
+    isLegal: boolean;
+    issues: string[];
+  } | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -85,6 +90,34 @@ export default function TradesPage() {
       setSelectedTeamId(parseInt(stored, 10));
     }
   }, [leagueId]);
+
+  // Real-time validation with debounce
+  useEffect(() => {
+    // Only validate when both sides have at least 1 player selected
+    if (givePlayerIds.length === 0 || receivePlayerIds.length === 0) {
+      setValidationResult(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsValidating(true);
+      try {
+        const result = await api.validateTrade(
+          parseInt(leagueId, 10),
+          selectedTeamId!,
+          { givePlayers: givePlayerIds, receivePlayers: receivePlayerIds },
+        );
+        setValidationResult(result);
+      } catch (err) {
+        // Silently ignore validation errors (non-blocking)
+        setValidationResult(null);
+      } finally {
+        setIsValidating(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [givePlayerIds, receivePlayerIds, leagueId, selectedTeamId]);
 
   // Fetch league status for ESPN links
   const { data: leagueStatus } = useQuery({
@@ -280,6 +313,7 @@ export default function TradesPage() {
                 setGivePlayerIds([]);
                 setReceivePlayerIds([]);
                 setTradeAnalysis(null);
+                setValidationResult(null);
               }}
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
             >
@@ -306,7 +340,7 @@ export default function TradesPage() {
                   {/* Your Team */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">
-                      You Give ({rostersData.userTeam.name})
+                      You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
                     </label>
                     <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3">
                       {rostersData.userTeam.roster.map((player) => (
@@ -318,6 +352,7 @@ export default function TradesPage() {
                             <input
                               type="checkbox"
                               checked={givePlayerIds.includes(player.playerId)}
+                              disabled={givePlayerIds.length >= 3 && !givePlayerIds.includes(player.playerId)}
                               onChange={(e) => {
                                 if (e.target.checked) {
                                   setGivePlayerIds([
@@ -333,7 +368,7 @@ export default function TradesPage() {
                                 }
                                 setTradeAnalysis(null);
                               }}
-                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div className="flex-1">
@@ -353,15 +388,17 @@ export default function TradesPage() {
                         </label>
                       ))}
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      {givePlayerIds.length} player(s) selected
-                    </div>
+                    {givePlayerIds.length >= 3 && (
+                      <div className="mt-2 text-xs text-amber-600 font-medium">
+                        Maximum 3 players
+                      </div>
+                    )}
                   </div>
 
                   {/* Partner Team */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">
-                      You Receive ({rostersData.partnerTeam.name})
+                      You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
                     </label>
                     <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3">
                       {rostersData.partnerTeam.roster.map((player) => (
@@ -375,6 +412,7 @@ export default function TradesPage() {
                               checked={receivePlayerIds.includes(
                                 player.playerId,
                               )}
+                              disabled={receivePlayerIds.length >= 3 && !receivePlayerIds.includes(player.playerId)}
                               onChange={(e) => {
                                 if (e.target.checked) {
                                   setReceivePlayerIds([
@@ -390,7 +428,7 @@ export default function TradesPage() {
                                 }
                                 setTradeAnalysis(null);
                               }}
-                              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div className="flex-1">
@@ -410,10 +448,50 @@ export default function TradesPage() {
                         </label>
                       ))}
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      {receivePlayerIds.length} player(s) selected
-                    </div>
+                    {receivePlayerIds.length >= 3 && (
+                      <div className="mt-2 text-xs text-amber-600 font-medium">
+                        Maximum 3 players
+                      </div>
+                    )}
                   </div>
+                </div>
+              )}
+
+              {/* Validation Status */}
+              {givePlayerIds.length > 0 && receivePlayerIds.length > 0 && (
+                <div className="mt-4">
+                  {isValidating ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Checking roster validity...
+                    </div>
+                  ) : validationResult ? (
+                    validationResult.isLegal ? (
+                      <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Trade is roster-legal
+                      </div>
+                    ) : (
+                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-1">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                          </svg>
+                          Roster issues detected
+                        </div>
+                        <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+                          {validationResult.issues.map((issue, i) => (
+                            <li key={i}>{issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  ) : null}
                 </div>
               )}
 
@@ -423,11 +501,19 @@ export default function TradesPage() {
                   disabled={
                     analyzeTradeM.isPending ||
                     givePlayerIds.length === 0 ||
-                    receivePlayerIds.length === 0
+                    receivePlayerIds.length === 0 ||
+                    (validationResult !== null && !validationResult.isLegal) ||
+                    isValidating
                   }
                   className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {analyzeTradeM.isPending ? "Analyzing..." : "Analyze Trade"}
+                  {analyzeTradeM.isPending
+                    ? "Analyzing..."
+                    : isValidating
+                      ? "Validating..."
+                      : validationResult && !validationResult.isLegal
+                        ? "Fix Roster Issues First"
+                        : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
                 </button>
               </div>
 
@@ -586,7 +672,7 @@ export default function TradesPage() {
             AI-Generated Trade Suggestions
           </h2>
           <p className="text-sm text-gray-600 mb-6">
-            These are 1-for-1 trades that would improve your projected standings
+            These are trades that would improve your projected standings
           </p>
 
           {candidatesLoading ? (
