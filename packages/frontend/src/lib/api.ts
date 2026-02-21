@@ -312,4 +312,20 @@ export const api = {
   async getAdminLeagues() {
     return fetchAPI('/api/admin/leagues');
   },
+
+  // Backfill
+  async triggerBackfill(leagueId: number, data: { season: number; startWeek?: number; endWeek?: number }) {
+    return fetchAPI(`/api/admin/leagues/${leagueId}/backfill`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getBackfillJobStatus(jobId: string) {
+    return fetchAPI(`/api/admin/backfill-jobs/${jobId}`);
+  },
+
+  async getBackfillJobs() {
+    return fetchAPI('/api/admin/backfill-jobs');
+  },
 };

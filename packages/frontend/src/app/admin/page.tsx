@@ -19,6 +19,15 @@ function AdminPageContent() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
+  // Backfill state
+  const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
+  const [season, setSeason] = useState<number>(new Date().getFullYear() - 1);
+  const [startWeek, setStartWeek] = useState<number>(1);
+  const [endWeek, setEndWeek] = useState<number>(26);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillSuccess, setBackfillSuccess] = useState<string | null>(null);
+
   // System stats query
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["admin", "stats"],
@@ -42,6 +51,24 @@ function AdminPageContent() {
   const { data: projectionsData, isLoading: projectionsLoading } = useQuery({
     queryKey: ["projections"],
     queryFn: () => api.getProjections(),
+  });
+
+  // Backfill jobs query
+  const { data: backfillJobsData } = useQuery({
+    queryKey: ["backfill-jobs"],
+    queryFn: () => api.getBackfillJobs(),
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
+  // Active job status query (only when activeJobId is set)
+  const { data: activeJobData } = useQuery({
+    queryKey: ["backfill-job", activeJobId],
+    queryFn: () => api.getBackfillJobStatus(activeJobId!),
+    enabled: !!activeJobId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "completed" || status === "failed" ? false : 2000;
+    },
   });
 
   // Role update mutation
@@ -85,6 +112,27 @@ function AdminPageContent() {
     onError: (error: Error) => {
       setUploadError(error.message);
       setUploadSuccess(null);
+    },
+  });
+
+  // Backfill mutation
+  const backfillMutation = useMutation({
+    mutationFn: async (data: { leagueId: number; season: number; startWeek: number; endWeek: number }) => {
+      return api.triggerBackfill(data.leagueId, {
+        season: data.season,
+        startWeek: data.startWeek,
+        endWeek: data.endWeek,
+      });
+    },
+    onSuccess: (data: any) => {
+      setActiveJobId(data.jobId);
+      setBackfillSuccess(`Backfill job started: ${data.message || data.jobId}`);
+      setBackfillError(null);
+      queryClient.invalidateQueries({ queryKey: ["backfill-jobs"] });
+    },
+    onError: (error: Error) => {
+      setBackfillError(error.message);
+      setBackfillSuccess(null);
     },
   });
 
@@ -150,6 +198,24 @@ function AdminPageContent() {
     if (batterFile || pitcherFile) {
       uploadMutation.mutate({ batter: batterFile, pitcher: pitcherFile });
     }
+  };
+
+  const handleBackfillSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLeagueId) {
+      setBackfillError("Please select a league");
+      return;
+    }
+    if (startWeek > endWeek) {
+      setBackfillError("Start week must be less than or equal to end week");
+      return;
+    }
+    backfillMutation.mutate({
+      leagueId: selectedLeagueId,
+      season,
+      startWeek,
+      endWeek,
+    });
   };
 
   return (
@@ -740,6 +806,256 @@ function AdminPageContent() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Historical Backfill */}
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          Historical Backfill
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Backfill historical snapshots for a league and season. This will fetch data from ESPN for the specified weeks.
+        </p>
+
+        {/* Backfill Trigger Form */}
+        <form onSubmit={handleBackfillSubmit} className="space-y-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                League
+              </label>
+              <select
+                value={selectedLeagueId || ""}
+                onChange={(e) => setSelectedLeagueId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                required
+              >
+                <option value="">Select a league</option>
+                {leaguesData?.leagues?.map((league: any) => (
+                  <option key={league.id} value={league.id}>
+                    {league.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Season
+              </label>
+              <input
+                type="number"
+                value={season}
+                onChange={(e) => setSeason(parseInt(e.target.value, 10))}
+                min={2017}
+                max={new Date().getFullYear()}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Week
+              </label>
+              <input
+                type="number"
+                value={startWeek}
+                onChange={(e) => setStartWeek(parseInt(e.target.value, 10))}
+                min={1}
+                max={26}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Week
+              </label>
+              <input
+                type="number"
+                value={endWeek}
+                onChange={(e) => setEndWeek(parseInt(e.target.value, 10))}
+                min={1}
+                max={26}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                required
+              />
+            </div>
+          </div>
+
+          {backfillSuccess && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-green-800">{backfillSuccess}</p>
+            </div>
+          )}
+
+          {backfillError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-red-800">{backfillError}</p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={!selectedLeagueId || backfillMutation.isPending}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {backfillMutation.isPending ? "Starting..." : "Start Backfill"}
+            </button>
+          </div>
+        </form>
+
+        {/* Active Job Progress */}
+        {activeJobId && activeJobData && (
+          <div className="mb-8 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">
+              Active Backfill Job
+            </h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Job ID:</span>
+                <span className="font-mono text-xs text-gray-900">{activeJobId}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Status:</span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    activeJobData.status === "completed"
+                      ? "bg-green-100 text-green-800"
+                      : activeJobData.status === "failed"
+                        ? "bg-red-100 text-red-800"
+                        : activeJobData.status === "active"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-yellow-100 text-yellow-800"
+                  }`}
+                >
+                  {activeJobData.status}
+                </span>
+              </div>
+              {activeJobData.progress && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Stage:</span>
+                    <span className="text-gray-900">{activeJobData.progress.stage || "Processing"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Progress:</span>
+                    <span className="text-gray-900">
+                      {activeJobData.progress.completedWeeks || 0} of {activeJobData.progress.totalWeeks || 0} weeks
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-4 transition-all duration-300"
+                      style={{ width: `${activeJobData.progress.percentage || 0}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-500 text-right">
+                    {activeJobData.progress.percentage?.toFixed(1) || 0}%
+                  </div>
+                </>
+              )}
+              {activeJobData.status === "completed" && activeJobData.returnValue && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded p-3">
+                  <p className="text-sm text-green-800 font-medium">
+                    Backfill completed successfully!
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    {activeJobData.returnValue.message || `Processed ${activeJobData.returnValue.snapshotsCreated || 0} snapshots`}
+                  </p>
+                </div>
+              )}
+              {activeJobData.status === "failed" && activeJobData.failedReason && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded p-3">
+                  <p className="text-sm text-red-800 font-medium">Backfill failed</p>
+                  <p className="text-xs text-red-700 mt-1">{activeJobData.failedReason}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Backfill Jobs Table */}
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            Recent Backfill Jobs
+          </h3>
+          {!backfillJobsData?.jobs || backfillJobsData.jobs.length === 0 ? (
+            <p className="text-center py-8 text-sm text-gray-500">
+              No backfill jobs yet
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Job ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      League
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Season
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Progress
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {backfillJobsData.jobs.map((job: any) => (
+                    <tr key={job.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-900">
+                        {job.id.length > 20 ? `${job.id.substring(0, 20)}...` : job.id}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {job.data?.leagueId || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {job.data?.season || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            job.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : job.status === "failed"
+                                ? "bg-red-100 text-red-800"
+                                : job.status === "active"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {job.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {job.progress?.percentage
+                          ? `${job.progress.percentage.toFixed(0)}%`
+                          : "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {job.createdAt
+                          ? new Date(job.createdAt).toLocaleString()
+                          : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
