@@ -68,10 +68,10 @@ Plans:
   1. Timeline chart shows transaction annotations (trades, waiver adds/drops) at the weeks they occurred
   2. User can hover over annotation markers to see transaction details (players involved, date, teams)
   3. User can select different seasons or custom date ranges for timeline view
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md — Enrich annotations endpoint with player names, build TransactionMarker and DateRangeFilter components, integrate into trends page
 
 ### Phase 9: Trade Retrospectives
 **Goal:** Users can see how past trades actually worked out compared to projections at the time
