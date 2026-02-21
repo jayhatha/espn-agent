@@ -10,10 +10,86 @@ import { authenticate } from "../middleware/auth.js";
  * Per DESIGN_DOC.md §9
  */
 
-interface UploadProjectionsBody {
-  battersCsv?: string;
-  pitchersCsv?: string;
-  asOfDate: string;
+/**
+ * Helper function to trigger re-snapshots for degraded leagues
+ */
+async function triggerDegradedLeagueResnapshots(
+  db: any,
+  log: any,
+  today: string,
+) {
+  const degradedLeagues = await db
+    .selectFrom("league")
+    .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
+    .select([
+      "league.id",
+      "league.espn_swid",
+      "league.espn_s2",
+      "league.espn_swid_encrypted",
+      "league.espn_s2_encrypted",
+    ])
+    .where("league_daily_snapshot.is_degraded", "=", true)
+    .where(
+      sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
+    )
+    .groupBy([
+      "league.id",
+      "league.espn_swid",
+      "league.espn_s2",
+      "league.espn_swid_encrypted",
+      "league.espn_s2_encrypted",
+    ])
+    .execute();
+
+  if (degradedLeagues.length > 0) {
+    log.info(
+      { leagueCount: degradedLeagues.length },
+      "Triggering re-snapshots for degraded leagues"
+    );
+
+    // Import and trigger snapshots in background
+    const { SnapshotOrchestratorAgent } = await import(
+      "../agents/snapshot-orchestrator.js"
+    );
+
+    // Fire and forget - don't wait for snapshots to complete
+    Promise.all(
+      degradedLeagues.map(async (league: any) => {
+        try {
+          const orchestrator = new SnapshotOrchestratorAgent(db, log);
+
+          // Decrypt ESPN cookies - prefer encrypted, fallback to plaintext
+          let auth: { SWID: string; espn_s2: string } | undefined;
+          try {
+            if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
+              auth = {
+                SWID: decryptToken(league.espn_swid_encrypted),
+                espn_s2: decryptToken(league.espn_s2_encrypted),
+              };
+            } else if (league.espn_swid && league.espn_s2) {
+              auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
+            }
+          } catch (error) {
+            log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
+            if (league.espn_swid && league.espn_s2) {
+              auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
+            }
+          }
+
+          await orchestrator.executeSnapshot({
+            leagueId: league.id,
+            snapshotDate: today,
+            espnAuth: auth,
+            forceFresh: true,
+          });
+        } catch (error) {
+          log.error({ error, leagueId: league.id }, "Failed to re-snapshot league");
+        }
+      })
+    ).catch((error) => {
+      log.error({ error }, "Error during re-snapshots");
+    });
+  }
 }
 
 export async function projectionsRoutes(app: FastifyInstance) {
@@ -74,79 +150,8 @@ export async function projectionsRoutes(app: FastifyInstance) {
           asOfDate: today,
         });
 
-        // Re-snapshot leagues that have degraded snapshots due to missing/stale projections
-        const degradedLeagues = await db
-          .selectFrom("league")
-          .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
-          .select([
-            "league.id",
-            "league.espn_swid",
-            "league.espn_s2",
-            "league.espn_swid_encrypted",
-            "league.espn_s2_encrypted",
-          ])
-          .where("league_daily_snapshot.is_degraded", "=", true)
-          .where(
-            sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
-          )
-          .groupBy([
-            "league.id",
-            "league.espn_swid",
-            "league.espn_s2",
-            "league.espn_swid_encrypted",
-            "league.espn_s2_encrypted",
-          ])
-          .execute();
-
-        if (degradedLeagues.length > 0) {
-          request.log.info(
-            { leagueCount: degradedLeagues.length },
-            "Triggering re-snapshots for degraded leagues"
-          );
-
-          // Import and trigger snapshots in background
-          const { SnapshotOrchestratorAgent } = await import(
-            "../agents/snapshot-orchestrator.js"
-          );
-
-          // Fire and forget - don't wait for snapshots to complete
-          Promise.all(
-            degradedLeagues.map(async (league) => {
-              try {
-                const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
-
-                // Decrypt ESPN cookies - prefer encrypted, fallback to plaintext
-                let auth: { SWID: string; espn_s2: string } | undefined;
-                try {
-                  if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
-                    auth = {
-                      SWID: decryptToken(league.espn_swid_encrypted),
-                      espn_s2: decryptToken(league.espn_s2_encrypted),
-                    };
-                  } else if (league.espn_swid && league.espn_s2) {
-                    auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
-                  }
-                } catch (error) {
-                  request.log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
-                  if (league.espn_swid && league.espn_s2) {
-                    auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
-                  }
-                }
-
-                await orchestrator.executeSnapshot({
-                  leagueId: league.id,
-                  snapshotDate: today,
-                  espnAuth: auth,
-                  forceFresh: true,
-                });
-              } catch (error) {
-                request.log.error({ error, leagueId: league.id }, "Failed to re-snapshot league");
-              }
-            })
-          ).catch((error) => {
-            request.log.error({ error }, "Error during re-snapshots");
-          });
-        }
+        // Re-snapshot degraded leagues
+        await triggerDegradedLeagueResnapshots(db, request.log, today);
 
         return {
           projectionsRunId: result.projectionsRunId,
@@ -164,6 +169,101 @@ export async function projectionsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Upload batch (batter + pitcher CSVs in one request)
+  app.post(
+    "/api/projections/upload-batch",
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 hour",
+        },
+      },
+      preHandler: [
+        authenticate,
+        async (request: any, reply: any) => {
+          if (request.user.role !== "admin") {
+            return reply.code(403).send({
+              error: "Forbidden",
+              message: "Only administrators can upload projections. Projections are shared across all leagues.",
+            });
+          }
+        },
+      ],
+    },
+    async (
+      request: any,
+      reply: any,
+    ) => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const agent = new ProjectionsIngestAgent(db, request.log);
+
+        let battersCsv: string | undefined;
+        let pitchersCsv: string | undefined;
+
+        // Read all files from multipart request
+        const files = request.files();
+        let hasFiles = false;
+
+        for await (const file of files) {
+          hasFiles = true;
+          const buffer = await file.toBuffer();
+          const csvContent = buffer.toString("utf-8");
+
+          // Auto-detect batters vs pitchers by field name first, then by headers
+          let isPitchers = false;
+          let isBatters = false;
+
+          if (file.fieldname === "pitcher" || file.fieldname === "pitchers") {
+            isPitchers = true;
+          } else if (file.fieldname === "batter" || file.fieldname === "batters") {
+            isBatters = true;
+          } else {
+            // Auto-detect from headers
+            const firstLine = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
+            const headers = firstLine.split(",").map((h: string) => h.trim());
+            isPitchers = headers.includes("IP") || headers.includes("ERA") || headers.includes("ER");
+            isBatters = !isPitchers;
+          }
+
+          if (isBatters) {
+            battersCsv = csvContent;
+          } else if (isPitchers) {
+            pitchersCsv = csvContent;
+          }
+        }
+
+        if (!hasFiles) {
+          return reply.code(400).send({ error: "No files uploaded" });
+        }
+
+        // Ingest both files
+        const result = await agent.ingest({
+          battersCsv,
+          pitchersCsv,
+          asOfDate: today,
+        });
+
+        // Re-snapshot degraded leagues
+        await triggerDegradedLeagueResnapshots(db, request.log, today);
+
+        return {
+          projectionsRunId: result.projectionsRunId,
+          batters: result.battersReport,
+          pitchers: result.pitchersReport,
+        };
+      } catch (error) {
+        request.log.error({ error }, "Batch projections upload failed");
+        const errorMessage =
+          error instanceof Error ? error.message : "Batch projections upload failed";
+        return reply
+          .code(500)
+          .send({ error: "Batch projections upload failed", details: errorMessage });
+      }
+    },
+  );
+
   // Get projections run
   app.get(
     "/api/projections/:runId",
@@ -177,8 +277,8 @@ export async function projectionsRoutes(app: FastifyInstance) {
       },
     },
     async (
-      request: FastifyRequest<{ Params: { runId: string } }>,
-      reply: FastifyReply,
+      request: any,
+      reply: any,
     ) => {
       const runId = parseInt(request.params.runId, 10);
 
@@ -209,8 +309,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
       },
     },
     async (
-      request: FastifyRequest<{ Querystring: { limit?: string } }>,
-      reply: FastifyReply,
+      request: any,
     ) => {
       const limit = parseInt(request.query.limit || "20", 10);
 
