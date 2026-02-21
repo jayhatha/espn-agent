@@ -353,12 +353,19 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { from, to, teamIds } = request.query;
+      const { from, to, teamIds, season } = request.query;
 
       let query = db
         .selectFrom("league_transaction_event")
         .selectAll()
         .where("league_id", "=", leagueId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("event_date", ">=", `${seasonYear}-01-01`)
+          .where("event_date", "<=", `${seasonYear}-12-31`);
+      }
 
       if (from) {
         query = query.where("event_date", ">=", from);
@@ -373,7 +380,72 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       const annotations = await query.orderBy("event_date", "asc").execute();
 
-      return { annotations };
+      // Collect all player IDs from annotations
+      const playerIds = new Set<number>();
+      annotations.forEach((ann) => {
+        if (ann.players_added && Array.isArray(ann.players_added)) {
+          ann.players_added.forEach((id: number) => playerIds.add(id));
+        }
+        if (ann.players_dropped && Array.isArray(ann.players_dropped)) {
+          ann.players_dropped.forEach((id: number) => playerIds.add(id));
+        }
+      });
+
+      // Fetch player names
+      const playerMap = new Map<number, { id: number; name: string }>();
+      if (playerIds.size > 0) {
+        const players = await db
+          .selectFrom("player")
+          .select(["id", "name"])
+          .where("id", "in", Array.from(playerIds))
+          .execute();
+
+        players.forEach((p) => {
+          playerMap.set(p.id, { id: p.id, name: p.name });
+        });
+      }
+
+      // Collect all team IDs
+      const teamIds_set = new Set<number>();
+      annotations.forEach((ann) => {
+        teamIds_set.add(ann.team_id);
+      });
+
+      // Fetch team names
+      const teamMap = new Map<number, string>();
+      if (teamIds_set.size > 0) {
+        const teams = await db
+          .selectFrom("team")
+          .select(["id", "name"])
+          .where("id", "in", Array.from(teamIds_set))
+          .execute();
+
+        teams.forEach((t) => {
+          teamMap.set(t.id, t.name);
+        });
+      }
+
+      // Enrich annotations with player names and team names
+      const enrichedAnnotations = annotations.map((ann) => {
+        const players_added_details = (ann.players_added as number[] || []).map(
+          (id) =>
+            playerMap.get(id) || { id, name: "Unknown Player" },
+        );
+        const players_dropped_details = (ann.players_dropped as number[] || []).map(
+          (id) =>
+            playerMap.get(id) || { id, name: "Unknown Player" },
+        );
+        const team_name = teamMap.get(ann.team_id);
+
+        return {
+          ...ann,
+          players_added_details,
+          players_dropped_details,
+          team_name,
+        };
+      });
+
+      return { annotations: enrichedAnnotations };
     },
   );
 }

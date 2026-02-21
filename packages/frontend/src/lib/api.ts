@@ -248,7 +248,7 @@ export const api = {
   },
 
   // Annotations
-  async getAnnotations(leagueId: number, params?: { from?: string; to?: string }) {
+  async getAnnotations(leagueId: number, params?: { from?: string; to?: string; teamIds?: string; season?: string }) {
     const query = new URLSearchParams(params as any).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/annotations${query ? '?' + query : ''}`);
   },
