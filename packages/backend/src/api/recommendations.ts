@@ -504,6 +504,111 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Trade validation (lightweight check before expensive simulation)
+  app.post(
+    "/api/leagues/:leagueId/teams/:teamId/trades/validate",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { leagueId: string; teamId: string };
+        Body: { givePlayers: number[]; receivePlayers: number[]; snapshotDate?: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const teamId = parseInt(request.params.teamId, 10);
+      const { givePlayers, receivePlayers, snapshotDate } = request.body;
+
+      // Validate trade size
+      const proposedTrade: ProposedTrade = {
+        givePlayers: givePlayers.map((id) => ({ playerId: id, playerName: "" })),
+        receivePlayers: receivePlayers.map((id) => ({ playerId: id, playerName: "" })),
+      };
+
+      const sizeValidation = TradeRecommendationAgent.validateTradeSize(proposedTrade);
+      if (!sizeValidation.valid) {
+        return reply.code(400).send({
+          error: sizeValidation.error,
+        });
+      }
+
+      // Get latest snapshot date if not provided
+      let date = snapshotDate;
+      if (!date) {
+        const latest = await db
+          .selectFrom("league_daily_snapshot")
+          .select("snapshot_date")
+          .where("league_id", "=", leagueId)
+          .orderBy("snapshot_date", "desc")
+          .executeTakeFirst();
+
+        if (!latest) {
+          return reply
+            .code(404)
+            .send({ error: "No snapshots found for league" });
+        }
+        date = latest.snapshot_date;
+      }
+
+      // Look up player names
+      const allPlayerIds = [...givePlayers, ...receivePlayers];
+      const players =
+        allPlayerIds.length > 0
+          ? await db
+              .selectFrom("player")
+              .select(["id", "name"])
+              .where("id", "in", allPlayerIds)
+              .execute()
+          : [];
+
+      const playerMap = new Map(players.map((p) => [p.id, p.name]));
+
+      const trade: ProposedTrade = {
+        givePlayers: givePlayers.map((id) => ({
+          playerId: id,
+          playerName: playerMap.get(id) || "Unknown",
+        })),
+        receivePlayers: receivePlayers.map((id) => ({
+          playerId: id,
+          playerName: playerMap.get(id) || "Unknown",
+        })),
+      };
+
+      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
+
+      try {
+        const validation = await tradeAgent.validateRosterSlots(
+          leagueId,
+          teamId,
+          date,
+          trade,
+        );
+
+        return {
+          isLegal: validation.isLegal,
+          issues: validation.issues,
+          giveCount: givePlayers.length,
+          receiveCount: receivePlayers.length,
+        };
+      } catch (error) {
+        request.log.error({ error }, "Trade validation failed");
+        return reply.code(500).send({
+          error: "Failed to validate trade",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
   // Trade impact analysis
   app.post(
     "/api/leagues/:leagueId/teams/:teamId/trades/impact",
@@ -514,17 +619,59 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
-        Body: { trade: ProposedTrade; snapshotDate?: string };
+        Body: {
+          trade?: ProposedTrade;
+          givePlayers?: number[];
+          receivePlayers?: number[];
+          snapshotDate?: string;
+        };
       }>,
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const { trade, snapshotDate } = request.body;
+      const { trade: legacyTrade, givePlayers, receivePlayers, snapshotDate } = request.body;
 
-      if (!trade || !trade.givePlayers || !trade.receivePlayers) {
+      let trade: ProposedTrade;
+
+      // Support both legacy format and new ID-only format
+      if (legacyTrade) {
+        trade = legacyTrade;
+      } else if (givePlayers && receivePlayers) {
+        // Look up player names from DB
+        const allPlayerIds = [...givePlayers, ...receivePlayers];
+        const players =
+          allPlayerIds.length > 0
+            ? await db
+                .selectFrom("player")
+                .select(["id", "name"])
+                .where("id", "in", allPlayerIds)
+                .execute()
+            : [];
+
+        const playerMap = new Map(players.map((p) => [p.id, p.name]));
+
+        trade = {
+          givePlayers: givePlayers.map((id) => ({
+            playerId: id,
+            playerName: playerMap.get(id) || "Unknown",
+          })),
+          receivePlayers: receivePlayers.map((id) => ({
+            playerId: id,
+            playerName: playerMap.get(id) || "Unknown",
+          })),
+        };
+      } else {
         return reply.code(400).send({
-          error: "Invalid trade format. Must include givePlayers and receivePlayers.",
+          error: "Invalid trade format. Must include either 'trade' or 'givePlayers' and 'receivePlayers'.",
+        });
+      }
+
+      // Validate trade size before expensive simulation
+      const sizeValidation = TradeRecommendationAgent.validateTradeSize(trade);
+      if (!sizeValidation.valid) {
+        return reply.code(400).send({
+          error: sizeValidation.error,
         });
       }
 

@@ -8,6 +8,7 @@ import {
   calculateOPS,
   calculateERA,
   calculateWHIP,
+  type RosterValidationResult,
 } from "../../../shared/dist/index.js";
 
 /**
@@ -67,6 +68,151 @@ export class TradeRecommendationAgent {
     private db: Kysely<Database>,
     private logger?: Logger,
   ) {}
+
+  /**
+   * Validate trade size (1-3 players per side)
+   */
+  static validateTradeSize(trade: ProposedTrade): { valid: boolean; error?: string } {
+    if (!trade.givePlayers || trade.givePlayers.length < 1) {
+      return { valid: false, error: "Must give at least 1 player" };
+    }
+    if (!trade.receivePlayers || trade.receivePlayers.length < 1) {
+      return { valid: false, error: "Must receive at least 1 player" };
+    }
+    if (trade.givePlayers.length > 3) {
+      return { valid: false, error: "Cannot give more than 3 players in a single trade" };
+    }
+    if (trade.receivePlayers.length > 3) {
+      return { valid: false, error: "Cannot receive more than 3 players in a single trade" };
+    }
+    return { valid: true };
+  }
+
+  /**
+   * Validate that post-trade roster can fill all required position slots
+   */
+  async validateRosterSlots(
+    leagueId: number,
+    teamId: number,
+    snapshotDate: string,
+    trade: ProposedTrade,
+  ): Promise<RosterValidationResult> {
+    this.logger?.info(
+      { leagueId, teamId, snapshotDate, trade },
+      "Validating roster slots for trade",
+    );
+
+    // Get current roster
+    const currentRoster = await this.getTeamRoster(leagueId, teamId, snapshotDate);
+
+    if (currentRoster.length === 0) {
+      return {
+        isLegal: false,
+        issues: ["No roster data found for team"],
+      };
+    }
+
+    // Get league settings to fetch roster slots
+    const settingsVersion = await this.db
+      .selectFrom("league_daily_snapshot")
+      .innerJoin(
+        "league_settings_version",
+        "league_daily_snapshot.settings_version_id",
+        "league_settings_version.id",
+      )
+      .select(["league_settings_version.settings_json"])
+      .where("league_daily_snapshot.league_id", "=", leagueId)
+      .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    if (!settingsVersion) {
+      return {
+        isLegal: false,
+        issues: ["League settings not found"],
+      };
+    }
+
+    const rosterSlots = (settingsVersion.settings_json as any).roster_slots || {};
+
+    // Build post-trade roster: remove givePlayers, add receivePlayers
+    const givePlayerIds = trade.givePlayers.map((p) => p.playerId);
+    const receivePlayerIds = trade.receivePlayers.map((p) => p.playerId);
+
+    // Fetch positions for received players
+    const receivedPlayers =
+      receivePlayerIds.length > 0
+        ? await this.db
+            .selectFrom("player")
+            .select(["id as player_id", "positions"])
+            .where("id", "in", receivePlayerIds)
+            .execute()
+        : [];
+
+    // Build post-trade roster
+    const postTradeRoster = [
+      ...currentRoster
+        .filter((p) => !givePlayerIds.includes(p.player_id))
+        .map((p) => ({ playerId: p.player_id, positions: p.positions })),
+      ...receivedPlayers.map((p) => ({ playerId: p.player_id, positions: p.positions })),
+    ];
+
+    // Run greedy slot assignment
+    const issues: string[] = [];
+    const assigned = new Set<number>();
+
+    // Sort slots by specificity (specific positions first, then generic)
+    const slotOrder = ["C", "1B", "2B", "3B", "SS", "OF", "SP", "RP", "P", "UTIL", "BN", "IL"];
+
+    for (const slotType of slotOrder) {
+      const count = rosterSlots[slotType] || 0;
+      if (count === 0) continue;
+
+      let filled = 0;
+
+      for (const player of postTradeRoster) {
+        if (assigned.has(player.playerId)) continue;
+
+        const eligible = this.canFillSlot(player.positions, slotType);
+        if (eligible && filled < count) {
+          assigned.add(player.playerId);
+          filled++;
+        }
+      }
+
+      if (filled < count) {
+        issues.push(`Cannot fill all ${slotType} slots (need ${count}, filled ${filled})`);
+      }
+    }
+
+    // Check for unassigned players (excluding IL)
+    const unassignedCount = postTradeRoster.filter((p) => !assigned.has(p.playerId)).length;
+    if (unassignedCount > 0) {
+      issues.push(`${unassignedCount} players cannot be assigned to roster slots`);
+    }
+
+    return {
+      isLegal: issues.length === 0,
+      issues,
+    };
+  }
+
+  /**
+   * Helper: Check if a player can fill a specific roster slot
+   */
+  private canFillSlot(playerPositions: string[], slotType: string): boolean {
+    // UTIL, BN, IL accept any position
+    if (slotType === "UTIL" || slotType === "BN" || slotType === "IL") {
+      return true;
+    }
+
+    // P slot accepts SP or RP
+    if (slotType === "P") {
+      return playerPositions.some((pos) => pos === "SP" || pos === "RP");
+    }
+
+    // Specific slots require exact position match
+    return playerPositions.includes(slotType);
+  }
 
   /**
    * Analyze the impact of a proposed trade for a specific team

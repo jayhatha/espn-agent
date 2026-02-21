@@ -291,3 +291,21 @@ export interface DraftContext {
   budget?: number; // For auction (default 260)
   minBid?: number; // For auction (default 1)
 }
+
+// Trade validation types
+export interface RosterValidationResult {
+  isLegal: boolean;
+  issues: string[];
+}
+
+export interface TradeValidationRequest {
+  givePlayers: number[];
+  receivePlayers: number[];
+}
+
+export interface TradeValidationResponse {
+  isLegal: boolean;
+  issues: string[];
+  giveCount: number;
+  receiveCount: number;
+}
