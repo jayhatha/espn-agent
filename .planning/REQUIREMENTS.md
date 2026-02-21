@@ -11,7 +11,7 @@ Requirements for v1.1 Trades & History milestone. Each maps to roadmap phases.
 
 - [x] **TRADE-01**: User can propose an N-for-M trade (up to 3-for-3) and see projected standings impact per category
 - [x] **TRADE-02**: System validates roster slot constraints before showing trade impact (prevents illegal trade proposals)
-- [ ] **TRADE-03**: User sees category-by-category impact breakdown (HR rank, RBI rank, AVG rank, etc.) for proposed multi-player trades
+- [x] **TRADE-03**: User sees category-by-category impact breakdown (HR rank, RBI rank, AVG rank, etc.) for proposed multi-player trades
 - [x] **TRADE-04**: Trade simulation uses component-based rate stat math (H/AB not averaged rates) with integration tests
 
 ### Historical Data & Backfill
@@ -67,7 +67,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | TRADE-01 | Phase 6 | Complete |
 | TRADE-02 | Phase 6 | Complete |
-| TRADE-03 | Phase 6 | Pending |
+| TRADE-03 | Phase 6 | Complete |
 | TRADE-04 | Phase 6 | Complete |
 | HIST-01 | Phase 7 | Pending |
 | HIST-02 | Phase 7 | Pending |
