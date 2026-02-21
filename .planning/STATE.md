@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 7 of 9 (Historical Backfill Timeline)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-02-21 — Completed 07-01-PLAN.md (historical backfill backend infrastructure)
+Plan: 2 of 2 in current phase
+Status: Completed
+Last activity: 2026-02-21 — Completed 07-02-PLAN.md (frontend backfill UI and season timeline)
 
-Progress: [██████░░░░] 61% (6 of 9 phases in progress)
+Progress: [███████░░░] 78% (7 of 9 phases in progress)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [██████░░░░] 61% (6 of 9 phases in progress)
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 3
-- Plans remaining: 3 (estimated)
-- Current phase: 7 (Historical Backfill Timeline) - IN PROGRESS
+- Plans completed: 4
+- Plans remaining: 2 (estimated)
+- Current phase: 7 (Historical Backfill Timeline) - COMPLETED
 
 **By Phase (v1.1):**
 
@@ -45,8 +45,9 @@ Progress: [██████░░░░] 61% (6 of 9 phases in progress)
 | 06 | P01 | 3min | 2 | 5 |
 | 06 | P02 | 2min | 1 | 2 |
 | 07 | P01 | 6min | 2 | 4 |
+| 07 | P02 | 4min | 2 | 4 |
 
-*Updated: 2026-02-21 after 07-01 completion*
+*Updated: 2026-02-21 after 07-02 completion*
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 06]: Progressive disclosure pattern for max selection warnings (only shown when limit reached)
 - [Phase 07]: Separate BullMQ queue for backfills prevents starving daily snapshot processing
 - [Phase 07]: SHA-256 transaction deduplication prevents duplicate entries on overlapping backfills
+- [Phase 07]: 2-second polling for active backfill jobs prevents server overload while providing real-time feedback
+- [Phase 07]: Season filter additive to from/to filters allows flexible year + date range queries
 
 ### Pending Todos
 
@@ -90,5 +93,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 07-01-PLAN.md (historical backfill backend infrastructure)
+Stopped at: Completed 07-02-PLAN.md (frontend backfill UI and season timeline)
 Resume file: None

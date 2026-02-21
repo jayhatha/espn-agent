@@ -23,7 +23,7 @@ Requirements for v1.1 Trades & History milestone. Each maps to roadmap phases.
 
 ### Season Timeline & Replay
 
-- [ ] **TIME-01**: User can view week-by-week standings progression as a line chart for any season with data
+- [x] **TIME-01**: User can view week-by-week standings progression as a line chart for any season with data
 - [ ] **TIME-02**: Timeline shows transaction annotations (trades, waiver adds/drops) at the weeks they occurred
 - [ ] **TIME-03**: User can select different seasons/date ranges for the timeline view
 
@@ -73,7 +73,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIST-02 | Phase 7 | Complete |
 | HIST-03 | Phase 7 | Complete |
 | HIST-04 | Phase 7 | Complete |
-| TIME-01 | Phase 7 | Pending |
+| TIME-01 | Phase 7 | Complete |
 | TIME-02 | Phase 8 | Pending |
 | TIME-03 | Phase 8 | Pending |
 | RETRO-01 | Phase 9 | Pending |

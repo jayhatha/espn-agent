@@ -22,8 +22,8 @@
 
 **Milestone Goal:** Enable multi-player trade evaluation and historical season analysis with data backfill
 
-- [ ] **Phase 6: Multi-Player Trade Foundation** - N-for-M trade evaluation with roster validation
-- [ ] **Phase 7: Historical Backfill & Timeline** - ESPN historical data and week-by-week standings
+- [x] **Phase 6: Multi-Player Trade Foundation** - N-for-M trade evaluation with roster validation (2/2 plans) — completed 2026-02-21
+- [x] **Phase 7: Historical Backfill & Timeline** - ESPN historical data and week-by-week standings (2/2 plans) — completed 2026-02-21
 - [ ] **Phase 8: Season Replay & Annotations** - Transaction markers and date range selection
 - [ ] **Phase 9: Trade Retrospectives** - Actual vs projected outcomes with accuracy indicators
 
@@ -41,8 +41,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Backend roster validation, 3-per-side enforcement, /trades/validate endpoint, and integration tests (TDD)
-- [ ] 06-02-PLAN.md — Frontend multi-player trade builder with selection limits, real-time validation, and category breakdown
+- [x] 06-01-PLAN.md — Backend roster validation, 3-per-side enforcement, /trades/validate endpoint, and integration tests (TDD) — completed 2026-02-21
+- [x] 06-02-PLAN.md — Frontend multi-player trade builder with selection limits, real-time validation, and category breakdown — completed 2026-02-21
 
 ### Phase 7: Historical Backfill & Timeline
 **Goal:** Users can view week-by-week standings progression for their league's current and past seasons
@@ -57,8 +57,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Backend backfill infrastructure: ESPN historical fetch, backfill agent with rate limiting and transaction dedup, BullMQ worker, admin API endpoints
-- [ ] 07-02-PLAN.md — Frontend backfill UI (admin trigger + progress tracking) and season-filtered timeline on trends page
+- [x] 07-01-PLAN.md — Backend backfill infrastructure: ESPN historical fetch, backfill agent with rate limiting and transaction dedup, BullMQ worker, admin API endpoints — completed 2026-02-21
+- [x] 07-02-PLAN.md — Frontend backfill UI (admin trigger + progress tracking) and season-filtered timeline on trends page — completed 2026-02-21
 
 ### Phase 8: Season Replay & Annotations
 **Goal:** Users can see how transactions affected their standings over time with visual annotations
@@ -95,7 +95,7 @@ Plans:
 | 3. Core Dashboard & Recommendations | v1.0 | 3/3 | Complete | 2026-02-20 |
 | 4. Advanced Features & Polish | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 5. Admin UI | v1.0 | 2/2 | Complete | 2026-02-21 |
-| 6. Multi-Player Trade Foundation | v1.1 | 0/2 | Not started | - |
-| 7. Historical Backfill & Timeline | v1.1 | 0/2 | Not started | - |
+| 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
+| 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 8. Season Replay & Annotations | v1.1 | 0/1 | Not started | - |
 | 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |
