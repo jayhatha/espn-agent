@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A public web app where fantasy baseball managers sign up, connect their ESPN league, and get a full command center for managing their team — projected standings, team health analysis, daily action items (waiver grabs, trade proposals, lineup suggestions), and category trend analysis. Powered by FanGraphs RoS projections and component-based stat math.
+A public web app where fantasy baseball managers sign up, connect their ESPN league, and get a full command center for managing their team — projected standings, team health analysis, daily action items (waiver grabs, trade proposals, lineup suggestions), draft rankings, and category trend analysis. Powered by FanGraphs RoS projections and component-based stat math.
 
 ## Core Value
 
@@ -12,75 +12,77 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Validated
 
-<!-- Shipped and confirmed valuable — inferred from existing codebase. -->
-
-- ✓ ESPN league connection with SWID/espn_s2 auth — existing
-- ✓ Daily snapshot pipeline (fetch ESPN → normalize → archive → store) — existing
-- ✓ FanGraphs CSV projection upload and ingest — existing
-- ✓ Projected final standings using component-based rate stat math — existing
-- ✓ Basic waiver add/drop recommendation engine — existing
-- ✓ Basic trade impact analysis and 1-for-1 candidate generation — existing
-- ✓ Time series data for standings, category ranks, projected overall — existing
-- ✓ JWT auth with registration and login — existing
-- ✓ OAuth stubs for Google and GitHub — existing
-- ✓ Slack integration for notifications (feature-flagged) — existing
-- ✓ Database schema with 20+ tables covering snapshots, projections, transactions — existing
+- ✓ ESPN league connection with SWID/espn_s2 auth (encrypted at rest) — v1.0
+- ✓ Daily snapshot pipeline with retry/backoff, rate limiting, job dedup — v1.0
+- ✓ FanGraphs CSV projection upload with player identity fuzzy matching — v1.0
+- ✓ Projected final standings using component-based rate stat math — v1.0
+- ✓ Waiver add/drop recommendations using real ESPN free agent pool — v1.0
+- ✓ Trade impact analysis and 1-for-1 candidate generation with accurate deltas — v1.0
+- ✓ Time series data with transaction timeline annotations — v1.0
+- ✓ JWT auth with email/password, HttpOnly cookies, refresh token rotation — v1.0
+- ✓ OAuth stubs for Google and GitHub — v1.0
+- ✓ Guided 4-step onboarding wizard for new users — v1.0
+- ✓ Team dashboard with health overview, scarcity badges, category mini-charts — v1.0
+- ✓ Recharts trend visualizations (not tables) for standings over time — v1.0
+- ✓ Daily action items with ESPN deep links — v1.0
+- ✓ Lineup optimizer with greedy slot-filling algorithm — v1.0
+- ✓ Streaming pitcher suggestions via MLB StatsAPI matchup analysis — v1.0
+- ✓ Draft rankings with VBD/SGP positional scarcity analysis — v1.0
+- ✓ Auction valuations based on projected stats and budget constraints — v1.0
+- ✓ Shared component library (ui/ + league/ two-tier structure) — v1.0
+- ✓ Centralized API client with environment-based URLs — v1.0
+- ✓ Multi-tenant auth with league membership verification on all routes — v1.0
+- ✓ Admin dashboard with system health KPIs, user management, batch upload, league health — v1.0
 
 ### Active
 
-<!-- Current scope — building toward these. -->
-
-- [ ] Polished frontend with real data visualization (charts, not just tables)
-- [ ] Team dashboard showing health, strengths, weaknesses, action items
-- [ ] League-wide insights — every team's standing, category gaps, trends
-- [ ] Daily action items — what to do today (waivers, trades, lineup)
-- [ ] Lineup optimization recommendations
-- [ ] Fix rate stat trade impact (currently returns 0 delta)
-- [ ] Wire PlayerIdentityResolution into projections ingest
-- [ ] Fetch and use ESPN free agent pool for waiver recommendations
-- [ ] Deep links to ESPN.com for recommended actions
-- [ ] Draft assistant with positional scarcity and auction valuations
-- [ ] Transaction ingestion and timeline annotations
-- [ ] Current-season history tracking from moment of connection
-- [ ] Multi-tenant auth flow with proper onboarding
-- [ ] Responsive, production-quality UI with shared component library
+(None — next milestone requirements TBD)
 
 ### Out of Scope
 
-- Automated roster moves via ESPN API — ESPN has no official write API; defer until feasibility proven
+- Automated roster moves via ESPN API — ESPN has no official write API; ToS risk
 - Past season backfill — v2 feature; track going forward first
 - What-if counterfactual analysis — v2 feature; requires historical backfill
 - Mobile native app — web-first, responsive design covers mobile
 - Real-time live scoring — ESPN doesn't expose real-time feeds reliably
 - Points league support — roto category leagues only for v1
+- Multi-player trade scenarios (2-for-2, 3-for-1) — combinatorial complexity, defer to v2
+- Custom stat categories (QS, K/9, OPS+) — standard categories only for v1
+- Automated FanGraphs data fetching — ToS compliance, manual CSV upload only
 
 ## Context
 
-This is a brownfield project with a working backend (Fastify + PostgreSQL + BullMQ) and a basic frontend (Next.js 14). The backend agents compute useful data but the frontend barely surfaces it — pages are duplicated, use no shared components, hardcode localhost:3001, and render tables instead of charts despite Recharts being installed.
+Shipped v1.0 with 24,177 lines of TypeScript across a monorepo (Turbo + pnpm). Backend: Fastify 4, Kysely (PostgreSQL), BullMQ (Redis). Frontend: Next.js 14 (App Router), TanStack Query v5, Tailwind CSS, Recharts. Shared package: types, component-based stat formulas (AVG, OBP, SLG, OPS, ERA, WHIP), VBD/SGP draft math.
 
-Key backend gaps: free agent pool always empty, player identity matching disconnected, rate stat trade simulation returns zeros, no transaction ingestion, no job locking on snapshot orchestrator.
+7 backend agents: ESPNAdapter, ProjectionsIngestAgent, PlayerIdentityResolutionAgent, StandingsProjectionAgent, WaiverRecommendationAgent, TradeRecommendationAgent, SnapshotOrchestratorAgent. Plus: DraftRankingsAgent, AuctionValuationAgent, LineupOptimizerAgent, StreamingPitcherAgent. Admin API with user management, system stats, league health, and batch upload.
 
-The ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies from private leagues. Data freshness depends on daily snapshot jobs.
-
-FanGraphs Depth Charts RoS projections are uploaded as CSV and are global (not league-specific). Component math (H/AB for AVG, etc.) is critical — never average rates directly.
+ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies (encrypted at rest with AES-256-GCM). MLB StatsAPI (free, no auth) used for game schedules and probable pitchers.
 
 ## Constraints
 
-- **Tech stack**: Existing monorepo (Turbo + pnpm), Fastify backend, Next.js frontend, PostgreSQL, Redis — build on what exists
-- **ESPN API**: Read-only, undocumented, cookie-based auth — fragile, needs retry/backoff
-- **Projections**: FanGraphs CSV upload (manual), not auto-fetched — user must upload periodically
+- **Tech stack**: Monorepo (Turbo + pnpm), Fastify backend, Next.js frontend, PostgreSQL, Redis
+- **ESPN API**: Read-only, undocumented, cookie-based auth — retry with exponential backoff
+- **Projections**: FanGraphs CSV upload (manual) — ToS prevents automated fetching
 - **Rate stats**: Must use component math from `packages/shared/src/formulas.ts` — never average rates
-- **Multi-tenant**: Public product — all data must be scoped per user/league, auth must be production-grade
+- **Multi-tenant**: All data scoped per user/league, JWT auth with league membership verification
+- **Roto only**: Category-based roto leagues for v1 — points/H2H are different paradigms
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Recommendations only, no ESPN write actions | ESPN has no official write API; reverse-engineering is fragile | — Pending |
-| Deep links to ESPN.com for user action | Low complexity, reliable, good UX | — Pending |
-| Current-season history first, backfill later | Nail current experience before investing in historical data | — Pending |
-| Build on existing stack (Fastify + Next.js) | Large working codebase, no reason to rewrite | — Pending |
-| Roto category leagues only for v1 | Simplifies scoring model; points/H2H are different paradigms | — Pending |
+| Recommendations only, no ESPN write actions | ESPN has no official write API; reverse-engineering is fragile | ✓ Good — deep links to ESPN.com work well |
+| Deep links to ESPN.com for user action | Low complexity, reliable, good UX | ✓ Good |
+| Current-season history first, backfill later | Nail current experience before investing in historical data | ✓ Good — v1 ships without backfill |
+| Build on existing stack (Fastify + Next.js) | Large working codebase, no reason to rewrite | ✓ Good — saved significant time |
+| Roto category leagues only for v1 | Simplifies scoring model; points/H2H are different paradigms | ✓ Good — focused scope |
+| AES-256-GCM for ESPN cookie encryption | Industry standard, graceful degradation without ENCRYPTION_KEY | ✓ Good |
+| Component-based rate stat math (never average rates) | Mathematically correct projections | ✓ Good — fixed broken trade simulations |
+| VBD with population std dev for SGP | Complete player pool, not sample | ✓ Good |
+| MLB StatsAPI for schedules (free, no auth) | Reliable, well-documented, no cost | ✓ Good |
+| Manual FanGraphs CSV upload only | ToS compliance — no automated scraping | ✓ Good — batch upload UX acceptable |
+| Two-tier component structure (ui/ + league/) | Generic primitives vs domain-specific separation | ✓ Good |
+| HttpOnly cookies for JWT (not localStorage) | XSS protection, automatic inclusion | ✓ Good |
 
 ---
-*Last updated: 2026-02-19 after initialization*
+*Last updated: 2026-02-21 after v1.0 milestone*

@@ -2,23 +2,20 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-19)
+See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
-**Current focus:** Phase 5 - Admin UI
+**Current focus:** v1.0 shipped — planning next milestone
 
 ## Current Position
 
-Phase: 5 of 5 (Admin UI)
-Plan: 2 of 2 completed
+Milestone: v1.0 MVP — SHIPPED 2026-02-21
 Status: Complete
-Last activity: 2026-02-20 — Completed Phase 5 Plan 2 (Admin Dashboard UI)
-
-Progress: [####################] 100%
+Last activity: 2026-02-21 — Milestone v1.0 archived
 
 ## Performance Metrics
 
-**Velocity:**
+**v1.0 Velocity:**
 - Total plans completed: 18
 - Average duration: 6 minutes
 - Total execution time: 115 minutes
@@ -33,88 +30,27 @@ Progress: [####################] 100%
 | 04 | 4 | 17min | 4min |
 | 05 | 2 | 7min | 3min |
 
-**Recent Executions:**
-- Phase 05 Plan 02: 2min (2 tasks, 2 files)
-- Phase 05 Plan 01: 5min (2 tasks, 3 files)
-- Phase 04 Plan 04: 6min (2 tasks, 6 files)
-- Phase 04 Plan 03: 5min (2 tasks, 4 files)
-- Phase 04 Plan 02: 3min (2 tasks, 3 files)
-- Phase 04 Plan 01: 3min (2 tasks, 4 files)
-- Phase 03 Plan 03: 4min (2 tasks, 2 files)
-- Phase 03 Plan 01: 1min (2 tasks, 3 files)
-- Phase 02 Plan 03: 3min (2 tasks, 2 files)
-- Phase 02 Plan 02: 3min (2 tasks, 6 files)
-
 *Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Build on existing stack (Fastify + Next.js) — large working codebase, no reason to rewrite
-- Recommendations only, no ESPN write actions — ESPN has no official write API
-- Current-season history first, backfill later — nail current experience before investing in historical data
-- Roto category leagues only for v1 — simplifies scoring model
-- [Phase 01-02]: Generic ENCRYPTION_KEY instead of service-specific keys for easier configuration
-- [Phase 01-02]: Graceful degradation with hasEncryptionKey() for development without encryption
-- [Phase 01-02]: Middleware reads leagueId/teamId from request.params instead of closure pattern
-- [Phase 01-02]: Filter GET /api/leagues to user's leagues instead of global list
-- [Phase 01-04]: ESPN free agent filter passed as x-fantasy-filter URL parameter with filterSlotIds
-- [Phase 01-04]: Fuzzy match confidence threshold 0.8 in projections ingest, 0.7 in identity agent
-- [Phase 01-04]: Transaction deduplication via SHA-256 payload hash on unique constraint
-- [Phase 01-06]: Two-tier component structure: ui/ for generic primitives, league/ for domain-specific
-- [Phase 01-06]: Export helper functions (formatStatValue, getRankColor) from components for cross-page reuse
-- [Phase 01-06]: TeamSelector handles localStorage persistence internally to reduce page boilerplate
-- [Phase 02-01]: Shared auth-cookies utility in utils/ instead of exporting from auth.ts to avoid circular dependencies
-- [Phase 02-01]: Bcrypt 10 rounds for refresh token hashing (speed) vs 13 rounds for passwords (security)
-- [Phase 02-01]: Graceful logout clears cookies even with invalid/expired JWT
-- [Phase 02-02]: Navigation displays user.displayName with email fallback instead of just email
-- [Phase 02-03]: Wizard state is in-memory only -- navigating away resets to step 0 (simplicity over persistence)
-- [Phase 02-03]: Feature card hrefs on landing page point to /signup instead of /leagues for unauthenticated users
-- [Phase 03]: ScarcityBadge uses color + text labels (not color-only) for accessibility
-- [Phase 03]: CategoryMiniChart hides X-axis labels for space but shows ticks for visual rhythm
-- [Phase 03-03]: Action items section only renders when recommendations exist (graceful degradation)
-- [Phase 03-03]: Visual hierarchy places health overview and action items above detailed category table
-- [Phase 03-03]: Quick actions moved below category table (action items section is now primary CTA)
-- [Phase 04-01]: Population standard deviation for SGP (divide by N, not N-1) since we have complete player pool
-- [Phase 04-01]: LOWER_BETTER categories (ERA, WHIP) invert SGP calculation for proper ranking
-- [Phase 04-01]: Multi-position players use maximum VBD across all eligible positions
-- [Phase 04-01]: Replacement level prorated for shared slots (UTIL=0.2, MI/IF=0.25, CI/OF=0.33 per team)
-- [Phase 05-01]: Extract re-snapshot logic into helper function to avoid duplication between single and batch upload endpoints
-- [Phase 05-01]: Auto-detect batter vs pitcher files by field name first, then fall back to header inspection
-- [Phase 05-02]: Remove redundant admin check in AdminPageContent (AdminRoute wrapper already handles this)
-- [Phase 05-02]: Poll system stats every 30 seconds for near-real-time KPI updates
+See PROJECT.md Key Decisions table for full history.
 
 ### Pending Todos
 
-None yet.
-
-### Roadmap Evolution
-
-- Phase 5 added: Admin UI — Upload projections, manage user accounts, monitor leagues and system health
+None.
 
 ### Blockers/Concerns
 
-**From Research (Phase 1 Critical Items):**
-- ~~Free agent pool never fetched from ESPN~~ — RESOLVED in 01-04 (fetchFreeAgents with filterSlotIds and position filtering)
-- ~~ESPN cookies stored plaintext~~ — RESOLVED in 01-02 (encryption at rest with AES-256-GCM)
-- ~~Multi-tenant data leakage risk~~ — RESOLVED in 01-02 (JWT auth on all routes, league membership verification)
-- ~~Rate stat simulation math broken~~ — RESOLVED in 01-03 (component-based calculations for all 6 rate stats with TDD)
-- ~~Frontend hardcoded localhost URLs~~ — RESOLVED in 01-05 (centralized API client with environment-based base URL)
-
-**Research Flags for Future Phases:**
-- Phase 3: Multi-player trade combinatorics may need constraint solver research
-- Phase 3: Matchup analysis requires external data sources (MLB schedule API, park factors)
-- Phase 4: Draft assistant ADP data sourcing strategy needs research
+None — all v1.0 blockers resolved.
 
 ## Session Continuity
 
-Last session: 2026-02-20 (plan execution)
-Stopped at: Completed 05-02-PLAN.md (Admin Dashboard UI) - Phase 5 complete
+Last session: 2026-02-21 (milestone completion)
+Stopped at: v1.0 milestone archived
 Resume file: None
 
 ---
-*Phase 5 complete. All v1 requirements satisfied.*
+*v1.0 MVP shipped. Use `/gsd:new-milestone` to start next version.*
