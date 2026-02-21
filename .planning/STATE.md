@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 7 - Historical Backfill Timeline
+**Current focus:** Phase 8 - Season Replay Annotations
 
 ## Current Position
 
-Phase: 7 of 9 (Historical Backfill Timeline)
-Plan: 2 of 2 in current phase
+Phase: 8 of 9 (Season Replay Annotations)
+Plan: 1 of 1 in current phase
 Status: Completed
-Last activity: 2026-02-21 — Completed 07-02-PLAN.md (frontend backfill UI and season timeline)
+Last activity: 2026-02-21 — Completed 08-01-PLAN.md (interactive transaction annotations and date range filtering)
 
-Progress: [███████░░░] 78% (7 of 9 phases in progress)
+Progress: [████████░░] 89% (8 of 9 phases in progress)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [███████░░░] 78% (7 of 9 phases in progress)
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 4
-- Plans remaining: 2 (estimated)
-- Current phase: 7 (Historical Backfill Timeline) - COMPLETED
+- Plans completed: 5
+- Plans remaining: 1 (estimated)
+- Current phase: 8 (Season Replay Annotations) - COMPLETED
 
 **By Phase (v1.1):**
 
@@ -46,8 +46,9 @@ Progress: [███████░░░] 78% (7 of 9 phases in progress)
 | 06 | P02 | 2min | 1 | 2 |
 | 07 | P01 | 6min | 2 | 4 |
 | 07 | P02 | 4min | 2 | 4 |
+| 08 | P01 | 3min | 2 | 5 |
 
-*Updated: 2026-02-21 after 07-02 completion*
+*Updated: 2026-02-21 after 08-01 completion*
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 07]: SHA-256 transaction deduplication prevents duplicate entries on overlapping backfills
 - [Phase 07]: 2-second polling for active backfill jobs prevents server overload while providing real-time feedback
 - [Phase 07]: Season filter additive to from/to filters allows flexible year + date range queries
+- [Phase 08]: SVG foreignObject for rich tooltips inside Recharts without external positioning libraries
+- [Phase 08]: Team-scoped annotations by default to prevent chart clutter on multi-team transactions
 
 ### Pending Todos
 
@@ -93,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 07-02-PLAN.md (frontend backfill UI and season timeline)
+Stopped at: Completed 08-01-PLAN.md (interactive transaction annotations and date range filtering)
 Resume file: None

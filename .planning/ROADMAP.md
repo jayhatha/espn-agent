@@ -24,7 +24,7 @@
 
 - [x] **Phase 6: Multi-Player Trade Foundation** - N-for-M trade evaluation with roster validation (2/2 plans) — completed 2026-02-21
 - [x] **Phase 7: Historical Backfill & Timeline** - ESPN historical data and week-by-week standings (2/2 plans) — completed 2026-02-21
-- [ ] **Phase 8: Season Replay & Annotations** - Transaction markers and date range selection
+- [x] **Phase 8: Season Replay & Annotations** - Transaction markers and date range selection (completed 2026-02-21)
 - [ ] **Phase 9: Trade Retrospectives** - Actual vs projected outcomes with accuracy indicators
 
 ## Phase Details
@@ -68,7 +68,7 @@ Plans:
   1. Timeline chart shows transaction annotations (trades, waiver adds/drops) at the weeks they occurred
   2. User can hover over annotation markers to see transaction details (players involved, date, teams)
   3. User can select different seasons or custom date ranges for timeline view
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 08-01-PLAN.md — Enrich annotations endpoint with player names, build TransactionMarker and DateRangeFilter components, integrate into trends page
@@ -97,5 +97,5 @@ Plans:
 | 5. Admin UI | v1.0 | 2/2 | Complete | 2026-02-21 |
 | 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
-| 8. Season Replay & Annotations | v1.1 | 0/1 | Not started | - |
+| 8. Season Replay & Annotations | 1/1 | Complete   | 2026-02-21 | - |
 | 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |
