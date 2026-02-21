@@ -225,6 +225,7 @@ export class ESPNAdapter {
   private client: AxiosInstance;
   private logger?: Logger;
   private cache?: Map<string, { data: unknown; expiresAt: number }>;
+  private lastRequestTime: number = 0;
 
   constructor(logger?: Logger) {
     this.client = createRetryableAxios(logger);
@@ -248,6 +249,122 @@ export class ESPNAdapter {
     };
     this.logger = logger;
     this.cache = new Map();
+  }
+
+  /**
+   * Fetch historical league data for a specific scoring period (week)
+   * Includes instance-level throttle: enforces minimum 2000ms between requests
+   */
+  async fetchHistoricalWeek(options: {
+    leagueId: number;
+    season: number;
+    scoringPeriodId: number;
+    auth?: ESPNAuthCookies;
+  }): Promise<ESPNRawResponse> {
+    const { leagueId, season, scoringPeriodId, auth } = options;
+
+    // Enforce 2-second throttle
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < 2000) {
+      const delay = 2000 - timeSinceLastRequest;
+      this.logger?.debug(
+        { delay, scoringPeriodId },
+        "Throttling historical fetch",
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    try {
+      const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
+      const params: Record<string, unknown> = {
+        view: ["mSettings", "mTeam", "mRoster", "mStandings"],
+        scoringPeriodId,
+      };
+
+      const headers: Record<string, string> = {};
+      if (auth?.SWID && auth?.espn_s2) {
+        headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
+      }
+
+      this.logger?.info(
+        { leagueId, season, scoringPeriodId },
+        "Fetching ESPN historical week",
+      );
+
+      this.lastRequestTime = Date.now();
+
+      const response = await this.client.get(url, {
+        params,
+        headers,
+        validateStatus: (status) => status < 500,
+      });
+
+      // Check for 429 rate limit
+      if (response.status === 429) {
+        const retryAfter = response.headers["retry-after"];
+        this.logger?.warn(
+          { scoringPeriodId, retryAfter },
+          "ESPN rate limit hit (429), axios-retry will handle exponential backoff",
+        );
+        throw new Error(`ESPN rate limit exceeded (429). Retry-After: ${retryAfter}`);
+      }
+
+      // Check if ESPN returned HTML instead of JSON (auth issue)
+      if (
+        typeof response.data === "string" &&
+        response.data.trim().startsWith("<")
+      ) {
+        throw new Error(
+          "ESPN returned HTML instead of JSON. This usually means the league is private and requires authentication cookies (SWID and espn_s2).",
+        );
+      }
+
+      // Check for non-200 responses
+      if (response.status !== 200) {
+        throw new Error(
+          `ESPN API returned status ${response.status}: ${JSON.stringify(response.data)}`,
+        );
+      }
+
+      // Validate that we got an object response
+      if (typeof response.data !== "object" || response.data === null) {
+        throw new Error(
+          `ESPN returned unexpected data type: ${typeof response.data}`,
+        );
+      }
+
+      const schemaFingerprint = this.computeSchemaFingerprint(response.data);
+      const result: ESPNRawResponse = {
+        data: response.data,
+        schemaFingerprint,
+        fetchedAt: new Date(),
+      };
+
+      return result;
+    } catch (error) {
+      const errorDetails: any = {
+        message: error instanceof Error ? error.message : String(error),
+        leagueId,
+        season,
+        scoringPeriodId,
+      };
+
+      if ((error as any).response) {
+        errorDetails.status = (error as any).response.status;
+        errorDetails.statusText = (error as any).response.statusText;
+        errorDetails.responseData = (error as any).response.data;
+      } else if ((error as any).request) {
+        errorDetails.networkError = "No response received from ESPN";
+      }
+
+      this.logger?.error(errorDetails, "ESPN historical fetch failed");
+
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error(`Failed to fetch ESPN historical week: ${error}`);
+    }
   }
 
   /**
