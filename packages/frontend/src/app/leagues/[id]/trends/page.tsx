@@ -189,19 +189,24 @@ export default function TrendsPage() {
   const teams = teamsData?.teams || [];
   const teamMap = new Map(teams.map((t) => [t.id, t.name]));
 
-  const categories = [
-    { value: "AVG", label: "Batting Average" },
-    { value: "HR", label: "Home Runs" },
-    { value: "R", label: "Runs" },
-    { value: "RBI", label: "RBI" },
-    { value: "SB", label: "Stolen Bases" },
-    { value: "WHIP", label: "WHIP" },
-    { value: "ERA", label: "ERA" },
-    { value: "K", label: "Strikeouts" },
-    { value: "W", label: "Wins" },
-    { value: "SV", label: "Saves" },
-    { value: "HLD", label: "Holds" },
-  ];
+  // Fetch league categories for dynamic category dropdown
+  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["league-categories", leagueId],
+    queryFn: () => api.getLeagueCategories(parseInt(leagueId, 10)),
+    enabled: !!leagueId,
+  });
+
+  const categories = (categoriesData?.categories || []).map((cat: any) => ({
+    value: cat.stat_key || cat.category_id,
+    label: cat.name,
+  }));
+
+  // Update selectedCategory when categories load if current selection is invalid
+  useEffect(() => {
+    if (categories.length > 0 && !categories.find((c: any) => c.value === selectedCategory)) {
+      setSelectedCategory(categories[0].value);
+    }
+  }, [categories, selectedCategory]);
 
   // Transform data for charts
   const getChartData = () => {
@@ -250,7 +255,7 @@ export default function TrendsPage() {
   };
 
   const chartData = getChartData();
-  const isLoading = overallLoading || categoryLoading || projectedLoading;
+  const isLoading = overallLoading || categoryLoading || projectedLoading || (viewMode === "category" && categoriesLoading);
 
   const teamNames =
     chartData.length > 0
@@ -309,7 +314,7 @@ export default function TrendsPage() {
               <select
                 value={selectedSeason || ""}
                 onChange={(e) => setSelectedSeason(e.target.value || undefined)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white text-gray-900"
               >
                 <option value="">Current Season</option>
                 {seasonsData?.seasons?.map((s: number) => (
@@ -335,9 +340,10 @@ export default function TrendsPage() {
               id="category-select"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="block w-full md:w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+              disabled={categoriesLoading}
+              className="block w-full md:w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border bg-white text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {categories.map((cat) => (
+              {categories.map((cat: { value: string; label: string }) => (
                 <option key={cat.value} value={cat.value}>
                   {cat.label}
                 </option>
@@ -353,10 +359,6 @@ export default function TrendsPage() {
               onRangeChange={(from, to) => {
                 setFromDate(from);
                 setToDate(to);
-                // Clear selected season when manually setting date range
-                if (from || to) {
-                  setSelectedSeason(undefined);
-                }
               }}
               initialFrom={fromDate}
               initialTo={toDate}
@@ -390,7 +392,7 @@ export default function TrendsPage() {
             <h2 className="text-lg font-medium text-gray-900 mb-4">
               {viewMode === "overall" && "Overall Standings Over Time"}
               {viewMode === "category" &&
-                `${categories.find((c) => c.value === selectedCategory)?.label} Rankings Over Time`}
+                `${categories.find((c: { value: string; label: string }) => c.value === selectedCategory)?.label} Rankings Over Time`}
               {viewMode === "projected" && "Projected Standings Over Time"}
             </h2>
 

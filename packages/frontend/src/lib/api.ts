@@ -146,6 +146,10 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/seasons`);
   },
 
+  async getLeagueCategories(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/categories`);
+  },
+
   // Recommendations
   async getWaiverRecommendations(
     leagueId: number,
