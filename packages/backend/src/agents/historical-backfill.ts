@@ -87,6 +87,9 @@ export class HistoricalBackfillAgent {
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
 
+      // Track previous snapshot date for cumulative accumulation
+      let previousSnapshotDate: string | undefined = undefined;
+
       // Process each week sequentially
       for (let scoringPeriodId = startWeek; scoringPeriodId <= endWeek; scoringPeriodId++) {
         this.logger?.info(
@@ -147,7 +150,7 @@ export class HistoricalBackfillAgent {
             await this.db.transaction().execute(async (trx) => {
               await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
                 trx, leagueId, snapshotDate, rawTeams, espnTeamIdToDbId,
-                categories, scoringPeriodId,
+                categories, scoringPeriodId, previousSnapshotDate,
               );
             });
           }
@@ -161,6 +164,7 @@ export class HistoricalBackfillAgent {
           }
 
           weeksProcessed++;
+          previousSnapshotDate = snapshotDate;
 
           // Update progress
           if (onProgress) {

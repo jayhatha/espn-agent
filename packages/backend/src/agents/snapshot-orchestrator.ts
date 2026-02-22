@@ -463,6 +463,7 @@ export class SnapshotOrchestratorAgent {
     espnTeamIdToDbId: Map<number, number>,
     categories: ESPNScoringCategory[],
     scoringPeriodId: number,
+    previousSnapshotDate?: string,
   ): Promise<void> {
     // Delete existing standings for this snapshot
     await trx
@@ -481,6 +482,33 @@ export class SnapshotOrchestratorAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
+    // Fetch previous snapshot's cumulative totals for accumulation
+    const priorComponentsMap = new Map<number, Record<string, number>>();
+
+    if (previousSnapshotDate) {
+      const priorRows = await trx
+        .selectFrom("team_daily_category_totals")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", previousSnapshotDate)
+        .execute();
+
+      // Store prior components per team (components_json is the same for all categories of a team)
+      for (const row of priorRows) {
+        if (!priorComponentsMap.has(row.team_id) && row.components_json) {
+          priorComponentsMap.set(
+            row.team_id,
+            row.components_json as Record<string, number>,
+          );
+        }
+      }
+
+      this.logger?.debug(
+        { leagueId, previousSnapshotDate, teamsWithPrior: priorComponentsMap.size },
+        "Fetched prior cumulative components for accumulation",
+      );
+    }
+
     // Process each team
     const teamCategoryValues: Array<{
       dbTeamId: number;
@@ -496,8 +524,8 @@ export class SnapshotOrchestratorAgent {
       const rosterEntries = team.roster?.entries || [];
       const activeRoster = rosterEntries.filter((entry: any) => entry.lineupSlotId <= 15);
 
-      // Accumulate components from all active players
-      const teamComponents: Record<string, number> = {};
+      // Accumulate this week's components from all active players
+      const weekComponents: Record<string, number> = {};
 
       for (const entry of activeRoster) {
         // Find per-period stats (statSplitTypeId=5)
@@ -507,64 +535,71 @@ export class SnapshotOrchestratorAgent {
         );
 
         if (!periodStats || !periodStats.stats) {
-          // No stats for this player in this period - zero contribution
           continue;
         }
 
-        // Accumulate stats from this player
         for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
           const espnStatId = parseInt(espnStatIdStr, 10);
           const statInfo = ESPN_STAT_MAP[espnStatId];
 
-          if (!statInfo) continue; // Unknown stat, skip
+          if (!statInfo) continue;
+
+          // Only accumulate COUNTING stats as components — skip RATE stats
+          // (AVG, OBP, SLG, OPS, ERA, WHIP, K9, WPCT) which ESPN includes
+          // in per-period stats but should not be summed across players/weeks
+          if (statInfo.type !== "COUNTING") continue;
 
           const statKey = statInfo.key;
           const statValue = typeof value === "number" ? value : 0;
 
-          // Special handling for OUTS → IP conversion
           if (statKey === "OUTS") {
             const ip = statValue / 3;
-            teamComponents.IP = (teamComponents.IP || 0) + ip;
+            weekComponents.IP = (weekComponents.IP || 0) + ip;
           } else {
-            teamComponents[statKey] = (teamComponents[statKey] || 0) + statValue;
+            weekComponents[statKey] = (weekComponents[statKey] || 0) + statValue;
           }
         }
       }
 
-      // Compute category values from accumulated components
+      // Build cumulative components: prior + this week
+      const priorComponents = priorComponentsMap.get(dbTeamId) || {};
+      const cumulativeComponents: Record<string, number> = {};
+      const allKeys = new Set([...Object.keys(priorComponents), ...Object.keys(weekComponents)]);
+      for (const key of allKeys) {
+        cumulativeComponents[key] = (priorComponents[key] || 0) + (weekComponents[key] || 0);
+      }
+
+      // Compute category values from cumulative components
       const categoryValues = new Map<string, number>();
 
       for (const cat of categories) {
         let value = 0;
 
         if (cat.type === "COUNTING") {
-          // For counting stats, use accumulated component directly
-          value = teamComponents[cat.statKey] || 0;
+          value = cumulativeComponents[cat.statKey] || 0;
         } else if (cat.type === "RATE" && cat.formulaId) {
-          // For rate stats, compute using component math
-          // Special handling for pitching rate stats (need to remap HA->H, BBA->BB)
           const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
 
           if (isPitchingRate) {
-            // Build pitching-specific components for formula
             const pitchingRateComponents = {
-              H: teamComponents.HA || 0,   // Hits Allowed -> H for WHIP
-              BB: teamComponents.BBA || 0, // Walks Allowed -> BB for WHIP
-              IP: teamComponents.IP || 0,
-              ER: teamComponents.ER || 0,
-              K: teamComponents.K || 0,
+              H: cumulativeComponents.HA || 0,
+              BB: cumulativeComponents.BBA || 0,
+              IP: cumulativeComponents.IP || 0,
+              ER: cumulativeComponents.ER || 0,
+              K: cumulativeComponents.K || 0,
             };
-            value = calculateFinalRate(cat.formulaId, {}, pitchingRateComponents);
+            if (pitchingRateComponents.IP > 0) {
+              value = calculateFinalRate(cat.formulaId, {}, pitchingRateComponents);
+            }
           } else {
-            // Batting rate stats - components already have correct keys
-            value = calculateFinalRate(cat.formulaId, {}, teamComponents);
+            value = calculateFinalRate(cat.formulaId, {}, cumulativeComponents);
           }
         }
 
         categoryValues.set(cat.statKey, value);
       }
 
-      teamCategoryValues.push({ dbTeamId, categoryValues, components: teamComponents });
+      teamCategoryValues.push({ dbTeamId, categoryValues, components: cumulativeComponents });
     }
 
     // Write category totals for each team
