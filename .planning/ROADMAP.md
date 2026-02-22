@@ -72,7 +72,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 07.2-01-PLAN.md — Diagnose root cause via debug logging and ESPN response inspection, implement fix, verify with re-backfill
+- [x] 07.2-01-PLAN.md — Diagnose root cause via debug logging and ESPN response inspection, implement fix, verify with re-backfill -- completed 2026-02-22
 
 ### Phase 07.1: Historical Stats Accumulation & Dynamic Categories (INSERTED)
 
@@ -129,6 +129,6 @@ Plans:
 | 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
-| 7.2 Fix Standings Values | v1.1 | 0/1 | Planning | - |
+| 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |

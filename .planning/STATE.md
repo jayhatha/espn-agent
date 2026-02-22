@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 8 - Season Replay Annotations
+**Current focus:** Phase 07.2 - Fix Counting Stat Magnitude Bug (COMPLETED)
 
 ## Current Position
 
-Phase: 8 of 9 (Season Replay Annotations)
+Phase: 07.2 (Fix Counting Stat Magnitude Bug in Backfill)
 Plan: 1 of 1 in current phase
 Status: Completed
-Last activity: 2026-02-21 — Completed 08-01-PLAN.md (interactive transaction annotations and date range filtering)
+Last activity: 2026-02-22 — Completed 07.2-01-PLAN.md (diagnose and fix rate stat accumulation bug)
 
-Progress: [████████░░] 89% (8 of 9 phases in progress)
+Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complete)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [████████░░] 89% (8 of 9 phases in progress)
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 5
-- Plans remaining: 1 (estimated)
-- Current phase: 8 (Season Replay Annotations) - COMPLETED
+- Plans completed: 6
+- Plans remaining: 0
+- Current phase: 07.2 (Fix Counting Stat Magnitude Bug) - COMPLETED
 
 **By Phase (v1.1):**
 
@@ -47,10 +47,11 @@ Progress: [████████░░] 89% (8 of 9 phases in progress)
 | 07 | P01 | 6min | 2 | 4 |
 | 07 | P02 | 4min | 2 | 4 |
 | 08 | P01 | 3min | 2 | 5 |
+| 07.1 | P01 | 217min | 2 | 4 |
+| 07.1 | P02 | 4min | 1 | 2 |
+| 07.2 | P01 | 28min | 2 | 2 |
 
-*Updated: 2026-02-21 after 08-01 completion*
-| Phase 07.1 P01 | 217 | 2 tasks | 4 files |
-| Phase 07.1 P02 | 4 | 1 tasks | 2 files |
+*Updated: 2026-02-22 after 07.2-01 completion*
 
 ## Accumulated Context
 
@@ -77,10 +78,13 @@ Recent decisions affecting v1.1 work:
 - [Phase 07.1]: Per-period accumulation only for backfill - live snapshots unchanged to avoid regression
 - [Phase 07.1]: Pitching components remapped at rate calculation time preserving raw names in components_json
 - [Phase 07.1]: Dynamic category dropdown loads from league settings API ensuring accurate category list per league configuration
+- [Phase 07.2]: Filter ESPN rate stats (AVG, OBP, SLG, OPS, ERA, WHIP, K9) at accumulation time, not at ESPN_STAT_MAP level -- preserves rate stat info for other uses
+- [Phase 07.2]: Rate stats from ESPN per-period data must never be accumulated as components -- always compute from counting stat components
 
 ### Roadmap Evolution
 
 - Phase 07.1 inserted after Phase 7: Historical Stats Accumulation & Dynamic Categories (URGENT) — ESPN backfill produces identical standings across all weeks because `valuesByStat` returns full-season cumulative stats. Fix: accumulate per-period player stats (statSplitTypeId=5), filter active roster, use league-defined scoring categories.
+- Phase 07.2 inserted after Phase 7: Research and fix standings over time (URGENT) — counting stat values are an order of magnitude smaller than expected in backfill snapshots despite cumulative accumulation fix in 07.1.
 
 ### Pending Todos
 
@@ -104,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: Completed 08-01-PLAN.md (interactive transaction annotations and date range filtering)
+Last session: 2026-02-22
+Stopped at: Completed 07.2-01-PLAN.md (diagnose and fix rate stat accumulation bug in backfill)
 Resume file: None
