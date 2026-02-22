@@ -50,6 +50,7 @@ Progress: [████████░░] 89% (8 of 9 phases in progress)
 
 *Updated: 2026-02-21 after 08-01 completion*
 | Phase 07.1 P01 | 217 | 2 tasks | 4 files |
+| Phase 07.1 P02 | 4 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 08]: Team-scoped annotations by default to prevent chart clutter on multi-team transactions
 - [Phase 07.1]: Per-period accumulation only for backfill - live snapshots unchanged to avoid regression
 - [Phase 07.1]: Pitching components remapped at rate calculation time preserving raw names in components_json
+- [Phase 07.1]: Dynamic category dropdown loads from league settings API ensuring accurate category list per league configuration
 
 ### Roadmap Evolution
 
