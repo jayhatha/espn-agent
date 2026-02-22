@@ -25,7 +25,7 @@
 - [x] **Phase 6: Multi-Player Trade Foundation** - N-for-M trade evaluation with roster validation (2/2 plans) — completed 2026-02-21
 - [x] **Phase 7: Historical Backfill & Timeline** - ESPN historical data and week-by-week standings (2/2 plans) — completed 2026-02-21
 - [x] **Phase 8: Season Replay & Annotations** - Transaction markers and date range selection (completed 2026-02-21)
-- [ ] **Phase 9: Trade Retrospectives** - Actual vs projected outcomes with accuracy indicators
+- [x] **Phase 9: Transaction Impact Analysis (Roto WPA)** - Per-move roto-points impact with counterfactual analysis (completed 2026-02-22)
 
 ## Phase Details
 
@@ -116,10 +116,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Migration + backfill modification to store per-player per-period stats + re-backfill
-- [ ] 09-02-PLAN.md — Roster move derivation + impact computation agent with counterfactual analysis
-- [ ] 09-03-PLAN.md — API endpoints for transaction impacts, draft report, and compute trigger
-- [ ] 09-04-PLAN.md — Frontend moves page with impact timeline, leaderboard, and draft report tabs
+- [x] 09-01-PLAN.md — Migration + backfill modification to store per-player per-period stats + re-backfill — completed 2026-02-22
+- [x] 09-02-PLAN.md — Roster move derivation + impact computation agent with counterfactual analysis — completed 2026-02-22
+- [x] 09-03-PLAN.md — API endpoints for transaction impacts, draft report, and compute trigger — completed 2026-02-22
+- [x] 09-04-PLAN.md — Frontend moves page with impact timeline, leaderboard, and draft report tabs — completed 2026-02-22
 
 ## Progress
 
@@ -135,4 +135,4 @@ Plans:
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
-| 9. Transaction Impact (Roto WPA) | v1.1 | 0/4 | Not started | - |
+| 9. Transaction Impact (Roto WPA) | v1.1 | 4/4 | Complete | 2026-02-22 |
