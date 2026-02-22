@@ -22,7 +22,7 @@ const connection = new IORedis(
   { maxRetriesPerRequest: null },
 );
 
-export const morningReportQueue = new Queue("morning-reports", { connection });
+export const morningReportQueue = new Queue("morning-reports", { connection: connection as any });
 
 interface MorningReportJobData {
   slackUserLinkId: string;
@@ -136,7 +136,7 @@ const worker = new Worker<MorningReportJobData>(
     }
   },
   {
-    connection,
+    connection: connection as any,
     concurrency: 5, // Process up to 5 reports concurrently
   },
 );

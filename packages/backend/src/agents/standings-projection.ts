@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
-import type { Database, LeagueSettingsVersion } from "../db/schema.js";
+import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { calculateFinalRate, combineComponents } from "../../../shared/dist/index.js";
 

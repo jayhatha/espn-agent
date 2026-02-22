@@ -51,7 +51,7 @@ export function DateRangeFilter({
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
+            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border bg-white text-gray-900"
           />
         </div>
 
@@ -68,7 +68,7 @@ export function DateRangeFilter({
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
+            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border bg-white text-gray-900"
           />
         </div>
 

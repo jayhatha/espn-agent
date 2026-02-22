@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 
@@ -19,18 +19,15 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   const { sql } = await import("kysely");
 
   // Available seasons for a league
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+  }>(
     "/api/leagues/:leagueId/seasons",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       const result = await db
@@ -46,7 +43,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Overall standings over time
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery;
+  }>(
     "/api/leagues/:leagueId/timeseries/overall",
     {
       onRequest: [authenticate],
@@ -58,13 +58,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: TimeSeriesQuery;
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { from, to, teamIds, season } = request.query;
 
@@ -98,19 +92,16 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Category rank over time
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery & { categoryId: string };
+  }>(
     "/api/leagues/:leagueId/timeseries/category-rank",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: TimeSeriesQuery & { categoryId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { from, to, teamIds, categoryId, season } = request.query;
 
@@ -149,19 +140,16 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Projected overall over time
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery;
+  }>(
     "/api/leagues/:leagueId/timeseries/projected-overall",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: TimeSeriesQuery;
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { from, to, teamIds, season } = request.query;
 
@@ -195,19 +183,16 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Projected standings for latest snapshot (by category)
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/standings/projected",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: { snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { snapshotDate } = request.query;
 
@@ -339,18 +324,15 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // League categories
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+  }>(
     "/api/leagues/:leagueId/categories",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       // Get the latest settings version for this league
@@ -371,19 +353,16 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Transaction annotations
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery;
+  }>(
     "/api/leagues/:leagueId/timeseries/annotations",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: TimeSeriesQuery;
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { from, to, teamIds, season } = request.query;
 

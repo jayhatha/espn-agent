@@ -20,13 +20,6 @@ const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-interface Migration {
-  id: number;
-  version: number;
-  filename: string;
-  applied_at: Date;
-}
-
 interface MigrationFile {
   filename: string;
   filepath: string;

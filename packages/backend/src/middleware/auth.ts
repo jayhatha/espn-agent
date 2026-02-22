@@ -37,14 +37,15 @@ export async function requireAdmin(
 // Require team ownership in a league (user must have a team in this league)
 // Reads leagueId from request.params.id or request.params.leagueId
 export async function requireLeagueAccess(
-  request: FastifyRequest<{ Params: { id?: string; leagueId?: string } }>,
+  request: FastifyRequest,
   reply: FastifyReply,
 ) {
   const { getDb } = await import("../db/connection.js");
   const db = getDb();
 
   // Extract league ID from params (supports both :id and :leagueId)
-  const leagueIdStr = request.params.id || request.params.leagueId;
+  const params = request.params as { id?: string; leagueId?: string };
+  const leagueIdStr = params.id || params.leagueId;
   if (!leagueIdStr) {
     return reply.code(400).send({ error: "League ID required" });
   }
@@ -66,13 +67,14 @@ export async function requireLeagueAccess(
 // Require specific team ownership
 // Reads teamId from request.params.teamId
 export async function requireTeamOwnership(
-  request: FastifyRequest<{ Params: { teamId: string } }>,
+  request: FastifyRequest,
   reply: FastifyReply,
 ) {
   const { getDb } = await import("../db/connection.js");
   const db = getDb();
 
-  const teamId = parseInt(request.params.teamId, 10);
+  const params = request.params as { teamId: string };
+  const teamId = parseInt(params.teamId, 10);
 
   const team = await db
     .selectFrom("team")

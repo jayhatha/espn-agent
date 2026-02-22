@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { StreamingPitcherAgent } from "../agents/streaming-pitcher.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
@@ -12,24 +12,21 @@ export async function streamingRoutes(app: FastifyInstance) {
   const db = getDb();
 
   // Get streaming pitcher recommendations
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: {
+      teamId?: string;
+      startDate?: string;
+      lookAheadDays?: string;
+      limit?: string;
+    };
+  }>(
     "/api/leagues/:leagueId/streaming-pitchers",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: {
-          teamId?: string;
-          startDate?: string;
-          lookAheadDays?: string;
-          limit?: string;
-        };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamIdStr = request.query.teamId;
       const teamId = teamIdStr ? parseInt(teamIdStr, 10) : 0;

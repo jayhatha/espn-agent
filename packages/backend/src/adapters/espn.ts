@@ -786,16 +786,7 @@ export class ESPNAdapter {
     };
   }
 
-  /**
-   * Parse free agents from ESPN teams data
-   * Free agents are players with onTeamId: 0
-   */
-  private parseFreeAgents(teams: any[]): Array<{ playerId: number; name: string }> {
-    // ESPN doesn't include a team roster for free agents (teamId 0)
-    // Instead, free agents must be fetched via kona_player_info view
-    // This method is a placeholder - actual free agent data comes from raw.players
-    return [];
-  }
+
 
   /**
    * Parse free agents from players array (kona_player_info view)

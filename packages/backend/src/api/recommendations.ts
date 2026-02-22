@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
@@ -15,19 +15,16 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   const db = getDb();
 
   // List available free agents
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { snapshotDate?: string; limit?: string; sortBy?: string; position?: string };
+  }>(
     "/api/leagues/:leagueId/free-agents",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: { snapshotDate?: string; limit?: string; sortBy?: string; position?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { snapshotDate, limit, sortBy, position } = request.query;
       const maxPlayers = limit ? parseInt(limit, 10) : 200;
@@ -187,19 +184,16 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Get team roster
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+    Querystring: { snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/roster",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Querystring: { snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { snapshotDate } = request.query;
@@ -294,7 +288,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Evaluate add/drop impact
-  app.post(
+  app.post<{
+    Params: { leagueId: string; teamId: string };
+    Body: { addPlayerId: number; dropPlayerId: number; snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/waivers/evaluate",
     {
       onRequest: [authenticate],
@@ -306,13 +303,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Body: { addPlayerId: number; dropPlayerId: number; snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { addPlayerId, dropPlayerId, snapshotDate } = request.body;
@@ -445,19 +436,16 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Waiver recommendations
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+    Querystring: { snapshotDate?: string; maxRecommendations?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/waivers/recommendations",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Querystring: { snapshotDate?: string; maxRecommendations?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { snapshotDate, maxRecommendations } = request.query;
@@ -505,7 +493,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Trade validation (lightweight check before expensive simulation)
-  app.post(
+  app.post<{
+    Params: { leagueId: string; teamId: string };
+    Body: { givePlayers: number[]; receivePlayers: number[]; snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/trades/validate",
     {
       onRequest: [authenticate],
@@ -517,13 +508,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Body: { givePlayers: number[]; receivePlayers: number[]; snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { givePlayers, receivePlayers, snapshotDate } = request.body;
@@ -610,24 +595,21 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Trade impact analysis
-  app.post(
+  app.post<{
+    Params: { leagueId: string; teamId: string };
+    Body: {
+      trade?: ProposedTrade;
+      givePlayers?: number[];
+      receivePlayers?: number[];
+      snapshotDate?: string;
+    };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/trades/impact",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Body: {
-          trade?: ProposedTrade;
-          givePlayers?: number[];
-          receivePlayers?: number[];
-          snapshotDate?: string;
-        };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { trade: legacyTrade, givePlayers, receivePlayers, snapshotDate } = request.body;
@@ -715,19 +697,16 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Trade candidate generation
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+    Querystring: { snapshotDate?: string; maxCandidates?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/trades/recommendations",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Querystring: { snapshotDate?: string; maxCandidates?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { snapshotDate, maxCandidates } = request.query;
@@ -772,23 +751,20 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // Get rosters for manual trade building
-  app.get(
+  app.get<{
+    Params: {
+      leagueId: string;
+      teamId: string;
+      partnerTeamId: string;
+    };
+    Querystring: { snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/trades/partners/:partnerTeamId/rosters",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: {
-          leagueId: string;
-          teamId: string;
-          partnerTeamId: string;
-        };
-        Querystring: { snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const partnerTeamId = parseInt(request.params.partnerTeamId, 10);
@@ -950,18 +926,15 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   );
 
   // List potential trade partners
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/trades/partners",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
 
@@ -993,7 +966,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (request, reply) => {
+    async () => {
       return { message: "Draft recommendations - to be implemented" };
     },
   );

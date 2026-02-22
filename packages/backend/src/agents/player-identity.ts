@@ -94,7 +94,7 @@ export class PlayerIdentityResolutionAgent {
    * Find best match for a FanGraphs player
    */
   async findBestMatch(
-    fangraphsKey: string,
+    _fangraphsKey: string,
     playerName: string,
     team?: string,
     positions?: string[],

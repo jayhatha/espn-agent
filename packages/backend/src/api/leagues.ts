@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
@@ -23,7 +23,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   const db = getDb();
 
   // Connect to a league
-  app.post(
+  app.post<{ Body: ConnectLeagueBody }>(
     "/api/leagues/connect",
     {
       onRequest: [authenticate],
@@ -34,10 +34,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{ Body: ConnectLeagueBody }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const { espnLeagueId, season, auth, name, timezone, teamEspnId } = request.body;
 
       try {
@@ -68,9 +65,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
         // Find user's team by matching SWID or explicit teamEspnId
         let userTeamEspnId: number | null = teamEspnId || null;
         if (!userTeamEspnId && auth?.SWID) {
+          const swid = auth.SWID; // Type narrowing helper
           const userTeam = normalized.teams.find((team) =>
-            team.primaryOwner === auth.SWID ||
-            (team.owners && team.owners.includes(auth.SWID))
+            team.primaryOwner === swid ||
+            (team.owners && team.owners.includes(swid))
           );
           if (userTeam) {
             userTeamEspnId = userTeam.id;
@@ -274,7 +272,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // Get league status
-  app.get(
+  app.get<{ Params: { leagueId: string } }>(
     "/api/leagues/:leagueId/status",
     {
       onRequest: [authenticate],
@@ -286,10 +284,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{ Params: { leagueId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       const league = await db
@@ -337,7 +332,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request, reply) => {
+    async (request) => {
       // Only return leagues where the user has a team
       const leagues = await db
         .selectFrom("league")
@@ -352,7 +347,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // Get teams in a league
-  app.get(
+  app.get<{ Params: { leagueId: string } }>(
     "/api/leagues/:leagueId/teams",
     {
       onRequest: [authenticate],
@@ -364,10 +359,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{ Params: { leagueId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       const league = await db
@@ -392,7 +384,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // Update league authentication
-  app.patch(
+  app.patch<{
+    Params: { leagueId: string };
+    Body: { SWID?: string; espn_s2?: string };
+  }>(
     "/api/leagues/:leagueId/auth",
     {
       onRequest: [authenticate],
@@ -404,13 +399,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Body: { SWID?: string; espn_s2?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { SWID, espn_s2 } = request.body;
 
@@ -469,7 +458,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // Trigger manual snapshot for a league
-  app.post(
+  app.post<{ Params: { leagueId: string } }>(
     "/api/leagues/:leagueId/snapshot",
     {
       onRequest: [authenticate],
@@ -481,10 +470,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: FastifyRequest<{ Params: { leagueId: string } }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       const league = await db
@@ -558,18 +544,15 @@ export async function leaguesRoutes(app: FastifyInstance) {
   );
 
   // Team overview (roster + stats + standings)
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/overview",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
 

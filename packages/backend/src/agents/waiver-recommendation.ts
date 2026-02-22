@@ -47,6 +47,7 @@ export interface WaiverRecommendation {
 export class WaiverRecommendationAgent {
   constructor(
     private db: Kysely<Database>,
+    // @ts-expect-error reserved for future standings-based scoring
     private standingsAgent: StandingsProjectionAgent,
     private espnAdapter: ESPNAdapter,
     private logger?: Logger,
@@ -280,7 +281,7 @@ export class WaiverRecommendationAgent {
     snapshotDate: string,
     addPlayerId: number,
     dropPlayerId: number,
-    baselinePoints: number,
+    _baselinePoints: number,
   ): Promise<{
     deltaOverallPoints: number;
     categoryImpacts: Array<{

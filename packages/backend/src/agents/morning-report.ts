@@ -139,7 +139,7 @@ export class MorningReportAgent {
     );
 
     // Get waiver recommendations (top 5)
-    let waiverRecs;
+    let waiverRecs: any[] = [];
     try {
       waiverRecs = await this.waiverAgent.getRecommendations(
         leagueId,

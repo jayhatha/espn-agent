@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { AuctionValuationAgent } from "../agents/auction-valuation.js";
@@ -13,23 +13,20 @@ export async function draftRoutes(app: FastifyInstance) {
   const db = getDb();
 
   // GET /api/leagues/:leagueId/draft/rankings - Pre-draft VBD rankings
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: {
+      position?: string;
+      limit?: string;
+      projectionsRunId?: string;
+    };
+  }>(
     "/api/leagues/:leagueId/draft/rankings",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: {
-          position?: string;
-          limit?: string;
-          projectionsRunId?: string;
-        };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { position, limit, projectionsRunId } = request.query;
       const maxPlayers = limit ? parseInt(limit, 10) : 300;
@@ -93,25 +90,22 @@ export async function draftRoutes(app: FastifyInstance) {
   );
 
   // GET /api/leagues/:leagueId/draft/auction - Auction dollar valuations
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: {
+      position?: string;
+      limit?: string;
+      budget?: string;
+      minBid?: string;
+      projectionsRunId?: string;
+    };
+  }>(
     "/api/leagues/:leagueId/draft/auction",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: {
-          position?: string;
-          limit?: string;
-          budget?: string;
-          minBid?: string;
-          projectionsRunId?: string;
-        };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { position, limit, budget, minBid, projectionsRunId } =
         request.query;

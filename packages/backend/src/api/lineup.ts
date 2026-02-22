@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { LineupOptimizerAgent } from "../agents/lineup-optimizer.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
@@ -12,19 +12,16 @@ export async function lineupRoutes(app: FastifyInstance) {
   const db = getDb();
 
   // Get lineup optimization recommendations
-  app.get(
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+    Querystring: { snapshotDate?: string };
+  }>(
     "/api/leagues/:leagueId/teams/:teamId/lineup/recommendations",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess, requireTeamOwnership],
     },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string; teamId: string };
-        Querystring: { snapshotDate?: string };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
       const { snapshotDate } = request.query;

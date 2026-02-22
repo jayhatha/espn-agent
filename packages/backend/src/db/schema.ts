@@ -23,13 +23,18 @@ import type {
  * Based on DESIGN_DOC.md §4
  */
 
+/** Helper: marks `id` as auto-generated so Kysely treats it as optional on insert */
+type WithGeneratedId<T extends { id: unknown }> = Omit<T, "id"> & {
+  id: Generated<T["id"]>;
+};
+
 export interface Database {
-  league: League;
+  league: WithGeneratedId<League>;
   league_settings_version: LeagueSettingsVersion;
-  team: Team;
-  player: Player;
+  team: WithGeneratedId<Team>;
+  player: WithGeneratedId<Player>;
   player_identity_map: PlayerIdentityMap;
-  league_raw_payload: LeagueRawPayload;
+  league_raw_payload: WithGeneratedId<LeagueRawPayload>;
   league_daily_snapshot: LeagueDailySnapshot;
   team_daily_category_totals: TeamDailyCategoryTotals;
   team_daily_category_ranks: TeamDailyCategoryRanks;
@@ -37,8 +42,8 @@ export interface Database {
   team_daily_projected_category: TeamDailyProjectedCategory;
   team_daily_projected_overall: TeamDailyProjectedOverall;
   team_roster_snapshot: TeamRosterSnapshot;
-  league_transaction_event: LeagueTransactionEvent;
-  projections_run: ProjectionsRun;
+  league_transaction_event: WithGeneratedId<LeagueTransactionEvent>;
+  projections_run: WithGeneratedId<ProjectionsRun>;
   player_projection: PlayerProjection;
   // Auth tables
   users: UsersTable;
@@ -54,7 +59,7 @@ export interface Database {
 }
 
 export interface LeagueSettingsVersion {
-  id: number;
+  id: Generated<number>;
   league_id: number;
   effective_date: string; // DATE
   settings_json: LeagueSettings;
@@ -95,7 +100,7 @@ export interface RefreshTokensTable {
  */
 
 export interface SlackInstallation {
-  id: string;
+  id: Generated<string>;
   team_id: string;
   enterprise_id: string | null;
   bot_token_encrypted: Buffer;
@@ -160,7 +165,7 @@ export interface AgentAction {
 }
 
 export interface AgentActionDecision {
-  id: string;
+  id: Generated<string>;
   action_id: string;
   decided_by_slack_user_link_id: string;
   decision: 'approve' | 'reject' | 'modify';
@@ -169,7 +174,7 @@ export interface AgentActionDecision {
 }
 
 export interface SlackMessageRef {
-  id: string;
+  id: Generated<string>;
   team_id: string;
   channel_id: string;
   message_ts: string;

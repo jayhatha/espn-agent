@@ -688,7 +688,7 @@ export class TradeRecommendationAgent {
     teamId: number,
     snapshotDate: string,
     currentStandings: any,
-    roster: any[],
+    _roster: any[],
     trade: ProposedTrade,
     projections: Map<number, any>,
   ): Promise<{ overallPoints: number; categoryImpacts: CategoryImpact[] }> {

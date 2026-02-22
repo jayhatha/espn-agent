@@ -20,7 +20,7 @@ const connection = new IORedis(
   { maxRetriesPerRequest: null },
 );
 
-export const slackApprovalQueue = new Queue("slack-approvals", { connection });
+export const slackApprovalQueue = new Queue("slack-approvals", { connection: connection as any });
 
 interface SlackApprovalJobData {
   actionId: string;
@@ -38,13 +38,10 @@ const worker = new Worker<SlackApprovalJobData>(
   async (job: Job<SlackApprovalJobData>) => {
     const {
       actionId,
-      reportId,
       decision,
       slackTeamId,
       slackUserId,
       responseUrl,
-      messageTs,
-      channelId,
     } = job.data;
 
     logger.info(
@@ -186,7 +183,7 @@ const worker = new Worker<SlackApprovalJobData>(
     }
   },
   {
-    connection,
+    connection: connection as any,
     concurrency: 10, // Process approvals quickly
   },
 );

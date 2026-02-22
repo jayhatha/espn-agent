@@ -4,7 +4,6 @@ import type { Database } from "../db/schema.js";
 import crypto from "crypto";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, ESPN_STAT_MAP } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
-import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { calculateFinalRate } from "../../../shared/dist/index.js";
 
 /**
@@ -197,7 +196,7 @@ export class SnapshotOrchestratorAgent {
         );
 
         // Write free agent players
-        await this.writeFreeAgentPlayers(trx, normalized.freeAgents);
+        await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
 
         // Write current category totals, ranks, and overall
         const categories = normalized.settings.categories;
@@ -656,14 +655,6 @@ export class SnapshotOrchestratorAgent {
     effectiveDate: string,
     settings: any,
   ): Promise<number> {
-    // Check if settings changed
-    const latest = await this.db
-      .selectFrom("league_settings_version")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .orderBy("effective_date", "desc")
-      .executeTakeFirst();
-
     // Convert ESPN categories to shared Category format
     const categories = (settings.categories || []).map((cat: ESPNScoringCategory) => ({
       category_id: cat.statKey,
@@ -848,7 +839,7 @@ export class SnapshotOrchestratorAgent {
       let counterpartyDbTeamId: number | null = null;
       if (txn.type === "TRADE") {
         for (const item of txn.items) {
-          const otherTeamId = item.fromTeamId !== primaryEspnTeamId
+          const otherTeamId: number | null = item.fromTeamId !== primaryEspnTeamId
             ? item.fromTeamId
             : item.toTeamId;
           if (otherTeamId !== null && otherTeamId !== primaryEspnTeamId) {

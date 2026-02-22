@@ -4,6 +4,9 @@ import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 
+// Import backfill worker so it runs in the same process
+import "./backfill-worker.js";
+
 /**
  * Background worker for daily snapshot jobs
  * Per AGENTS.md §8
@@ -21,7 +24,7 @@ const connection = new IORedis(
 );
 
 // Create queue
-export const snapshotQueue = new Queue("snapshots", { connection });
+export const snapshotQueue = new Queue("snapshots", { connection: connection as any });
 
 interface SnapshotJobData {
   leagueId: number;
@@ -60,7 +63,7 @@ const worker = new Worker<SnapshotJobData>(
       throw error;
     }
   },
-  { connection },
+  { connection: connection as any },
 );
 
 worker.on("completed", (job) => {

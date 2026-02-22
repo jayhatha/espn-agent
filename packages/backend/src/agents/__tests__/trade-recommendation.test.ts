@@ -244,7 +244,7 @@ function createMockDb(): any {
     const key = [normalizedTable, ...normalizedJoinTables].join("_");
 
     const builder: any = {
-      where: (...args: any[]) => createChainable(table, joinTables),
+      where: (..._args: any[]) => createChainable(table, joinTables),
       execute: () => mockResults.get(`${key}_list`) || [],
       executeTakeFirst: () => mockResults.get(`${key}_single`),
       executeTakeFirstOrThrow: () => {
@@ -252,10 +252,10 @@ function createMockDb(): any {
         if (!result) throw new Error(`No result for ${key}_single`);
         return result;
       },
-      orderBy: (...args: any[]) => createChainable(table, joinTables),
-      select: (fields: any) => createChainable(table, joinTables),
-      selectAll: (prefix?: string) => createChainable(table, joinTables),
-      innerJoin: (jTable: string, ...args: any[]) => createChainable(table, [...joinTables, jTable]),
+      orderBy: (..._args: any[]) => createChainable(table, joinTables),
+      select: (_fields: any) => createChainable(table, joinTables),
+      selectAll: (_prefix?: string) => createChainable(table, joinTables),
+      innerJoin: (jTable: string, ..._args: any[]) => createChainable(table, [...joinTables, jTable]),
     };
 
     return builder;
