@@ -69,7 +69,7 @@ Plans:
   1. Backfill counting stats (HR, RBI, R, SB, K, W, SV) are within expected magnitude (20-90 HR at mid-season, not 2-3)
   2. Week-over-week accumulation produces increasing cumulative totals
   3. Rate stats (AVG, ERA, WHIP) from accumulated components are in reasonable ranges
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 07.2-01-PLAN.md — Diagnose root cause via debug logging and ESPN response inspection, implement fix, verify with re-backfill -- completed 2026-02-22
