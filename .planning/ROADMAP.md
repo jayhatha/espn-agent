@@ -60,6 +60,23 @@ Plans:
 - [x] 07-01-PLAN.md — Backend backfill infrastructure: ESPN historical fetch, backfill agent with rate limiting and transaction dedup, BullMQ worker, admin API endpoints — completed 2026-02-21
 - [x] 07-02-PLAN.md — Frontend backfill UI (admin trigger + progress tracking) and season-filtered timeline on trends page — completed 2026-02-21
 
+### Phase 07.1: Historical Stats Accumulation & Dynamic Categories (INSERTED)
+
+**Goal:** Fix historical backfill to produce accurate week-by-week standings by accumulating per-period player stats and use league-defined scoring categories
+**Depends on:** Phase 7
+**Requirements:** TIME-01-fix
+**Success Criteria** (what must be TRUE):
+  1. Backfill produces per-week standings that actually differ (not identical across all weeks)
+  2. Stats are accumulated from per-period player data (statSplitTypeId=5), filtered to active roster only
+  3. Rate stats use component-based math (accumulate H/AB, ER/OUTS, not average rates)
+  4. League-defined scoring categories used for ranking (from league_settings_version)
+  5. Frontend trends page uses dynamic categories from API, not hardcoded list
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07.1-01-PLAN.md — Backend per-period player stat accumulation, rate stat component math, league categories endpoint
+- [ ] 07.1-02-PLAN.md — Frontend dynamic category dropdown replacing hardcoded list
+
 ### Phase 8: Season Replay & Annotations
 **Goal:** Users can see how transactions affected their standings over time with visual annotations
 **Depends on:** Phase 7
@@ -97,5 +114,6 @@ Plans:
 | 5. Admin UI | v1.0 | 2/2 | Complete | 2026-02-21 |
 | 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
-| 8. Season Replay & Annotations | 1/1 | Complete   | 2026-02-21 | - |
+| 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
+| 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |
