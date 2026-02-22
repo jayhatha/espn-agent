@@ -452,8 +452,8 @@ export class SnapshotOrchestratorAgent {
    * Write current standings by accumulating per-period player stats
    * Used by historical backfill to produce accurate week-by-week standings
    *
-   * Extracts statSplitTypeId=5 (per-period) player stats, filters active roster,
-   * aggregates to team-level, and computes rate stats via component math
+   * Extracts statSplitTypeId=5 (per-period) player stats from all rostered players
+   * (excluding IL/NA), aggregates to team-level, and computes rate stats via component math
    */
   async writeCurrentStandingsFromPlayerStats(
     trx: Kysely<Database>,
@@ -520,14 +520,17 @@ export class SnapshotOrchestratorAgent {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
-      // Get active roster entries (lineupSlotId 0-15, exclude 16=bench, 17=IL, 19=NA)
+      // Get counting roster entries (include bench=16, exclude IL=17, NA=19)
       const rosterEntries = team.roster?.entries || [];
-      const activeRoster = rosterEntries.filter((entry: any) => entry.lineupSlotId <= 15);
+      // Include all rostered players except IL (17) and NA (19) — in roto, bench stats count
+      const countingRoster = rosterEntries.filter(
+        (entry: any) => entry.lineupSlotId !== undefined && entry.lineupSlotId <= 16
+      );
 
-      // Accumulate this week's components from all active players
+      // Accumulate this week's components from all counting players
       const weekComponents: Record<string, number> = {};
 
-      for (const entry of activeRoster) {
+      for (const entry of countingRoster) {
         // Find per-period stats (statSplitTypeId=5)
         const playerStats = entry.playerPoolEntry?.player?.stats || [];
         const periodStats = playerStats.find(
@@ -560,6 +563,12 @@ export class SnapshotOrchestratorAgent {
           }
         }
       }
+
+      // Debug logging for week components
+      this.logger?.debug(
+        { teamId: team.id, scoringPeriodId, rosterCount: countingRoster.length, weekComponentKeys: Object.keys(weekComponents), sampleStats: { R: weekComponents.R, HR: weekComponents.HR, RBI: weekComponents.RBI } },
+        "Week components computed for team",
+      );
 
       // Build cumulative components: prior + this week
       const priorComponents = priorComponentsMap.get(dbTeamId) || {};
