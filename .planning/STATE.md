@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 07.2 (Fix Counting Stat Magnitude Bug in Backfill)
 Plan: 1 of 1 in current phase
 Status: Completed
-Last activity: 2026-02-22 — Completed 07.2-01-PLAN.md (diagnose and fix rate stat accumulation bug)
+Last activity: 2026-02-22 - Completed quick task 1: Fix cumulative counting stats magnitude (bench player exclusion)
 
 Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complete)
 
@@ -113,6 +113,12 @@ None yet.
 **Phase 9 readiness:**
 - Depends on Phase 6 (multi-player simulation) + Phase 7 (historical snapshots)
 - Projection accuracy metrics need user research (MAE/RMSE vs simple indicator)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
 
 ## Session Continuity
 
