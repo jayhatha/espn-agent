@@ -51,7 +51,13 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 | 07.1 | P02 | 4min | 1 | 2 |
 | 07.2 | P01 | 28min | 2 | 2 |
 
-*Updated: 2026-02-22 after 07.2-01 completion*
+**Quick Tasks:**
+
+| ID | Duration | Tasks | Files |
+|----|----------|-------|-------|
+| quick-01 | 2min | 3 | 3 |
+
+*Updated: 2026-02-22 after quick-01 completion*
 
 ## Accumulated Context
 
@@ -80,6 +86,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 07.1]: Dynamic category dropdown loads from league settings API ensuring accurate category list per league configuration
 - [Phase 07.2]: Filter ESPN rate stats (AVG, OBP, SLG, OPS, ERA, WHIP, K9) at accumulation time, not at ESPN_STAT_MAP level -- preserves rate stat info for other uses
 - [Phase 07.2]: Rate stats from ESPN per-period data must never be accumulated as components -- always compute from counting stat components
+- [Quick 01]: Include bench players (lineupSlotId 16) in roto stat accumulation — bench stats count toward team totals, only IL/NA excluded
+- [Quick 01]: Debug endpoint at /api/admin/leagues/:id/debug/period-stats enables manual verification of roster inclusion logic and ESPN data comparison
 
 ### Roadmap Evolution
 
@@ -109,5 +117,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 07.2-01-PLAN.md (diagnose and fix rate stat accumulation bug in backfill)
+Stopped at: Completed quick-01-PLAN.md (fix bench player exclusion in backfill accumulation)
 Resume file: None
