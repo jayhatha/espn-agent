@@ -4,6 +4,7 @@ import { getDb } from "../db/connection.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { backfillQueue } from "../workers/backfill-worker.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { ESPNAdapter, type ESPNAuthCookies, ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP } from "../adapters/espn.js";
 
 /**
  * Admin API Routes
@@ -283,7 +284,7 @@ export async function adminRoutes(app: FastifyInstance) {
     },
     async (request: any, reply: any) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { season, startWeek, endWeek } = request.body;
+      const { season, startWeek, endWeek, clearExisting } = request.body;
 
       // Validate inputs
       if (!season || typeof season !== "number") {
@@ -355,10 +356,58 @@ export async function adminRoutes(app: FastifyInstance) {
         espnAuth = { SWID, espn_s2 };
       }
 
+      // Clear existing data if requested
+      if (clearExisting) {
+        const baseDate = new Date(season, 3, 1);
+        const startDate = new Date(baseDate.getTime() + (start - 1) * 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+        const endDate = new Date(baseDate.getTime() + (end - 1) * 7 * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .split("T")[0];
+
+        request.log.info(
+          { leagueId, season, startDate, endDate },
+          "Clearing existing backfill data before re-trigger",
+        );
+
+        await db
+          .deleteFrom("league_daily_snapshot")
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", ">=", startDate)
+          .where("snapshot_date", "<=", endDate)
+          .execute();
+
+        await db
+          .deleteFrom("league_raw_payload")
+          .where("league_id", "=", leagueId)
+          .where("scoring_period_id", ">=", start)
+          .where("scoring_period_id", "<=", end)
+          .execute();
+
+        await db
+          .deleteFrom("league_transaction_event")
+          .where("league_id", "=", leagueId)
+          .where("event_date", ">=", startDate)
+          .where("event_date", "<=", endDate)
+          .execute();
+      }
+
       // Construct jobId for deduplication
       const jobId = `backfill-${leagueId}-${season}`;
 
       try {
+        // Remove existing completed/failed job so we can re-queue with the same ID.
+        // BullMQ deduplicates by jobId — a completed job kept by removeOnComplete
+        // blocks re-adds until it expires.
+        const existingJob = await backfillQueue.getJob(jobId);
+        if (existingJob) {
+          const state = await existingJob.getState();
+          if (state === "completed" || state === "failed") {
+            await existingJob.remove();
+          }
+        }
+
         // Add job to queue
         const job = await backfillQueue.add(
           jobId,
@@ -407,6 +456,102 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.code(500).send({
           success: false,
           error: "Failed to start backfill job",
+        });
+      }
+    },
+  );
+
+  // DELETE /api/admin/leagues/:leagueId/backfill - Clear existing backfill data
+  app.delete(
+    "/api/admin/leagues/:leagueId/backfill",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request: any, reply: any) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const season = parseInt(request.query.season, 10);
+      const startWeek = parseInt(request.query.startWeek || "1", 10);
+      const endWeek = parseInt(request.query.endWeek || "26", 10);
+
+      if (!season || isNaN(season)) {
+        return reply.code(400).send({
+          error: "Invalid season",
+          message: "season query parameter is required",
+        });
+      }
+
+      // Compute snapshot date range using same formula as historical-backfill.ts
+      const baseDate = new Date(season, 3, 1); // April 1 of season year
+      const startDate = new Date(baseDate.getTime() + (startWeek - 1) * 7 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+      const endDate = new Date(baseDate.getTime() + (endWeek - 1) * 7 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
+
+      request.log.info(
+        { leagueId, season, startWeek, endWeek, startDate, endDate },
+        "Clearing backfill data",
+      );
+
+      try {
+        // Delete league_daily_snapshot rows in the date range
+        // All child tables (category_totals, category_ranks, overall, roster_snapshot)
+        // are cascade-deleted via ON DELETE CASCADE foreign keys
+        const snapshotResult = await db
+          .deleteFrom("league_daily_snapshot")
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", ">=", startDate)
+          .where("snapshot_date", "<=", endDate)
+          .executeTakeFirst();
+
+        const snapshotsDeleted = Number(snapshotResult.numDeletedRows);
+
+        // Delete raw payloads for the historical scoring periods
+        const rawResult = await db
+          .deleteFrom("league_raw_payload")
+          .where("league_id", "=", leagueId)
+          .where("scoring_period_id", ">=", startWeek)
+          .where("scoring_period_id", "<=", endWeek)
+          .executeTakeFirst();
+
+        const rawPayloadsDeleted = Number(rawResult.numDeletedRows);
+
+        // Delete transaction events in the date range
+        const txnResult = await db
+          .deleteFrom("league_transaction_event")
+          .where("league_id", "=", leagueId)
+          .where("event_date", ">=", startDate)
+          .where("event_date", "<=", endDate)
+          .executeTakeFirst();
+
+        const transactionsDeleted = Number(txnResult.numDeletedRows);
+
+        request.log.info(
+          { leagueId, season, snapshotsDeleted, rawPayloadsDeleted, transactionsDeleted },
+          "Backfill data cleared",
+        );
+
+        return {
+          success: true,
+          deleted: {
+            snapshots: snapshotsDeleted,
+            rawPayloads: rawPayloadsDeleted,
+            transactions: transactionsDeleted,
+          },
+          dateRange: { startDate, endDate },
+        };
+      } catch (error) {
+        request.log.error({ error, leagueId, season }, "Failed to clear backfill data");
+        return reply.code(500).send({
+          success: false,
+          error: "Failed to clear backfill data",
         });
       }
     },
@@ -509,6 +654,188 @@ export async function adminRoutes(app: FastifyInstance) {
       return {
         jobs: allJobs,
       };
+    },
+  );
+
+  // GET /api/admin/leagues/:leagueId/debug/period-stats - Debug endpoint for scoring period roster stats
+  app.get(
+    "/api/admin/leagues/:leagueId/debug/period-stats",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request: any, reply: any) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const season = parseInt(request.query.season, 10);
+      const scoringPeriodId = parseInt(request.query.scoringPeriodId, 10);
+
+      // Validate inputs
+      if (!season || isNaN(season)) {
+        return reply.code(400).send({
+          error: "Invalid season",
+          message: "season query parameter is required",
+        });
+      }
+
+      if (!scoringPeriodId || isNaN(scoringPeriodId)) {
+        return reply.code(400).send({
+          error: "Invalid scoringPeriodId",
+          message: "scoringPeriodId query parameter is required",
+        });
+      }
+
+      // Look up league
+      const league = await db
+        .selectFrom("league")
+        .select([
+          "id",
+          "espn_league_id",
+          "espn_swid",
+          "espn_s2",
+          "espn_swid_encrypted",
+          "espn_s2_encrypted",
+          "name",
+        ])
+        .where("id", "=", leagueId)
+        .executeTakeFirst();
+
+      if (!league) {
+        return reply.code(404).send({
+          error: "League not found",
+        });
+      }
+
+      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      let espnAuth: ESPNAuthCookies | undefined;
+      const swidSource = league.espn_swid_encrypted || league.espn_swid;
+      const s2Source = league.espn_s2_encrypted || league.espn_s2;
+
+      if (swidSource || s2Source) {
+        const SWID = swidSource
+          ? Buffer.isBuffer(swidSource) && hasEncryptionKey()
+            ? decryptToken(swidSource)
+            : Buffer.isBuffer(swidSource)
+              ? swidSource.toString()
+              : swidSource
+          : undefined;
+        const espn_s2 = s2Source
+          ? Buffer.isBuffer(s2Source) && hasEncryptionKey()
+            ? decryptToken(s2Source)
+            : Buffer.isBuffer(s2Source)
+              ? s2Source.toString()
+              : s2Source
+          : undefined;
+        espnAuth = { SWID, espn_s2 };
+      }
+
+      try {
+        // Create ESPNAdapter instance with request logger
+        const espnAdapter = new ESPNAdapter(request.log);
+
+        // Fetch historical week data
+        const espnData = await espnAdapter.fetchHistoricalWeek({
+          leagueId: league.espn_league_id,
+          season,
+          scoringPeriodId,
+          auth: espnAuth,
+        });
+
+        const rawTeams = (espnData.data as any).teams || [];
+        const teams = [];
+
+        for (const team of rawTeams) {
+          const rosterEntries = team.roster?.entries || [];
+          const players = [];
+          const teamPeriodTotals: Record<string, number> = {};
+
+          for (const entry of rosterEntries) {
+            const playerId = entry.playerId;
+            const playerName = entry.playerPoolEntry?.player?.fullName || "Unknown";
+            const lineupSlotId = entry.lineupSlotId;
+            const slotLabel = ESPN_LINEUP_SLOT_MAP[lineupSlotId] || `Slot ${lineupSlotId}`;
+
+            // Check if player would be included by the fixed filter
+            const included = lineupSlotId !== undefined && lineupSlotId <= 16;
+
+            // Find per-period stats (statSplitTypeId=5)
+            const playerStats = entry.playerPoolEntry?.player?.stats || [];
+            const periodStats = playerStats.find(
+              (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
+            );
+
+            const periodStatsObj: Record<string, number> = {};
+
+            if (periodStats && periodStats.stats) {
+              for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
+                const espnStatId = parseInt(espnStatIdStr, 10);
+                const statInfo = ESPN_STAT_MAP[espnStatId];
+
+                if (statInfo && typeof value === "number") {
+                  periodStatsObj[statInfo.key] = value;
+
+                  // Accumulate to team totals if included
+                  if (included && statInfo.type === "COUNTING") {
+                    if (statInfo.key === "OUTS") {
+                      const ip = value / 3;
+                      teamPeriodTotals.IP = (teamPeriodTotals.IP || 0) + ip;
+                    } else {
+                      teamPeriodTotals[statInfo.key] = (teamPeriodTotals[statInfo.key] || 0) + value;
+                    }
+                  }
+                }
+              }
+            }
+
+            players.push({
+              playerId,
+              name: playerName,
+              lineupSlotId,
+              slotLabel,
+              included,
+              periodStats: periodStatsObj,
+            });
+          }
+
+          // Get ESPN's team-level valuesByStat for comparison
+          const valuesByStat: Record<string, number> = {};
+          if (team.valuesByStat) {
+            for (const [espnStatIdStr, value] of Object.entries(team.valuesByStat)) {
+              const espnStatId = parseInt(espnStatIdStr, 10);
+              const statInfo = ESPN_STAT_MAP[espnStatId];
+              if (statInfo && typeof value === "number") {
+                valuesByStat[statInfo.key] = value;
+              }
+            }
+          }
+
+          teams.push({
+            teamId: team.id,
+            teamName: team.name || `Team ${team.id}`,
+            valuesByStat,
+            rosterPlayerCount: rosterEntries.length,
+            playersWithPeriodStats: players.filter(p => Object.keys(p.periodStats).length > 0).length,
+            players,
+            teamPeriodTotals,
+          });
+        }
+
+        return {
+          scoringPeriodId,
+          season,
+          teams,
+        };
+      } catch (error) {
+        request.log.error({ error, leagueId, season, scoringPeriodId }, "Failed to fetch period stats");
+        return reply.code(500).send({
+          success: false,
+          error: "Failed to fetch period stats from ESPN",
+        });
+      }
     },
   );
 }
