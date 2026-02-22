@@ -60,6 +60,20 @@ Plans:
 - [x] 07-01-PLAN.md — Backend backfill infrastructure: ESPN historical fetch, backfill agent with rate limiting and transaction dedup, BullMQ worker, admin API endpoints — completed 2026-02-21
 - [x] 07-02-PLAN.md — Frontend backfill UI (admin trigger + progress tracking) and season-filtered timeline on trends page — completed 2026-02-21
 
+### Phase 07.2: Research and fix standings over time — counting stat values an order of magnitude too small in backfill snapshots (INSERTED)
+
+**Goal:** Fix counting stat values in backfill snapshots that appear ~10x smaller than expected by diagnosing and correcting the data extraction in writeCurrentStandingsFromPlayerStats
+**Depends on:** Phase 7
+**Requirements:** TIME-01-fix-07.2
+**Success Criteria** (what must be TRUE):
+  1. Backfill counting stats (HR, RBI, R, SB, K, W, SV) are within expected magnitude (20-90 HR at mid-season, not 2-3)
+  2. Week-over-week accumulation produces increasing cumulative totals
+  3. Rate stats (AVG, ERA, WHIP) from accumulated components are in reasonable ranges
+**Plans:** 1 plan
+
+Plans:
+- [ ] 07.2-01-PLAN.md — Diagnose root cause via debug logging and ESPN response inspection, implement fix, verify with re-backfill
+
 ### Phase 07.1: Historical Stats Accumulation & Dynamic Categories (INSERTED)
 
 **Goal:** Fix historical backfill to produce accurate week-by-week standings by accumulating per-period player stats and use league-defined scoring categories
@@ -115,5 +129,6 @@ Plans:
 | 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
+| 7.2 Fix Standings Values | v1.1 | 0/1 | Planning | - |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |
