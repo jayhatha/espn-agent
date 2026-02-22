@@ -104,18 +104,22 @@ Plans:
 Plans:
 - [ ] 08-01-PLAN.md — Enrich annotations endpoint with player names, build TransactionMarker and DateRangeFilter components, integrate into trends page
 
-### Phase 9: Trade Retrospectives
-**Goal:** Users can see how past trades actually worked out compared to projections at the time
-**Depends on:** Phase 6, Phase 7 (needs multi-player simulation + historical snapshots)
-**Requirements:** RETRO-01, RETRO-02, RETRO-03
+### Phase 9: Transaction Impact Analysis (Roto WPA)
+**Goal:** Users see the roto-points impact of every roster move — from draft picks through the final add/drop — showing which moves helped/hurt their season the most
+**Depends on:** Phase 7 (needs historical backfill snapshots with per-player data)
+**Requirements:** IMPACT-01, IMPACT-02, IMPACT-03, IMPACT-04
 **Success Criteria** (what must be TRUE):
-  1. User can view trade history showing all past trades with players, dates, and teams involved
-  2. Each past trade shows projected impact (at time of trade) vs actual outcome (from snapshots after trade)
-  3. Past trades display accuracy indicators ("Exceeded projections", "Met projections", "Underperformed")
-**Plans:** TBD
+  1. Per-player per-period stats stored during backfill, enabling individual contribution tracking
+  2. Roster moves derived from weekly snapshot diffs with draft picks identified from opening-day roster
+  3. Each move shows roto-points impact computed via counterfactual analysis (actual vs what-if-you-hadn't-made-this-move)
+  4. Frontend shows impact timeline, move leaderboard (best/worst moves), and draft pick report
+**Plans:** 4 plans
 
 Plans:
-- [ ] 09-01: TBD
+- [ ] 09-01-PLAN.md — Migration + backfill modification to store per-player per-period stats + re-backfill
+- [ ] 09-02-PLAN.md — Roster move derivation + impact computation agent with counterfactual analysis
+- [ ] 09-03-PLAN.md — API endpoints for transaction impacts, draft report, and compute trigger
+- [ ] 09-04-PLAN.md — Frontend moves page with impact timeline, leaderboard, and draft report tabs
 
 ## Progress
 
@@ -131,4 +135,4 @@ Plans:
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
-| 9. Trade Retrospectives | v1.1 | 0/1 | Not started | - |
+| 9. Transaction Impact (Roto WPA) | v1.1 | 0/4 | Not started | - |

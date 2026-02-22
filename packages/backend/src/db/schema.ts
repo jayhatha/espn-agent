@@ -16,6 +16,9 @@ import type {
   ProjectionsRun,
   PlayerProjection,
   PlayerIdentityMap,
+  PlayerPeriodStats,
+  RosterMove,
+  TransactionImpact,
 } from "../../../shared/dist/index.js";
 
 /**
@@ -45,6 +48,10 @@ export interface Database {
   league_transaction_event: WithGeneratedId<LeagueTransactionEvent>;
   projections_run: WithGeneratedId<ProjectionsRun>;
   player_projection: PlayerProjection;
+  // Transaction Impact Analysis (Roto WPA)
+  player_period_stats: PlayerPeriodStats;
+  roster_move: WithGeneratedId<RosterMove>;
+  transaction_impact: WithGeneratedId<TransactionImpact>;
   // Auth tables
   users: UsersTable;
   refresh_tokens: RefreshTokensTable;

@@ -474,6 +474,7 @@ export class SnapshotOrchestratorAgent {
     scoringPeriodId: number,
     previousSnapshotDate?: string,
     benchCountsForStats: boolean = true,
+    storePlayerStats: boolean = false,
   ): Promise<void> {
     // Fetch previous snapshot's cumulative totals BEFORE deleting current snapshot.
     // When accumulating within the same week (previousSnapshotDate === snapshotDate),
@@ -623,6 +624,115 @@ export class SnapshotOrchestratorAgent {
       }
 
       teamCategoryValues.push({ dbTeamId, categoryValues, components: cumulativeComponents });
+    }
+
+    // Store per-player per-period stats for transaction impact analysis
+    if (storePlayerStats) {
+      // Build espnPlayerId → dbPlayerId lookup from all roster entries
+      const allEspnPlayerIds: number[] = [];
+      for (const team of rawTeamsData) {
+        const entries = team.roster?.entries || [];
+        for (const entry of entries) {
+          const espnPlayerId = entry.playerPoolEntry?.playerId ?? entry.playerId;
+          if (espnPlayerId) allEspnPlayerIds.push(espnPlayerId);
+        }
+      }
+
+      const espnPlayerIdToDbId = new Map<number, number>();
+      if (allEspnPlayerIds.length > 0) {
+        const playerRows = await trx
+          .selectFrom("player")
+          .select(["id", "espn_player_id"])
+          .where("espn_player_id", "in", allEspnPlayerIds)
+          .execute();
+        for (const row of playerRows) {
+          espnPlayerIdToDbId.set(row.espn_player_id, row.id);
+        }
+      }
+
+      // Collect per-player stats from ALL roster entries (including bench for counterfactual)
+      // Exclude only IL (17) and NA (19)
+      const playerRows: Array<{
+        league_id: number;
+        snapshot_date: string;
+        scoring_period: number;
+        player_id: number;
+        team_id: number;
+        lineup_slot_id: number | null;
+        components_json: Record<string, number>;
+      }> = [];
+
+      for (const team of rawTeamsData) {
+        const dbTeamId = espnTeamIdToDbId.get(team.id);
+        if (!dbTeamId) continue;
+
+        const entries = team.roster?.entries || [];
+        for (const entry of entries) {
+          // Skip IL (17) and NA (19) — they don't have meaningful stats
+          if (entry.lineupSlotId === 17 || entry.lineupSlotId === 19) continue;
+
+          const espnPlayerId = entry.playerPoolEntry?.playerId ?? entry.playerId;
+          const dbPlayerId = espnPlayerIdToDbId.get(espnPlayerId);
+          if (!dbPlayerId) continue;
+
+          const playerStats = entry.playerPoolEntry?.player?.stats || [];
+          const periodStats = playerStats.find(
+            (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
+          );
+
+          if (!periodStats || !periodStats.stats) continue;
+
+          const components: Record<string, number> = {};
+          for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
+            const espnStatId = parseInt(espnStatIdStr, 10);
+            const statInfo = ESPN_STAT_MAP[espnStatId];
+            if (!statInfo || statInfo.type !== "COUNTING") continue;
+
+            const statValue = typeof value === "number" ? value : 0;
+            if (statInfo.key === "OUTS") {
+              components.IP = (components.IP || 0) + statValue / 3;
+            } else {
+              components[statInfo.key] = (components[statInfo.key] || 0) + statValue;
+            }
+          }
+
+          // Only store if the player had any stats this period
+          if (Object.keys(components).length > 0) {
+            playerRows.push({
+              league_id: leagueId,
+              snapshot_date: snapshotDate,
+              scoring_period: scoringPeriodId,
+              player_id: dbPlayerId,
+              team_id: dbTeamId,
+              lineup_slot_id: entry.lineupSlotId ?? null,
+              components_json: components,
+            });
+          }
+        }
+      }
+
+      // Batch upsert per-player stats
+      if (playerRows.length > 0) {
+        for (const row of playerRows) {
+          await trx
+            .insertInto("player_period_stats")
+            .values(row as any)
+            .onConflict((oc) =>
+              oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
+                snapshot_date: row.snapshot_date,
+                team_id: row.team_id,
+                lineup_slot_id: row.lineup_slot_id,
+                components_json: row.components_json as any,
+              }),
+            )
+            .execute();
+        }
+
+        this.logger?.debug(
+          { leagueId, scoringPeriodId, playerStatsStored: playerRows.length },
+          "Per-player period stats stored",
+        );
+      }
     }
 
     // Write category totals for each team

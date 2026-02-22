@@ -215,6 +215,7 @@ export class HistoricalBackfillAgent {
                 await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
                   trx, leagueId, snapshotDate, rawTeams, cachedTeamIdMap!,
                   categories, day, previousSnapshotDate, benchCountsForStats!,
+                  true, // storePlayerStats — capture per-player per-period stats for impact analysis
                 );
               });
 
