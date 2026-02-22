@@ -134,6 +134,18 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/category-rank?${query}`);
   },
 
+  async getCategoryTotalTimeSeries(
+    leagueId: number,
+    categoryId: string,
+    params?: { from?: string; to?: string; teamIds?: string; season?: string },
+  ) {
+    const query = new URLSearchParams({
+      ...params,
+      categoryId,
+    } as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/category-total?${query}`);
+  },
+
   async getProjectedOverallTimeSeries(
     leagueId: number,
     params?: { from?: string; to?: string; teamIds?: string; season?: string },
@@ -322,10 +334,21 @@ export const api = {
   },
 
   // Backfill
-  async triggerBackfill(leagueId: number, data: { season: number; startWeek?: number; endWeek?: number }) {
+  async triggerBackfill(leagueId: number, data: { season: number; startWeek?: number; endWeek?: number; clearExisting?: boolean }) {
     return fetchAPI(`/api/admin/leagues/${leagueId}/backfill`, {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  async clearBackfillData(leagueId: number, params: { season: number; startWeek?: number; endWeek?: number }) {
+    const qs = new URLSearchParams({
+      season: String(params.season),
+      ...(params.startWeek !== undefined && { startWeek: String(params.startWeek) }),
+      ...(params.endWeek !== undefined && { endWeek: String(params.endWeek) }),
+    });
+    return fetchAPI(`/api/admin/leagues/${leagueId}/backfill?${qs}`, {
+      method: 'DELETE',
     });
   },
 
@@ -335,5 +358,25 @@ export const api = {
 
   async getBackfillJobs() {
     return fetchAPI('/api/admin/backfill-jobs');
+  },
+
+  // Transaction Impact
+  async computeTransactionImpacts(leagueId: number, season: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/transaction-impacts/compute?season=${season}`, {
+      method: 'POST',
+    });
+  },
+
+  async getTransactionImpacts(leagueId: number, teamId: number, params?: { season?: number; sortBy?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.season) qs.set('season', String(params.season));
+    if (params?.sortBy) qs.set('sortBy', params.sortBy);
+    const query = qs.toString();
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/transaction-impacts${query ? '?' + query : ''}`);
+  },
+
+  async getDraftReport(leagueId: number, teamId: number, season?: number) {
+    const qs = season ? `?season=${season}` : '';
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/draft-report${qs}`);
   },
 };
