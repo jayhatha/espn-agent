@@ -49,6 +49,7 @@ Progress: [████████░░] 89% (8 of 9 phases in progress)
 | 08 | P01 | 3min | 2 | 5 |
 
 *Updated: 2026-02-21 after 08-01 completion*
+| Phase 07.1 P01 | 217 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,12 @@ Recent decisions affecting v1.1 work:
 - [Phase 07]: Season filter additive to from/to filters allows flexible year + date range queries
 - [Phase 08]: SVG foreignObject for rich tooltips inside Recharts without external positioning libraries
 - [Phase 08]: Team-scoped annotations by default to prevent chart clutter on multi-team transactions
+- [Phase 07.1]: Per-period accumulation only for backfill - live snapshots unchanged to avoid regression
+- [Phase 07.1]: Pitching components remapped at rate calculation time preserving raw names in components_json
+
+### Roadmap Evolution
+
+- Phase 07.1 inserted after Phase 7: Historical Stats Accumulation & Dynamic Categories (URGENT) — ESPN backfill produces identical standings across all weeks because `valuesByStat` returns full-season cumulative stats. Fix: accumulate per-period player stats (statSplitTypeId=5), filter active roster, use league-defined scoring categories.
 
 ### Pending Todos
 

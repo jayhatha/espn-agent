@@ -71,7 +71,7 @@ Plans:
   3. Rate stats use component-based math (accumulate H/AB, ER/OUTS, not average rates)
   4. League-defined scoring categories used for ranking (from league_settings_version)
   5. Frontend trends page uses dynamic categories from API, not hardcoded list
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 07.1-01-PLAN.md — Backend per-period player stat accumulation, rate stat component math, league categories endpoint
