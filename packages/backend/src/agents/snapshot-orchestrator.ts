@@ -2,9 +2,10 @@ import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import crypto from "crypto";
-import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, type ESPNFreeAgent, type ESPNTransaction } from "../adapters/espn.js";
+import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, ESPN_STAT_MAP } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { calculateFinalRate } from "../../../shared/dist/index.js";
 
 /**
  * Snapshot Orchestrator Agent
@@ -19,6 +20,7 @@ export interface SnapshotJobOptions {
   snapshotDate: string; // DATE in ISO format
   espnAuth?: ESPNAuthCookies;
   forceFresh?: boolean;
+  prefetchedData?: any; // Pre-fetched ESPN response data (used by backfill to avoid re-fetching)
 }
 
 export class SnapshotOrchestratorAgent {
@@ -37,7 +39,7 @@ export class SnapshotOrchestratorAgent {
    * Execute daily snapshot job
    */
   async executeSnapshot(options: SnapshotJobOptions): Promise<void> {
-    const { leagueId, snapshotDate, espnAuth, forceFresh } = options;
+    const { leagueId, snapshotDate, espnAuth, forceFresh, prefetchedData } = options;
 
     this.logger?.info({ leagueId, snapshotDate }, "Starting snapshot job");
 
@@ -67,34 +69,18 @@ export class SnapshotOrchestratorAgent {
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
 
-      // 2. Fetch ESPN data (including kona_player_info for free agents)
-      const espnData = await this.espnAdapter.fetchLeague({
-        leagueId: league.espn_league_id,
-        season: league.season,
-        auth: espnAuth,
-        views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
-        xFantasyFilter: {
-          players: {
-            limit: 1500,
-            sortDraftRanks: {
-              sortPriority: 100,
-              sortAsc: true,
-              value: "STANDARD",
-            },
-          },
-        },
-      });
-
-      // Archive raw payload
-      await this.db
-        .insertInto("league_raw_payload")
-        .values({
-          league_id: leagueId,
-          fetched_at: espnData.fetchedAt,
-          endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
+      // 2. Use pre-fetched data (backfill) or fetch fresh from ESPN
+      let rawData: any;
+      if (prefetchedData) {
+        rawData = prefetchedData;
+        this.logger?.info({ leagueId, snapshotDate }, "Using pre-fetched ESPN data");
+      } else {
+        const espnData = await this.espnAdapter.fetchLeague({
+          leagueId: league.espn_league_id,
+          season: league.season,
+          auth: espnAuth,
           views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
-          scoring_period_id: null,
-          x_fantasy_filter: {
+          xFantasyFilter: {
             players: {
               limit: 1500,
               sortDraftRanks: {
@@ -103,14 +89,37 @@ export class SnapshotOrchestratorAgent {
                 value: "STANDARD",
               },
             },
-          } as any,
-          response_json: espnData.data as any,
-          schema_fingerprint: espnData.schemaFingerprint,
-        })
-        .execute();
+          },
+        });
+        rawData = espnData.data;
+
+        // Archive raw payload (only for fresh fetches, not backfill)
+        await this.db
+          .insertInto("league_raw_payload")
+          .values({
+            league_id: leagueId,
+            fetched_at: espnData.fetchedAt,
+            endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
+            views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+            scoring_period_id: null,
+            x_fantasy_filter: {
+              players: {
+                limit: 1500,
+                sortDraftRanks: {
+                  sortPriority: 100,
+                  sortAsc: true,
+                  value: "STANDARD",
+                },
+              },
+            } as any,
+            response_json: espnData.data as any,
+            schema_fingerprint: espnData.schemaFingerprint,
+          })
+          .execute();
+      }
 
       // 3. Normalize data
-      const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
+      const normalized = this.espnAdapter.normalizeLeagueData(rawData);
 
       // 4. Determine settings version
       const settingsVersionId = await this.getOrCreateSettingsVersion(
@@ -437,6 +446,208 @@ export class SnapshotOrchestratorAgent {
     this.logger?.info(
       { leagueId, numCategories: categories.length, numTeams },
       "Current standings written",
+    );
+  }
+
+  /**
+   * Write current standings by accumulating per-period player stats
+   * Used by historical backfill to produce accurate week-by-week standings
+   *
+   * Extracts statSplitTypeId=5 (per-period) player stats, filters active roster,
+   * aggregates to team-level, and computes rate stats via component math
+   */
+  async writeCurrentStandingsFromPlayerStats(
+    trx: Kysely<Database>,
+    leagueId: number,
+    snapshotDate: string,
+    rawTeamsData: any[],
+    espnTeamIdToDbId: Map<number, number>,
+    categories: ESPNScoringCategory[],
+    scoringPeriodId: number,
+  ): Promise<void> {
+    // Delete existing standings for this snapshot
+    await trx
+      .deleteFrom("team_daily_category_totals")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+    await trx
+      .deleteFrom("team_daily_category_ranks")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+    await trx
+      .deleteFrom("team_daily_overall")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+
+    // Process each team
+    const teamCategoryValues: Array<{
+      dbTeamId: number;
+      categoryValues: Map<string, number>;
+      components: Record<string, number>;
+    }> = [];
+
+    for (const team of rawTeamsData) {
+      const dbTeamId = espnTeamIdToDbId.get(team.id);
+      if (!dbTeamId) continue;
+
+      // Get active roster entries (lineupSlotId 0-15, exclude 16=bench, 17=IL, 19=NA)
+      const rosterEntries = team.roster?.entries || [];
+      const activeRoster = rosterEntries.filter((entry: any) => entry.lineupSlotId <= 15);
+
+      // Accumulate components from all active players
+      const teamComponents: Record<string, number> = {};
+
+      for (const entry of activeRoster) {
+        // Find per-period stats (statSplitTypeId=5)
+        const playerStats = entry.playerPoolEntry?.player?.stats || [];
+        const periodStats = playerStats.find(
+          (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
+        );
+
+        if (!periodStats || !periodStats.stats) {
+          // No stats for this player in this period - zero contribution
+          continue;
+        }
+
+        // Accumulate stats from this player
+        for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
+          const espnStatId = parseInt(espnStatIdStr, 10);
+          const statInfo = ESPN_STAT_MAP[espnStatId];
+
+          if (!statInfo) continue; // Unknown stat, skip
+
+          const statKey = statInfo.key;
+          const statValue = typeof value === "number" ? value : 0;
+
+          // Special handling for OUTS → IP conversion
+          if (statKey === "OUTS") {
+            const ip = statValue / 3;
+            teamComponents.IP = (teamComponents.IP || 0) + ip;
+          } else {
+            teamComponents[statKey] = (teamComponents[statKey] || 0) + statValue;
+          }
+        }
+      }
+
+      // Compute category values from accumulated components
+      const categoryValues = new Map<string, number>();
+
+      for (const cat of categories) {
+        let value = 0;
+
+        if (cat.type === "COUNTING") {
+          // For counting stats, use accumulated component directly
+          value = teamComponents[cat.statKey] || 0;
+        } else if (cat.type === "RATE" && cat.formulaId) {
+          // For rate stats, compute using component math
+          // Special handling for pitching rate stats (need to remap HA->H, BBA->BB)
+          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+
+          if (isPitchingRate) {
+            // Build pitching-specific components for formula
+            const pitchingRateComponents = {
+              H: teamComponents.HA || 0,   // Hits Allowed -> H for WHIP
+              BB: teamComponents.BBA || 0, // Walks Allowed -> BB for WHIP
+              IP: teamComponents.IP || 0,
+              ER: teamComponents.ER || 0,
+              K: teamComponents.K || 0,
+            };
+            value = calculateFinalRate(cat.formulaId, {}, pitchingRateComponents);
+          } else {
+            // Batting rate stats - components already have correct keys
+            value = calculateFinalRate(cat.formulaId, {}, teamComponents);
+          }
+        }
+
+        categoryValues.set(cat.statKey, value);
+      }
+
+      teamCategoryValues.push({ dbTeamId, categoryValues, components: teamComponents });
+    }
+
+    // Write category totals for each team
+    for (const { dbTeamId, categoryValues, components } of teamCategoryValues) {
+      for (const cat of categories) {
+        const value = categoryValues.get(cat.statKey) || 0;
+        await trx
+          .insertInto("team_daily_category_totals")
+          .values({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: dbTeamId,
+            category_id: cat.statKey,
+            value,
+            components_json: components as any,
+          })
+          .execute();
+      }
+    }
+
+    // Rank teams per category and compute roto points
+    const numTeams = teamCategoryValues.length;
+    const teamOverallPoints = new Map<number, number>();
+
+    for (const cat of categories) {
+      const teamValues = teamCategoryValues.map((tv) => ({
+        dbTeamId: tv.dbTeamId,
+        value: tv.categoryValues.get(cat.statKey) || 0,
+      }));
+
+      // Sort by direction
+      teamValues.sort((a, b) =>
+        cat.direction === "LOWER_BETTER"
+          ? a.value - b.value
+          : b.value - a.value,
+      );
+
+      for (let i = 0; i < teamValues.length; i++) {
+        const rank = i + 1;
+        const rotoPoints = numTeams - rank + 1;
+        const { dbTeamId } = teamValues[i];
+
+        teamOverallPoints.set(
+          dbTeamId,
+          (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
+        );
+
+        await trx
+          .insertInto("team_daily_category_ranks")
+          .values({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: dbTeamId,
+            category_id: cat.statKey,
+            rank,
+            roto_points: rotoPoints,
+          })
+          .execute();
+      }
+    }
+
+    // Write overall standings
+    const overallRankings = Array.from(teamOverallPoints.entries())
+      .map(([teamId, points]) => ({ teamId, points }))
+      .sort((a, b) => b.points - a.points);
+
+    for (let i = 0; i < overallRankings.length; i++) {
+      await trx
+        .insertInto("team_daily_overall")
+        .values({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: overallRankings[i].teamId,
+          overall_points: overallRankings[i].points,
+          overall_rank: i + 1,
+        })
+        .execute();
+    }
+
+    this.logger?.info(
+      { leagueId, scoringPeriodId, numCategories: categories.length, numTeams },
+      "Per-period standings written from player stats",
     );
   }
 

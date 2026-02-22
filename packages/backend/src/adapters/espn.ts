@@ -116,7 +116,7 @@ export interface ESPNLeagueData {
  * ESPN Baseball stat ID → canonical stat key mapping
  * Source: https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/constant.py
  */
-const ESPN_STAT_MAP: Record<number, { key: string; name: string; type: "COUNTING" | "RATE"; formulaId?: string; requiredComponents?: string[] }> = {
+export const ESPN_STAT_MAP: Record<number, { key: string; name: string; type: "COUNTING" | "RATE"; formulaId?: string; requiredComponents?: string[] }> = {
   // Batting
   0: { key: "AB", name: "At Bats", type: "COUNTING" },
   1: { key: "H", name: "Hits", type: "COUNTING" },
@@ -163,7 +163,7 @@ const ESPN_STAT_MAP: Record<number, { key: string; name: string; type: "COUNTING
 };
 
 /** ESPN lineup slot ID → position label */
-const ESPN_LINEUP_SLOT_MAP: Record<number, string> = {
+export const ESPN_LINEUP_SLOT_MAP: Record<number, string> = {
   0: "C", 1: "1B", 2: "2B", 3: "3B", 4: "SS",
   5: "OF", 6: "LF", 7: "CF", 8: "RF", 9: "DH",
   10: "DH", 11: "IF", 12: "UTIL", 13: "P",
