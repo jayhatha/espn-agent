@@ -2,7 +2,7 @@ import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import crypto from "crypto";
-import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
+import { ESPNAdapter, type ESPNAuthCookies, ESPN_STAT_MAP } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "./snapshot-orchestrator.js";
 
 /**
@@ -153,6 +153,23 @@ export class HistoricalBackfillAgent {
                 categories, scoringPeriodId, previousSnapshotDate,
               );
             });
+
+            // Log comparison of accumulated vs ESPN team-level totals for key counting stats
+            const keyCountingStats = [20, 5, 21, 23, 48, 57]; // R, HR, RBI, SB, K, SV
+            for (const team of rawTeams) {
+              const vbs = team.valuesByStat || {};
+              const sampleStats: Record<string, { espn: number }> = {};
+              for (const statId of keyCountingStats) {
+                const statInfo = ESPN_STAT_MAP[statId];
+                if (statInfo && vbs[statId] !== undefined) {
+                  sampleStats[statInfo.key] = { espn: Math.round(vbs[statId] * 100) / 100 };
+                }
+              }
+              this.logger?.debug(
+                { teamId: team.id, scoringPeriodId, espnTeamTotals: sampleStats },
+                "ESPN team-level valuesByStat for comparison",
+              );
+            }
           }
 
           // Transaction deduplication (if transactions exist in normalized data)
