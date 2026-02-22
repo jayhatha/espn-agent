@@ -381,7 +381,7 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Rank teams per category and compute roto points
+    // Rank teams per category and compute roto points (with tie handling)
     const numTeams = teams.length;
     const teamOverallPoints = new Map<number, number>();
 
@@ -400,11 +400,11 @@ export class SnapshotOrchestratorAgent {
           : b.value - a.value,
       );
 
-      for (let i = 0; i < teamValues.length; i++) {
-        const rank = i + 1;
-        const rotoPoints = numTeams - rank + 1;
-        const { dbTeamId } = teamValues[i];
+      // Assign ranks and roto points with tie handling:
+      // Tied teams share the average of the positions they occupy.
+      const ranked = this.assignRanksWithTies(teamValues, numTeams);
 
+      for (const { dbTeamId, rank, rotoPoints } of ranked) {
         teamOverallPoints.set(
           dbTeamId,
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
@@ -424,12 +424,21 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Write overall standings
+    // Write overall standings (with tie handling for overall rank)
     const overallRankings = Array.from(teamOverallPoints.entries())
       .map(([teamId, points]) => ({ teamId, points }))
       .sort((a, b) => b.points - a.points);
 
     for (let i = 0; i < overallRankings.length; i++) {
+      // Compute overall rank with ties
+      let rank = i + 1;
+      if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
+        // Find the first team with this point total to get the tied rank
+        let j = i;
+        while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
+        rank = j + 1;
+      }
+
       await trx
         .insertInto("team_daily_overall")
         .values({
@@ -437,7 +446,7 @@ export class SnapshotOrchestratorAgent {
           snapshot_date: snapshotDate,
           team_id: overallRankings[i].teamId,
           overall_points: overallRankings[i].points,
-          overall_rank: i + 1,
+          overall_rank: rank,
         })
         .execute();
     }
@@ -464,25 +473,11 @@ export class SnapshotOrchestratorAgent {
     categories: ESPNScoringCategory[],
     scoringPeriodId: number,
     previousSnapshotDate?: string,
+    benchCountsForStats: boolean = true,
   ): Promise<void> {
-    // Delete existing standings for this snapshot
-    await trx
-      .deleteFrom("team_daily_category_totals")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-    await trx
-      .deleteFrom("team_daily_category_ranks")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-    await trx
-      .deleteFrom("team_daily_overall")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-
-    // Fetch previous snapshot's cumulative totals for accumulation
+    // Fetch previous snapshot's cumulative totals BEFORE deleting current snapshot.
+    // When accumulating within the same week (previousSnapshotDate === snapshotDate),
+    // we must read the prior data before it gets deleted.
     const priorComponentsMap = new Map<number, Record<string, number>>();
 
     if (previousSnapshotDate) {
@@ -509,6 +504,23 @@ export class SnapshotOrchestratorAgent {
       );
     }
 
+    // Delete existing standings for this snapshot (after reading prior data)
+    await trx
+      .deleteFrom("team_daily_category_totals")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+    await trx
+      .deleteFrom("team_daily_category_ranks")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+    await trx
+      .deleteFrom("team_daily_overall")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+
     // Process each team
     const teamCategoryValues: Array<{
       dbTeamId: number;
@@ -520,11 +532,13 @@ export class SnapshotOrchestratorAgent {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
-      // Get counting roster entries (include bench=16, exclude IL=17, NA=19)
+      // Get counting roster entries — exclude IL (17) and NA (19) always.
+      // For leagues with daily lineups (lineupLocktimeType=INDIVIDUAL_GAME),
+      // also exclude bench (16) since only active lineup stats count.
       const rosterEntries = team.roster?.entries || [];
-      // Include all rostered players except IL (17) and NA (19) — in roto, bench stats count
+      const maxSlotId = benchCountsForStats ? 16 : 15;
       const countingRoster = rosterEntries.filter(
-        (entry: any) => entry.lineupSlotId !== undefined && entry.lineupSlotId <= 16
+        (entry: any) => entry.lineupSlotId !== undefined && entry.lineupSlotId <= maxSlotId
       );
 
       // Accumulate this week's components from all counting players
@@ -629,7 +643,7 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Rank teams per category and compute roto points
+    // Rank teams per category and compute roto points (with tie handling)
     const numTeams = teamCategoryValues.length;
     const teamOverallPoints = new Map<number, number>();
 
@@ -646,11 +660,10 @@ export class SnapshotOrchestratorAgent {
           : b.value - a.value,
       );
 
-      for (let i = 0; i < teamValues.length; i++) {
-        const rank = i + 1;
-        const rotoPoints = numTeams - rank + 1;
-        const { dbTeamId } = teamValues[i];
+      // Assign ranks and roto points with tie handling
+      const ranked = this.assignRanksWithTies(teamValues, numTeams);
 
+      for (const { dbTeamId, rank, rotoPoints } of ranked) {
         teamOverallPoints.set(
           dbTeamId,
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
@@ -670,12 +683,19 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Write overall standings
+    // Write overall standings (with tie handling for overall rank)
     const overallRankings = Array.from(teamOverallPoints.entries())
       .map(([teamId, points]) => ({ teamId, points }))
       .sort((a, b) => b.points - a.points);
 
     for (let i = 0; i < overallRankings.length; i++) {
+      let rank = i + 1;
+      if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
+        let j = i;
+        while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
+        rank = j + 1;
+      }
+
       await trx
         .insertInto("team_daily_overall")
         .values({
@@ -683,7 +703,7 @@ export class SnapshotOrchestratorAgent {
           snapshot_date: snapshotDate,
           team_id: overallRankings[i].teamId,
           overall_points: overallRankings[i].points,
-          overall_rank: i + 1,
+          overall_rank: rank,
         })
         .execute();
     }
@@ -692,6 +712,42 @@ export class SnapshotOrchestratorAgent {
       { leagueId, scoringPeriodId, numCategories: categories.length, numTeams },
       "Per-period standings written from player stats",
     );
+  }
+
+  /**
+   * Assign ranks and roto points with tie handling.
+   * Tied teams (same value) share the average of the positions they occupy.
+   * e.g. Two teams tied for 1st in a 10-team league: each gets (10+9)/2 = 9.5 points.
+   * Input must already be sorted in the desired ranking order.
+   */
+  private assignRanksWithTies(
+    sorted: Array<{ dbTeamId: number; value: number }>,
+    numTeams: number,
+  ): Array<{ dbTeamId: number; rank: number; rotoPoints: number }> {
+    const result: Array<{ dbTeamId: number; rank: number; rotoPoints: number }> = [];
+    let i = 0;
+    while (i < sorted.length) {
+      // Find the group of teams tied at this value
+      let j = i;
+      while (j < sorted.length && sorted[j].value === sorted[i].value) {
+        j++;
+      }
+      // Positions i..j-1 are tied. Rank = i+1 (first position in the group).
+      // Roto points = average of (numTeams - pos) for pos = i..j-1
+      const tiedCount = j - i;
+      let totalPoints = 0;
+      for (let k = i; k < j; k++) {
+        totalPoints += numTeams - k; // numTeams - rank + 1 where rank = k+1
+      }
+      const sharedPoints = totalPoints / tiedCount;
+      const rank = i + 1;
+
+      for (let k = i; k < j; k++) {
+        result.push({ dbTeamId: sorted[k].dbTeamId, rank, rotoPoints: sharedPoints });
+      }
+      i = j;
+    }
+    return result;
   }
 
   private async getOrCreateSettingsVersion(

@@ -2,7 +2,7 @@ import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import crypto from "crypto";
-import { ESPNAdapter, type ESPNAuthCookies, ESPN_STAT_MAP } from "../adapters/espn.js";
+import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "./snapshot-orchestrator.js";
 
 /**
@@ -90,107 +90,163 @@ export class HistoricalBackfillAgent {
       // Track previous snapshot date for cumulative accumulation
       let previousSnapshotDate: string | undefined = undefined;
 
+      // Determine if bench stats count toward team totals.
+      // Leagues with lineupLocktimeType=INDIVIDUAL_GAME have daily lineups
+      // where only active lineup slots count. Will be resolved on first ESPN fetch.
+      let benchCountsForStats: boolean | undefined = undefined;
+
+      // Cache espnTeamId → dbTeamId map (built once on first week, reused for all)
+      let cachedTeamIdMap: Map<number, number> | undefined = undefined;
+
+      // ESPN baseball scoring periods are DAILY (not weekly).
+      // Each "week" we show = 7 consecutive daily scoring periods.
+      // We fetch all 7 days per week, accumulate stats, and save one weekly snapshot.
+      const DAYS_PER_WEEK = 7;
+
+      // Determine the final scoring period to avoid fetching beyond season end.
+      // ESPN's game-level API returns currentScoringPeriod.id (e.g. 196 for 2024).
+      const finalScoringPeriod = await this.espnAdapter.getFinalScoringPeriod(season);
+      this.logger?.info({ finalScoringPeriod, season }, "Resolved final scoring period");
+
       // Process each week sequentially
-      for (let scoringPeriodId = startWeek; scoringPeriodId <= endWeek; scoringPeriodId++) {
+      for (let week = startWeek; week <= endWeek; week++) {
         this.logger?.info(
-          { leagueId, season, scoringPeriodId, progress: `${scoringPeriodId - startWeek + 1}/${totalWeeks}` },
+          { leagueId, season, week, progress: `${week - startWeek + 1}/${totalWeeks}` },
           "Processing historical week",
         );
 
         try {
-          // Fetch historical week from ESPN (throttle is inside adapter)
-          const espnData = await this.espnAdapter.fetchHistoricalWeek({
-            leagueId: league.espn_league_id,
-            season,
-            scoringPeriodId,
-            auth: espnAuth,
-          });
+          // Compute the 7 daily scoring periods for this week
+          const firstDay = (week - 1) * DAYS_PER_WEEK + 1;
+          let lastDay = week * DAYS_PER_WEEK;
 
-          // Compute snapshot date: approximate using April 1 + (week - 1) * 7 days
-          // This is a rough heuristic - the important part is unique dates per week
+          // Clip to final scoring period so we don't fetch beyond season end
+          if (finalScoringPeriod && lastDay > finalScoringPeriod) {
+            lastDay = finalScoringPeriod;
+          }
+
+          // Skip this week entirely if first day is past season end
+          if (finalScoringPeriod && firstDay > finalScoringPeriod) {
+            this.logger?.info(
+              { week, firstDay, finalScoringPeriod },
+              "Skipping week — beyond final scoring period",
+            );
+            weeksSkipped++;
+            continue;
+          }
+
+          // Compute snapshot date: April 1 + (week - 1) * 7 days
           const baseDate = new Date(season, 3, 1); // April 1 of the season year
-          const daysOffset = (scoringPeriodId - 1) * 7;
+          const daysOffset = (week - 1) * DAYS_PER_WEEK;
           const snapshotDate = new Date(baseDate.getTime() + daysOffset * 24 * 60 * 60 * 1000)
             .toISOString()
             .split("T")[0];
 
-          // Normalize data
-          const normalizedData = this.espnAdapter.normalizeLeagueData(espnData.data);
+          let latestEspnData: any = null;
+          let latestNormalizedData: any = null;
 
-          // Reuse snapshot orchestrator to write snapshot data, passing pre-fetched data
-          // to avoid re-fetching from ESPN (which would return current-state, not historical)
-          await this.snapshotOrchestrator.executeSnapshot({
-            leagueId,
-            snapshotDate,
-            espnAuth,
-            forceFresh: true,
-            prefetchedData: espnData.data,
-          });
+          // Fetch and accumulate each daily scoring period within this week
+          for (let day = firstDay; day <= lastDay; day++) {
+            this.logger?.debug(
+              { leagueId, season, week, day, snapshotDate },
+              "Fetching daily scoring period",
+            );
 
-          // Overwrite standings with per-period player stats accumulation
-          // (executeSnapshot uses team-level valuesByStat which returns cumulative totals)
-          const categories = normalizedData.settings.categories;
-
-          if (categories.length > 0) {
-            // Build espnTeamIdToDbId map
-            const espnTeamIdToDbId = new Map<number, number>();
-            for (const team of normalizedData.teams) {
-              const dbTeam = await this.db
-                .selectFrom("team")
-                .select("id")
-                .where("league_id", "=", leagueId)
-                .where("espn_team_id", "=", team.id)
-                .executeTakeFirst();
-              if (dbTeam) espnTeamIdToDbId.set(team.id, dbTeam.id);
-            }
-
-            // Use raw teams data (not normalized) since we need playerPoolEntry.player.stats[]
-            const rawTeams = (espnData.data as any).teams || [];
-
-            await this.db.transaction().execute(async (trx) => {
-              await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
-                trx, leagueId, snapshotDate, rawTeams, espnTeamIdToDbId,
-                categories, scoringPeriodId, previousSnapshotDate,
-              );
+            const espnData = await this.espnAdapter.fetchHistoricalWeek({
+              leagueId: league.espn_league_id,
+              season,
+              scoringPeriodId: day,
+              auth: espnAuth,
             });
 
-            // Log comparison of accumulated vs ESPN team-level totals for key counting stats
-            const keyCountingStats = [20, 5, 21, 23, 48, 57]; // R, HR, RBI, SB, K, SV
-            for (const team of rawTeams) {
-              const vbs = team.valuesByStat || {};
-              const sampleStats: Record<string, { espn: number }> = {};
-              for (const statId of keyCountingStats) {
-                const statInfo = ESPN_STAT_MAP[statId];
-                if (statInfo && vbs[statId] !== undefined) {
-                  sampleStats[statInfo.key] = { espn: Math.round(vbs[statId] * 100) / 100 };
+            latestEspnData = espnData;
+
+            if (day === firstDay) {
+              // First day of week: set up snapshot infrastructure (roster, raw payload, etc.)
+              latestNormalizedData = this.espnAdapter.normalizeLeagueData(espnData.data);
+
+              // Resolve benchCountsForStats on first fetch (once per backfill)
+              if (benchCountsForStats === undefined) {
+                const rosterSettings = (espnData.data as any)?.settings?.rosterSettings;
+                const locktimeType = rosterSettings?.lineupLocktimeType;
+                // INDIVIDUAL_GAME = daily lineups; only active lineup counts
+                benchCountsForStats = locktimeType !== "INDIVIDUAL_GAME";
+                this.logger?.info(
+                  { lineupLocktimeType: locktimeType, benchCountsForStats },
+                  "Resolved bench stat counting from league settings",
+                );
+              }
+
+              await this.snapshotOrchestrator.executeSnapshot({
+                leagueId,
+                snapshotDate,
+                espnAuth,
+                forceFresh: true,
+                prefetchedData: espnData.data,
+              });
+            }
+
+            // Accumulate this day's per-period player stats into the weekly snapshot.
+            // writeCurrentStandingsFromPlayerStats reads previousSnapshotDate's cumulative
+            // components, adds this day's stats, and saves to snapshotDate.
+            // Day 1: reads previous WEEK's cumulative (or nothing for week 1)
+            // Days 2-7: reads current week's snapshot (accumulating within the week)
+            const normalizedData = latestNormalizedData || this.espnAdapter.normalizeLeagueData(espnData.data);
+            const categories = normalizedData.settings.categories;
+
+            if (categories.length > 0) {
+              // Build espnTeamIdToDbId map once, reuse across all days/weeks
+              if (!cachedTeamIdMap) {
+                cachedTeamIdMap = new Map<number, number>();
+                for (const team of normalizedData.teams) {
+                  const dbTeam = await this.db
+                    .selectFrom("team")
+                    .select("id")
+                    .where("league_id", "=", leagueId)
+                    .where("espn_team_id", "=", team.id)
+                    .executeTakeFirst();
+                  if (dbTeam) cachedTeamIdMap.set(team.id, dbTeam.id);
                 }
               }
-              this.logger?.debug(
-                { teamId: team.id, scoringPeriodId, espnTeamTotals: sampleStats },
-                "ESPN team-level valuesByStat for comparison",
-              );
+
+              const rawTeams = (espnData.data as any).teams || [];
+
+              await this.db.transaction().execute(async (trx) => {
+                await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
+                  trx, leagueId, snapshotDate, rawTeams, cachedTeamIdMap!,
+                  categories, day, previousSnapshotDate, benchCountsForStats!,
+                );
+              });
+
+              // After day 1, point previousSnapshotDate to current week so
+              // subsequent days accumulate within the same weekly snapshot
+              if (day === firstDay) {
+                previousSnapshotDate = snapshotDate;
+              }
             }
           }
 
-          // Transaction deduplication (if transactions exist in normalized data)
-          if (normalizedData.transactions && normalizedData.transactions.length > 0) {
-            await this.deduplicateAndInsertTransactions(
-              leagueId,
-              normalizedData.transactions as any[],
-            );
+          // Transaction deduplication from the last day's data
+          if (latestEspnData && latestNormalizedData) {
+            if (latestNormalizedData.transactions && latestNormalizedData.transactions.length > 0) {
+              await this.deduplicateAndInsertTransactions(
+                leagueId,
+                latestNormalizedData.transactions as any[],
+              );
+            }
           }
 
           weeksProcessed++;
-          previousSnapshotDate = snapshotDate;
+          // previousSnapshotDate already set to this week's date after day 1
 
           // Update progress
           if (onProgress) {
             await onProgress({
               stage: "processing",
-              completedWeeks: scoringPeriodId - startWeek + 1,
+              completedWeeks: week - startWeek + 1,
               totalWeeks,
-              currentWeek: scoringPeriodId,
-              percentage: Math.round(((scoringPeriodId - startWeek + 1) / totalWeeks) * 100),
+              currentWeek: week,
+              percentage: Math.round(((week - startWeek + 1) / totalWeeks) * 100),
               errors: errors.length > 0 ? errors : undefined,
             });
           }
@@ -198,23 +254,164 @@ export class HistoricalBackfillAgent {
           // Log error and continue to next week (don't abort entire backfill)
           const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger?.error(
-            { error, leagueId, season, scoringPeriodId },
+            { error, leagueId, season, week },
             "Failed to process historical week",
           );
-          errors.push(`Week ${scoringPeriodId}: ${errorMessage}`);
+          errors.push(`Week ${week}: ${errorMessage}`);
           weeksFailed++;
 
           // Update progress with error
           if (onProgress) {
             await onProgress({
               stage: "processing",
-              completedWeeks: scoringPeriodId - startWeek + 1,
+              completedWeeks: week - startWeek + 1,
               totalWeeks,
-              currentWeek: scoringPeriodId,
-              percentage: Math.round(((scoringPeriodId - startWeek + 1) / totalWeeks) * 100),
+              currentWeek: week,
+              percentage: Math.round(((week - startWeek + 1) / totalWeeks) * 100),
               errors: errors.length > 0 ? errors : undefined,
             });
           }
+        }
+      }
+
+      // Correct final snapshot with ESPN's official valuesByStat totals.
+      // Per-period stats miss ~1% due to MLB stat corrections not being
+      // retroactively applied to splitType=5 data. valuesByStat is ground truth.
+      if (previousSnapshotDate && cachedTeamIdMap) {
+        try {
+          const lastNormalized = this.espnAdapter.normalizeLeagueData(
+            (await this.espnAdapter.fetchHistoricalWeek({
+              leagueId: league.espn_league_id,
+              season,
+              scoringPeriodId: finalScoringPeriod || endWeek * 7,
+              auth: espnAuth,
+            })).data,
+          );
+
+          const categories = lastNormalized.settings.categories;
+          const countingCatKeys = new Set(
+            categories.filter((c) => c.type === "COUNTING").map((c) => c.statKey),
+          );
+
+          // Update counting stat values with ESPN ground truth
+          let corrected = 0;
+          for (const team of lastNormalized.teams) {
+            const dbTeamId = cachedTeamIdMap.get(team.id);
+            if (!dbTeamId) continue;
+
+            for (const cat of categories) {
+              if (!countingCatKeys.has(cat.statKey)) continue;
+
+              const espnValue = team.statValues[cat.espnStatId] ?? 0;
+              if (espnValue === 0) continue;
+
+              await this.db
+                .updateTable("team_daily_category_totals")
+                .set({ value: espnValue })
+                .where("league_id", "=", leagueId)
+                .where("snapshot_date", "=", previousSnapshotDate)
+                .where("team_id", "=", dbTeamId)
+                .where("category_id", "=", cat.statKey)
+                .execute();
+              corrected++;
+            }
+          }
+
+          // Recompute ranks and overall standings from corrected values
+          await this.db
+            .deleteFrom("team_daily_category_ranks")
+            .where("league_id", "=", leagueId)
+            .where("snapshot_date", "=", previousSnapshotDate)
+            .execute();
+          await this.db
+            .deleteFrom("team_daily_overall")
+            .where("league_id", "=", leagueId)
+            .where("snapshot_date", "=", previousSnapshotDate)
+            .execute();
+
+          const numTeams = lastNormalized.teams.length;
+          const teamOverallPoints = new Map<number, number>();
+
+          for (const cat of categories) {
+            // Read corrected values
+            const rows = await this.db
+              .selectFrom("team_daily_category_totals")
+              .select(["team_id", "value"])
+              .where("league_id", "=", leagueId)
+              .where("snapshot_date", "=", previousSnapshotDate)
+              .where("category_id", "=", cat.statKey)
+              .execute();
+
+            // Sort and rank
+            const sorted = [...rows].sort((a, b) =>
+              cat.direction === "LOWER_BETTER"
+                ? a.value - b.value
+                : b.value - a.value,
+            );
+
+            // Assign ranks with tie handling
+            let i = 0;
+            while (i < sorted.length) {
+              let j = i;
+              while (j < sorted.length && sorted[j].value === sorted[i].value) j++;
+              const tiedCount = j - i;
+              const avgPoints = Array.from({ length: tiedCount }, (_, k) => numTeams - (i + k))
+                .reduce((sum, p) => sum + p, 0) / tiedCount;
+              for (let k = i; k < j; k++) {
+                const rank = i + 1;
+                teamOverallPoints.set(
+                  sorted[k].team_id,
+                  (teamOverallPoints.get(sorted[k].team_id) || 0) + avgPoints,
+                );
+                await this.db
+                  .insertInto("team_daily_category_ranks")
+                  .values({
+                    league_id: leagueId,
+                    snapshot_date: previousSnapshotDate,
+                    team_id: sorted[k].team_id,
+                    category_id: cat.statKey,
+                    rank,
+                    roto_points: avgPoints,
+                  })
+                  .execute();
+              }
+              i = j;
+            }
+          }
+
+          // Write overall standings
+          const overallRankings = Array.from(teamOverallPoints.entries())
+            .map(([teamId, points]) => ({ teamId, points }))
+            .sort((a, b) => b.points - a.points);
+
+          for (let i = 0; i < overallRankings.length; i++) {
+            let rank = i + 1;
+            if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
+              let j = i;
+              while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
+              rank = j + 1;
+            }
+            await this.db
+              .insertInto("team_daily_overall")
+              .values({
+                league_id: leagueId,
+                snapshot_date: previousSnapshotDate,
+                team_id: overallRankings[i].teamId,
+                overall_points: overallRankings[i].points,
+                overall_rank: rank,
+              })
+              .execute();
+          }
+
+          this.logger?.info(
+            { leagueId, snapshotDate: previousSnapshotDate, corrected },
+            "Final snapshot corrected with valuesByStat ground truth",
+          );
+        } catch (error) {
+          this.logger?.warn(
+            { error, leagueId },
+            "Failed to correct final snapshot with valuesByStat (non-fatal)",
+          );
         }
       }
 
