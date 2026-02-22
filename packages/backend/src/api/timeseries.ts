@@ -338,6 +338,38 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
   );
 
+  // League categories
+  app.get(
+    "/api/leagues/:leagueId/categories",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { leagueId: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+
+      // Get the latest settings version for this league
+      const settingsVersion = await db
+        .selectFrom("league_settings_version")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .orderBy("effective_date", "desc")
+        .executeTakeFirst();
+
+      if (!settingsVersion) {
+        return reply.code(404).send({ error: "No settings found for this league" });
+      }
+
+      const categories = (settingsVersion.settings_json as any).categories || [];
+      return { categories };
+    },
+  );
+
   // Transaction annotations
   app.get(
     "/api/leagues/:leagueId/timeseries/annotations",

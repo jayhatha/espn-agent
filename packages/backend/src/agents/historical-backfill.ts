@@ -111,39 +111,46 @@ export class HistoricalBackfillAgent {
             .toISOString()
             .split("T")[0];
 
-          // Archive raw payload
-          await this.db
-            .insertInto("league_raw_payload")
-            .values({
-              league_id: leagueId,
-              fetched_at: espnData.fetchedAt,
-              endpoint: `/seasons/${season}/segments/0/leagues/${league.espn_league_id}`,
-              views: ["mSettings", "mTeam", "mRoster", "mStandings"],
-              scoring_period_id: scoringPeriodId,
-              x_fantasy_filter: null,
-              response_json: espnData.data,
-              schema_fingerprint: espnData.schemaFingerprint,
-            } as any) // Type assertion: DB auto-generates id (BIGSERIAL)
-            .onConflict((oc) =>
-              oc
-                .columns(["league_id", "fetched_at", "endpoint"])
-                .doUpdateSet({
-                  response_json: espnData.data,
-                  schema_fingerprint: espnData.schemaFingerprint,
-                }),
-            )
-            .execute();
-
           // Normalize data
           const normalizedData = this.espnAdapter.normalizeLeagueData(espnData.data);
 
-          // Reuse snapshot orchestrator to write snapshot data (handles idempotent writes)
+          // Reuse snapshot orchestrator to write snapshot data, passing pre-fetched data
+          // to avoid re-fetching from ESPN (which would return current-state, not historical)
           await this.snapshotOrchestrator.executeSnapshot({
             leagueId,
             snapshotDate,
             espnAuth,
             forceFresh: true,
+            prefetchedData: espnData.data,
           });
+
+          // Overwrite standings with per-period player stats accumulation
+          // (executeSnapshot uses team-level valuesByStat which returns cumulative totals)
+          const categories = normalizedData.settings.categories;
+
+          if (categories.length > 0) {
+            // Build espnTeamIdToDbId map
+            const espnTeamIdToDbId = new Map<number, number>();
+            for (const team of normalizedData.teams) {
+              const dbTeam = await this.db
+                .selectFrom("team")
+                .select("id")
+                .where("league_id", "=", leagueId)
+                .where("espn_team_id", "=", team.id)
+                .executeTakeFirst();
+              if (dbTeam) espnTeamIdToDbId.set(team.id, dbTeam.id);
+            }
+
+            // Use raw teams data (not normalized) since we need playerPoolEntry.player.stats[]
+            const rawTeams = (espnData.data as any).teams || [];
+
+            await this.db.transaction().execute(async (trx) => {
+              await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
+                trx, leagueId, snapshotDate, rawTeams, espnTeamIdToDbId,
+                categories, scoringPeriodId,
+              );
+            });
+          }
 
           // Transaction deduplication (if transactions exist in normalized data)
           if (normalizedData.transactions && normalizedData.transactions.length > 0) {
