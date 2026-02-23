@@ -64,7 +64,6 @@ Progress: [██████████] 100% (all v1.1 phases complete)
 | quick-05 | 9min | 2 | 4 |
 
 *Updated: 2026-02-23 after quick-05 completion*
-| Phase quick-5 P01 | 9 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
