@@ -1210,6 +1210,221 @@ export class TransactionImpactAgent {
   }
 
   /**
+   * Bootstrap confidence intervals for transaction impacts.
+   * Updates existing transaction_impact rows with CI data.
+   *
+   * Algorithm:
+   * 1. Get all transaction_impact rows for this team
+   * 2. For each impact, get the original player period stats
+   * 3. For numBootstraps iterations:
+   *    - Resample gained and lost player stats WITH REPLACEMENT
+   *    - Recompute counterfactual impact
+   *    - Record delta
+   * 4. Extract 2.5th and 97.5th percentiles as CI bounds
+   * 5. Flag uncertain if CI crosses zero or width > 2x point estimate
+   */
+  async bootstrapConfidenceIntervals(
+    leagueId: number,
+    season: number,
+    teamId: number,
+    numBootstraps: number = 200,
+  ): Promise<void> {
+    this.logger?.info({ leagueId, season, teamId, numBootstraps }, "Computing bootstrap confidence intervals");
+
+    const startDate = `${season}-04-01`;
+    const endDate = `${season}-10-31`;
+
+    // Get league categories
+    const categories = await this.getLeagueCategories(leagueId);
+    if (categories.length === 0) {
+      this.logger?.warn({ leagueId }, "No categories found");
+      return;
+    }
+
+    // Get final snapshot date
+    const finalSnapshotDate = await this.getFinalSnapshotDate(leagueId, season);
+    if (!finalSnapshotDate) {
+      this.logger?.warn({ leagueId, season }, "No final snapshot found");
+      return;
+    }
+
+    // Get final team components for ranking
+    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
+    const teamIds = Array.from(teamFinalComponents.keys());
+    const numTeams = teamIds.length;
+
+    // Get all transaction impacts for this team
+    const impacts = await this.db
+      .selectFrom("transaction_impact as ti")
+      .selectAll()
+      .where("ti.league_id", "=", leagueId)
+      .where("ti.team_id", "=", teamId)
+      .where("ti.effective_date", ">=", startDate)
+      .where("ti.effective_date", "<=", endDate)
+      .execute();
+
+    if (impacts.length === 0) {
+      this.logger?.info({ leagueId, teamId }, "No impacts found for team");
+      return;
+    }
+
+    // Process each impact
+    for (const impact of impacts) {
+      // Get original player period stats for gained player
+      const gainedPeriods = await this.db
+        .selectFrom("player_period_stats")
+        .select("components_json")
+        .where("league_id", "=", leagueId)
+        .where("player_id", "=", impact.player_gained_id)
+        .where("team_id", "=", teamId)
+        .where("lineup_slot_id", "<=", 15)
+        .where("snapshot_date", ">=", impact.effective_date)
+        .where("snapshot_date", "<=", finalSnapshotDate)
+        .execute();
+
+      const gainedComponents = gainedPeriods.map((p) => p.components_json as Record<string, number>);
+
+      // Get lost player period stats (if any)
+      let lostComponents: Record<string, number>[] = [];
+      if (impact.player_lost_id) {
+        const lostPeriods = await this.db
+          .selectFrom("player_period_stats")
+          .select("components_json")
+          .where("league_id", "=", leagueId)
+          .where("player_id", "=", impact.player_lost_id)
+          .where("lineup_slot_id", "<=", 15)
+          .where("snapshot_date", ">=", impact.effective_date)
+          .where("snapshot_date", "<=", finalSnapshotDate)
+          .execute();
+
+        lostComponents = lostPeriods.map((p) => p.components_json as Record<string, number>);
+      }
+
+      // Skip if no data to resample
+      if (gainedComponents.length === 0) {
+        this.logger?.debug({ impactId: impact.id, playerId: impact.player_gained_id }, "No period stats for gained player, skipping CI");
+        continue;
+      }
+
+      // Run bootstrap
+      const bootstrapDeltas: number[] = [];
+
+      for (let i = 0; i < numBootstraps; i++) {
+        // Resample gained player stats WITH REPLACEMENT
+        const resampledGained = this.resampleWithReplacement(gainedComponents);
+        const gainedSum = this.sumComponents(resampledGained);
+
+        // Resample lost player stats WITH REPLACEMENT
+        let lostSum: Record<string, number> = {};
+        if (lostComponents.length > 0) {
+          const resampledLost = this.resampleWithReplacement(lostComponents);
+          lostSum = this.sumComponents(resampledLost);
+        }
+
+        // Build counterfactual team components: actual - resampled_gained + resampled_lost
+        const actualComponents = { ...teamFinalComponents.get(teamId)! };
+        const counterfactualComponents = { ...actualComponents };
+
+        // Remove resampled gained
+        for (const [key, val] of Object.entries(gainedSum)) {
+          if (key in counterfactualComponents && typeof counterfactualComponents[key] === "number") {
+            counterfactualComponents[key] -= val;
+          }
+        }
+
+        // Add resampled lost
+        for (const [key, val] of Object.entries(lostSum)) {
+          if (typeof val === "number") {
+            counterfactualComponents[key] = (counterfactualComponents[key] || 0) + val;
+          }
+        }
+
+        // Recompute rate stats from components
+        for (const cat of categories) {
+          if (cat.type === "RATE" && cat.formulaId) {
+            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            let value = 0;
+            if (isPitchingRate) {
+              const pitchingComponents = {
+                H: counterfactualComponents.HA || 0,
+                BB: counterfactualComponents.BBA || 0,
+                IP: counterfactualComponents.IP || 0,
+                ER: counterfactualComponents.ER || 0,
+                K: counterfactualComponents.K || 0,
+              };
+              if (pitchingComponents.IP > 0) {
+                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+              }
+            } else {
+              value = calculateFinalRate(cat.formulaId, {}, counterfactualComponents);
+            }
+            counterfactualComponents[`_val_${cat.statKey}`] = value;
+          } else if (cat.type === "COUNTING") {
+            counterfactualComponents[`_val_${cat.statKey}`] = counterfactualComponents[cat.statKey] ?? 0;
+          }
+        }
+
+        // Re-rank league with counterfactual
+        const counterfactualLeague = new Map(teamFinalComponents);
+        counterfactualLeague.set(teamId, counterfactualComponents);
+        const counterfactualRotoPoints = this.computeRotoPointsFromComponents(
+          counterfactualLeague, categories, numTeams,
+        );
+
+        const actualRotoPoints = this.computeRotoPointsFromComponents(
+          teamFinalComponents, categories, numTeams,
+        );
+
+        const actualPoints = actualRotoPoints.get(teamId) || 0;
+        const counterfactualPoints = counterfactualRotoPoints.get(teamId) || 0;
+
+        const delta = actualPoints - counterfactualPoints;
+        bootstrapDeltas.push(delta);
+      }
+
+      // Sort and extract percentiles
+      bootstrapDeltas.sort((a, b) => a - b);
+      const ciLowIndex = Math.floor(numBootstraps * 0.025);
+      const ciHighIndex = Math.floor(numBootstraps * 0.975);
+      const ciLow = bootstrapDeltas[ciLowIndex];
+      const ciHigh = bootstrapDeltas[ciHighIndex];
+
+      // Determine uncertainty
+      const pointEstimate = impact.shapley_impact != null ? Number(impact.shapley_impact) : Number(impact.impact_roto_points);
+      const ciWidth = ciHigh - ciLow;
+      const crossesZero = ciLow < 0 && ciHigh > 0;
+      const wideTooWide = ciWidth > 2 * Math.abs(pointEstimate);
+      const isUncertain = crossesZero || wideTooWide;
+
+      // Update the transaction_impact row
+      await this.db
+        .updateTable("transaction_impact")
+        .set({
+          ci_low: ciLow,
+          ci_high: ciHigh,
+          is_uncertain: isUncertain,
+        })
+        .where("id", "=", impact.id)
+        .execute();
+    }
+
+    this.logger?.info({ leagueId, teamId, impactsProcessed: impacts.length }, "Bootstrap CI complete");
+  }
+
+  /**
+   * Resample array WITH REPLACEMENT (for bootstrap).
+   */
+  private resampleWithReplacement<T>(array: T[]): T[] {
+    const result: T[] = [];
+    const n = array.length;
+    for (let i = 0; i < n; i++) {
+      const randomIndex = Math.floor(Math.random() * n);
+      result.push(array[randomIndex]);
+    }
+    return result;
+  }
+
+  /**
    * Public API: Compute transaction impacts.
    * Delegates to Shapley-based implementation.
    */

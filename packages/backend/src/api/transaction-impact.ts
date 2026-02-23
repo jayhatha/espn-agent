@@ -19,7 +19,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
    */
   app.post<{
     Params: { leagueId: string };
-    Querystring: { season?: string };
+    Querystring: { season?: string; skipBootstrap?: string };
   }>(
     "/api/leagues/:leagueId/transaction-impacts/compute",
     {
@@ -28,6 +28,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const skipBootstrap = request.query.skipBootstrap === "true";
 
       const agent = new TransactionImpactAgent(db, request.log as any);
 
@@ -37,11 +38,25 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       // Step 2: Compute impacts
       const impactsComputed = await agent.computeImpacts(leagueId, season);
 
+      // Step 3: Compute bootstrap confidence intervals for all teams
+      if (!skipBootstrap) {
+        const teams = await db
+          .selectFrom("team")
+          .select("id")
+          .where("league_id", "=", leagueId)
+          .execute();
+
+        for (const team of teams) {
+          await agent.bootstrapConfidenceIntervals(leagueId, season, team.id, 200);
+        }
+      }
+
       return {
         success: true,
         season,
         totalMoves,
         impactsComputed,
+        bootstrapComputed: !skipBootstrap,
       };
     },
   );
@@ -78,6 +93,12 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           "ti.move_type",
           "ti.effective_date",
           "ti.impact_roto_points",
+          "ti.shapley_impact",
+          "ti.ci_low",
+          "ti.ci_high",
+          "ti.is_uncertain",
+          "ti.sgp_category_impacts",
+          "ti.replacement_level_impact",
           "ti.category_impacts",
           "ti.gained_components",
           "ti.lost_components",
@@ -94,13 +115,18 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
         .orderBy(
-          sortBy === "date" ? "ti.effective_date" : "ti.impact_roto_points",
+          sortBy === "impact"
+            ? (qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points")
+            : "ti.effective_date",
           sortBy === "date" ? "asc" : "desc",
         )
         .execute();
 
+      // Helper to get primary impact (Shapley if available, else legacy)
+      const primaryImpact = (i: any) => i.shapley_impact != null ? Number(i.shapley_impact) : Number(i.impact_roto_points);
+
       // Compute summary
-      const sumOfIndividualImpacts = impacts.reduce((sum, i) => sum + Number(i.impact_roto_points), 0);
+      const sumOfIndividualImpacts = impacts.reduce((sum, i) => sum + primaryImpact(i), 0);
       const avgImpactPerMove = impacts.length > 0 ? sumOfIndividualImpacts / impacts.length : 0;
       const bestMove = impacts.length > 0 ? impacts[0] : null;
       const worstMove = impacts.length > 0 ? impacts[impacts.length - 1] : null;
@@ -115,6 +141,12 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           moveType: i.move_type,
           effectiveDate: i.effective_date,
           impactRotoPoints: Number(i.impact_roto_points),
+          shapleyImpact: i.shapley_impact ? Number(i.shapley_impact) : null,
+          ciLow: i.ci_low ? Number(i.ci_low) : null,
+          ciHigh: i.ci_high ? Number(i.ci_high) : null,
+          isUncertain: i.is_uncertain ?? false,
+          sgpCategoryImpacts: i.sgp_category_impacts,
+          replacementLevelImpact: i.replacement_level_impact ? Number(i.replacement_level_impact) : null,
           playerGained: i.player_gained_id
             ? { id: i.player_gained_id, name: i.gained_player_name, positions: i.gained_player_positions }
             : null,
@@ -132,10 +164,10 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           avgImpactPerMove: Math.round(avgImpactPerMove * 100) / 100,
           sumOfIndividualImpacts: Math.round(sumOfIndividualImpacts * 100) / 100,
           bestMove: bestMove
-            ? { playerName: bestMove.gained_player_name, impact: Number(bestMove.impact_roto_points) }
+            ? { playerName: bestMove.gained_player_name, impact: primaryImpact(bestMove) }
             : null,
           worstMove: worstMove
-            ? { playerName: worstMove.gained_player_name, impact: Number(worstMove.impact_roto_points) }
+            ? { playerName: worstMove.gained_player_name, impact: primaryImpact(worstMove) }
             : null,
         },
       };
@@ -171,6 +203,13 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           "ti.id",
           "ti.effective_date",
           "ti.impact_roto_points",
+          "ti.shapley_impact",
+          "ti.ci_low",
+          "ti.ci_high",
+          "ti.is_uncertain",
+          "ti.sgp_category_impacts",
+          "ti.replacement_level_impact",
+          "ti.replacement_level_components",
           "ti.category_impacts",
           "ti.gained_components",
           "ti.is_incomplete",
@@ -183,7 +222,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .where("ti.move_type", "=", "draft")
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
-        .orderBy("ti.impact_roto_points", "desc")
+        .orderBy((qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"), "desc")
         .execute();
 
       // Check if each draft pick is still on the team (final roster snapshot)
@@ -205,7 +244,10 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
 
       const finalPlayerIds = new Set(finalRoster.map((r) => r.player_id));
 
-      const totalDraftValue = draftPicks.reduce((sum, d) => sum + Number(d.impact_roto_points), 0);
+      // Helper to get primary impact
+      const primaryImpact = (d: any) => d.shapley_impact != null ? Number(d.shapley_impact) : Number(d.impact_roto_points);
+
+      const totalDraftValue = draftPicks.reduce((sum, d) => sum + primaryImpact(d), 0);
 
       return {
         draftPicks: draftPicks.map((d) => ({
@@ -213,6 +255,12 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           playerName: d.player_name,
           positions: d.positions,
           impactRotoPoints: Number(d.impact_roto_points),
+          shapleyImpact: d.shapley_impact ? Number(d.shapley_impact) : null,
+          replacementLevelImpact: d.replacement_level_impact ? Number(d.replacement_level_impact) : null,
+          ciLow: d.ci_low ? Number(d.ci_low) : null,
+          ciHigh: d.ci_high ? Number(d.ci_high) : null,
+          isUncertain: d.is_uncertain ?? false,
+          sgpCategoryImpacts: d.sgp_category_impacts,
           categoryImpacts: d.category_impacts,
           keyStats: d.gained_components,
           stillOnTeam: d.player_gained_id ? finalPlayerIds.has(d.player_gained_id) : false,
@@ -222,12 +270,12 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           totalPicks: draftPicks.length,
           totalDraftValue: Math.round(totalDraftValue * 100) / 100,
           bestPick: draftPicks.length > 0
-            ? { playerName: draftPicks[0].player_name, impact: Number(draftPicks[0].impact_roto_points) }
+            ? { playerName: draftPicks[0].player_name, impact: primaryImpact(draftPicks[0]) }
             : null,
           worstPick: draftPicks.length > 0
             ? {
               playerName: draftPicks[draftPicks.length - 1].player_name,
-              impact: Number(draftPicks[draftPicks.length - 1].impact_roto_points),
+              impact: primaryImpact(draftPicks[draftPicks.length - 1]),
             }
             : null,
         },
