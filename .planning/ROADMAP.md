@@ -111,15 +111,13 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Per-player per-period stats stored during backfill, enabling individual contribution tracking
   2. Roster moves derived from weekly snapshot diffs with draft picks identified from opening-day roster
-  3. Each move shows roto-points impact computed via counterfactual analysis (actual vs what-if-you-hadn't-made-this-move)
-  4. Frontend shows impact timeline, move leaderboard (best/worst moves), and draft pick report
-**Plans:** 4 plans
+  3. Each move shows roto-points impact computed via counterfactual analysis (actual vs what-if-you-hadn't-made-this-move) (UPGRADE: Shapley values)
+  4. Frontend shows impact timeline, move leaderboard (best/worst moves), and draft pick report (UPGRADE: confidence indicators, SGP)
+**Plans:** 2 plans (statistical methodology upgrade)
 
 Plans:
-- [x] 09-01-PLAN.md — Migration + backfill modification to store per-player per-period stats + re-backfill — completed 2026-02-22
-- [x] 09-02-PLAN.md — Roster move derivation + impact computation agent with counterfactual analysis — completed 2026-02-22
-- [x] 09-03-PLAN.md — API endpoints for transaction impacts, draft report, and compute trigger — completed 2026-02-22
-- [x] 09-04-PLAN.md — Frontend moves page with impact timeline, leaderboard, and draft report tabs — completed 2026-02-22
+- [ ] 09-01-PLAN.md — Shapley value computation, SGP category normalization, replacement-level baselines, DB migration
+- [ ] 09-02-PLAN.md — Bootstrap confidence intervals, API updates, frontend confidence/SGP/replacement-level UI
 
 ## Progress
 
@@ -135,4 +133,4 @@ Plans:
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
-| 9. Transaction Impact (Roto WPA) | v1.1 | 4/4 | Complete | 2026-02-22 |
+| 9. Transaction Impact (Roto WPA) | v1.1 | 0/2 | In Progress | - |
