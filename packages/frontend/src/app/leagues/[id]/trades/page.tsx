@@ -37,6 +37,14 @@ interface TradeImpactAnalysis {
   explanation: string;
 }
 
+interface PositionalContext {
+  positionGained: string[];
+  positionLost: string[];
+  fillsNeed: boolean;
+  needPositions: string[];
+  positionalBonus: number;
+}
+
 interface TradeCandidate {
   trade: ProposedTrade;
   partnerTeamId: number;
@@ -46,6 +54,7 @@ interface TradeCandidate {
   fairnessScore: number;
   likelihood: "high" | "medium" | "low";
   explanation: string;
+  positionalContext?: PositionalContext;
 }
 
 interface RosterPlayer {
@@ -675,6 +684,24 @@ export default function TradesPage() {
             These are trades that would improve your projected standings
           </p>
 
+          {candidatesData &&
+            candidatesData.candidates.length > 0 &&
+            candidatesData.candidates[0]?.positionalContext?.needPositions &&
+            candidatesData.candidates[0].positionalContext.needPositions.length >
+              0 && (
+              <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-medium text-blue-800">
+                  Positions of need:{" "}
+                  {candidatesData.candidates[0].positionalContext.needPositions.join(
+                    ", ",
+                  )}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Trades filling these positions are ranked higher
+                </div>
+              </div>
+            )}
+
           {candidatesLoading ? (
             <LoadingSkeleton lines={3} />
           ) : candidatesError ? (
@@ -770,6 +797,27 @@ export default function TradesPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Positional Context Badges */}
+                  {candidate.positionalContext?.fillsNeed && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        Fills need:{" "}
+                        {candidate.positionalContext.needPositions
+                          .filter((pos) =>
+                            candidate.positionalContext!.positionGained.includes(
+                              pos,
+                            ),
+                          )
+                          .join(", ")}
+                      </span>
+                      {candidate.positionalContext.positionalBonus >= 1.0 && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                          High positional value
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Metadata */}
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
