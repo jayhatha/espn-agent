@@ -341,6 +341,27 @@ function LeagueDetailPageContent() {
             {league.timezone}
           </span>
         </span>
+        <button
+          onClick={() => createSnapshotMutation.mutate()}
+          disabled={createSnapshotMutation.isPending}
+          className="ml-auto inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+        >
+          <svg
+            className={`-ml-0.5 mr-1.5 h-3.5 w-3.5 ${createSnapshotMutation.isPending ? "animate-spin" : ""}`}
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          {createSnapshotMutation.isPending ? "Refreshing..." : "Refresh Snapshot"}
+        </button>
       </div>
 
       {/* Initial Snapshot Banner */}
