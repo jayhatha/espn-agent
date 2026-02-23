@@ -196,110 +196,6 @@ export class TransactionImpactAgent {
     return totalMoves;
   }
 
-  /**
-   * Compute roto-points impact for all moves in a season.
-   *
-   * For each add/drop pair (or draft pick):
-   * 1. Sum gained player's per-period stats from join → season end
-   * 2. Sum lost player's per-period stats from drop → season end (counterfactual)
-   * 3. Compute counterfactual team season totals: actual - gained + lost
-   * 4. Re-rank league with counterfactual → compute roto points delta
-   */
-  async computeImpacts(leagueId: number, season: number): Promise<number> {
-    this.logger?.info({ leagueId, season }, "Computing transaction impacts");
-
-    // Clear existing impacts (idempotent re-run)
-    await this.db
-      .deleteFrom("transaction_impact")
-      .where("league_id", "=", leagueId)
-      .execute();
-
-    // Get league categories from league_settings_version
-    const categories = await this.getLeagueCategories(leagueId);
-    if (categories.length === 0) {
-      this.logger?.warn({ leagueId }, "No categories found for league");
-      return 0;
-    }
-
-    // Get final season team totals (components) for all teams
-    const finalSnapshotDate = await this.getFinalSnapshotDate(leagueId, season);
-    if (!finalSnapshotDate) {
-      this.logger?.warn({ leagueId, season }, "No final snapshot found");
-      return 0;
-    }
-
-    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
-    const teamIds = Array.from(teamFinalComponents.keys());
-    const numTeams = teamIds.length;
-
-    // Get actual final roto points
-    const actualRotoPoints = await this.computeRotoPointsFromComponents(
-      teamFinalComponents, categories, numTeams,
-    );
-
-    // Get all roster moves grouped by team
-    const startDate = `${season}-04-01`;
-    const endDate = `${season}-10-31`;
-
-    const moves = await this.db
-      .selectFrom("roster_move")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("effective_date", ">=", startDate)
-      .where("effective_date", "<=", endDate)
-      .orderBy("effective_date", "asc")
-      .execute();
-
-    let impactsComputed = 0;
-
-    // Process each team's moves
-    for (const teamId of teamIds) {
-      const teamMoves = moves.filter((m) => m.team_id === teamId);
-
-      // Group adds with their paired drops
-      const addDropPairs = this.groupMovesIntoPairs(teamMoves);
-
-      for (const pair of addDropPairs) {
-        const impact = await this.computeSingleMoveImpact(
-          leagueId, teamId, pair, finalSnapshotDate,
-          teamFinalComponents, categories, numTeams, actualRotoPoints,
-        );
-
-        if (impact) {
-          // JSONB columns must be JSON.stringify'd for Kysely/pg
-          const insertValues = {
-            ...impact,
-            gained_components: impact.gained_components ? JSON.stringify(impact.gained_components) : null,
-            lost_components: impact.lost_components ? JSON.stringify(impact.lost_components) : null,
-            category_impacts: JSON.stringify(impact.category_impacts),
-          };
-          await this.db
-            .insertInto("transaction_impact")
-            .values(insertValues as any)
-            .onConflict((oc) =>
-              oc.columns(["league_id", "team_id", "player_gained_id", "effective_date"]).doUpdateSet({
-                gained_components: insertValues.gained_components as any,
-                lost_components: insertValues.lost_components as any,
-                impact_roto_points: impact.impact_roto_points,
-                category_impacts: insertValues.category_impacts as any,
-                is_incomplete: impact.is_incomplete,
-                computed_at: new Date(),
-              }),
-            )
-            .execute();
-          impactsComputed++;
-        }
-      }
-    }
-
-    this.logger?.info(
-      { leagueId, season, impactsComputed, totalMoves: moves.length },
-      "Transaction impact computation complete",
-    );
-
-    return impactsComputed;
-  }
-
   // ─── Private helpers ────────────────────────────────────────
 
   private async getRosterByTeam(
@@ -521,141 +417,6 @@ export class TransactionImpactAgent {
     return pairs;
   }
 
-  private async computeSingleMoveImpact(
-    leagueId: number,
-    teamId: number,
-    pair: {
-      type: "draft" | "add_drop" | "trade";
-      gainedPlayerId: number;
-      lostPlayerId: number | null;
-      effectiveDate: string;
-    },
-    finalSnapshotDate: string,
-    teamFinalComponents: Map<number, Record<string, number>>,
-    categories: CategoryConfig[],
-    numTeams: number,
-    actualRotoPoints: Map<number, number>,
-  ): Promise<{
-    league_id: number;
-    team_id: number;
-    move_type: string;
-    player_gained_id: number | null;
-    player_lost_id: number | null;
-    effective_date: string;
-    gained_components: Record<string, number> | null;
-    lost_components: Record<string, number> | null;
-    impact_roto_points: number;
-    category_impacts: any;
-    is_incomplete: boolean;
-  } | null> {
-    // Sum gained player's per-period stats from join date to season end
-    // Only count stats while on THIS team's active roster
-    const gainedContribution = await this.sumPlayerContribution(
-      leagueId, pair.gainedPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
-    );
-
-    // Sum lost player's per-period stats from drop date to season end (on ANY team)
-    let lostCounterfactual: Record<string, number> | null = null;
-    let isIncomplete = false;
-
-    if (pair.lostPlayerId) {
-      lostCounterfactual = await this.sumPlayerContributionAnywhere(
-        leagueId, pair.lostPlayerId, pair.effectiveDate, finalSnapshotDate,
-      );
-      if (!lostCounterfactual || Object.keys(lostCounterfactual).length === 0) {
-        isIncomplete = true;
-        lostCounterfactual = {};
-      }
-    }
-
-    // For draft picks, there's no "lost" player — the counterfactual is simply
-    // "what if this player hadn't been on your team" → team loses all their production
-    // Impact = counterfactual roto points - actual roto points (should be negative,
-    // meaning the draft pick HELPED)
-
-    // Build counterfactual team components:
-    // counterfactual = actual - gained_contribution + lost_counterfactual
-    const actualComponents = teamFinalComponents.get(teamId);
-    if (!actualComponents) return null;
-
-    const counterfactualComponents = { ...actualComponents };
-
-    // Subtract gained player's contribution
-    if (gainedContribution) {
-      for (const [key, val] of Object.entries(gainedContribution)) {
-        if (key in counterfactualComponents && typeof counterfactualComponents[key] === "number") {
-          counterfactualComponents[key] -= val;
-        }
-      }
-    }
-
-    // Add lost player's counterfactual contribution
-    if (lostCounterfactual) {
-      for (const [key, val] of Object.entries(lostCounterfactual)) {
-        if (typeof val === "number") {
-          counterfactualComponents[key] = (counterfactualComponents[key] || 0) + val;
-        }
-      }
-    }
-
-    // Recompute rate stat values from modified components
-    for (const cat of categories) {
-      if (cat.type === "RATE" && cat.formulaId) {
-        const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
-        let value = 0;
-        if (isPitchingRate) {
-          const pitchingComponents = {
-            H: counterfactualComponents.HA || 0,
-            BB: counterfactualComponents.BBA || 0,
-            IP: counterfactualComponents.IP || 0,
-            ER: counterfactualComponents.ER || 0,
-            K: counterfactualComponents.K || 0,
-          };
-          if (pitchingComponents.IP > 0) {
-            value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
-          }
-        } else {
-          value = calculateFinalRate(cat.formulaId, {}, counterfactualComponents);
-        }
-        counterfactualComponents[`_val_${cat.statKey}`] = value;
-      } else if (cat.type === "COUNTING") {
-        counterfactualComponents[`_val_${cat.statKey}`] = counterfactualComponents[cat.statKey] ?? 0;
-      }
-    }
-
-    // Build counterfactual league standings (swap this team's components)
-    const counterfactualTeamComponents = new Map(teamFinalComponents);
-    counterfactualTeamComponents.set(teamId, counterfactualComponents);
-
-    const counterfactualRotoPoints = this.computeRotoPointsFromComponents(
-      counterfactualTeamComponents, categories, numTeams,
-    );
-
-    const actualTeamPoints = actualRotoPoints.get(teamId) || 0;
-    const counterfactualTeamPoints = counterfactualRotoPoints.get(teamId) || 0;
-    const impactRotoPoints = actualTeamPoints - counterfactualTeamPoints;
-
-    // Compute per-category impact
-    const categoryImpacts = this.computeCategoryImpacts(
-      teamId, actualComponents, counterfactualComponents, categories, numTeams,
-      teamFinalComponents, counterfactualTeamComponents,
-    );
-
-    return {
-      league_id: leagueId,
-      team_id: teamId,
-      move_type: pair.type,
-      player_gained_id: pair.gainedPlayerId,
-      player_lost_id: pair.lostPlayerId,
-      effective_date: pair.effectiveDate,
-      gained_components: gainedContribution,
-      lost_components: lostCounterfactual,
-      impact_roto_points: Math.round(impactRotoPoints * 100) / 100,
-      category_impacts: categoryImpacts,
-      is_incomplete: isIncomplete,
-    };
-  }
-
   /**
    * Sum a player's per-period stats while on a specific team's active roster
    */
@@ -778,6 +539,682 @@ export class TransactionImpactAgent {
     const ranked = assignRanksWithTies(teamValues, numTeams);
     const teamRank = ranked.find((r) => r.teamId === teamId);
     return teamRank?.rotoPoints ?? 0;
+  }
+
+  /**
+   * Compute SGP (Standings Gain Points) factors from league standings distribution.
+   * For counting stats: average absolute gap between adjacent teams.
+   * For rate stats: standard deviation of team values.
+   */
+  private computeSGPFactors(
+    teamFinalComponents: Map<number, Record<string, number>>,
+    categories: CategoryConfig[],
+  ): Record<string, number> {
+    const sgpFactors: Record<string, number> = {};
+
+    for (const cat of categories) {
+      const teamValues: number[] = [];
+
+      for (const [, components] of teamFinalComponents) {
+        let value = components[`_val_${cat.statKey}`] ?? 0;
+
+        // For rate stats, recompute if needed
+        if (cat.type === "RATE" && cat.formulaId && !(`_val_${cat.statKey}` in components)) {
+          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+          if (isPitchingRate) {
+            const pitchingComponents = {
+              H: components.HA || 0,
+              BB: components.BBA || 0,
+              IP: components.IP || 0,
+              ER: components.ER || 0,
+              K: components.K || 0,
+            };
+            if (pitchingComponents.IP > 0) {
+              value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+            }
+          } else {
+            value = calculateFinalRate(cat.formulaId, {}, components);
+          }
+        }
+
+        teamValues.push(value);
+      }
+
+      if (teamValues.length === 0) {
+        sgpFactors[cat.statKey] = 1.0;
+        continue;
+      }
+
+      if (cat.type === "COUNTING") {
+        // For counting stats: average absolute gap between adjacent teams
+        const sorted = [...teamValues].sort((a, b) => b - a);
+        let sumGaps = 0;
+        for (let i = 0; i < sorted.length - 1; i++) {
+          sumGaps += Math.abs(sorted[i] - sorted[i + 1]);
+        }
+        const avgGap = sorted.length > 1 ? sumGaps / (sorted.length - 1) : 1.0;
+        sgpFactors[cat.statKey] = Math.max(1.0, avgGap);
+      } else if (cat.type === "RATE") {
+        // For rate stats: standard deviation
+        const mean = teamValues.reduce((a, b) => a + b, 0) / teamValues.length;
+        const squaredDiffs = teamValues.map((v) => Math.pow(v - mean, 2));
+        const variance = squaredDiffs.reduce((a, b) => a + b, 0) / teamValues.length;
+        const stdDev = Math.sqrt(variance);
+        sgpFactors[cat.statKey] = Math.max(0.001, stdDev);
+      } else {
+        sgpFactors[cat.statKey] = 1.0;
+      }
+    }
+
+    return sgpFactors;
+  }
+
+  /**
+   * Compute replacement-level production for a position.
+   * Replacement level = average production of players just outside rostered pool.
+   */
+  private async computeReplacementLevel(
+    leagueId: number,
+    season: number,
+    finalSnapshotDate: string,
+    position: string,
+  ): Promise<Record<string, number>> {
+    // Get league settings to determine roster size at this position
+    const settings = await this.db
+      .selectFrom("league_settings_version")
+      .select("settings_json")
+      .where("league_id", "=", leagueId)
+      .orderBy("effective_date", "desc")
+      .executeTakeFirst();
+
+    if (!settings) return {};
+
+    const json = settings.settings_json as any;
+    const rosterSlots = json?.roster_slots || {};
+    const numTeams = await this.db
+      .selectFrom("team")
+      .where("league_id", "=", leagueId)
+      .execute()
+      .then((teams) => teams.length);
+
+    // Estimate rostered players at this position
+    const slotsPerTeam = rosterSlots[position] || 1;
+    const totalRostered = slotsPerTeam * numTeams;
+
+    // Get all players at this position from player_period_stats
+    const startDate = `${season}-04-01`;
+
+    const playerTotals = await this.db
+      .selectFrom("player_period_stats as pps")
+      .innerJoin("player as p", "p.id", "pps.player_id")
+      .select(["pps.player_id", "pps.components_json"])
+      .where("pps.league_id", "=", leagueId)
+      .where("pps.snapshot_date", ">=", startDate)
+      .where("pps.snapshot_date", "<=", finalSnapshotDate)
+      .execute();
+
+    // Sum each player's total production
+    const playerProductionMap = new Map<number, Record<string, number>>();
+    for (const row of playerTotals) {
+      if (!playerProductionMap.has(row.player_id)) {
+        playerProductionMap.set(row.player_id, {});
+      }
+      const total = playerProductionMap.get(row.player_id)!;
+      const components = row.components_json as Record<string, number>;
+      for (const [key, val] of Object.entries(components)) {
+        if (typeof val === "number") {
+          total[key] = (total[key] || 0) + val;
+        }
+      }
+    }
+
+    if (playerProductionMap.size === 0) return {};
+
+    // Sort players by counting stat production (R+HR+RBI for hitters, K+W+SV for pitchers)
+    const playerProduction = Array.from(playerProductionMap.entries()).map(([playerId, components]) => {
+      const isPitcher = (components.IP || 0) > 0;
+      const score = isPitcher
+        ? (components.K || 0) + (components.W || 0) + (components.SV || 0)
+        : (components.R || 0) + (components.HR || 0) + (components.RBI || 0);
+      return { playerId, components, score };
+    });
+
+    playerProduction.sort((a, b) => b.score - a.score);
+
+    // Replacement level = average of players ranked just outside rostered pool
+    const replacementStart = Math.floor(totalRostered);
+    const replacementEnd = Math.min(replacementStart + 3, playerProduction.length);
+
+    if (replacementEnd <= replacementStart) return {};
+
+    const replacementPlayers = playerProduction.slice(replacementStart, replacementEnd);
+    const replacementComponents: Record<string, number> = {};
+
+    for (const player of replacementPlayers) {
+      for (const [key, val] of Object.entries(player.components)) {
+        if (typeof val === "number") {
+          replacementComponents[key] = (replacementComponents[key] || 0) + val;
+        }
+      }
+    }
+
+    // Average the components
+    const count = replacementPlayers.length;
+    for (const key of Object.keys(replacementComponents)) {
+      replacementComponents[key] /= count;
+    }
+
+    return replacementComponents;
+  }
+
+  /**
+   * Compute Shapley-attributed impacts for all moves in a season.
+   * Uses Monte Carlo sampling to estimate Shapley values.
+   */
+  async computeShapleyImpacts(leagueId: number, season: number, numSamples = 500): Promise<number> {
+    this.logger?.info({ leagueId, season }, "Computing Shapley-based transaction impacts");
+
+    // Clear existing impacts (idempotent re-run)
+    await this.db
+      .deleteFrom("transaction_impact")
+      .where("league_id", "=", leagueId)
+      .execute();
+
+    // Get league categories
+    const categories = await this.getLeagueCategories(leagueId);
+    if (categories.length === 0) {
+      this.logger?.warn({ leagueId }, "No categories found for league");
+      return 0;
+    }
+
+    // Get final snapshot date
+    const finalSnapshotDate = await this.getFinalSnapshotDate(leagueId, season);
+    if (!finalSnapshotDate) {
+      this.logger?.warn({ leagueId, season }, "No final snapshot found");
+      return 0;
+    }
+
+    // Get final team components
+    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
+    const teamIds = Array.from(teamFinalComponents.keys());
+    const numTeams = teamIds.length;
+
+    // Compute actual roto points
+    const actualRotoPoints = this.computeRotoPointsFromComponents(
+      teamFinalComponents, categories, numTeams,
+    );
+
+    // Compute SGP factors
+    const sgpFactors = this.computeSGPFactors(teamFinalComponents, categories);
+
+    // Get all roster moves
+    const startDate = `${season}-04-01`;
+    const endDate = `${season}-10-31`;
+
+    const moves = await this.db
+      .selectFrom("roster_move")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("effective_date", ">=", startDate)
+      .where("effective_date", "<=", endDate)
+      .orderBy("effective_date", "asc")
+      .execute();
+
+    let impactsComputed = 0;
+
+    // Process each team
+    for (const teamId of teamIds) {
+      const teamMoves = moves.filter((m) => m.team_id === teamId);
+      const movePairs = this.groupMovesIntoPairs(teamMoves);
+
+      if (movePairs.length === 0) continue;
+
+      // Get draft-day components for this team
+      const draftPicks = movePairs.filter((p) => p.type === "draft");
+      const draftComponents: Record<string, number> = {};
+      for (const pick of draftPicks) {
+        const contribution = await this.sumPlayerContributionAnywhere(
+          leagueId, pick.gainedPlayerId, startDate, finalSnapshotDate,
+        );
+        for (const [key, val] of Object.entries(contribution)) {
+          if (typeof val === "number") {
+            draftComponents[key] = (draftComponents[key] || 0) + val;
+          }
+        }
+      }
+
+      // Compute Shapley values for this team
+      const shapleyValues = await this.computeTeamShapleyValues(
+        leagueId,
+        teamId,
+        movePairs,
+        draftComponents,
+        teamFinalComponents,
+        categories,
+        numTeams,
+        actualRotoPoints,
+        finalSnapshotDate,
+        numSamples,
+      );
+
+      // Insert impacts
+      for (let i = 0; i < movePairs.length; i++) {
+        const pair = movePairs[i];
+        const shapleyImpact = shapleyValues.get(i) || 0;
+
+        // Get gained and lost components for this move
+        const gainedContribution = await this.sumPlayerContribution(
+          leagueId, pair.gainedPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
+        );
+
+        let lostCounterfactual: Record<string, number> | null = null;
+        let isIncomplete = false;
+        if (pair.lostPlayerId) {
+          lostCounterfactual = await this.sumPlayerContributionAnywhere(
+            leagueId, pair.lostPlayerId, pair.effectiveDate, finalSnapshotDate,
+          );
+          if (!lostCounterfactual || Object.keys(lostCounterfactual).length === 0) {
+            isIncomplete = true;
+            lostCounterfactual = {};
+          }
+        }
+
+        // Compute SGP category impacts
+        const sgpCategoryImpacts = this.computeSGPCategoryImpacts(
+          gainedContribution,
+          lostCounterfactual || {},
+          categories,
+          sgpFactors,
+        );
+
+        // Compute replacement-level impact for draft picks
+        let replacementLevelComponents: Record<string, number> | null = null;
+        let replacementLevelImpact: number | null = null;
+
+        if (pair.type === "draft") {
+          // Get player's primary position
+          const player = await this.db
+            .selectFrom("player")
+            .select("positions")
+            .where("id", "=", pair.gainedPlayerId)
+            .executeTakeFirst();
+
+          if (player && player.positions && player.positions.length > 0) {
+            const position = player.positions[0];
+            replacementLevelComponents = await this.computeReplacementLevel(
+              leagueId, season, finalSnapshotDate, position,
+            );
+
+            if (Object.keys(replacementLevelComponents).length > 0) {
+              // Build counterfactual with replacement level instead of this player
+              const replacementTeamComponents = { ...teamFinalComponents.get(teamId)! };
+
+              // Subtract gained player
+              for (const [key, val] of Object.entries(gainedContribution || {})) {
+                if (key in replacementTeamComponents && typeof replacementTeamComponents[key] === "number") {
+                  replacementTeamComponents[key] -= val;
+                }
+              }
+
+              // Add replacement level
+              for (const [key, val] of Object.entries(replacementLevelComponents)) {
+                if (typeof val === "number") {
+                  replacementTeamComponents[key] = (replacementTeamComponents[key] || 0) + val;
+                }
+              }
+
+              // Recompute rate stats
+              for (const cat of categories) {
+                if (cat.type === "RATE" && cat.formulaId) {
+                  const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+                  let value = 0;
+                  if (isPitchingRate) {
+                    const pitchingComponents = {
+                      H: replacementTeamComponents.HA || 0,
+                      BB: replacementTeamComponents.BBA || 0,
+                      IP: replacementTeamComponents.IP || 0,
+                      ER: replacementTeamComponents.ER || 0,
+                      K: replacementTeamComponents.K || 0,
+                    };
+                    if (pitchingComponents.IP > 0) {
+                      value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+                    }
+                  } else {
+                    value = calculateFinalRate(cat.formulaId, {}, replacementTeamComponents);
+                  }
+                  replacementTeamComponents[`_val_${cat.statKey}`] = value;
+                } else if (cat.type === "COUNTING") {
+                  replacementTeamComponents[`_val_${cat.statKey}`] = replacementTeamComponents[cat.statKey] ?? 0;
+                }
+              }
+
+              // Compute roto points with replacement level
+              const replacementLeagueComponents = new Map(teamFinalComponents);
+              replacementLeagueComponents.set(teamId, replacementTeamComponents);
+              const replacementRotoPoints = this.computeRotoPointsFromComponents(
+                replacementLeagueComponents, categories, numTeams,
+              );
+
+              const actualTeamPoints = actualRotoPoints.get(teamId) || 0;
+              const replacementTeamPoints = replacementRotoPoints.get(teamId) || 0;
+              replacementLevelImpact = actualTeamPoints - replacementTeamPoints;
+            }
+          }
+        }
+
+        // Compute category impacts (legacy format for backward compat)
+        const actualComponents = teamFinalComponents.get(teamId)!;
+        const counterfactualComponents = { ...actualComponents };
+        if (gainedContribution) {
+          for (const [key, val] of Object.entries(gainedContribution)) {
+            if (key in counterfactualComponents && typeof counterfactualComponents[key] === "number") {
+              counterfactualComponents[key] -= val;
+            }
+          }
+        }
+        if (lostCounterfactual) {
+          for (const [key, val] of Object.entries(lostCounterfactual)) {
+            if (typeof val === "number") {
+              counterfactualComponents[key] = (counterfactualComponents[key] || 0) + val;
+            }
+          }
+        }
+        for (const cat of categories) {
+          if (cat.type === "RATE" && cat.formulaId) {
+            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            let value = 0;
+            if (isPitchingRate) {
+              const pitchingComponents = {
+                H: counterfactualComponents.HA || 0,
+                BB: counterfactualComponents.BBA || 0,
+                IP: counterfactualComponents.IP || 0,
+                ER: counterfactualComponents.ER || 0,
+                K: counterfactualComponents.K || 0,
+              };
+              if (pitchingComponents.IP > 0) {
+                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+              }
+            } else {
+              value = calculateFinalRate(cat.formulaId, {}, counterfactualComponents);
+            }
+            counterfactualComponents[`_val_${cat.statKey}`] = value;
+          } else if (cat.type === "COUNTING") {
+            counterfactualComponents[`_val_${cat.statKey}`] = counterfactualComponents[cat.statKey] ?? 0;
+          }
+        }
+
+        const counterfactualTeamComponents = new Map(teamFinalComponents);
+        counterfactualTeamComponents.set(teamId, counterfactualComponents);
+        const categoryImpacts = this.computeCategoryImpacts(
+          teamId, actualComponents, counterfactualComponents, categories, numTeams,
+          teamFinalComponents, counterfactualTeamComponents,
+        );
+
+        // Insert into database
+        const insertValues = {
+          league_id: leagueId,
+          team_id: teamId,
+          move_type: pair.type,
+          player_gained_id: pair.gainedPlayerId,
+          player_lost_id: pair.lostPlayerId,
+          effective_date: pair.effectiveDate,
+          gained_components: gainedContribution ? JSON.stringify(gainedContribution) : null,
+          lost_components: lostCounterfactual ? JSON.stringify(lostCounterfactual) : null,
+          impact_roto_points: Math.round(shapleyImpact * 100) / 100,
+          shapley_impact: Math.round(shapleyImpact * 100) / 100,
+          category_impacts: JSON.stringify(categoryImpacts),
+          sgp_category_impacts: JSON.stringify(sgpCategoryImpacts),
+          replacement_level_components: replacementLevelComponents ? JSON.stringify(replacementLevelComponents) : null,
+          replacement_level_impact: replacementLevelImpact !== null ? Math.round(replacementLevelImpact * 100) / 100 : null,
+          is_incomplete: isIncomplete,
+          ci_low: null,
+          ci_high: null,
+          is_uncertain: false,
+        };
+
+        await this.db
+          .insertInto("transaction_impact")
+          .values(insertValues as any)
+          .onConflict((oc) =>
+            oc.columns(["league_id", "team_id", "player_gained_id", "effective_date"]).doUpdateSet({
+              gained_components: insertValues.gained_components as any,
+              lost_components: insertValues.lost_components as any,
+              impact_roto_points: insertValues.impact_roto_points,
+              shapley_impact: insertValues.shapley_impact,
+              category_impacts: insertValues.category_impacts as any,
+              sgp_category_impacts: insertValues.sgp_category_impacts as any,
+              replacement_level_components: insertValues.replacement_level_components as any,
+              replacement_level_impact: insertValues.replacement_level_impact,
+              is_incomplete: insertValues.is_incomplete,
+              computed_at: new Date(),
+            }),
+          )
+          .execute();
+
+        impactsComputed++;
+      }
+    }
+
+    this.logger?.info(
+      { leagueId, season, impactsComputed, numSamples },
+      "Shapley-based transaction impact computation complete",
+    );
+
+    return impactsComputed;
+  }
+
+  /**
+   * Compute Shapley values for a team's moves using Monte Carlo sampling.
+   */
+  private async computeTeamShapleyValues(
+    leagueId: number,
+    teamId: number,
+    movePairs: Array<{
+      type: "draft" | "add_drop" | "trade";
+      gainedPlayerId: number;
+      lostPlayerId: number | null;
+      effectiveDate: string;
+    }>,
+    draftComponents: Record<string, number>,
+    teamFinalComponents: Map<number, Record<string, number>>,
+    categories: CategoryConfig[],
+    numTeams: number,
+    _actualRotoPoints: Map<number, number>,
+    finalSnapshotDate: string,
+    numSamples: number,
+  ): Promise<Map<number, number>> {
+    // Pre-load all player contributions to avoid N*samples DB queries
+    const playerContributions = new Map<string, Record<string, number>>();
+
+    for (const pair of movePairs) {
+      // Gained player contribution (on this team only)
+      const gainedKey = `gained_${pair.gainedPlayerId}_${pair.effectiveDate}`;
+      if (!playerContributions.has(gainedKey)) {
+        const contribution = await this.sumPlayerContribution(
+          leagueId, pair.gainedPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
+        );
+        playerContributions.set(gainedKey, contribution);
+      }
+
+      // Lost player contribution (anywhere)
+      if (pair.lostPlayerId) {
+        const lostKey = `lost_${pair.lostPlayerId}_${pair.effectiveDate}`;
+        if (!playerContributions.has(lostKey)) {
+          const contribution = await this.sumPlayerContributionAnywhere(
+            leagueId, pair.lostPlayerId, pair.effectiveDate, finalSnapshotDate,
+          );
+          playerContributions.set(lostKey, contribution);
+        }
+      }
+    }
+
+    // Track marginal contributions for each move
+    const marginalContributions = new Map<number, number[]>();
+    for (let i = 0; i < movePairs.length; i++) {
+      marginalContributions.set(i, []);
+    }
+
+    // Monte Carlo sampling
+    for (let sample = 0; sample < numSamples; sample++) {
+      // Random permutation (Fisher-Yates shuffle)
+      const indices = Array.from({ length: movePairs.length }, (_, i) => i);
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]];
+      }
+
+      // Walk through permutation, tracking marginal contribution of each move
+      const coalitionComponents: Record<string, number> = { ...draftComponents };
+
+      for (let k = 0; k < indices.length; k++) {
+        const moveIndex = indices[k];
+        const move = movePairs[moveIndex];
+
+        // Compute roto points WITHOUT this move (just coalition so far)
+        const withoutComponents = { ...coalitionComponents };
+        for (const cat of categories) {
+          if (cat.type === "RATE" && cat.formulaId) {
+            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            let value = 0;
+            if (isPitchingRate) {
+              const pitchingComponents = {
+                H: withoutComponents.HA || 0,
+                BB: withoutComponents.BBA || 0,
+                IP: withoutComponents.IP || 0,
+                ER: withoutComponents.ER || 0,
+                K: withoutComponents.K || 0,
+              };
+              if (pitchingComponents.IP > 0) {
+                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+              }
+            } else {
+              value = calculateFinalRate(cat.formulaId, {}, withoutComponents);
+            }
+            withoutComponents[`_val_${cat.statKey}`] = value;
+          } else if (cat.type === "COUNTING") {
+            withoutComponents[`_val_${cat.statKey}`] = withoutComponents[cat.statKey] ?? 0;
+          }
+        }
+
+        const withoutLeague = new Map(teamFinalComponents);
+        withoutLeague.set(teamId, withoutComponents);
+        const withoutRotoPoints = this.computeRotoPointsFromComponents(withoutLeague, categories, numTeams);
+        const withoutPoints = withoutRotoPoints.get(teamId) || 0;
+
+        // Add this move to coalition
+        const gainedKey = `gained_${move.gainedPlayerId}_${move.effectiveDate}`;
+        const gainedContribution = playerContributions.get(gainedKey) || {};
+        for (const [key, val] of Object.entries(gainedContribution)) {
+          if (typeof val === "number") {
+            coalitionComponents[key] = (coalitionComponents[key] || 0) + val;
+          }
+        }
+
+        if (move.lostPlayerId) {
+          const lostKey = `lost_${move.lostPlayerId}_${move.effectiveDate}`;
+          const lostContribution = playerContributions.get(lostKey) || {};
+          for (const [key, val] of Object.entries(lostContribution)) {
+            if (typeof val === "number") {
+              coalitionComponents[key] = (coalitionComponents[key] || 0) - val;
+            }
+          }
+        }
+
+        // Compute roto points WITH this move
+        const withComponents = { ...coalitionComponents };
+        for (const cat of categories) {
+          if (cat.type === "RATE" && cat.formulaId) {
+            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            let value = 0;
+            if (isPitchingRate) {
+              const pitchingComponents = {
+                H: withComponents.HA || 0,
+                BB: withComponents.BBA || 0,
+                IP: withComponents.IP || 0,
+                ER: withComponents.ER || 0,
+                K: withComponents.K || 0,
+              };
+              if (pitchingComponents.IP > 0) {
+                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+              }
+            } else {
+              value = calculateFinalRate(cat.formulaId, {}, withComponents);
+            }
+            withComponents[`_val_${cat.statKey}`] = value;
+          } else if (cat.type === "COUNTING") {
+            withComponents[`_val_${cat.statKey}`] = withComponents[cat.statKey] ?? 0;
+          }
+        }
+
+        const withLeague = new Map(teamFinalComponents);
+        withLeague.set(teamId, withComponents);
+        const withRotoPoints = this.computeRotoPointsFromComponents(withLeague, categories, numTeams);
+        const withPoints = withRotoPoints.get(teamId) || 0;
+
+        // Marginal contribution = with - without
+        const marginal = withPoints - withoutPoints;
+        marginalContributions.get(moveIndex)!.push(marginal);
+      }
+    }
+
+    // Average marginal contributions to get Shapley values
+    const shapleyValues = new Map<number, number>();
+    for (let i = 0; i < movePairs.length; i++) {
+      const contributions = marginalContributions.get(i)!;
+      const avg = contributions.length > 0
+        ? contributions.reduce((a, b) => a + b, 0) / contributions.length
+        : 0;
+      shapleyValues.set(i, avg);
+    }
+
+    return shapleyValues;
+  }
+
+  /**
+   * Compute SGP-normalized category impacts for a move.
+   */
+  private computeSGPCategoryImpacts(
+    gainedComponents: Record<string, number> | null,
+    lostComponents: Record<string, number>,
+    categories: CategoryConfig[],
+    sgpFactors: Record<string, number>,
+  ): Array<{
+    categoryId: string;
+    sgpDelta: number;
+    rawDelta: number;
+    sgpFactor: number;
+  }> {
+    const result: Array<{
+      categoryId: string;
+      sgpDelta: number;
+      rawDelta: number;
+      sgpFactor: number;
+    }> = [];
+
+    for (const cat of categories) {
+      const gained = (gainedComponents && gainedComponents[cat.statKey]) || 0;
+      const lost = lostComponents[cat.statKey] || 0;
+      const rawDelta = gained - lost;
+      const sgpFactor = sgpFactors[cat.statKey] || 1.0;
+      const sgpDelta = rawDelta / sgpFactor;
+
+      result.push({
+        categoryId: cat.statKey,
+        sgpDelta: Math.round(sgpDelta * 1000) / 1000,
+        rawDelta: Math.round(rawDelta * 1000) / 1000,
+        sgpFactor: Math.round(sgpFactor * 1000) / 1000,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Public API: Compute transaction impacts.
+   * Delegates to Shapley-based implementation.
+   */
+  async computeImpacts(leagueId: number, season: number): Promise<number> {
+    return this.computeShapleyImpacts(leagueId, season);
   }
 
   /**
