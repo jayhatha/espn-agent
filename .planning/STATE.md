@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 09 (Trade Retrospectives)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-02-23 - Completed quick task 5: Inflection point explanations on trends chart
+Last activity: 2026-02-23 - Completed quick task 6: Delete old/inaccurate/unused md files
 
 Progress: [██████████] 100% (all v1.1 phases complete)
 
@@ -144,6 +144,7 @@ None yet.
 | 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
 | 4 | Season selector and historical trade analysis (moves page) | 2026-02-23 | 79ecc41 | [4-season-selector-and-historical-trade-ana](./quick/4-season-selector-and-historical-trade-ana/) |
 | 5 | Inflection point explanations on trends chart (category attribution + transactions) | 2026-02-23 | bf89cb2 | [5-add-inflection-point-explanations-to-ran](./quick/5-add-inflection-point-explanations-to-ran/) |
+| 6 | Delete old/inaccurate/unused md files | 2026-02-23 | aae76f3 | [6-delete-old-inaccurate-unused-md-files](./quick/6-delete-old-inaccurate-unused-md-files/) |
 
 ## Session Continuity
 
