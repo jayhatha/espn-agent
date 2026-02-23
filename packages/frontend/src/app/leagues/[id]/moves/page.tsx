@@ -30,6 +30,17 @@ interface MoveImpact {
   moveType: string;
   effectiveDate: string;
   impactRotoPoints: number;
+  shapleyImpact: number | null;
+  ciLow: number | null;
+  ciHigh: number | null;
+  isUncertain: boolean;
+  sgpCategoryImpacts: Array<{
+    categoryId: string;
+    sgpDelta: number;
+    rawDelta: number;
+    sgpFactor: number;
+  }> | null;
+  replacementLevelImpact: number | null;
   playerGained: { id: number; name: string; positions: string[] } | null;
   playerLost: { id: number; name: string; positions: string[] } | null;
   categoryImpacts: Array<{
@@ -46,6 +57,17 @@ interface DraftPick {
   playerName: string;
   positions: string[];
   impactRotoPoints: number;
+  shapleyImpact: number | null;
+  replacementLevelImpact: number | null;
+  ciLow: number | null;
+  ciHigh: number | null;
+  isUncertain: boolean;
+  sgpCategoryImpacts: Array<{
+    categoryId: string;
+    sgpDelta: number;
+    rawDelta: number;
+    sgpFactor: number;
+  }> | null;
   categoryImpacts: Array<{
     categoryId: string;
     actualValue: number;
@@ -326,8 +348,11 @@ function LeaderboardTab({
                 ?.filter((c) => c.deltaRotoPoints !== 0)
                 .sort((a, b) => Math.abs(b.deltaRotoPoints) - Math.abs(a.deltaRotoPoints))[0];
 
+              // Use Shapley impact if available, else legacy impact
+              const displayImpact = move.shapleyImpact ?? move.impactRotoPoints;
+
               return (
-                <tr key={move.id} className="group">
+                <tr key={move.id} className={`group ${move.isUncertain ? "opacity-80" : ""}`}>
                   <td colSpan={6} className="p-0">
                     <div
                       className="px-4 py-3 cursor-pointer hover:bg-gray-50 grid grid-cols-6 items-center"
@@ -351,7 +376,12 @@ function LeaderboardTab({
                         {move.playerLost?.name || "—"}
                       </div>
                       <div className="text-right">
-                        <ImpactBadge impact={move.impactRotoPoints} />
+                        <ImpactBadge
+                          impact={displayImpact}
+                          isUncertain={move.isUncertain}
+                          ciLow={move.ciLow}
+                          ciHigh={move.ciHigh}
+                        />
                       </div>
                       <div className="text-right text-xs text-gray-500">
                         {topCat ? `${topCat.categoryId} (${topCat.deltaRotoPoints > 0 ? "+" : ""}${topCat.deltaRotoPoints})` : "—"}
@@ -365,8 +395,12 @@ function LeaderboardTab({
                           playerLost={move.playerLost}
                           moveType={move.moveType}
                           effectiveDate={move.effectiveDate}
-                          impactRotoPoints={move.impactRotoPoints}
+                          impactRotoPoints={displayImpact}
                           categoryImpacts={move.categoryImpacts}
+                          sgpCategoryImpacts={move.sgpCategoryImpacts}
+                          isUncertain={move.isUncertain}
+                          ciLow={move.ciLow}
+                          ciHigh={move.ciHigh}
                           isIncomplete={move.isIncomplete}
                           onClose={() => setExpandedMoveId(null)}
                         />
@@ -407,6 +441,14 @@ function DraftReportTab({
 }) {
   if (isLoading) return <LoadingSpinner message="Loading draft report..." />;
 
+  // Calculate draft skill (average replacement-level impact)
+  const replacementImpacts = draftPicks
+    .map(p => p.replacementLevelImpact)
+    .filter((i): i is number => i != null);
+  const avgReplacementImpact = replacementImpacts.length > 0
+    ? replacementImpacts.reduce((sum, i) => sum + i, 0) / replacementImpacts.length
+    : null;
+
   return (
     <div>
       {/* Draft Summary */}
@@ -425,11 +467,19 @@ function DraftReportTab({
             <div className="text-sm font-semibold text-green-800">{summary.bestPick?.playerName}</div>
             {summary.bestPick && <ImpactBadge impact={summary.bestPick.impact} size="sm" />}
           </div>
-          <div className="bg-red-50 rounded-lg p-3">
-            <div className="text-xs font-medium text-red-600 uppercase">Worst Pick</div>
-            <div className="text-sm font-semibold text-red-800">{summary.worstPick?.playerName}</div>
-            {summary.worstPick && <ImpactBadge impact={summary.worstPick.impact} size="sm" />}
-          </div>
+          {avgReplacementImpact != null ? (
+            <div className="bg-purple-50 rounded-lg p-3">
+              <div className="text-xs font-medium text-purple-600 uppercase">Draft Skill</div>
+              <div className="text-sm font-semibold text-purple-800">vs Replacement</div>
+              <ImpactBadge impact={avgReplacementImpact} size="sm" />
+            </div>
+          ) : (
+            <div className="bg-red-50 rounded-lg p-3">
+              <div className="text-xs font-medium text-red-600 uppercase">Worst Pick</div>
+              <div className="text-sm font-semibold text-red-800">{summary.worstPick?.playerName}</div>
+              {summary.worstPick && <ImpactBadge impact={summary.worstPick.impact} size="sm" />}
+            </div>
+          )}
         </div>
       )}
 
@@ -443,30 +493,46 @@ function DraftReportTab({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pos</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Key Stats</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Roto Pts Value</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">vs Replacement</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Still On Team</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {draftPicks.map((pick, idx) => (
-              <tr key={pick.playerId} className={pick.stillOnTeam ? "" : "opacity-60"}>
-                <td className="px-4 py-3 text-sm text-gray-400">{idx + 1}</td>
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{pick.playerName}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{pick.positions?.join(", ")}</td>
-                <td className="px-4 py-3 text-right text-xs text-gray-600">
-                  {pick.keyStats && formatKeyStats(pick.keyStats)}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <ImpactBadge impact={pick.impactRotoPoints} />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {pick.stillOnTeam ? (
-                    <span className="text-green-500">&#10003;</span>
-                  ) : (
-                    <span className="text-gray-300">&#10007;</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {draftPicks.map((pick, idx) => {
+              const displayImpact = pick.shapleyImpact ?? pick.impactRotoPoints;
+              return (
+                <tr key={pick.playerId} className={pick.stillOnTeam ? "" : "opacity-60"}>
+                  <td className="px-4 py-3 text-sm text-gray-400">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{pick.playerName}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{pick.positions?.join(", ")}</td>
+                  <td className="px-4 py-3 text-right text-xs text-gray-600">
+                    {pick.keyStats && formatKeyStats(pick.keyStats)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <ImpactBadge
+                      impact={displayImpact}
+                      isUncertain={pick.isUncertain}
+                      ciLow={pick.ciLow}
+                      ciHigh={pick.ciHigh}
+                    />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {pick.replacementLevelImpact != null ? (
+                      <ImpactBadge impact={pick.replacementLevelImpact} size="sm" />
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {pick.stillOnTeam ? (
+                      <span className="text-green-500">&#10003;</span>
+                    ) : (
+                      <span className="text-gray-300">&#10007;</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -9,6 +9,13 @@ interface CategoryImpact {
   deltaRotoPoints: number;
 }
 
+interface SGPCategoryImpact {
+  categoryId: string;
+  sgpDelta: number;
+  rawDelta: number;
+  sgpFactor: number;
+}
+
 interface ImpactDetailCardProps {
   playerGained: { name: string; positions: string[] } | null;
   playerLost: { name: string; positions: string[] } | null;
@@ -16,6 +23,10 @@ interface ImpactDetailCardProps {
   effectiveDate: string;
   impactRotoPoints: number;
   categoryImpacts: CategoryImpact[];
+  sgpCategoryImpacts?: SGPCategoryImpact[] | null;
+  isUncertain?: boolean;
+  ciLow?: number | null;
+  ciHigh?: number | null;
   isIncomplete: boolean;
   onClose: () => void;
 }
@@ -27,6 +38,10 @@ export default function ImpactDetailCard({
   effectiveDate,
   impactRotoPoints,
   categoryImpacts,
+  sgpCategoryImpacts,
+  isUncertain = false,
+  ciLow,
+  ciHigh,
   isIncomplete,
   onClose,
 }: ImpactDetailCardProps) {
@@ -34,6 +49,14 @@ export default function ImpactDetailCard({
     moveType === "draft" ? "Draft Pick" :
     moveType === "trade" ? "Trade" :
     "Add/Drop";
+
+  // Build SGP lookup map
+  const sgpMap = new Map<string, SGPCategoryImpact>();
+  if (sgpCategoryImpacts) {
+    for (const sgp of sgpCategoryImpacts) {
+      sgpMap.set(sgp.categoryId, sgp);
+    }
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 mt-2">
@@ -45,7 +68,7 @@ export default function ImpactDetailCard({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <ImpactBadge impact={impactRotoPoints} />
+          <ImpactBadge impact={impactRotoPoints} isUncertain={isUncertain} ciLow={ciLow} ciHigh={ciHigh} />
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">
             &times;
           </button>
@@ -77,6 +100,15 @@ export default function ImpactDetailCard({
         </div>
       )}
 
+      {isUncertain && (
+        <div className="text-xs text-blue-600 bg-blue-50 rounded px-2 py-1 mb-3">
+          Low confidence — impact estimate has wide uncertainty range
+          {ciLow != null && ciHigh != null && (
+            <span className="ml-1 text-blue-400">(95% CI: {ciLow.toFixed(1)} to {ciHigh.toFixed(1)})</span>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs">
           <thead>
@@ -84,27 +116,37 @@ export default function ImpactDetailCard({
               <th className="text-left py-1 pr-3 text-gray-500 font-medium">Category</th>
               <th className="text-right py-1 px-2 text-gray-500 font-medium">Actual</th>
               <th className="text-right py-1 px-2 text-gray-500 font-medium">W/O Move</th>
-              <th className="text-right py-1 pl-2 text-gray-500 font-medium">Impact</th>
+              <th className="text-right py-1 px-2 text-gray-500 font-medium">Impact</th>
+              <th className="text-right py-1 pl-2 text-gray-500 font-medium">SGP</th>
             </tr>
           </thead>
           <tbody>
             {categoryImpacts
               .filter((c) => c.deltaRotoPoints !== 0)
               .sort((a, b) => Math.abs(b.deltaRotoPoints) - Math.abs(a.deltaRotoPoints))
-              .map((cat) => (
-                <tr key={cat.categoryId} className="border-b border-gray-50">
-                  <td className="py-1 pr-3 font-medium text-gray-700">{cat.categoryId}</td>
-                  <td className="py-1 px-2 text-right text-gray-600">
-                    {cat.actualValue < 1 ? cat.actualValue.toFixed(3) : Math.round(cat.actualValue)}
-                  </td>
-                  <td className="py-1 px-2 text-right text-gray-400">
-                    {cat.counterfactualValue < 1 ? cat.counterfactualValue.toFixed(3) : Math.round(cat.counterfactualValue)}
-                  </td>
-                  <td className="py-1 pl-2 text-right">
-                    <ImpactBadge impact={cat.deltaRotoPoints} size="sm" />
-                  </td>
-                </tr>
-              ))}
+              .map((cat) => {
+                const sgp = sgpMap.get(cat.categoryId);
+                return (
+                  <tr key={cat.categoryId} className="border-b border-gray-50">
+                    <td className="py-1 pr-3 font-medium text-gray-700">{cat.categoryId}</td>
+                    <td className="py-1 px-2 text-right text-gray-600">
+                      {cat.actualValue < 1 ? cat.actualValue.toFixed(3) : Math.round(cat.actualValue)}
+                    </td>
+                    <td className="py-1 px-2 text-right text-gray-400">
+                      {cat.counterfactualValue < 1 ? cat.counterfactualValue.toFixed(3) : Math.round(cat.counterfactualValue)}
+                    </td>
+                    <td className="py-1 px-2 text-right">
+                      <ImpactBadge impact={cat.deltaRotoPoints} size="sm" />
+                    </td>
+                    <td
+                      className="py-1 pl-2 text-right text-gray-500"
+                      title={sgp ? `SGP factor: ${sgp.sgpFactor.toFixed(2)}` : undefined}
+                    >
+                      {sgp ? sgp.sgpDelta.toFixed(2) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
