@@ -779,4 +779,118 @@ export class TransactionImpactAgent {
     const teamRank = ranked.find((r) => r.teamId === teamId);
     return teamRank?.rotoPoints ?? 0;
   }
+
+  /**
+   * Compute Net Roster Management Value:
+   * The single counterfactual delta comparing actual final roto points vs. draft-only roster.
+   *
+   * This answers: "What would my roto points be if I kept ONLY my draft-day roster all season?"
+   * Unlike summing per-move impacts (which double-count), this is ONE computation with no overlap.
+   */
+  async computeNetRosterValue(
+    leagueId: number,
+    season: number,
+    teamId: number,
+  ): Promise<{ netRosterValue: number; draftOnlyRotoPoints: number; actualRotoPoints: number } | null> {
+    // 1. Get league categories
+    const categories = await this.getLeagueCategories(leagueId);
+    if (categories.length === 0) {
+      this.logger?.warn({ leagueId }, "No categories found for league");
+      return null;
+    }
+
+    // 2. Get final snapshot date
+    const finalSnapshotDate = await this.getFinalSnapshotDate(leagueId, season);
+    if (!finalSnapshotDate) {
+      this.logger?.warn({ leagueId, season }, "No final snapshot found");
+      return null;
+    }
+
+    // 3. Get actual team final components for ALL teams
+    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
+    const teamIds = Array.from(teamFinalComponents.keys());
+    const numTeams = teamIds.length;
+
+    // 4. Compute actual roto points for all teams
+    const actualRotoPoints = this.computeRotoPointsFromComponents(
+      teamFinalComponents, categories, numTeams,
+    );
+
+    const actualTeamPoints = actualRotoPoints.get(teamId) || 0;
+
+    // 5. Get draft-day roster for the target team
+    const draftPicks = await this.db
+      .selectFrom("roster_move")
+      .select("player_id")
+      .where("league_id", "=", leagueId)
+      .where("team_id", "=", teamId)
+      .where("move_type", "=", "draft")
+      .execute();
+
+    if (draftPicks.length === 0) {
+      this.logger?.warn({ leagueId, teamId }, "No draft picks found for team");
+      return null;
+    }
+
+    // 6. Sum each draft pick's full-season contribution (on any team)
+    const startDate = `${season}-04-01`;
+    const draftOnlyComponents: Record<string, number> = {};
+
+    for (const pick of draftPicks) {
+      const contribution = await this.sumPlayerContributionAnywhere(
+        leagueId, pick.player_id, startDate, finalSnapshotDate,
+      );
+      // Sum contributions from all draft picks
+      for (const [key, val] of Object.entries(contribution)) {
+        if (typeof val === "number") {
+          draftOnlyComponents[key] = (draftOnlyComponents[key] || 0) + val;
+        }
+      }
+    }
+
+    // 7. Recompute rate stat values from draft-only components
+    for (const cat of categories) {
+      if (cat.type === "RATE" && cat.formulaId) {
+        const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        let value = 0;
+        if (isPitchingRate) {
+          const pitchingComponents = {
+            H: draftOnlyComponents.HA || 0,
+            BB: draftOnlyComponents.BBA || 0,
+            IP: draftOnlyComponents.IP || 0,
+            ER: draftOnlyComponents.ER || 0,
+            K: draftOnlyComponents.K || 0,
+          };
+          if (pitchingComponents.IP > 0) {
+            value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+          }
+        } else {
+          value = calculateFinalRate(cat.formulaId, {}, draftOnlyComponents);
+        }
+        draftOnlyComponents[`_val_${cat.statKey}`] = value;
+      } else if (cat.type === "COUNTING") {
+        draftOnlyComponents[`_val_${cat.statKey}`] = draftOnlyComponents[cat.statKey] ?? 0;
+      }
+    }
+
+    // 8. Build counterfactual league: replace target team's components with draft-only
+    const counterfactualTeamComponents = new Map(teamFinalComponents);
+    counterfactualTeamComponents.set(teamId, draftOnlyComponents);
+
+    // 9. Compute roto points with draft-only roster
+    const counterfactualRotoPoints = this.computeRotoPointsFromComponents(
+      counterfactualTeamComponents, categories, numTeams,
+    );
+
+    const draftOnlyTeamPoints = counterfactualRotoPoints.get(teamId) || 0;
+
+    // 10. Net roster value = actual - draft-only (positive = roster management helped)
+    const netRosterValue = actualTeamPoints - draftOnlyTeamPoints;
+
+    return {
+      netRosterValue: Math.round(netRosterValue * 100) / 100,
+      draftOnlyRotoPoints: Math.round(draftOnlyTeamPoints * 100) / 100,
+      actualRotoPoints: Math.round(actualTeamPoints * 100) / 100,
+    };
+  }
 }
