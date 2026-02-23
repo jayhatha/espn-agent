@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 09 (Trade Retrospectives)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-02-23 - Completed 09-01-PLAN.md: Shapley value attribution with SGP and replacement-level baselines
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-02-23 - Completed 09-02-PLAN.md: Bootstrap CI, frontend uncertainty indicators, SGP view, replacement-level draft report
 
-Progress: [█████████░] 90% (phases 1-8 + 07.1 + 07.2 + 09.01 complete)
+Progress: [██████████] 100% (all v1.1 phases complete)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [█████████░] 90% (phases 1-8 + 07.1 + 07.2 + 09.01
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 7
-- Plans remaining: 1 (09-02)
-- Current phase: 09 (Trade Retrospectives) - IN PROGRESS
+- Plans completed: 8
+- Plans remaining: 0
+- Current phase: 09 (Trade Retrospectives) - COMPLETE
 
 **By Phase (v1.1):**
 
@@ -51,6 +51,7 @@ Progress: [█████████░] 90% (phases 1-8 + 07.1 + 07.2 + 09.01
 | 07.1 | P02 | 4min | 1 | 2 |
 | 07.2 | P01 | 28min | 2 | 2 |
 | 09 | P01 | 6min | 2 | 4 |
+| 09 | P02 | 6min | 2 | 5 |
 
 **Quick Tasks:**
 
@@ -60,7 +61,7 @@ Progress: [█████████░] 90% (phases 1-8 + 07.1 + 07.2 + 09.01
 | quick-02 | 3min | 2 | 2 |
 | quick-03 | 3min | 2 | 3 |
 
-*Updated: 2026-02-23 after 09-01 completion*
+*Updated: 2026-02-23 after 09-02 completion*
 
 ## Accumulated Context
 
@@ -100,6 +101,12 @@ Recent decisions affecting v1.1 work:
 - [Phase 09 P01]: Pre-load all player contributions upfront to avoid N*samples DB queries during Shapley computation
 - [Phase 09 P01]: SGP factors use average gap (counting stats) and stddev (rate stats) for standings normalization
 - [Phase 09 P01]: Replacement level = average of players ranked N+1 through N+3 just outside rostered pool
+- [Phase 09]: Bootstrap CI uses 200 samples (not 1000) balancing accuracy vs runtime for interactive responses
+- [Phase 09]: Uncertain moves flagged when CI crosses zero OR width > 2x point estimate (captures both insignificance and variance)
+- [Phase 09]: Graceful null handling ensures frontend works with pre-Shapley and post-Shapley data (zero-downtime migration)
+- [Phase 09]: Bootstrap CI uses 200 samples (not 1000) balancing accuracy vs runtime for interactive responses
+- [Phase 09]: Uncertain moves flagged when CI crosses zero OR width > 2x point estimate (captures both insignificance and variance)
+- [Phase 09]: Graceful null handling ensures frontend works with pre-Shapley and post-Shapley data (zero-downtime migration)
 
 ### Roadmap Evolution
 
@@ -137,5 +144,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed quick-03-PLAN.md (fix move impact metric with single counterfactual)
+Stopped at: Completed 09-02-PLAN.md (Bootstrap CI + frontend statistical indicators)
 Resume file: None
