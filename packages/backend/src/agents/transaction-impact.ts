@@ -938,7 +938,14 @@ export class TransactionImpactAgent {
             }
             counterfactualComponents[`_val_${cat.statKey}`] = value;
           } else if (cat.type === "COUNTING") {
-            counterfactualComponents[`_val_${cat.statKey}`] = counterfactualComponents[cat.statKey] ?? 0;
+            // Adjust actual _val_ by the move's contribution instead of reading
+            // from raw component key (which may differ from ESPN's reported total)
+            const actualVal = actualComponents[`_val_${cat.statKey}`] ?? 0;
+            const gainedDelta = (gainedContribution && typeof gainedContribution[cat.statKey] === "number")
+              ? gainedContribution[cat.statKey] : 0;
+            const lostDelta = (lostCounterfactual && typeof lostCounterfactual[cat.statKey] === "number")
+              ? lostCounterfactual[cat.statKey] : 0;
+            counterfactualComponents[`_val_${cat.statKey}`] = actualVal - gainedDelta + lostDelta;
           }
         }
 

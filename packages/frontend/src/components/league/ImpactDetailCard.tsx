@@ -2,13 +2,6 @@
 
 import ImpactBadge from "./ImpactBadge";
 
-interface CategoryImpact {
-  categoryId: string;
-  actualValue: number;
-  counterfactualValue: number;
-  deltaRotoPoints: number;
-}
-
 interface SGPCategoryImpact {
   categoryId: string;
   sgpDelta: number;
@@ -22,7 +15,7 @@ interface ImpactDetailCardProps {
   moveType: string;
   effectiveDate: string;
   impactRotoPoints: number;
-  categoryImpacts: CategoryImpact[];
+  categoryImpacts: unknown[];
   sgpCategoryImpacts?: SGPCategoryImpact[] | null;
   isUncertain?: boolean;
   ciLow?: number | null;
@@ -37,7 +30,6 @@ export default function ImpactDetailCard({
   moveType,
   effectiveDate,
   impactRotoPoints,
-  categoryImpacts,
   sgpCategoryImpacts,
   isUncertain = false,
   ciLow,
@@ -50,13 +42,9 @@ export default function ImpactDetailCard({
     moveType === "trade" ? "Trade" :
     "Add/Drop";
 
-  // Build SGP lookup map
-  const sgpMap = new Map<string, SGPCategoryImpact>();
-  if (sgpCategoryImpacts) {
-    for (const sgp of sgpCategoryImpacts) {
-      sgpMap.set(sgp.categoryId, sgp);
-    }
-  }
+  // Use SGP data for category breakdown — shows raw stat contributions
+  const sgpData = sgpCategoryImpacts || [];
+  const nonZeroSgp = sgpData.filter((s) => Math.abs(s.rawDelta) >= 0.5);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 mt-2">
@@ -109,47 +97,47 @@ export default function ImpactDetailCard({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-xs">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <th className="text-left py-1 pr-3 text-gray-500 font-medium">Category</th>
-              <th className="text-right py-1 px-2 text-gray-500 font-medium">Actual</th>
-              <th className="text-right py-1 px-2 text-gray-500 font-medium">W/O Move</th>
-              <th className="text-right py-1 px-2 text-gray-500 font-medium">Impact</th>
-              <th className="text-right py-1 pl-2 text-gray-500 font-medium">SGP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categoryImpacts
-              .filter((c) => c.deltaRotoPoints !== 0)
-              .sort((a, b) => Math.abs(b.deltaRotoPoints) - Math.abs(a.deltaRotoPoints))
-              .map((cat) => {
-                const sgp = sgpMap.get(cat.categoryId);
-                return (
-                  <tr key={cat.categoryId} className="border-b border-gray-50">
-                    <td className="py-1 pr-3 font-medium text-gray-700">{cat.categoryId}</td>
+      {nonZeroSgp.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left py-1 pr-3 text-gray-500 font-medium">Category</th>
+                <th className="text-right py-1 px-2 text-gray-500 font-medium">Net Stats</th>
+                <th className="text-right py-1 pl-2 text-gray-500 font-medium">SGP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nonZeroSgp
+                .sort((a, b) => Math.abs(b.sgpDelta) - Math.abs(a.sgpDelta))
+                .map((sgp) => (
+                  <tr key={sgp.categoryId} className="border-b border-gray-50">
+                    <td className="py-1 pr-3 font-medium text-gray-700">{sgp.categoryId}</td>
                     <td className="py-1 px-2 text-right text-gray-600">
-                      {cat.actualValue < 1 ? cat.actualValue.toFixed(3) : Math.round(cat.actualValue)}
-                    </td>
-                    <td className="py-1 px-2 text-right text-gray-400">
-                      {cat.counterfactualValue < 1 ? cat.counterfactualValue.toFixed(3) : Math.round(cat.counterfactualValue)}
-                    </td>
-                    <td className="py-1 px-2 text-right">
-                      <ImpactBadge impact={cat.deltaRotoPoints} size="sm" />
+                      <span className={sgp.rawDelta > 0 ? "text-green-600" : sgp.rawDelta < 0 ? "text-red-600" : ""}>
+                        {sgp.rawDelta > 0 ? "+" : ""}
+                        {Math.abs(sgp.rawDelta) < 1 ? sgp.rawDelta.toFixed(3) : Math.round(sgp.rawDelta)}
+                      </span>
                     </td>
                     <td
-                      className="py-1 pl-2 text-right text-gray-500"
-                      title={sgp ? `SGP factor: ${sgp.sgpFactor.toFixed(2)}` : undefined}
+                      className="py-1 pl-2 text-right"
+                      title={`1 SGP = ${sgp.sgpFactor.toFixed(1)} ${sgp.categoryId}`}
                     >
-                      {sgp ? sgp.sgpDelta.toFixed(2) : "—"}
+                      <span className={sgp.sgpDelta > 0 ? "text-green-600" : sgp.sgpDelta < 0 ? "text-red-600" : "text-gray-500"}>
+                        {sgp.sgpDelta > 0 ? "+" : ""}{sgp.sgpDelta.toFixed(2)}
+                      </span>
                     </td>
                   </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
+                ))}
+            </tbody>
+          </table>
+          <p className="text-[10px] text-gray-400 mt-1">
+            Net stats = gained player - lost player. SGP = standings gain points.
+          </p>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400">No significant category contributions.</p>
+      )}
     </div>
   );
 }
