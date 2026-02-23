@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 07.2 (Fix Counting Stat Magnitude Bug in Backfill)
 Plan: 1 of 1 in current phase
 Status: Completed
-Last activity: 2026-02-22 - Completed quick task 1: Fix cumulative counting stats magnitude (bench player exclusion)
+Last activity: 2026-02-23 - Completed quick task 2: Add positional value to trade recommendations
 
 Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complete)
 
@@ -56,8 +56,9 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 | ID | Duration | Tasks | Files |
 |----|----------|-------|-------|
 | quick-01 | 2min | 3 | 3 |
+| quick-02 | 3min | 2 | 2 |
 
-*Updated: 2026-02-22 after quick-01 completion*
+*Updated: 2026-02-23 after quick-02 completion*
 
 ## Accumulated Context
 
@@ -88,6 +89,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 07.2]: Rate stats from ESPN per-period data must never be accumulated as components -- always compute from counting stat components
 - [Quick 01]: Include bench players (lineupSlotId 16) in roto stat accumulation — bench stats count toward team totals, only IL/NA excluded
 - [Quick 01]: Debug endpoint at /api/admin/leagues/:id/debug/period-stats enables manual verification of roster inclusion logic and ESPN data comparison
+- [Quick 02]: Positional scarcity multipliers (C: 1.5, RP: 1.3, OF: 0.8) based on typical fantasy baseball player pools — catchers and closers valued higher than outfielders
+- [Quick 02]: Depth threshold at 1.5x roster slots marks positions of need — teams with fewer than 1.5 eligible players per slot are thin at that position
+- [Quick 02]: Positional bonus capped at 3.0 points prevents overwhelming stat-based value — keeps trades balanced between positional and statistical improvements
+- [Quick 02]: Additive bonus (valueDelta + positionalBonus) in pre-filter sorting surfaces positional trades earlier without separate queuing
 
 ### Roadmap Evolution
 
@@ -119,9 +124,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
+| 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: Completed quick-01-PLAN.md (fix bench player exclusion in backfill accumulation)
+Last session: 2026-02-23
+Stopped at: Completed quick-02-PLAN.md (positional value in trade recommendations)
 Resume file: None
