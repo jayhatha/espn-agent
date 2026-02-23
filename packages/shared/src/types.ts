@@ -335,6 +335,18 @@ export interface TransactionImpact {
   }>;
   is_incomplete: boolean;
   computed_at: Date;
+  shapley_impact: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  is_uncertain: boolean;
+  sgp_category_impacts: Array<{
+    categoryId: string;
+    sgpDelta: number;
+    rawDelta: number;
+    sgpFactor: number;
+  }> | null;
+  replacement_level_components: Record<string, number> | null;
+  replacement_level_impact: number | null;
 }
 
 // Trade validation types
