@@ -99,7 +99,7 @@ export default function MovesPage() {
   const [activeTab, setActiveTab] = useState<TabView>("leaderboard");
   const [moveFilter, setMoveFilter] = useState<MoveFilter>("all");
   const [expandedMoveId, setExpandedMoveId] = useState<number | null>(null);
-  const [season] = useState(2025);
+  const [season, setSeason] = useState<number | null>(null);
 
   // Load team from localStorage
   useEffect(() => {
@@ -114,25 +114,39 @@ export default function MovesPage() {
     enabled: !!leagueId,
   });
 
+  // Fetch available seasons
+  const { data: seasonsData } = useQuery({
+    queryKey: ["league-seasons", leagueId],
+    queryFn: () => api.getLeagueSeasons(leagueId),
+    enabled: !!leagueId,
+  });
+
+  // Default season to most recent when seasons load
+  useEffect(() => {
+    if (seasonsData?.seasons?.length && season === null) {
+      setSeason(seasonsData.seasons[0]);
+    }
+  }, [seasonsData, season]);
+
   // Fetch transaction impacts
   const { data: impactData, isLoading: impactLoading, error: impactError } = useQuery({
     queryKey: ["transaction-impacts", leagueId, selectedTeamId, season],
-    queryFn: () => api.getTransactionImpacts(leagueId, selectedTeamId!, { season }),
-    enabled: !!selectedTeamId,
+    queryFn: () => api.getTransactionImpacts(leagueId, selectedTeamId!, { season: season! }),
+    enabled: !!selectedTeamId && !!season,
   });
 
   // Fetch draft report
   const { data: draftData, isLoading: draftLoading } = useQuery({
     queryKey: ["draft-report", leagueId, selectedTeamId, season],
-    queryFn: () => api.getDraftReport(leagueId, selectedTeamId!, season),
-    enabled: !!selectedTeamId && activeTab === "draft",
+    queryFn: () => api.getDraftReport(leagueId, selectedTeamId!, season!),
+    enabled: !!selectedTeamId && !!season && activeTab === "draft",
   });
 
   // Fetch overall standings timeline for the chart
   const { data: timelineData } = useQuery({
     queryKey: ["timeline-overall", leagueId, season],
-    queryFn: () => api.getOverallTimeSeries(leagueId, { season: String(season) }),
-    enabled: !!leagueId && activeTab === "timeline",
+    queryFn: () => api.getOverallTimeSeries(leagueId, { season: String(season!) }),
+    enabled: !!leagueId && !!season && activeTab === "timeline",
   });
 
   const teams = teamsData?.teams || [];
@@ -171,6 +185,17 @@ export default function MovesPage() {
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
+            ))}
+          </select>
+
+          <label className="text-sm font-medium text-gray-700">Season:</label>
+          <select
+            value={season || ""}
+            onChange={(e) => setSeason(parseInt(e.target.value, 10))}
+            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+          >
+            {seasonsData?.seasons?.map((s: number) => (
+              <option key={s} value={s}>{s}</option>
             ))}
           </select>
 
