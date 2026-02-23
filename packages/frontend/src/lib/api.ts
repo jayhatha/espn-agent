@@ -269,6 +269,12 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/annotations${query ? '?' + query : ''}`);
   },
 
+  // Inflection points
+  async getInflectionPoints(leagueId: number, teamId: number, params?: { season?: string; from?: string; to?: string; limit?: number }) {
+    const qs = new URLSearchParams({ teamId: String(teamId), ...(params && Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))) } as any).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/timeseries/inflection-points?${qs}`);
+  },
+
   // Auth
   async login(email: string, password: string) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
@@ -378,5 +384,10 @@ export const api = {
   async getDraftReport(leagueId: number, teamId: number, season?: number) {
     const qs = season ? `?season=${season}` : '';
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/draft-report${qs}`);
+  },
+
+  async getLeagueImpactSummary(leagueId: number, season?: number) {
+    const qs = season ? `?season=${season}` : '';
+    return fetchAPI(`/api/leagues/${leagueId}/transaction-impacts/league-summary${qs}`);
   },
 };

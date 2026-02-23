@@ -513,4 +513,207 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       return { annotations: enrichedAnnotations };
     },
   );
+
+  // Inflection points (biggest ranking changes)
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery & { teamId: string; limit?: string };
+  }>(
+    "/api/leagues/:leagueId/timeseries/inflection-points",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const { teamId, from, to, season, limit: limitStr } = request.query;
+
+      if (!teamId) {
+        return reply.code(400).send({ error: "teamId is required" });
+      }
+
+      const parsedTeamId = parseInt(teamId, 10);
+      const limit = Math.min(parseInt(limitStr || "5", 10), 10);
+
+      // Fetch team_daily_overall for the team
+      let query = db
+        .selectFrom("team_daily_overall")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .where("team_id", "=", parsedTeamId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+          .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+      }
+
+      if (from) {
+        query = query.where("snapshot_date", ">=", from);
+      }
+      if (to) {
+        query = query.where("snapshot_date", "<=", to);
+      }
+
+      const snapshots = await query.orderBy("snapshot_date", "asc").execute();
+
+      // Compute deltas between consecutive snapshots
+      const deltas: Array<{
+        date: string;
+        previousDate: string;
+        pointsDelta: number;
+        rankBefore: number;
+        rankAfter: number;
+      }> = [];
+
+      for (let i = 1; i < snapshots.length; i++) {
+        const prev = snapshots[i - 1];
+        const curr = snapshots[i];
+        const delta = curr.overall_points - prev.overall_points;
+
+        deltas.push({
+          date: curr.snapshot_date,
+          previousDate: prev.snapshot_date,
+          pointsDelta: delta,
+          rankBefore: prev.overall_rank,
+          rankAfter: curr.overall_rank,
+        });
+      }
+
+      // Sort by absolute delta, take top N
+      deltas.sort((a, b) => Math.abs(b.pointsDelta) - Math.abs(a.pointsDelta));
+      const topDeltas = deltas.slice(0, limit);
+
+      // For each inflection point, fetch category breakdowns and transactions
+      const inflectionPoints = await Promise.all(
+        topDeltas.map(async (delta) => {
+          // Fetch category ranks for both dates
+          const prevCategoryRanks = await db
+            .selectFrom("team_daily_category_ranks")
+            .selectAll()
+            .where("league_id", "=", leagueId)
+            .where("team_id", "=", parsedTeamId)
+            .where("snapshot_date", "=", delta.previousDate)
+            .execute();
+
+          const currCategoryRanks = await db
+            .selectFrom("team_daily_category_ranks")
+            .selectAll()
+            .where("league_id", "=", leagueId)
+            .where("team_id", "=", parsedTeamId)
+            .where("snapshot_date", "=", delta.date)
+            .execute();
+
+          // Build map for quick lookup
+          const prevMap = new Map(
+            prevCategoryRanks.map((r) => [
+              r.category_id,
+              { rank: r.rank, rotoPts: r.roto_points },
+            ]),
+          );
+          const currMap = new Map(
+            currCategoryRanks.map((r) => [
+              r.category_id,
+              { rank: r.rank, rotoPts: r.roto_points },
+            ]),
+          );
+
+          // Compute category deltas
+          const categoryChanges: Array<{
+            categoryId: string;
+            deltaPts: number;
+            rankBefore: number;
+            rankAfter: number;
+          }> = [];
+
+          currMap.forEach((curr, catId) => {
+            const prev = prevMap.get(catId);
+            if (!prev) return;
+            const prevPts = prev.rotoPts ?? 0;
+            const currPts = curr.rotoPts ?? 0;
+            const deltaPts = currPts - prevPts;
+            if (deltaPts !== 0) {
+              categoryChanges.push({
+                categoryId: catId,
+                deltaPts,
+                rankBefore: prev.rank,
+                rankAfter: curr.rank,
+              });
+            }
+          });
+
+          // Sort by absolute delta descending
+          categoryChanges.sort(
+            (a, b) => Math.abs(b.deltaPts) - Math.abs(a.deltaPts),
+          );
+
+          // Fetch correlated transactions (between previousDate and date, inclusive)
+          let txQuery = db
+            .selectFrom("league_transaction_event")
+            .selectAll()
+            .where("league_id", "=", leagueId)
+            .where("team_id", "=", parsedTeamId)
+            .where("event_date", ">", delta.previousDate)
+            .where("event_date", "<=", delta.date)
+            .orderBy("event_date", "asc");
+
+          const transactions = await txQuery.execute();
+
+          // Enrich transactions with player names
+          const playerIds = new Set<number>();
+          transactions.forEach((tx) => {
+            if (tx.players_added && Array.isArray(tx.players_added)) {
+              tx.players_added.forEach((id: number) => playerIds.add(id));
+            }
+            if (tx.players_dropped && Array.isArray(tx.players_dropped)) {
+              tx.players_dropped.forEach((id: number) => playerIds.add(id));
+            }
+          });
+
+          const playerMap = new Map<number, { id: number; name: string }>();
+          if (playerIds.size > 0) {
+            const players = await db
+              .selectFrom("player")
+              .select(["id", "name"])
+              .where("id", "in", Array.from(playerIds))
+              .execute();
+
+            players.forEach((p) => {
+              playerMap.set(p.id, { id: p.id, name: p.name });
+            });
+          }
+
+          const enrichedTransactions = transactions.map((tx) => {
+            const playersAdded = (tx.players_added as number[] || []).map(
+              (id) => playerMap.get(id) || { id, name: "Unknown Player" },
+            );
+            const playersDropped = (tx.players_dropped as number[] || []).map(
+              (id) => playerMap.get(id) || { id, name: "Unknown Player" },
+            );
+
+            return {
+              id: tx.id,
+              eventType: tx.event_type,
+              eventDate: tx.event_date,
+              playersAdded,
+              playersDropped,
+            };
+          });
+
+          return {
+            date: delta.date,
+            previousDate: delta.previousDate,
+            pointsDelta: delta.pointsDelta,
+            rankBefore: delta.rankBefore,
+            rankAfter: delta.rankAfter,
+            categoryChanges,
+            transactions: enrichedTransactions,
+          };
+        }),
+      );
+
+      return { inflectionPoints };
+    },
+  );
 }
