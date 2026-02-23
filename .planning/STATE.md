@@ -60,8 +60,9 @@ Progress: [██████████] 100% (all v1.1 phases complete)
 | quick-01 | 2min | 3 | 3 |
 | quick-02 | 3min | 2 | 2 |
 | quick-03 | 3min | 2 | 3 |
+| quick-04 | 3min | 2 | 1 |
 
-*Updated: 2026-02-23 after 09-02 completion*
+*Updated: 2026-02-23 after quick-04 completion*
 
 ## Accumulated Context
 
@@ -140,9 +141,10 @@ None yet.
 | 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
 | 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
 | 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
+| 4 | Season selector and historical trade analysis (moves page) | 2026-02-23 | 79ecc41 | [4-season-selector-and-historical-trade-ana](./quick/4-season-selector-and-historical-trade-ana/) |
 
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 09-02-PLAN.md (Bootstrap CI + frontend statistical indicators)
+Stopped at: Completed quick-04 (Season selector and Trades tab for moves page)
 Resume file: None
