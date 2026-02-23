@@ -53,6 +53,13 @@ COPY --from=builder /app/packages/shared/src ./packages/shared/src
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
 COPY --from=builder /app/packages/backend/src ./packages/backend/src
 
+# Copy migration SQL files to dist so compiled migrate.js can find them
+RUN cp -r ./packages/backend/src/db/migrations ./packages/backend/dist/db/migrations
+
+# Copy startup scripts
+COPY packages/backend/scripts ./packages/backend/scripts
+RUN chmod +x /app/packages/backend/scripts/*.sh
+
 WORKDIR /app/packages/backend
 
 # Expose port
@@ -62,5 +69,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
 
-# Start the application
-CMD ["node", "dist/index.js"]
+# Run migrations then start the application
+CMD ["/app/packages/backend/scripts/start-prod.sh"]

@@ -2,7 +2,9 @@ import { FastifyInstance, FastifyReply } from "fastify";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/connection.js";
 
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SECURE_COOKIES = process.env.COOKIE_SECURE === "false"
+  ? false
+  : process.env.NODE_ENV === "production";
 const ACCESS_TOKEN_MAX_AGE = 900; // 15 minutes in seconds
 const REFRESH_TOKEN_MAX_AGE = 604800; // 7 days in seconds
 const REFRESH_TOKEN_HASH_ROUNDS = 10; // Lower rounds for token hashing (not passwords)
@@ -17,7 +19,7 @@ export function setAuthCookies(
 ): void {
   reply.setCookie("accessToken", accessToken, {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: SECURE_COOKIES,
     sameSite: "lax",
     path: "/",
     maxAge: ACCESS_TOKEN_MAX_AGE,
@@ -25,7 +27,7 @@ export function setAuthCookies(
 
   reply.setCookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: SECURE_COOKIES,
     sameSite: "lax",
     path: "/api/auth",
     maxAge: REFRESH_TOKEN_MAX_AGE,
@@ -38,14 +40,14 @@ export function setAuthCookies(
 export function clearAuthCookies(reply: FastifyReply): void {
   reply.clearCookie("accessToken", {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: SECURE_COOKIES,
     sameSite: "lax",
     path: "/",
   });
 
   reply.clearCookie("refreshToken", {
     httpOnly: true,
-    secure: IS_PRODUCTION,
+    secure: SECURE_COOKIES,
     sameSite: "lax",
     path: "/api/auth",
   });

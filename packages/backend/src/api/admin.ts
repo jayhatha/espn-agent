@@ -303,12 +303,12 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       const start = startWeek ?? 1;
-      const end = endWeek ?? 26;
+      const end = endWeek ?? 28;
 
-      if (start < 1 || end > 26 || start > end) {
+      if (start < 1 || end > 30 || start > end) {
         return reply.code(400).send({
           error: "Invalid week range",
-          message: "startWeek must be >= 1, endWeek must be <= 26, and startWeek <= endWeek",
+          message: "startWeek must be >= 1, endWeek must be <= 30, and startWeek <= endWeek",
         });
       }
 
@@ -477,7 +477,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const leagueId = parseInt(request.params.leagueId, 10);
       const season = parseInt(request.query.season, 10);
       const startWeek = parseInt(request.query.startWeek || "1", 10);
-      const endWeek = parseInt(request.query.endWeek || "26", 10);
+      const endWeek = parseInt(request.query.endWeek || "28", 10);
 
       if (!season || isNaN(season)) {
         return reply.code(400).send({

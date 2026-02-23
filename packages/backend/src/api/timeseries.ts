@@ -139,6 +139,60 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
   );
 
+  // Category total values over time
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: TimeSeriesQuery & { categoryId: string };
+  }>(
+    "/api/leagues/:leagueId/timeseries/category-total",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const { from, to, teamIds, categoryId, season } = request.query;
+
+      if (!categoryId) {
+        return reply.code(400).send({ error: "categoryId is required" });
+      }
+
+      let query = db
+        .selectFrom("team_daily_category_totals")
+        .select([
+          "league_id",
+          "snapshot_date",
+          "team_id",
+          "category_id",
+          "value",
+        ])
+        .where("league_id", "=", leagueId)
+        .where("category_id", "=", categoryId);
+
+      if (season) {
+        const seasonYear = parseInt(season, 10);
+        query = query
+          .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+          .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+      }
+
+      if (from) {
+        query = query.where("snapshot_date", ">=", from);
+      }
+      if (to) {
+        query = query.where("snapshot_date", "<=", to);
+      }
+      if (teamIds) {
+        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
+        query = query.where("team_id", "in", ids);
+      }
+
+      const series = await query.orderBy("snapshot_date", "asc").execute();
+
+      return { series };
+    },
+  );
+
   // Projected overall over time
   app.get<{
     Params: { leagueId: string };

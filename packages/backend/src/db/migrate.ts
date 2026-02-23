@@ -236,6 +236,56 @@ async function showStatus(): Promise<void> {
 }
 
 /**
+ * Seed default admin user for local development
+ */
+async function seedDevAdmin(): Promise<void> {
+  console.log("=== Seed Dev Admin ===\n");
+
+  const pool = new Pool({ connectionString: DATABASE_URL });
+
+  try {
+    await pool.query("SELECT 1");
+
+    // Check if users table exists
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables WHERE table_name = 'users'
+      )
+    `);
+    if (!tableCheck.rows[0].exists) {
+      console.error("Users table does not exist. Run migrations first.");
+      process.exit(1);
+    }
+
+    // bcrypt hash of "Admin123" with 13 rounds
+    const passwordHash =
+      "$2a$13$AU9xOmRLNFO91Wr4a1TC3O5xxJFK1W7rDz/iCoEiw4jcU./7fCTSm";
+
+    const result = await pool.query(
+      `INSERT INTO users (email, email_verified, password_hash, role, oauth_provider, display_name)
+       VALUES ($1, TRUE, $2, 'admin', 'local', 'Admin')
+       ON CONFLICT (email) DO NOTHING
+       RETURNING id`,
+      ["admin@espn-agent.local", passwordHash],
+    );
+
+    if (result.rowCount && result.rowCount > 0) {
+      console.log("Created dev admin user:");
+    } else {
+      console.log("Dev admin user already exists:");
+    }
+    console.log("  Email:    admin@espn-agent.local");
+    console.log("  Password: Admin123");
+    console.log("  Role:     admin\n");
+  } catch (error) {
+    console.error("Error:", error);
+    process.exit(1);
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
  * Mark a migration as applied without running it
  * Useful when tables already exist from manual creation
  */
@@ -310,13 +360,19 @@ if (command === "status") {
     console.error("Mark failed:", error);
     process.exit(1);
   });
+} else if (command === "seed") {
+  seedDevAdmin().catch((error) => {
+    console.error("Seed failed:", error);
+    process.exit(1);
+  });
 } else {
   console.error("Usage: tsx migrate.ts [command]");
   console.error("Commands:");
   console.error("  up (default)       Apply pending migrations");
   console.error("  status             Show migration status");
+  console.error("  seed               Create default dev admin user");
   console.error("  mark-applied <ver> Mark migration as applied without running");
   process.exit(1);
 }
 
-export { runMigrations, showStatus, markAsApplied };
+export { runMigrations, showStatus, markAsApplied, seedDevAdmin };

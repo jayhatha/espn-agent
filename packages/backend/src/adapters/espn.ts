@@ -252,6 +252,26 @@ export class ESPNAdapter {
   }
 
   /**
+   * Fetch the final scoring period ID for a season from the ESPN game-level API.
+   * This is the last daily scoring period (e.g. 196 for 2024).
+   * Returns undefined if the API call fails.
+   */
+  async getFinalScoringPeriod(season: number): Promise<number | undefined> {
+    try {
+      const response = await this.client.get(`/seasons/${season}`, {
+        validateStatus: (status) => status < 500,
+      });
+      if (response.status === 200 && response.data?.currentScoringPeriod?.id) {
+        return response.data.currentScoringPeriod.id as number;
+      }
+      return undefined;
+    } catch (error) {
+      this.logger?.warn({ error, season }, "Failed to fetch final scoring period");
+      return undefined;
+    }
+  }
+
+  /**
    * Fetch historical league data for a specific scoring period (week)
    * Includes instance-level throttle: enforces minimum 2000ms between requests
    */
@@ -286,6 +306,21 @@ export class ESPNAdapter {
       if (auth?.SWID && auth?.espn_s2) {
         headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
       }
+
+      // Request per-period player stats (statSplitTypeId=5) so the accumulation
+      // loop in writeCurrentStandingsFromPlayerStats gets each player's weekly stats.
+      // Without this filter, ESPN only returns default season-level stats and
+      // most players lack per-period entries, producing drastically low team totals.
+      headers["x-fantasy-filter"] = JSON.stringify({
+        players: {
+          filterStatsForSplitTypeIds: { value: [5] },
+          filterStatsForSourceIds: { value: [0, 1] },
+          filterStatsForExternalIds: { value: [scoringPeriodId] },
+          sortPercOwned: { sortAsc: false, sortPriority: 1 },
+          limit: 1500,
+          offset: 0,
+        },
+      });
 
       this.logger?.info(
         { leagueId, season, scoringPeriodId },

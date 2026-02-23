@@ -23,8 +23,9 @@ function AdminPageContent() {
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
   const [season, setSeason] = useState<number>(new Date().getFullYear() - 1);
   const [startWeek, setStartWeek] = useState<number>(1);
-  const [endWeek, setEndWeek] = useState<number>(26);
+  const [endWeek, setEndWeek] = useState<number>(28);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [clearExisting, setClearExisting] = useState<boolean>(false);
   const [backfillError, setBackfillError] = useState<string | null>(null);
   const [backfillSuccess, setBackfillSuccess] = useState<string | null>(null);
 
@@ -117,11 +118,12 @@ function AdminPageContent() {
 
   // Backfill mutation
   const backfillMutation = useMutation({
-    mutationFn: async (data: { leagueId: number; season: number; startWeek: number; endWeek: number }) => {
+    mutationFn: async (data: { leagueId: number; season: number; startWeek: number; endWeek: number; clearExisting: boolean }) => {
       return api.triggerBackfill(data.leagueId, {
         season: data.season,
         startWeek: data.startWeek,
         endWeek: data.endWeek,
+        clearExisting: data.clearExisting,
       });
     },
     onSuccess: (data: any) => {
@@ -215,6 +217,7 @@ function AdminPageContent() {
       season,
       startWeek,
       endWeek,
+      clearExisting,
     });
   };
 
@@ -863,7 +866,7 @@ function AdminPageContent() {
                 value={startWeek}
                 onChange={(e) => setStartWeek(parseInt(e.target.value, 10))}
                 min={1}
-                max={26}
+                max={30}
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                 required
               />
@@ -878,11 +881,27 @@ function AdminPageContent() {
                 value={endWeek}
                 onChange={(e) => setEndWeek(parseInt(e.target.value, 10))}
                 min={1}
-                max={26}
+                max={30}
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                 required
               />
             </div>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              id="clearExisting"
+              type="checkbox"
+              checked={clearExisting}
+              onChange={(e) => setClearExisting(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="clearExisting" className="ml-2 block text-sm text-gray-700">
+              Clear existing data before backfill
+            </label>
+            <span className="ml-2 text-xs text-gray-500">
+              (Deletes existing snapshots for the selected season/week range)
+            </span>
           </div>
 
           {backfillSuccess && (

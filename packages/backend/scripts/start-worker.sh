@@ -3,7 +3,7 @@ set -e
 
 echo "Reinstalling dependencies to fix symlinks..."
 cd /app
-pnpm install --prefer-offline
+CI=true pnpm install --prefer-offline
 
 echo "Building shared package..."
 cd /app/packages/shared

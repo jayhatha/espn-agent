@@ -45,6 +45,14 @@ interface ProjectedOverallDataPoint {
   projected_overall_rank: number;
 }
 
+interface CategoryTotalDataPoint {
+  league_id: number;
+  snapshot_date: string;
+  team_id: number;
+  category_id: string;
+  value: number;
+}
+
 interface TransactionAnnotation {
   id: number;
   league_id: number;
@@ -62,7 +70,7 @@ interface Team {
   name: string;
 }
 
-type ViewMode = "overall" | "category" | "projected";
+type ViewMode = "overall" | "category" | "projected" | "values";
 
 const COLORS = [
   "#3b82f6", // blue
@@ -170,6 +178,23 @@ export default function TrendsPage() {
     enabled: !!leagueId && viewMode === "projected",
   });
 
+  // Fetch category total (values) time series
+  const { data: categoryTotalData, isLoading: categoryTotalLoading } = useQuery({
+    queryKey: ["timeseries-category-total", leagueId, selectedCategory, selectedSeason, fromDate, toDate],
+    queryFn: async () => {
+      return api.getCategoryTotalTimeSeries(
+        parseInt(leagueId, 10),
+        selectedCategory,
+        {
+          season: selectedSeason,
+          from: fromDate,
+          to: toDate,
+        },
+      ) as Promise<{ series: CategoryTotalDataPoint[] }>;
+    },
+    enabled: !!leagueId && viewMode === "values",
+  });
+
   // Fetch transaction annotations
   const { data: annotationsData } = useQuery({
     queryKey: ["annotations", leagueId, selectedTeamId, fromDate, toDate, selectedSeason],
@@ -219,6 +244,20 @@ export default function TrendsPage() {
         const teamName =
           teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.overall_rank;
+        dateMap.get(point.snapshot_date)[`${teamName}_points`] = point.overall_points;
+      });
+      return Array.from(dateMap.values()).sort((a, b) =>
+        a.date.localeCompare(b.date),
+      );
+    } else if (viewMode === "values" && categoryTotalData) {
+      const dateMap = new Map<string, any>();
+      categoryTotalData.series.forEach((point) => {
+        if (!dateMap.has(point.snapshot_date)) {
+          dateMap.set(point.snapshot_date, { date: point.snapshot_date });
+        }
+        const teamName =
+          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        dateMap.get(point.snapshot_date)[teamName] = point.value;
       });
       return Array.from(dateMap.values()).sort((a, b) =>
         a.date.localeCompare(b.date),
@@ -255,11 +294,11 @@ export default function TrendsPage() {
   };
 
   const chartData = getChartData();
-  const isLoading = overallLoading || categoryLoading || projectedLoading || (viewMode === "category" && categoriesLoading);
+  const isLoading = overallLoading || categoryLoading || projectedLoading || categoryTotalLoading || ((viewMode === "category" || viewMode === "values") && categoriesLoading);
 
   const teamNames =
     chartData.length > 0
-      ? Object.keys(chartData[0]).filter((k) => k !== "date")
+      ? Object.keys(chartData[0]).filter((k) => k !== "date" && !k.endsWith("_points"))
       : [];
 
   const relevantAnnotations = annotationsData?.annotations || [];
@@ -307,6 +346,16 @@ export default function TrendsPage() {
               >
                 Projected Standings
               </button>
+              <button
+                onClick={() => setViewMode("values")}
+                className={`${
+                  viewMode === "values"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+              >
+                Category Values
+              </button>
             </nav>
 
             {/* Season Selector */}
@@ -328,7 +377,7 @@ export default function TrendsPage() {
         </div>
 
         {/* Category selector for category view */}
-        {viewMode === "category" && (
+        {(viewMode === "category" || viewMode === "values") && (
           <div className="p-6 border-b border-gray-200">
             <label
               htmlFor="category-select"
@@ -394,6 +443,8 @@ export default function TrendsPage() {
               {viewMode === "category" &&
                 `${categories.find((c: { value: string; label: string }) => c.value === selectedCategory)?.label} Rankings Over Time`}
               {viewMode === "projected" && "Projected Standings Over Time"}
+              {viewMode === "values" &&
+                `${categories.find((c: { value: string; label: string }) => c.value === selectedCategory)?.label} Values Over Time`}
             </h2>
 
             <div className="h-96">
@@ -413,10 +464,10 @@ export default function TrendsPage() {
                     }
                   />
                   <YAxis
-                    reversed
-                    domain={[1, teamNames.length]}
+                    reversed={viewMode !== "values"}
+                    domain={viewMode === "values" ? ["auto", "auto"] : [1, teamNames.length]}
                     label={{
-                      value: "Rank",
+                      value: viewMode === "values" ? selectedCategory : "Rank",
                       angle: -90,
                       position: "insideLeft",
                     }}
@@ -429,7 +480,22 @@ export default function TrendsPage() {
                         year: "numeric",
                       })
                     }
-                    formatter={(value: any) => [`Rank ${value}`, ""]}
+                    formatter={(value: any, name: string, props: any) => {
+                      if (viewMode === "values") {
+                        const numVal = typeof value === "number" ? value : parseFloat(value);
+                        const formatted = numVal < 1 && numVal > 0
+                          ? numVal.toFixed(3)
+                          : numVal % 1 !== 0
+                          ? numVal.toFixed(2)
+                          : String(numVal);
+                        return [formatted, name];
+                      }
+                      if (viewMode === "overall") {
+                        const points = props.payload?.[`${name}_points`];
+                        return points != null ? [`Rank ${value} (${points} pts)`, name] : [`Rank ${value}`, name];
+                      }
+                      return [`Rank ${value}`, name];
+                    }}
                   />
                   <Legend />
 
@@ -468,8 +534,10 @@ export default function TrendsPage() {
 
             <div className="mt-6 text-xs text-gray-500">
               <p>
-                <strong>Note:</strong> Lower rank numbers are better (1st place
-                = rank 1).
+                <strong>Note:</strong>{" "}
+                {viewMode === "values"
+                  ? "Shows cumulative stat values over the season."
+                  : "Lower rank numbers are better (1st place = rank 1)."}
                 {selectedTeamId &&
                   " Your team is highlighted with a thicker line."}
               </p>

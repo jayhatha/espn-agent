@@ -12,8 +12,8 @@ interface AnnotationData {
   event_date: string;
   event_type: string;
   team_name?: string;
-  players_added_details: PlayerDetail[];
-  players_dropped_details: PlayerDetail[];
+  players_added_details?: PlayerDetail[];
+  players_dropped_details?: PlayerDetail[];
 }
 
 interface TransactionMarkerProps {
@@ -94,16 +94,16 @@ export function TransactionMarker({ viewBox, annotation }: TransactionMarkerProp
             {annotation.team_name && (
               <div className="text-gray-700 mb-1">{annotation.team_name}</div>
             )}
-            {annotation.players_added_details.length > 0 && (
+            {(annotation.players_added_details?.length ?? 0) > 0 && (
               <div className="text-green-700">
                 <span className="font-semibold">Added:</span>{" "}
-                {annotation.players_added_details.map((p) => p.name).join(", ")}
+                {annotation.players_added_details!.map((p) => p.name).join(", ")}
               </div>
             )}
-            {annotation.players_dropped_details.length > 0 && (
+            {(annotation.players_dropped_details?.length ?? 0) > 0 && (
               <div className="text-red-700">
                 <span className="font-semibold">Dropped:</span>{" "}
-                {annotation.players_dropped_details.map((p) => p.name).join(", ")}
+                {annotation.players_dropped_details!.map((p) => p.name).join(", ")}
               </div>
             )}
           </div>
