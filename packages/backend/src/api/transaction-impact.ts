@@ -100,9 +100,14 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .execute();
 
       // Compute summary
-      const totalImpact = impacts.reduce((sum, i) => sum + Number(i.impact_roto_points), 0);
+      const sumOfIndividualImpacts = impacts.reduce((sum, i) => sum + Number(i.impact_roto_points), 0);
+      const avgImpactPerMove = impacts.length > 0 ? sumOfIndividualImpacts / impacts.length : 0;
       const bestMove = impacts.length > 0 ? impacts[0] : null;
       const worstMove = impacts.length > 0 ? impacts[impacts.length - 1] : null;
+
+      // Compute Net Roster Management Value
+      const agent = new TransactionImpactAgent(db, request.log as any);
+      const netResult = await agent.computeNetRosterValue(leagueId, season, teamId);
 
       return {
         impacts: impacts.map((i) => ({
@@ -121,7 +126,11 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         })),
         summary: {
           totalMoves: impacts.length,
-          totalImpact: Math.round(totalImpact * 100) / 100,
+          netRosterValue: netResult?.netRosterValue ?? null,
+          actualRotoPoints: netResult?.actualRotoPoints ?? null,
+          draftOnlyRotoPoints: netResult?.draftOnlyRotoPoints ?? null,
+          avgImpactPerMove: Math.round(avgImpactPerMove * 100) / 100,
+          sumOfIndividualImpacts: Math.round(sumOfIndividualImpacts * 100) / 100,
           bestMove: bestMove
             ? { playerName: bestMove.gained_player_name, impact: Number(bestMove.impact_roto_points) }
             : null,
