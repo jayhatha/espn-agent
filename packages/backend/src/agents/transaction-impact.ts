@@ -301,14 +301,15 @@ export class TransactionImpactAgent {
     for (const row of rows) {
       if (!result.has(row.team_id)) result.set(row.team_id, {});
       const components = result.get(row.team_id)!;
-      // Store the category value directly (includes corrected counting stats)
-      components[`_val_${row.category_id}`] = row.value;
+      // Store the category value — parse to number since PostgreSQL returns float8 as string
+      components[`_val_${row.category_id}`] = Number(row.value) || 0;
       // Also store raw components for rate stat recomputation
       if (row.components_json) {
         const comps = row.components_json as Record<string, number>;
         for (const [key, val] of Object.entries(comps)) {
-          if (typeof val === "number") {
-            components[key] = val;
+          const num = Number(val);
+          if (!isNaN(num)) {
+            components[key] = num;
           }
         }
       }
@@ -824,6 +825,7 @@ export class TransactionImpactAgent {
           lostCounterfactual || {},
           categories,
           sgpFactors,
+          teamFinalComponents.get(teamId)!,
         );
 
         // Compute replacement-level impact for draft picks
@@ -1197,6 +1199,7 @@ export class TransactionImpactAgent {
     lostComponents: Record<string, number>,
     categories: CategoryConfig[],
     sgpFactors: Record<string, number>,
+    teamActualComponents: Record<string, number>,
   ): Array<{
     categoryId: string;
     sgpDelta: number;
@@ -1211,9 +1214,42 @@ export class TransactionImpactAgent {
     }> = [];
 
     for (const cat of categories) {
-      const gained = (gainedComponents && gainedComponents[cat.statKey]) || 0;
-      const lost = lostComponents[cat.statKey] || 0;
-      const rawDelta = gained - lost;
+      let rawDelta: number;
+
+      if (cat.type === "RATE" && cat.formulaId) {
+        // For rate stats, compute team-level rate change by building a counterfactual
+        const counterfactual = { ...teamActualComponents };
+        if (gainedComponents) {
+          for (const [key, val] of Object.entries(gainedComponents)) {
+            if (key in counterfactual && typeof val === "number") {
+              counterfactual[key] -= val;
+            }
+          }
+        }
+        for (const [key, val] of Object.entries(lostComponents)) {
+          if (typeof val === "number") {
+            counterfactual[key] = (counterfactual[key] || 0) + val;
+          }
+        }
+
+        const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        const buildRateArgs = (comps: Record<string, number>) => {
+          if (isPitchingRate) {
+            return { H: comps.HA || 0, BB: comps.BBA || 0, IP: comps.IP || 0, ER: comps.ER || 0, K: comps.K || 0 };
+          }
+          return comps;
+        };
+
+        const actualRate = calculateFinalRate(cat.formulaId, {}, buildRateArgs(teamActualComponents));
+        const counterfactualRate = calculateFinalRate(cat.formulaId, {}, buildRateArgs(counterfactual));
+        rawDelta = actualRate - counterfactualRate;
+      } else {
+        // Counting stats: direct component delta
+        const gained = (gainedComponents && gainedComponents[cat.statKey]) || 0;
+        const lost = lostComponents[cat.statKey] || 0;
+        rawDelta = gained - lost;
+      }
+
       const sgpFactor = sgpFactors[cat.statKey] || 1.0;
       const sgpDelta = rawDelta / sgpFactor;
 

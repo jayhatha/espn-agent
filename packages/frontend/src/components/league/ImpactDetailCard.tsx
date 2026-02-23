@@ -44,7 +44,8 @@ export default function ImpactDetailCard({
 
   // Use SGP data for category breakdown — shows raw stat contributions
   const sgpData = sgpCategoryImpacts || [];
-  const nonZeroSgp = sgpData.filter((s) => Math.abs(s.rawDelta) >= 0.5);
+  // Filter by SGP delta (not raw delta) so rate stats with small raw values but big SGP impact show up
+  const nonZeroSgp = sgpData.filter((s) => Math.abs(s.sgpDelta) >= 0.01 || Math.abs(s.rawDelta) >= 0.5);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 mt-2">
@@ -114,10 +115,18 @@ export default function ImpactDetailCard({
                   <tr key={sgp.categoryId} className="border-b border-gray-50">
                     <td className="py-1 pr-3 font-medium text-gray-700">{sgp.categoryId}</td>
                     <td className="py-1 px-2 text-right text-gray-600">
-                      <span className={sgp.rawDelta > 0 ? "text-green-600" : sgp.rawDelta < 0 ? "text-red-600" : ""}>
-                        {sgp.rawDelta > 0 ? "+" : ""}
-                        {Math.abs(sgp.rawDelta) < 1 ? sgp.rawDelta.toFixed(3) : Math.round(sgp.rawDelta)}
-                      </span>
+                      {(() => {
+                        const isLowerBetter = ["ERA", "WHIP"].includes(sgp.categoryId);
+                        const isGood = isLowerBetter ? sgp.rawDelta < 0 : sgp.rawDelta > 0;
+                        const isBad = isLowerBetter ? sgp.rawDelta > 0 : sgp.rawDelta < 0;
+                        const color = isGood ? "text-green-600" : isBad ? "text-red-600" : "";
+                        return (
+                          <span className={color}>
+                            {sgp.rawDelta > 0 ? "+" : ""}
+                            {Math.abs(sgp.rawDelta) < 1 ? sgp.rawDelta.toFixed(3) : Math.round(sgp.rawDelta)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td
                       className="py-1 pl-2 text-right"
