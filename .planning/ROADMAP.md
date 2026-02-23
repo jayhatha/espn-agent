@@ -113,7 +113,7 @@ Plans:
   2. Roster moves derived from weekly snapshot diffs with draft picks identified from opening-day roster
   3. Each move shows roto-points impact computed via counterfactual analysis (actual vs what-if-you-hadn't-made-this-move) (UPGRADE: Shapley values)
   4. Frontend shows impact timeline, move leaderboard (best/worst moves), and draft pick report (UPGRADE: confidence indicators, SGP)
-**Plans:** 2 plans (statistical methodology upgrade)
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 09-01-PLAN.md — Shapley value computation, SGP category normalization, replacement-level baselines, DB migration
@@ -133,4 +133,4 @@ Plans:
 | 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
-| 9. Transaction Impact (Roto WPA) | v1.1 | 0/2 | In Progress | - |
+| 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
