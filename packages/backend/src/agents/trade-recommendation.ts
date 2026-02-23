@@ -20,6 +20,19 @@ import {
  * - Fairness scoring based on projected standings impact
  */
 
+const POSITION_SCARCITY: Record<string, number> = {
+  C: 1.5,    // Very scarce - few quality catchers
+  SS: 1.2,   // Moderately scarce
+  "2B": 1.1, // Slightly scarce
+  "3B": 1.0, // Average
+  "1B": 0.9, // Deep position
+  OF: 0.8,   // Very deep
+  SP: 1.0,   // Average (many SPs but also many slots)
+  RP: 1.3,   // Scarce - quality closers are rare
+  P: 1.0,    // Generic pitcher slot
+  UTIL: 0.5, // Not position-specific
+};
+
 export interface TradePlayer {
   playerId: number;
   playerName: string;
@@ -52,6 +65,14 @@ export interface TradeImpactAnalysis {
   explanation: string;
 }
 
+export interface PositionalContext {
+  positionGained: string[];       // Primary positions of received player(s)
+  positionLost: string[];         // Primary positions of given player(s)
+  fillsNeed: boolean;             // True if received player fills a thin position
+  needPositions: string[];        // Positions where team has below-average depth
+  positionalBonus: number;        // Bonus points added to scoring (0 to ~3)
+}
+
 export interface TradeCandidate {
   trade: ProposedTrade;
   partnerTeamId: number;
@@ -61,6 +82,7 @@ export interface TradeCandidate {
   fairnessScore: number;
   likelihood: "high" | "medium" | "low";
   explanation: string;
+  positionalContext?: PositionalContext;
 }
 
 export class TradeRecommendationAgent {
@@ -394,6 +416,31 @@ export class TradeRecommendationAgent {
       );
     }
 
+    // Fetch league settings for roster slots (for positional depth analysis)
+    const settingsVersion = await this.db
+      .selectFrom("league_daily_snapshot")
+      .innerJoin(
+        "league_settings_version",
+        "league_daily_snapshot.settings_version_id",
+        "league_settings_version.id",
+      )
+      .select(["league_settings_version.settings_json"])
+      .where("league_daily_snapshot.league_id", "=", leagueId)
+      .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    const rosterSlots =
+      settingsVersion && (settingsVersion.settings_json as any).roster_slots
+        ? (settingsVersion.settings_json as any).roster_slots
+        : {};
+
+    // Analyze roster depth for positional scoring
+    const userRosterForDepth = userRoster.map((p) => ({
+      player_id: p.player_id,
+      positions: p.positions,
+    }));
+    const depthMap = this.analyzeRosterDepth(userRosterForDepth, rosterSlots);
+
     // OPTIMIZATION 2: Get projections for all players upfront
     const allPlayerIds = allRosters.map((p) => p.player_id);
     const projectionsMap = new Map<number, Record<string, number>>();
@@ -445,11 +492,13 @@ export class TradeRecommendationAgent {
         continue;
       }
 
-      // OPTIMIZATION 4: Create candidate pairs with value pre-filtering
+      // OPTIMIZATION 4: Create candidate pairs with value pre-filtering and positional scoring
       const tradePairs: Array<{
         give: typeof userRoster[0];
         receive: typeof partnerRoster[0];
         valueDelta: number;
+        positionalBonus: number;
+        positionalContext: PositionalContext;
       }> = [];
 
       for (const givePlayer of userRoster) {
@@ -459,20 +508,40 @@ export class TradeRecommendationAgent {
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
 
-          // Quick filter: only consider if receiving player has higher value
-          // (Heuristic: we want positive value trades)
-          if (valueDelta > 0) {
-            tradePairs.push({ give: givePlayer, receive: receivePlayer, valueDelta });
+          // Compute positional bonus for this trade pair
+          const positionalContext = this.computePositionalBonus(
+            [givePlayer.positions],
+            [receivePlayer.positions],
+            depthMap,
+          );
+
+          // Quick filter: only consider if receiving player has higher value OR fills a positional need
+          // (Heuristic: we want positive value trades or trades that fill needs)
+          if (valueDelta > 0 || positionalContext.fillsNeed) {
+            tradePairs.push({
+              give: givePlayer,
+              receive: receivePlayer,
+              valueDelta,
+              positionalBonus: positionalContext.positionalBonus,
+              positionalContext,
+            });
           }
         }
       }
 
-      // Sort by value delta (most promising first) and limit to top candidates per team
-      tradePairs.sort((a, b) => b.valueDelta - a.valueDelta);
+      // Sort by combined value delta + positional bonus (most promising first)
+      tradePairs.sort(
+        (a, b) =>
+          b.valueDelta + b.positionalBonus - (a.valueDelta + a.positionalBonus),
+      );
       const topPairsForTeam = tradePairs.slice(0, 20); // Only analyze top 20 per team
 
       // Analyze top candidates
-      for (const { give: givePlayer, receive: receivePlayer } of topPairsForTeam) {
+      for (const {
+        give: givePlayer,
+        receive: receivePlayer,
+        positionalContext,
+      } of topPairsForTeam) {
         if (simulationsRun >= maxSimulations) {
           this.logger?.info(
             { simulationsRun },
@@ -517,7 +586,13 @@ export class TradeRecommendationAgent {
               categoryImpacts: impact.categoryImpacts,
               fairnessScore: impact.fairnessScore,
               likelihood: this.assessTradeLikelihood(impact.fairnessScore),
-              explanation: impact.explanation,
+              explanation: this.generateTradeExplanation(
+                trade,
+                impact.deltaOverallPoints,
+                impact.categoryImpacts,
+                positionalContext,
+              ),
+              positionalContext,
             });
 
             // OPTIMIZATION 5: Early termination if we have enough good candidates
@@ -1039,10 +1114,110 @@ export class TradeRecommendationAgent {
     }
   }
 
+  private analyzeRosterDepth(
+    roster: Array<{ player_id: number; positions: string[] }>,
+    rosterSlots: Record<string, number>,
+  ): Map<string, { count: number; slots: number; depthRatio: number }> {
+    const depthMap = new Map<
+      string,
+      { count: number; slots: number; depthRatio: number }
+    >();
+
+    // Count eligible players for each position
+    for (const [position, slots] of Object.entries(rosterSlots)) {
+      // Skip bench, IL, and UTIL for depth analysis
+      if (position === "BN" || position === "IL" || position === "UTIL") {
+        continue;
+      }
+
+      let count = 0;
+      for (const player of roster) {
+        if (this.canFillSlot(player.positions, position)) {
+          count++;
+        }
+      }
+
+      const depthRatio = slots > 0 ? count / slots : 0;
+      depthMap.set(position, { count, slots, depthRatio });
+    }
+
+    return depthMap;
+  }
+
+  private computePositionalBonus(
+    givePositions: string[][],
+    receivePositions: string[][],
+    depthMap: Map<string, { count: number; slots: number; depthRatio: number }>,
+  ): PositionalContext {
+    // Identify positions of need (depth ratio < 1.5)
+    const needPositions: string[] = [];
+    for (const [position, depth] of depthMap.entries()) {
+      if (depth.depthRatio < 1.5) {
+        needPositions.push(position);
+      }
+    }
+
+    // Extract primary positions (first in each array)
+    const positionGained = receivePositions.map((positions) => positions[0] || "UTIL");
+    const positionLost = givePositions.map((positions) => positions[0] || "UTIL");
+
+    // Check if any received player fills a need
+    let fillsNeed = false;
+    for (const positions of receivePositions) {
+      for (const position of positions) {
+        if (needPositions.includes(position)) {
+          fillsNeed = true;
+          break;
+        }
+      }
+      if (fillsNeed) break;
+    }
+
+    // Calculate positional bonus
+    let positionalBonus = 0;
+
+    for (let i = 0; i < receivePositions.length; i++) {
+      const receivePrimary = receivePositions[i][0];
+      if (!receivePrimary) continue;
+
+      // Add scarcity bonus if filling a need
+      const receiveFillsNeed = receivePositions[i].some((pos) =>
+        needPositions.includes(pos),
+      );
+      if (receiveFillsNeed) {
+        const scarcityMultiplier = POSITION_SCARCITY[receivePrimary] || 1.0;
+        positionalBonus += scarcityMultiplier * 0.5;
+
+        // Additional bonus if trading from depth
+        if (i < givePositions.length) {
+          const givePrimary = givePositions[i][0];
+          if (givePrimary) {
+            const giveDepth = depthMap.get(givePrimary);
+            if (giveDepth && giveDepth.depthRatio > 2.5) {
+              positionalBonus += 0.5;
+            }
+          }
+        }
+      }
+    }
+
+    // Cap total bonus at 3.0
+    positionalBonus = Math.min(positionalBonus, 3.0);
+
+    return {
+      positionGained,
+      positionLost,
+      fillsNeed,
+      needPositions,
+      positionalBonus,
+    };
+  }
+
   private generateTradeExplanation(
     trade: ProposedTrade,
     deltaPoints: number,
     categoryImpacts: CategoryImpact[],
+    positionalContext?: PositionalContext,
   ): string {
     const giveNames = trade.givePlayers.map((p) => p.playerName).join(", ");
     const receiveNames = trade.receivePlayers
@@ -1054,7 +1229,19 @@ export class TradeRecommendationAgent {
       .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
       .slice(0, 3);
 
-    let explanation = `Trading ${giveNames} for ${receiveNames} would result in a ${deltaPoints > 0 ? "gain" : "loss"} of ${Math.abs(deltaPoints).toFixed(1)} overall roto points. `;
+    let explanation = "";
+
+    // Add positional context if available
+    if (positionalContext?.fillsNeed) {
+      const needsFilledByTrade = positionalContext.needPositions.filter((pos) =>
+        positionalContext.positionGained.includes(pos),
+      );
+      if (needsFilledByTrade.length > 0) {
+        explanation += `Fills a need at ${needsFilledByTrade.join(", ")}. `;
+      }
+    }
+
+    explanation += `Trading ${giveNames} for ${receiveNames} would result in a ${deltaPoints > 0 ? "gain" : "loss"} of ${Math.abs(deltaPoints).toFixed(1)} overall roto points. `;
 
     if (significantImpacts.length > 0) {
       explanation += `Significant impacts: `;
@@ -1065,6 +1252,19 @@ export class TradeRecommendationAgent {
         )
         .join(", ");
       explanation += ".";
+    }
+
+    // Add note if trading from depth
+    if (positionalContext) {
+      const deepPositions = positionalContext.positionLost.filter((pos) => {
+        const depth = Array.from(
+          this.analyzeRosterDepth([], {}).entries(),
+        ).find(([p]) => p === pos);
+        return depth && depth[1].depthRatio > 2.5;
+      });
+      if (deepPositions.length > 0) {
+        explanation += ` Trading from a position of depth (${deepPositions.join(", ")}).`;
+      }
     }
 
     return explanation;
