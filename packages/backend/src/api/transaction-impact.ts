@@ -19,7 +19,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
    */
   app.post<{
     Params: { leagueId: string };
-    Querystring: { season?: string; skipBootstrap?: string };
+    Querystring: { season?: string };
   }>(
     "/api/leagues/:leagueId/transaction-impacts/compute",
     {
@@ -28,35 +28,20 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
-      const skipBootstrap = request.query.skipBootstrap === "true";
 
       const agent = new TransactionImpactAgent(db, request.log as any);
 
       // Step 1: Derive roster moves
       const totalMoves = await agent.deriveRosterMoves(leagueId, season);
 
-      // Step 2: Compute impacts
+      // Step 2: Compute Shapley impacts (includes CI from Monte Carlo sampling variance)
       const impactsComputed = await agent.computeImpacts(leagueId, season);
-
-      // Step 3: Compute bootstrap confidence intervals for all teams
-      if (!skipBootstrap) {
-        const teams = await db
-          .selectFrom("team")
-          .select("id")
-          .where("league_id", "=", leagueId)
-          .execute();
-
-        for (const team of teams) {
-          await agent.bootstrapConfidenceIntervals(leagueId, season, team.id, 200);
-        }
-      }
 
       return {
         success: true,
         season,
         totalMoves,
         impactsComputed,
-        bootstrapComputed: !skipBootstrap,
       };
     },
   );
