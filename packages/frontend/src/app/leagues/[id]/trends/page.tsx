@@ -13,11 +13,13 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceDot,
 } from "recharts";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { TransactionMarker } from "@/components/league/TransactionMarker";
+import { InflectionPointMarker, type InflectionPoint } from "@/components/league/InflectionPointMarker";
 import { DateRangeFilter } from "@/components/league/DateRangeFilter";
 
 interface OverallDataPoint {
@@ -93,6 +95,7 @@ export default function TrendsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("AVG");
   const [selectedSeason, setSelectedSeason] = useState<string | undefined>(undefined);
   const [showAnnotations, setShowAnnotations] = useState(true);
+  const [showInflectionPoints, setShowInflectionPoints] = useState(true);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
   const [toDate, setToDate] = useState<string | undefined>(undefined);
 
@@ -209,6 +212,18 @@ export default function TrendsPage() {
       }>;
     },
     enabled: showAnnotations && !!leagueId,
+  });
+
+  // Fetch inflection points
+  const { data: inflectionData } = useQuery({
+    queryKey: ["inflection-points", leagueId, selectedTeamId, selectedSeason, fromDate, toDate],
+    queryFn: () => api.getInflectionPoints(parseInt(leagueId, 10), selectedTeamId!, {
+      season: selectedSeason,
+      from: fromDate,
+      to: toDate,
+      limit: 5,
+    }),
+    enabled: !!leagueId && !!selectedTeamId && viewMode === "overall",
   });
 
   const teams = teamsData?.teams || [];
@@ -413,20 +428,40 @@ export default function TrendsPage() {
               initialTo={toDate}
             />
 
-            <div className="flex items-center">
-              <input
-                id="show-annotations"
-                type="checkbox"
-                checked={showAnnotations}
-                onChange={(e) => setShowAnnotations(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="show-annotations"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                Show Transactions
-              </label>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <input
+                  id="show-annotations"
+                  type="checkbox"
+                  checked={showAnnotations}
+                  onChange={(e) => setShowAnnotations(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label
+                  htmlFor="show-annotations"
+                  className="ml-2 block text-sm text-gray-700"
+                >
+                  Show Transactions
+                </label>
+              </div>
+
+              {selectedTeamId && viewMode === "overall" && (
+                <div className="flex items-center">
+                  <input
+                    id="show-inflection-points"
+                    type="checkbox"
+                    checked={showInflectionPoints}
+                    onChange={(e) => setShowInflectionPoints(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="show-inflection-points"
+                    className="ml-2 block text-sm text-gray-700"
+                  >
+                    Show Inflection Points
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -528,6 +563,23 @@ export default function TrendsPage() {
                       label={<TransactionMarker annotation={annotation} />}
                     />
                   ))}
+
+                  {/* Inflection point markers */}
+                  {viewMode === "overall" && selectedTeamId && showInflectionPoints && inflectionData?.inflectionPoints?.map((ip: InflectionPoint) => {
+                    const selectedTeamName = teamMap.get(selectedTeamId);
+                    if (!selectedTeamName) return null;
+                    const dataIndex = chartData.findIndex((d) => d.date === ip.date);
+                    if (dataIndex === -1) return null;
+                    return (
+                      <ReferenceDot
+                        key={`ip-${ip.date}`}
+                        x={ip.date}
+                        y={chartData[dataIndex][selectedTeamName]}
+                        r={0}
+                        label={<InflectionPointMarker point={ip} />}
+                      />
+                    );
+                  })}
                 </LineChart>
               </ResponsiveContainer>
             </div>
