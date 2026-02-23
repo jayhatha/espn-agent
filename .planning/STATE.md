@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 07.2 - Fix Counting Stat Magnitude Bug (COMPLETED)
+**Current focus:** Phase 09 - Trade Retrospectives (IN PROGRESS)
 
 ## Current Position
 
-Phase: 07.2 (Fix Counting Stat Magnitude Bug in Backfill)
-Plan: 1 of 1 in current phase
-Status: Completed
-Last activity: 2026-02-23 - Completed quick task 3: Fix move impact metric with single counterfactual
+Phase: 09 (Trade Retrospectives)
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-02-23 - Completed 09-01-PLAN.md: Shapley value attribution with SGP and replacement-level baselines
 
-Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complete)
+Progress: [█████████░] 90% (phases 1-8 + 07.1 + 07.2 + 09.01 complete)
 
 ## Performance Metrics
 
@@ -34,9 +34,9 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 | 05 | 2 | 7min | 3min |
 
 **v1.1 Status:**
-- Plans completed: 6
-- Plans remaining: 0
-- Current phase: 07.2 (Fix Counting Stat Magnitude Bug) - COMPLETED
+- Plans completed: 7
+- Plans remaining: 1 (09-02)
+- Current phase: 09 (Trade Retrospectives) - IN PROGRESS
 
 **By Phase (v1.1):**
 
@@ -50,6 +50,7 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 | 07.1 | P01 | 217min | 2 | 4 |
 | 07.1 | P02 | 4min | 1 | 2 |
 | 07.2 | P01 | 28min | 2 | 2 |
+| 09 | P01 | 6min | 2 | 4 |
 
 **Quick Tasks:**
 
@@ -59,7 +60,7 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 | quick-02 | 3min | 2 | 2 |
 | quick-03 | 3min | 2 | 3 |
 
-*Updated: 2026-02-23 after quick-03 completion*
+*Updated: 2026-02-23 after 09-01 completion*
 
 ## Accumulated Context
 
@@ -94,6 +95,11 @@ Recent decisions affecting v1.1 work:
 - [Quick 02]: Depth threshold at 1.5x roster slots marks positions of need — teams with fewer than 1.5 eligible players per slot are thin at that position
 - [Quick 02]: Positional bonus capped at 3.0 points prevents overwhelming stat-based value — keeps trades balanced between positional and statistical improvements
 - [Quick 02]: Additive bonus (valueDelta + positionalBonus) in pre-filter sorting surfaces positional trades earlier without separate queuing
+- [Phase 09 P01]: Shapley values are the only attribution method with proven efficiency guarantee (per-move impacts sum to netRosterValue)
+- [Phase 09 P01]: 500 Monte Carlo samples (not 1000) balances accuracy vs runtime for teams with 50+ moves
+- [Phase 09 P01]: Pre-load all player contributions upfront to avoid N*samples DB queries during Shapley computation
+- [Phase 09 P01]: SGP factors use average gap (counting stats) and stddev (rate stats) for standings normalization
+- [Phase 09 P01]: Replacement level = average of players ranked N+1 through N+3 just outside rostered pool
 
 ### Roadmap Evolution
 
