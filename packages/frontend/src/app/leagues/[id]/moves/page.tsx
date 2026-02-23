@@ -22,7 +22,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import ImpactBadge from "@/components/league/ImpactBadge";
 import ImpactDetailCard from "@/components/league/ImpactDetailCard";
 
-type TabView = "timeline" | "leaderboard" | "draft";
+type TabView = "timeline" | "leaderboard" | "draft" | "trades";
 type MoveFilter = "all" | "draft" | "add_drop" | "trade";
 
 interface MoveImpact {
@@ -272,7 +272,7 @@ export default function MovesPage() {
           {/* Tab Navigation */}
           <div className="bg-white shadow rounded-lg mb-6">
             <nav className="-mb-px flex border-b border-gray-200">
-              {(["leaderboard", "draft", "timeline"] as const).map((tab) => (
+              {(["leaderboard", "trades", "draft", "timeline"] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -282,7 +282,7 @@ export default function MovesPage() {
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
                 >
-                  {tab === "leaderboard" ? "Move Leaderboard" : tab === "draft" ? "Draft Report" : "Impact Timeline"}
+                  {tab === "leaderboard" ? "Move Leaderboard" : tab === "trades" ? "Trades" : tab === "draft" ? "Draft Report" : "Impact Timeline"}
                 </button>
               ))}
             </nav>
@@ -293,6 +293,13 @@ export default function MovesPage() {
                   impacts={filteredImpacts}
                   moveFilter={moveFilter}
                   setMoveFilter={setMoveFilter}
+                  expandedMoveId={expandedMoveId}
+                  setExpandedMoveId={setExpandedMoveId}
+                />
+              )}
+              {activeTab === "trades" && (
+                <TradesTab
+                  impacts={impacts.filter((m) => m.moveType === "trade")}
                   expandedMoveId={expandedMoveId}
                   setExpandedMoveId={setExpandedMoveId}
                 />
@@ -578,6 +585,145 @@ function formatKeyStats(stats: Record<string, number>): string {
   if (parts.length === 0 && stats.H) parts.push(`${Math.round(stats.H)}H`);
   if (parts.length === 0 && stats.IP) parts.push(`${stats.IP.toFixed(1)}IP`);
   return parts.slice(0, 4).join(" / ");
+}
+
+// ─── Trades Tab ──────────────────────────────────────────
+
+function TradesTab({
+  impacts,
+  expandedMoveId,
+  setExpandedMoveId,
+}: {
+  impacts: MoveImpact[];
+  expandedMoveId: number | null;
+  setExpandedMoveId: (id: number | null) => void;
+}) {
+  // Calculate trade summary
+  const totalTrades = impacts.length;
+  const netTradeImpact = impacts.reduce((sum, m) => sum + (m.shapleyImpact ?? m.impactRotoPoints), 0);
+
+  // Sort by absolute impact (descending)
+  const sortedTrades = [...impacts].sort((a, b) => {
+    const impactA = Math.abs(a.shapleyImpact ?? a.impactRotoPoints);
+    const impactB = Math.abs(b.shapleyImpact ?? b.impactRotoPoints);
+    return impactB - impactA;
+  });
+
+  if (impacts.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No trades found for this season.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Trade Summary Header */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-purple-50 rounded-lg p-4">
+          <div className="text-xs font-medium text-purple-600 uppercase">Total Trades</div>
+          <div className="text-2xl font-bold text-purple-900">{totalTrades}</div>
+        </div>
+        <div className="bg-purple-50 rounded-lg p-4">
+          <div className="text-xs font-medium text-purple-600 uppercase">Net Trade Impact</div>
+          <div className="text-2xl font-bold text-purple-900">
+            <ImpactBadge impact={netTradeImpact} />
+          </div>
+        </div>
+      </div>
+
+      {/* Trades Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Received</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Top Category</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {sortedTrades.map((trade) => {
+              const topSgp = trade.sgpCategoryImpacts
+                ?.filter((c: any) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
+                .sort((a: any, b: any) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as any;
+              const topCatDelta = topSgp ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0) : null;
+
+              // Use Shapley impact if available, else legacy impact
+              const displayImpact = trade.shapleyImpact ?? trade.impactRotoPoints;
+
+              return (
+                <tr key={trade.id} className={`group ${trade.isUncertain ? "opacity-80" : ""}`}>
+                  <td colSpan={5} className="p-0">
+                    <div
+                      className="px-4 py-3 cursor-pointer hover:bg-purple-50 grid grid-cols-5 items-center"
+                      onClick={() => setExpandedMoveId(expandedMoveId === trade.id ? null : trade.id)}
+                    >
+                      <div className="text-sm text-gray-600">
+                        {new Date(trade.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {trade.isIncomplete && (
+                          <span className="ml-1 text-amber-500" title="Incomplete data">&#9888;</span>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {trade.playerGained?.name || "—"}
+                        {trade.playerGained?.positions && (
+                          <span className="ml-1 text-xs text-gray-500">
+                            ({trade.playerGained.positions.join(", ")})
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {trade.playerLost?.name || "—"}
+                        {trade.playerLost?.positions && (
+                          <span className="ml-1 text-xs text-gray-500">
+                            ({trade.playerLost.positions.join(", ")})
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <ImpactBadge
+                          impact={displayImpact}
+                          isUncertain={trade.isUncertain}
+                          ciLow={trade.ciLow}
+                          ciHigh={trade.ciHigh}
+                        />
+                      </div>
+                      <div className="text-right text-xs text-gray-500">
+                        {topSgp ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
+                      </div>
+                    </div>
+
+                    {expandedMoveId === trade.id && (
+                      <div className="px-4 pb-3">
+                        <ImpactDetailCard
+                          playerGained={trade.playerGained}
+                          playerLost={trade.playerLost}
+                          moveType={trade.moveType}
+                          effectiveDate={trade.effectiveDate}
+                          impactRotoPoints={displayImpact}
+                          categoryImpacts={trade.categoryImpacts}
+                          sgpCategoryImpacts={trade.sgpCategoryImpacts}
+                          isUncertain={trade.isUncertain}
+                          ciLow={trade.ciLow}
+                          ciHigh={trade.ciHigh}
+                          isIncomplete={trade.isIncomplete}
+                          onClose={() => setExpandedMoveId(null)}
+                        />
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 // ─── Timeline Tab ────────────────────────────────────────────
