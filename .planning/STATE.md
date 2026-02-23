@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 07.2 (Fix Counting Stat Magnitude Bug in Backfill)
 Plan: 1 of 1 in current phase
 Status: Completed
-Last activity: 2026-02-23 - Completed quick task 2: Add positional value to trade recommendations
+Last activity: 2026-02-23 - Completed quick task 3: Fix move impact metric with single counterfactual
 
 Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complete)
 
@@ -57,8 +57,9 @@ Progress: [████████░░] 89% (phases 1-8 + 07.1 + 07.2 complet
 |----|----------|-------|-------|
 | quick-01 | 2min | 3 | 3 |
 | quick-02 | 3min | 2 | 2 |
+| quick-03 | 3min | 2 | 3 |
 
-*Updated: 2026-02-23 after quick-02 completion*
+*Updated: 2026-02-23 after quick-03 completion*
 
 ## Accumulated Context
 
@@ -125,9 +126,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
 | 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
+| 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
 
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed quick-02-PLAN.md (positional value in trade recommendations)
+Stopped at: Completed quick-03-PLAN.md (fix move impact metric with single counterfactual)
 Resume file: None
