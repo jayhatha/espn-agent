@@ -363,6 +363,58 @@ export class TransactionImpactAgent {
     return computeOverallRotoPoints(categoryRankings);
   }
 
+  /**
+   * Like computeRotoPointsFromComponents but returns per-category roto points.
+   * Used inside Shapley loop to decompose overall impact into per-category contributions.
+   * Returns: teamId → { [categoryStatKey]: rotoPoints, _overall: totalPoints }
+   */
+  private computeRotoPointsWithBreakdown(
+    teamComponents: Map<number, Record<string, number>>,
+    categories: CategoryConfig[],
+    numTeams: number,
+  ): Map<number, Record<string, number>> {
+    const result = new Map<number, Record<string, number>>();
+    for (const teamId of teamComponents.keys()) {
+      result.set(teamId, { _overall: 0 });
+    }
+
+    for (const cat of categories) {
+      const teamValues: Array<{ teamId: number; value: number }> = [];
+
+      for (const [teamId, components] of teamComponents) {
+        let value = components[`_val_${cat.statKey}`] ?? 0;
+
+        if (cat.type === "RATE" && cat.formulaId && !(`_val_${cat.statKey}` in components)) {
+          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+          if (isPitchingRate) {
+            const pc = {
+              H: components.HA || 0, BB: components.BBA || 0,
+              IP: components.IP || 0, ER: components.ER || 0, K: components.K || 0,
+            };
+            if (pc.IP > 0) value = calculateFinalRate(cat.formulaId, {}, pc);
+          } else {
+            value = calculateFinalRate(cat.formulaId, {}, components);
+          }
+        }
+
+        teamValues.push({ teamId, value });
+      }
+
+      teamValues.sort((a, b) =>
+        cat.direction === "LOWER_BETTER" ? a.value - b.value : b.value - a.value,
+      );
+
+      const ranked = assignRanksWithTies(teamValues, numTeams);
+      for (const { teamId, rotoPoints } of ranked) {
+        const entry = result.get(teamId)!;
+        entry[cat.statKey] = rotoPoints;
+        entry._overall += rotoPoints;
+      }
+    }
+
+    return result;
+  }
+
   private groupMovesIntoPairs(
     moves: Array<{
       id: number;
@@ -776,7 +828,7 @@ export class TransactionImpactAgent {
       const emptyCoalition: Record<string, number> = {};
 
       // Compute Shapley values for this team
-      const { values: shapleyValues, standardErrors } = await this.computeTeamShapleyValues(
+      const { values: shapleyValues, standardErrors, categoryValues: shapleyCategoryValues } = await this.computeTeamShapleyValues(
         leagueId,
         teamId,
         movePairs,
@@ -819,14 +871,41 @@ export class TransactionImpactAgent {
           }
         }
 
-        // Compute SGP category impacts
-        const sgpCategoryImpacts = this.computeSGPCategoryImpacts(
-          gainedContribution,
-          lostCounterfactual || {},
-          categories,
-          sgpFactors,
-          teamFinalComponents.get(teamId)!,
-        );
+        // Build per-category Shapley decomposition + raw stat deltas for context
+        const categoryShapley = shapleyCategoryValues.get(i) || {};
+        const sgpCategoryImpacts = categories.map((cat) => {
+          // rawDelta: simple gained-minus-lost for informational display
+          let rawDelta: number;
+          if (cat.type === "RATE" && cat.formulaId) {
+            const teamComps = teamFinalComponents.get(teamId)!;
+            const counterfactual = { ...teamComps };
+            if (gainedContribution) {
+              for (const [key, val] of Object.entries(gainedContribution)) {
+                if (key in counterfactual && typeof val === "number") counterfactual[key] -= val;
+              }
+            }
+            for (const [key, val] of Object.entries(lostCounterfactual || {})) {
+              if (typeof val === "number") counterfactual[key] = (counterfactual[key] || 0) + val;
+            }
+            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            const buildArgs = (c: Record<string, number>) => isPitchingRate
+              ? { H: c.HA || 0, BB: c.BBA || 0, IP: c.IP || 0, ER: c.ER || 0, K: c.K || 0 }
+              : c;
+            const actualRate = calculateFinalRate(cat.formulaId, {}, buildArgs(teamComps));
+            const cfRate = calculateFinalRate(cat.formulaId, {}, buildArgs(counterfactual));
+            rawDelta = actualRate - cfRate;
+          } else {
+            const gained = (gainedContribution && gainedContribution[cat.statKey]) || 0;
+            const lost = (lostCounterfactual && lostCounterfactual[cat.statKey]) || 0;
+            rawDelta = gained - lost;
+          }
+          return {
+            categoryId: cat.statKey,
+            shapleyDelta: Math.round((categoryShapley[cat.statKey] || 0) * 1000) / 1000,
+            rawDelta: Math.round(rawDelta * 1000) / 1000,
+            sgpFactor: sgpFactors[cat.statKey] || 1.0,
+          };
+        });
 
         // Compute replacement-level impact for draft picks
         let replacementLevelComponents: Record<string, number> | null = null;
@@ -1033,7 +1112,7 @@ export class TransactionImpactAgent {
     _actualRotoPoints: Map<number, number>,
     finalSnapshotDate: string,
     numSamples: number,
-  ): Promise<{ values: Map<number, number>; standardErrors: Map<number, number> }> {
+  ): Promise<{ values: Map<number, number>; standardErrors: Map<number, number>; categoryValues: Map<number, Record<string, number>> }> {
     // Pre-load all player contributions to avoid N*samples DB queries
     const playerContributions = new Map<string, Record<string, number>>();
 
@@ -1047,22 +1126,29 @@ export class TransactionImpactAgent {
         playerContributions.set(gainedKey, contribution);
       }
 
-      // Lost player contribution (anywhere)
+      // Lost player contribution (same team only for Shapley coalition)
+      // Using same-team stats ensures the coalition builds up to the team's actual totals.
+      // "Anywhere" stats would subtract dropped players' performance on OTHER teams,
+      // making the coalition systematically weaker and counting stat Shapley values near-zero.
       if (pair.lostPlayerId) {
         const lostKey = `lost_${pair.lostPlayerId}_${pair.effectiveDate}`;
         if (!playerContributions.has(lostKey)) {
-          const contribution = await this.sumPlayerContributionAnywhere(
-            leagueId, pair.lostPlayerId, pair.effectiveDate, finalSnapshotDate,
+          const contribution = await this.sumPlayerContribution(
+            leagueId, pair.lostPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
           );
           playerContributions.set(lostKey, contribution);
         }
       }
     }
 
-    // Track marginal contributions for each move
+    // Track marginal contributions for each move (overall + per-category)
     const marginalContributions = new Map<number, number[]>();
+    const marginalByCategory = new Map<number, Map<string, number[]>>();
     for (let i = 0; i < movePairs.length; i++) {
       marginalContributions.set(i, []);
+      const catMap = new Map<string, number[]>();
+      for (const cat of categories) catMap.set(cat.statKey, []);
+      marginalByCategory.set(i, catMap);
     }
 
     // Monte Carlo sampling
@@ -1109,8 +1195,9 @@ export class TransactionImpactAgent {
 
         const withoutLeague = new Map(teamFinalComponents);
         withoutLeague.set(teamId, withoutComponents);
-        const withoutRotoPoints = this.computeRotoPointsFromComponents(withoutLeague, categories, numTeams);
-        const withoutPoints = withoutRotoPoints.get(teamId) || 0;
+        const withoutBreakdown = this.computeRotoPointsWithBreakdown(withoutLeague, categories, numTeams);
+        const withoutEntry = withoutBreakdown.get(teamId) || { _overall: 0 };
+        const withoutPoints = withoutEntry._overall;
 
         // Add this move to coalition
         const gainedKey = `gained_${move.gainedPlayerId}_${move.effectiveDate}`;
@@ -1159,18 +1246,25 @@ export class TransactionImpactAgent {
 
         const withLeague = new Map(teamFinalComponents);
         withLeague.set(teamId, withComponents);
-        const withRotoPoints = this.computeRotoPointsFromComponents(withLeague, categories, numTeams);
-        const withPoints = withRotoPoints.get(teamId) || 0;
+        const withBreakdown = this.computeRotoPointsWithBreakdown(withLeague, categories, numTeams);
+        const withEntry = withBreakdown.get(teamId) || { _overall: 0 };
+        const withPoints = withEntry._overall;
 
-        // Marginal contribution = with - without
+        // Marginal contribution = with - without (overall + per-category)
         const marginal = withPoints - withoutPoints;
         marginalContributions.get(moveIndex)!.push(marginal);
+        const moveCatMap = marginalByCategory.get(moveIndex)!;
+        for (const cat of categories) {
+          const catMarginal = (withEntry[cat.statKey] || 0) - (withoutEntry[cat.statKey] || 0);
+          moveCatMap.get(cat.statKey)!.push(catMarginal);
+        }
       }
     }
 
-    // Average marginal contributions to get Shapley values + standard errors
+    // Average marginal contributions to get Shapley values + standard errors + per-category
     const shapleyValues = new Map<number, number>();
     const standardErrors = new Map<number, number>();
+    const categoryValues = new Map<number, Record<string, number>>();
     for (let i = 0; i < movePairs.length; i++) {
       const contributions = marginalContributions.get(i)!;
       const n = contributions.length;
@@ -1186,82 +1280,20 @@ export class TransactionImpactAgent {
       } else {
         standardErrors.set(i, 0);
       }
-    }
 
-    return { values: shapleyValues, standardErrors };
-  }
-
-  /**
-   * Compute SGP-normalized category impacts for a move.
-   */
-  private computeSGPCategoryImpacts(
-    gainedComponents: Record<string, number> | null,
-    lostComponents: Record<string, number>,
-    categories: CategoryConfig[],
-    sgpFactors: Record<string, number>,
-    teamActualComponents: Record<string, number>,
-  ): Array<{
-    categoryId: string;
-    sgpDelta: number;
-    rawDelta: number;
-    sgpFactor: number;
-  }> {
-    const result: Array<{
-      categoryId: string;
-      sgpDelta: number;
-      rawDelta: number;
-      sgpFactor: number;
-    }> = [];
-
-    for (const cat of categories) {
-      let rawDelta: number;
-
-      if (cat.type === "RATE" && cat.formulaId) {
-        // For rate stats, compute team-level rate change by building a counterfactual
-        const counterfactual = { ...teamActualComponents };
-        if (gainedComponents) {
-          for (const [key, val] of Object.entries(gainedComponents)) {
-            if (key in counterfactual && typeof val === "number") {
-              counterfactual[key] -= val;
-            }
-          }
-        }
-        for (const [key, val] of Object.entries(lostComponents)) {
-          if (typeof val === "number") {
-            counterfactual[key] = (counterfactual[key] || 0) + val;
-          }
-        }
-
-        const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
-        const buildRateArgs = (comps: Record<string, number>) => {
-          if (isPitchingRate) {
-            return { H: comps.HA || 0, BB: comps.BBA || 0, IP: comps.IP || 0, ER: comps.ER || 0, K: comps.K || 0 };
-          }
-          return comps;
-        };
-
-        const actualRate = calculateFinalRate(cat.formulaId, {}, buildRateArgs(teamActualComponents));
-        const counterfactualRate = calculateFinalRate(cat.formulaId, {}, buildRateArgs(counterfactual));
-        rawDelta = actualRate - counterfactualRate;
-      } else {
-        // Counting stats: direct component delta
-        const gained = (gainedComponents && gainedComponents[cat.statKey]) || 0;
-        const lost = lostComponents[cat.statKey] || 0;
-        rawDelta = gained - lost;
+      // Per-category Shapley averages
+      const catAvgs: Record<string, number> = {};
+      const moveCatMap = marginalByCategory.get(i)!;
+      for (const cat of categories) {
+        const catContribs = moveCatMap.get(cat.statKey)!;
+        catAvgs[cat.statKey] = catContribs.length > 0
+          ? catContribs.reduce((a, b) => a + b, 0) / catContribs.length
+          : 0;
       }
-
-      const sgpFactor = sgpFactors[cat.statKey] || 1.0;
-      const sgpDelta = rawDelta / sgpFactor;
-
-      result.push({
-        categoryId: cat.statKey,
-        sgpDelta: Math.round(sgpDelta * 1000) / 1000,
-        rawDelta: Math.round(rawDelta * 1000) / 1000,
-        sgpFactor: Math.round(sgpFactor * 1000) / 1000,
-      });
+      categoryValues.set(i, catAvgs);
     }
 
-    return result;
+    return { values: shapleyValues, standardErrors, categoryValues };
   }
 
   /**

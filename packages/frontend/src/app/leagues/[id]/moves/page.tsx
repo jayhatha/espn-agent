@@ -344,9 +344,10 @@ function LeaderboardTab({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {impacts.map((move) => {
-              const topCat = move.categoryImpacts
-                ?.filter((c) => c.deltaRotoPoints !== 0)
-                .sort((a, b) => Math.abs(b.deltaRotoPoints) - Math.abs(a.deltaRotoPoints))[0];
+              const topSgp = move.sgpCategoryImpacts
+                ?.filter((c: any) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
+                .sort((a: any, b: any) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as any;
+              const topCatDelta = topSgp ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0) : null;
 
               // Use Shapley impact if available, else legacy impact
               const displayImpact = move.shapleyImpact ?? move.impactRotoPoints;
@@ -384,7 +385,7 @@ function LeaderboardTab({
                         />
                       </div>
                       <div className="text-right text-xs text-gray-500">
-                        {topCat ? `${topCat.categoryId} (${topCat.deltaRotoPoints > 0 ? "+" : ""}${topCat.deltaRotoPoints})` : "—"}
+                        {topSgp ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
                       </div>
                     </div>
 
