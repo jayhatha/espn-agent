@@ -146,7 +146,7 @@ Plans:
   3. Snake draft users see BPA recommendations, pair recommendations at turn, and roster summary
   4. Auction draft users see budget pacing tracker, dollar value recommendations, and spend guidance
   5. Draft state persists across page refreshes via chrome.storage.local
-**Plans:** 5 plans
+**Plans:** 6 plans
 
 Plans:
 - [ ] 10-01-PLAN.md — WXT extension setup, manifest config, baseline rankings bundle, API client
@@ -154,3 +154,4 @@ Plans:
 - [ ] 10-03-PLAN.md — Content script with Shadow DOM sidebar injection, MutationObserver for pick detection
 - [ ] 10-04-PLAN.md — Snake draft UI: BPA recommendations, pair recommendations, roster summary
 - [ ] 10-05-PLAN.md — Auction draft UI: budget pacing tracker, dollar value recommendations
+- [ ] 10-06-PLAN.md — Pick value tracking (overpay/underpay indicators), pre-draft ranking overrides, ADP/countdown display
