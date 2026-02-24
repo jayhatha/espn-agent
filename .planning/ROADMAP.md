@@ -146,7 +146,7 @@ Plans:
   3. Snake draft users see BPA recommendations, pair recommendations at turn, and roster summary
   4. Auction draft users see budget pacing tracker, dollar value recommendations, and spend guidance
   5. Draft state persists across page refreshes via chrome.storage.local
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 - [ ] 10-01-PLAN.md — WXT extension setup, manifest config, baseline rankings bundle, API client
