@@ -366,3 +366,25 @@ export interface TradeValidationResponse {
   giveCount: number;
   receiveCount: number;
 }
+
+// Chrome Extension Draft Assistant Types
+
+export interface DraftPick {
+  playerId: number;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  pickNumber: number;
+  timestamp: number;
+  cost?: number; // Auction only
+  positions: string[];
+}
+
+export interface DraftedPlayer {
+  playerId: number;
+  playerName: string;
+  positions: string[];
+  pickNumber: number;
+  cost?: number; // Auction only
+  projectedStats: StatComponents;
+}
