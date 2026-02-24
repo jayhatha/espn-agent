@@ -13,7 +13,6 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
-  ReferenceDot,
 } from "recharts";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -214,16 +213,18 @@ export default function TrendsPage() {
     enabled: showAnnotations && !!leagueId,
   });
 
-  // Fetch inflection points
+  // Fetch inflection points (category-specific when viewing category rank chart)
+  const inflectionCategory = viewMode === "category" ? selectedCategory : undefined;
   const { data: inflectionData } = useQuery({
-    queryKey: ["inflection-points", leagueId, selectedTeamId, selectedSeason, fromDate, toDate],
+    queryKey: ["inflection-points", leagueId, selectedTeamId, selectedSeason, fromDate, toDate, inflectionCategory],
     queryFn: () => api.getInflectionPoints(parseInt(leagueId, 10), selectedTeamId!, {
       season: selectedSeason,
       from: fromDate,
       to: toDate,
       limit: 5,
+      categoryId: inflectionCategory,
     }),
-    enabled: !!leagueId && !!selectedTeamId && viewMode === "overall",
+    enabled: !!leagueId && !!selectedTeamId && (viewMode === "category" || viewMode === "overall"),
   });
 
   const teams = teamsData?.teams || [];
@@ -445,7 +446,7 @@ export default function TrendsPage() {
                 </label>
               </div>
 
-              {selectedTeamId && viewMode === "overall" && (
+              {selectedTeamId && (viewMode === "overall" || viewMode === "category") && (
                 <div className="flex items-center">
                   <input
                     id="show-inflection-points"
@@ -565,21 +566,16 @@ export default function TrendsPage() {
                   ))}
 
                   {/* Inflection point markers */}
-                  {viewMode === "overall" && selectedTeamId && showInflectionPoints && inflectionData?.inflectionPoints?.map((ip: InflectionPoint) => {
-                    const selectedTeamName = teamMap.get(selectedTeamId);
-                    if (!selectedTeamName) return null;
-                    const dataIndex = chartData.findIndex((d) => d.date === ip.date);
-                    if (dataIndex === -1) return null;
-                    return (
-                      <ReferenceDot
-                        key={`ip-${ip.date}`}
-                        x={ip.date}
-                        y={chartData[dataIndex][selectedTeamName]}
-                        r={0}
-                        label={<InflectionPointMarker point={ip} />}
-                      />
-                    );
-                  })}
+                  {(viewMode === "overall" || viewMode === "category") && selectedTeamId && showInflectionPoints && inflectionData?.inflectionPoints?.map((ip: InflectionPoint) => (
+                    <ReferenceLine
+                      key={`ip-${ip.date}`}
+                      x={ip.date}
+                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? '#10b981' : '#ef4444') : (ip.pointsDelta != null && ip.pointsDelta > 0 ? '#10b981' : '#ef4444')}
+                      strokeDasharray="6 3"
+                      strokeOpacity={0.6}
+                      label={<InflectionPointMarker point={ip} />}
+                    />
+                  ))}
                 </LineChart>
               </ResponsiveContainer>
             </div>

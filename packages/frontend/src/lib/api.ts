@@ -1,5 +1,14 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+// Strip undefined/null values before passing to URLSearchParams
+function cleanParams(params: Record<string, any>): Record<string, string> {
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null) clean[k] = String(v);
+  }
+  return clean;
+}
+
 // Mutex for refresh token rotation - prevents multiple concurrent refresh calls
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -118,7 +127,7 @@ export const api = {
     leagueId: number,
     params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/overall?${query}`);
   },
 
@@ -127,10 +136,10 @@ export const api = {
     categoryId: string,
     params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
-    const query = new URLSearchParams({
+    const query = new URLSearchParams(cleanParams({
       ...params,
       categoryId,
-    } as any).toString();
+    })).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/category-rank?${query}`);
   },
 
@@ -139,10 +148,10 @@ export const api = {
     categoryId: string,
     params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
-    const query = new URLSearchParams({
+    const query = new URLSearchParams(cleanParams({
       ...params,
       categoryId,
-    } as any).toString();
+    })).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/category-total?${query}`);
   },
 
@@ -150,7 +159,7 @@ export const api = {
     leagueId: number,
     params?: { from?: string; to?: string; teamIds?: string; season?: string },
   ) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/projected-overall?${query}`);
   },
 
@@ -168,7 +177,7 @@ export const api = {
     teamId: number,
     params?: { snapshotDate?: string; maxRecommendations?: number },
   ) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/waivers/recommendations?${query}`);
   },
 
@@ -186,13 +195,13 @@ export const api = {
 
   // Projected standings
   async getProjectedStandings(leagueId: number, params?: { snapshotDate?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/standings/projected${query ? '?' + query : ''}`);
   },
 
   // Free agents
   async getFreeAgents(leagueId: number, params?: { limit?: number; sortBy?: string; position?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/free-agents${query ? '?' + query : ''}`);
   },
 
@@ -228,13 +237,13 @@ export const api = {
   },
 
   async getTradeRecommendations(leagueId: number, teamId: number, params?: { partnerTeamId?: number }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/recommendations${query ? '?' + query : ''}`);
   },
 
   // Team overview
   async getTeamOverview(leagueId: number, teamId: number, params?: { snapshotDate?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/overview${query ? '?' + query : ''}`);
   },
 
@@ -245,13 +254,13 @@ export const api = {
 
   // Lineup optimizer
   async getLineupRecommendations(leagueId: number, teamId: number, params?: { snapshotDate?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/lineup/recommendations${query ? '?' + query : ''}`);
   },
 
   // Streaming pitchers
   async getStreamingPitchers(leagueId: number, params?: { teamId?: number; startDate?: string; lookAheadDays?: number; limit?: number }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/streaming-pitchers${query ? '?' + query : ''}`);
   },
 
@@ -265,13 +274,13 @@ export const api = {
 
   // Annotations
   async getAnnotations(leagueId: number, params?: { from?: string; to?: string; teamIds?: string; season?: string }) {
-    const query = new URLSearchParams(params as any).toString();
+    const query = new URLSearchParams(cleanParams(params || {})).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/annotations${query ? '?' + query : ''}`);
   },
 
   // Inflection points
-  async getInflectionPoints(leagueId: number, teamId: number, params?: { season?: string; from?: string; to?: string; limit?: number }) {
-    const qs = new URLSearchParams({ teamId: String(teamId), ...(params && Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))) } as any).toString();
+  async getInflectionPoints(leagueId: number, teamId: number, params?: { season?: string; from?: string; to?: string; limit?: number; categoryId?: string }) {
+    const qs = new URLSearchParams(cleanParams({ teamId, ...params })).toString();
     return fetchAPI(`/api/leagues/${leagueId}/timeseries/inflection-points?${qs}`);
   },
 

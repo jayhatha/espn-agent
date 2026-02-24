@@ -25,29 +25,34 @@ interface Transaction {
 export interface InflectionPoint {
   date: string;
   previousDate: string;
-  pointsDelta: number;
+  pointsDelta?: number;
   rankBefore: number;
   rankAfter: number;
-  categoryChanges: CategoryChange[];
+  rankDelta?: number; // category-specific mode: positive = improved
+  categoryId?: string; // set when category-specific
+  ptsBefore?: number;
+  ptsAfter?: number;
+  categoryChanges?: CategoryChange[];
   transactions: Transaction[];
 }
 
 interface InflectionPointMarkerProps {
-  cx?: number;
-  cy?: number;
+  viewBox?: { x: number; y: number; width?: number; height?: number };
   point: InflectionPoint;
 }
 
-export function InflectionPointMarker({ cx, cy, point }: InflectionPointMarkerProps) {
+export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  if (cx === undefined || cy === undefined) return null;
+  if (!viewBox) return null;
 
-  const isPositive = point.pointsDelta > 0;
-  const color = isPositive ? "#10b981" : "#ef4444"; // green for positive, red for negative
-  const label = isPositive ? `+${point.pointsDelta}` : String(point.pointsDelta);
+  const { x } = viewBox;
+  const topY = 10; // render near top of chart
 
-  // Format date as "MMM d"
+  const isCategoryMode = point.categoryId != null;
+  const isPositive = isCategoryMode ? (point.rankDelta ?? 0) > 0 : (point.pointsDelta ?? 0) > 0;
+  const color = isPositive ? "#10b981" : "#ef4444";
+
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
     const month = date.toLocaleDateString(undefined, { month: "short" });
@@ -55,36 +60,44 @@ export function InflectionPointMarker({ cx, cy, point }: InflectionPointMarkerPr
     return `${month} ${day}`;
   };
 
-  // Estimate tooltip height
-  const baseHeight = 120;
-  const categoryHeight = point.categoryChanges.length * 20;
+  const rankSuffix = (rank: number) => {
+    if (rank === 1) return "st";
+    if (rank === 2) return "nd";
+    if (rank === 3) return "rd";
+    return "th";
+  };
+
+  const baseHeight = 100;
+  const categoryHeight = (point.categoryChanges?.length ?? 0) * 20;
   const transactionHeight = point.transactions.length * 20;
   const tooltipHeight = Math.min(baseHeight + categoryHeight + transactionHeight, 300);
 
   return (
     <g>
-      {/* Diamond marker (rotated square) */}
+      {/* Diamond marker at top of chart */}
       <g
-        transform={`translate(${cx}, ${cy})`}
+        transform={`translate(${x}, ${topY})`}
         style={{ cursor: "pointer" }}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
         <rect
-          x={-6}
-          y={-6}
-          width={12}
-          height={12}
+          x={-7}
+          y={-7}
+          width={14}
+          height={14}
           fill={color}
+          stroke="#fff"
+          strokeWidth={1}
           transform="rotate(45)"
         />
         <text
           x={0}
-          y={0}
+          y={1}
           textAnchor="middle"
           dominantBaseline="central"
           fill="#fff"
-          fontSize={7}
+          fontSize={8}
           fontWeight="bold"
           pointerEvents="none"
         >
@@ -95,28 +108,24 @@ export function InflectionPointMarker({ cx, cy, point }: InflectionPointMarkerPr
       {/* Tooltip */}
       {showTooltip && (
         <foreignObject
-          x={cx - 130}
-          y={cy + 15}
+          x={x - 130}
+          y={topY + 18}
           width={260}
           height={tooltipHeight}
         >
-          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs pointer-events-none">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs">
             <div className="font-bold mb-2">
-              {formatDate(point.date)}: {label} pts (Rank {point.rankBefore} → {point.rankAfter})
+              {formatDate(point.date)}: Rank {point.rankBefore}{rankSuffix(point.rankBefore)} → {point.rankAfter}{rankSuffix(point.rankAfter)}
+              {isCategoryMode && ` (${point.categoryId})`}
+              {!isCategoryMode && point.pointsDelta != null && ` · ${point.pointsDelta > 0 ? "+" : ""}${point.pointsDelta} pts`}
             </div>
 
-            {point.categoryChanges.length > 0 && (
+            {point.categoryChanges && point.categoryChanges.length > 0 && (
               <div className="mb-2">
                 <div className="font-semibold text-gray-700 mb-1">Category Changes:</div>
                 {point.categoryChanges.map((cat, idx) => {
                   const catColor = cat.deltaPts > 0 ? "text-green-700" : "text-red-700";
                   const catLabel = cat.deltaPts > 0 ? `+${cat.deltaPts}` : String(cat.deltaPts);
-                  const rankSuffix = (rank: number) => {
-                    if (rank === 1) return "st";
-                    if (rank === 2) return "nd";
-                    if (rank === 3) return "rd";
-                    return "th";
-                  };
                   return (
                     <div key={idx} className={catColor}>
                       {cat.categoryId}: {catLabel} pts ({cat.rankBefore}{rankSuffix(cat.rankBefore)} → {cat.rankAfter}{rankSuffix(cat.rankAfter)})
@@ -128,17 +137,17 @@ export function InflectionPointMarker({ cx, cy, point }: InflectionPointMarkerPr
 
             {point.transactions.length > 0 ? (
               <div>
-                <div className="font-semibold text-gray-700 mb-1">Transactions:</div>
+                <div className="font-semibold text-gray-700 mb-1">Roster Moves:</div>
                 {point.transactions.map((tx, idx) => (
                   <div key={idx} className="mb-1">
                     {tx.playersAdded.length > 0 && (
                       <div className="text-green-700">
-                        Added: {tx.playersAdded.map((p) => p.name).join(", ")}
+                        + {tx.playersAdded.map((p) => p.name).join(", ")}
                       </div>
                     )}
                     {tx.playersDropped.length > 0 && (
                       <div className="text-red-700">
-                        Dropped: {tx.playersDropped.map((p) => p.name).join(", ")}
+                        - {tx.playersDropped.map((p) => p.name).join(", ")}
                       </div>
                     )}
                   </div>

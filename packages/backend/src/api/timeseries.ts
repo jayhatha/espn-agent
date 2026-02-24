@@ -517,7 +517,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Inflection points (biggest ranking changes)
   app.get<{
     Params: { leagueId: string };
-    Querystring: TimeSeriesQuery & { teamId: string; limit?: string };
+    Querystring: TimeSeriesQuery & { teamId: string; limit?: string; categoryId?: string };
   }>(
     "/api/leagues/:leagueId/timeseries/inflection-points",
     {
@@ -526,7 +526,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { teamId, from, to, season, limit: limitStr } = request.query;
+      const { teamId, from, to, season, limit: limitStr, categoryId } = request.query;
 
       if (!teamId) {
         return reply.code(400).send({ error: "teamId is required" });
@@ -535,7 +535,118 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       const parsedTeamId = parseInt(teamId, 10);
       const limit = Math.min(parseInt(limitStr || "5", 10), 10);
 
-      // Fetch team_daily_overall for the team
+      // Category-specific mode: find biggest rank jumps in a single category
+      if (categoryId) {
+        let catQuery = db
+          .selectFrom("team_daily_category_ranks")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .where("team_id", "=", parsedTeamId)
+          .where("category_id", "=", categoryId);
+
+        if (season) {
+          const seasonYear = parseInt(season, 10);
+          catQuery = catQuery
+            .where("snapshot_date", ">=", `${seasonYear}-01-01`)
+            .where("snapshot_date", "<=", `${seasonYear}-12-31`);
+        }
+        if (from) catQuery = catQuery.where("snapshot_date", ">=", from);
+        if (to) catQuery = catQuery.where("snapshot_date", "<=", to);
+
+        const catSnapshots = await catQuery.orderBy("snapshot_date", "asc").execute();
+
+        // Compute rank deltas between consecutive snapshots
+        const catDeltas: Array<{
+          date: string;
+          previousDate: string;
+          rankBefore: number;
+          rankAfter: number;
+          rankDelta: number;
+          ptsBefore: number;
+          ptsAfter: number;
+        }> = [];
+
+        for (let i = 1; i < catSnapshots.length; i++) {
+          const prev = catSnapshots[i - 1];
+          const curr = catSnapshots[i];
+          const rankDelta = (prev.rank) - (curr.rank); // positive = improved (lower rank is better)
+
+          if (rankDelta !== 0) {
+            catDeltas.push({
+              date: curr.snapshot_date,
+              previousDate: prev.snapshot_date,
+              rankBefore: prev.rank,
+              rankAfter: curr.rank,
+              rankDelta,
+              ptsBefore: prev.roto_points ?? 0,
+              ptsAfter: curr.roto_points ?? 0,
+            });
+          }
+        }
+
+        // Sort by absolute rank change, take top N
+        catDeltas.sort((a, b) => Math.abs(b.rankDelta) - Math.abs(a.rankDelta));
+        const topCatDeltas = catDeltas.slice(0, limit);
+
+        // Enrich with transactions
+        const inflectionPoints = await Promise.all(
+          topCatDeltas.map(async (delta) => {
+            const rosterMoves = await db
+              .selectFrom("roster_move")
+              .innerJoin("player", "player.id", "roster_move.player_id")
+              .select([
+                "roster_move.id",
+                "roster_move.move_type",
+                "roster_move.effective_date",
+                "roster_move.player_id",
+                "player.name as player_name",
+              ])
+              .where("roster_move.league_id", "=", leagueId)
+              .where("roster_move.team_id", "=", parsedTeamId)
+              .where("roster_move.effective_date", ">", delta.previousDate)
+              .where("roster_move.effective_date", "<=", delta.date)
+              .where("roster_move.move_type", "!=", "draft")
+              .orderBy("roster_move.effective_date", "asc")
+              .execute();
+
+            // Group by date into transaction events
+            const byDate = new Map<string, typeof rosterMoves>();
+            for (const m of rosterMoves) {
+              const d = m.effective_date;
+              if (!byDate.has(d)) byDate.set(d, []);
+              byDate.get(d)!.push(m);
+            }
+
+            const enrichedTransactions = Array.from(byDate.entries()).map(([date, moves]) => ({
+              id: moves[0].id,
+              eventType: moves.some((m) => m.move_type.startsWith("trade")) ? "trade" : "waiver",
+              eventDate: date,
+              playersAdded: moves
+                .filter((m) => m.move_type === "add" || m.move_type === "trade_in")
+                .map((m) => ({ id: m.player_id, name: m.player_name })),
+              playersDropped: moves
+                .filter((m) => m.move_type === "drop" || m.move_type === "trade_out")
+                .map((m) => ({ id: m.player_id, name: m.player_name })),
+            }));
+
+            return {
+              date: delta.date,
+              previousDate: delta.previousDate,
+              categoryId,
+              rankBefore: delta.rankBefore,
+              rankAfter: delta.rankAfter,
+              rankDelta: delta.rankDelta,
+              ptsBefore: delta.ptsBefore,
+              ptsAfter: delta.ptsAfter,
+              transactions: enrichedTransactions,
+            };
+          }),
+        );
+
+        return { inflectionPoints };
+      }
+
+      // Overall mode (original): find biggest overall points changes
       let query = db
         .selectFrom("team_daily_overall")
         .selectAll()
@@ -558,7 +669,6 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       const snapshots = await query.orderBy("snapshot_date", "asc").execute();
 
-      // Compute deltas between consecutive snapshots
       const deltas: Array<{
         date: string;
         previousDate: string;
@@ -581,14 +691,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         });
       }
 
-      // Sort by absolute delta, take top N
       deltas.sort((a, b) => Math.abs(b.pointsDelta) - Math.abs(a.pointsDelta));
       const topDeltas = deltas.slice(0, limit);
 
-      // For each inflection point, fetch category breakdowns and transactions
       const inflectionPoints = await Promise.all(
         topDeltas.map(async (delta) => {
-          // Fetch category ranks for both dates
           const prevCategoryRanks = await db
             .selectFrom("team_daily_category_ranks")
             .selectAll()
@@ -605,7 +712,6 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             .where("snapshot_date", "=", delta.date)
             .execute();
 
-          // Build map for quick lookup
           const prevMap = new Map(
             prevCategoryRanks.map((r) => [
               r.category_id,
@@ -619,7 +725,6 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             ]),
           );
 
-          // Compute category deltas
           const categoryChanges: Array<{
             categoryId: string;
             deltaPts: number;
@@ -643,63 +748,46 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             }
           });
 
-          // Sort by absolute delta descending
           categoryChanges.sort(
             (a, b) => Math.abs(b.deltaPts) - Math.abs(a.deltaPts),
           );
 
-          // Fetch correlated transactions (between previousDate and date, inclusive)
-          let txQuery = db
-            .selectFrom("league_transaction_event")
-            .selectAll()
-            .where("league_id", "=", leagueId)
-            .where("team_id", "=", parsedTeamId)
-            .where("event_date", ">", delta.previousDate)
-            .where("event_date", "<=", delta.date)
-            .orderBy("event_date", "asc");
+          const rosterMoves = await db
+            .selectFrom("roster_move")
+            .innerJoin("player", "player.id", "roster_move.player_id")
+            .select([
+              "roster_move.id",
+              "roster_move.move_type",
+              "roster_move.effective_date",
+              "roster_move.player_id",
+              "player.name as player_name",
+            ])
+            .where("roster_move.league_id", "=", leagueId)
+            .where("roster_move.team_id", "=", parsedTeamId)
+            .where("roster_move.effective_date", ">", delta.previousDate)
+            .where("roster_move.effective_date", "<=", delta.date)
+            .where("roster_move.move_type", "!=", "draft")
+            .orderBy("roster_move.effective_date", "asc")
+            .execute();
 
-          const transactions = await txQuery.execute();
-
-          // Enrich transactions with player names
-          const playerIds = new Set<number>();
-          transactions.forEach((tx) => {
-            if (tx.players_added && Array.isArray(tx.players_added)) {
-              tx.players_added.forEach((id: number) => playerIds.add(id));
-            }
-            if (tx.players_dropped && Array.isArray(tx.players_dropped)) {
-              tx.players_dropped.forEach((id: number) => playerIds.add(id));
-            }
-          });
-
-          const playerMap = new Map<number, { id: number; name: string }>();
-          if (playerIds.size > 0) {
-            const players = await db
-              .selectFrom("player")
-              .select(["id", "name"])
-              .where("id", "in", Array.from(playerIds))
-              .execute();
-
-            players.forEach((p) => {
-              playerMap.set(p.id, { id: p.id, name: p.name });
-            });
+          const byDate = new Map<string, typeof rosterMoves>();
+          for (const m of rosterMoves) {
+            const d = m.effective_date;
+            if (!byDate.has(d)) byDate.set(d, []);
+            byDate.get(d)!.push(m);
           }
 
-          const enrichedTransactions = transactions.map((tx) => {
-            const playersAdded = (tx.players_added as number[] || []).map(
-              (id) => playerMap.get(id) || { id, name: "Unknown Player" },
-            );
-            const playersDropped = (tx.players_dropped as number[] || []).map(
-              (id) => playerMap.get(id) || { id, name: "Unknown Player" },
-            );
-
-            return {
-              id: tx.id,
-              eventType: tx.event_type,
-              eventDate: tx.event_date,
-              playersAdded,
-              playersDropped,
-            };
-          });
+          const enrichedTransactions = Array.from(byDate.entries()).map(([date, moves]) => ({
+            id: moves[0].id,
+            eventType: moves.some((m) => m.move_type.startsWith("trade")) ? "trade" : "waiver",
+            eventDate: date,
+            playersAdded: moves
+              .filter((m) => m.move_type === "add" || m.move_type === "trade_in")
+              .map((m) => ({ id: m.player_id, name: m.player_name })),
+            playersDropped: moves
+              .filter((m) => m.move_type === "drop" || m.move_type === "trade_out")
+              .map((m) => ({ id: m.player_id, name: m.player_name })),
+          }));
 
           return {
             date: delta.date,
