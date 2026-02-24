@@ -22,7 +22,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import ImpactBadge from "@/components/league/ImpactBadge";
 import ImpactDetailCard from "@/components/league/ImpactDetailCard";
 
-type TabView = "timeline" | "leaderboard" | "draft" | "trades";
+type TabView = "timeline" | "leaderboard" | "draft" | "trades" | "league";
 type MoveFilter = "all" | "draft" | "add_drop" | "trade";
 
 interface MoveImpact {
@@ -96,7 +96,7 @@ export default function MovesPage() {
   const leagueId = parseInt(params.id as string, 10);
 
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<TabView>("leaderboard");
+  const [activeTab, setActiveTab] = useState<TabView>("league");
   const [moveFilter, setMoveFilter] = useState<MoveFilter>("all");
   const [expandedMoveId, setExpandedMoveId] = useState<number | null>(null);
   const [season, setSeason] = useState<number | null>(null);
@@ -140,6 +140,13 @@ export default function MovesPage() {
     queryKey: ["draft-report", leagueId, selectedTeamId, season],
     queryFn: () => api.getDraftReport(leagueId, selectedTeamId!, season!),
     enabled: !!selectedTeamId && !!season && activeTab === "draft",
+  });
+
+  // Fetch league-wide impact summary
+  const { data: leagueSummaryData, isLoading: leagueSummaryLoading } = useQuery({
+    queryKey: ["league-impact-summary", leagueId, season],
+    queryFn: () => api.getLeagueImpactSummary(leagueId, season!),
+    enabled: !!leagueId && !!season && activeTab === "league",
   });
 
   // Fetch overall standings timeline for the chart
@@ -210,85 +217,93 @@ export default function MovesPage() {
         </div>
       </div>
 
-      {!selectedTeamId ? (
-        <div className="text-center py-12 text-gray-500">
-          Select a team to view move impact analysis
-        </div>
-      ) : impactLoading ? (
-        <LoadingSpinner message="Loading impact data..." />
-      ) : impactError ? (
-        <ErrorAlert message="Failed to load impact data. Make sure impact computation has been run." />
-      ) : (
-        <>
-          {/* Summary Cards */}
-          {summary && (
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              <div className="bg-white shadow rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-500 uppercase">Total Moves</div>
-                <div className="text-2xl font-bold text-gray-900 mt-1">{summary.totalMoves}</div>
-              </div>
-              <div className="bg-white shadow rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-500 uppercase">Roster Mgmt Value</div>
-                <div className="text-2xl font-bold mt-1">
-                  {summary.netRosterValue !== null && summary.netRosterValue !== undefined ? (
-                    <ImpactBadge impact={summary.netRosterValue} />
-                  ) : (
-                    <span className="text-gray-400">N/A</span>
-                  )}
-                </div>
-                {summary.actualRotoPoints !== null && summary.draftOnlyRotoPoints !== null && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    {summary.actualRotoPoints} actual vs {summary.draftOnlyRotoPoints} draft-only
-                  </div>
-                )}
-              </div>
-              <div className="bg-white shadow rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-500 uppercase">Avg Impact/Move</div>
-                <div className="text-2xl font-bold mt-1">
-                  <ImpactBadge impact={summary.avgImpactPerMove} />
-                </div>
-              </div>
-              <div className="bg-white shadow rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-500 uppercase">Best Move</div>
-                <div className="text-sm font-semibold text-green-700 mt-1">
-                  {summary.bestMove?.playerName || "N/A"}
-                </div>
-                {summary.bestMove && (
-                  <ImpactBadge impact={summary.bestMove.impact} size="sm" />
-                )}
-              </div>
-              <div className="bg-white shadow rounded-lg p-4">
-                <div className="text-xs font-medium text-gray-500 uppercase">Worst Move</div>
-                <div className="text-sm font-semibold text-red-700 mt-1">
-                  {summary.worstMove?.playerName || "N/A"}
-                </div>
-                {summary.worstMove && (
-                  <ImpactBadge impact={summary.worstMove.impact} size="sm" />
-                )}
-              </div>
+      {/* Team-specific Summary Cards */}
+      {selectedTeamId && summary && activeTab !== "league" && (
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-500 uppercase">Total Moves</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{summary.totalMoves}</div>
+          </div>
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-500 uppercase">Roster Mgmt Value</div>
+            <div className="text-2xl font-bold mt-1">
+              {summary.netRosterValue !== null && summary.netRosterValue !== undefined ? (
+                <ImpactBadge impact={summary.netRosterValue} />
+              ) : (
+                <span className="text-gray-400">N/A</span>
+              )}
             </div>
-          )}
+            {summary.actualRotoPoints !== null && summary.draftOnlyRotoPoints !== null && (
+              <div className="text-xs text-gray-400 mt-1">
+                {summary.actualRotoPoints} actual vs {summary.draftOnlyRotoPoints} draft-only
+              </div>
+            )}
+          </div>
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-500 uppercase">Avg Impact/Move</div>
+            <div className="text-2xl font-bold mt-1">
+              <ImpactBadge impact={summary.avgImpactPerMove} />
+            </div>
+          </div>
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-500 uppercase">Best Move</div>
+            <div className="text-sm font-semibold text-green-700 mt-1">
+              {summary.bestMove?.playerName || "N/A"}
+            </div>
+            {summary.bestMove && (
+              <ImpactBadge impact={summary.bestMove.impact} size="sm" />
+            )}
+          </div>
+          <div className="bg-white shadow rounded-lg p-4">
+            <div className="text-xs font-medium text-gray-500 uppercase">Worst Move</div>
+            <div className="text-sm font-semibold text-red-700 mt-1">
+              {summary.worstMove?.playerName || "N/A"}
+            </div>
+            {summary.worstMove && (
+              <ImpactBadge impact={summary.worstMove.impact} size="sm" />
+            )}
+          </div>
+        </div>
+      )}
 
+      {(selectedTeamId || activeTab === "league") ? (
+        <>
           {/* Tab Navigation */}
           <div className="bg-white shadow rounded-lg mb-6">
             <nav className="-mb-px flex border-b border-gray-200">
-              {(["leaderboard", "trades", "draft", "timeline"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`${
-                    activeTab === tab
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
-                >
-                  {tab === "leaderboard" ? "Move Leaderboard" : tab === "trades" ? "Trades" : tab === "draft" ? "Draft Report" : "Impact Timeline"}
-                </button>
-              ))}
+              {(["league", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
+                const labels: Record<string, string> = {
+                  league: "League Summary",
+                  leaderboard: "Move Leaderboard",
+                  trades: "Trades",
+                  draft: "Draft Report",
+                  timeline: "Impact Timeline",
+                };
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`${
+                      activeTab === tab
+                        ? "border-blue-500 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+                  >
+                    {labels[tab]}
+                  </button>
+                );
+              })}
             </nav>
 
             <div className="p-6">
-              {activeTab === "leaderboard" && (
+              {activeTab === "league" && (
+                <LeagueSummaryTab
+                  data={leagueSummaryData}
+                  isLoading={leagueSummaryLoading}
+                  selectedTeamId={selectedTeamId}
+                />
+              )}
+              {activeTab === "leaderboard" && selectedTeamId && (
                 <LeaderboardTab
                   impacts={filteredImpacts}
                   moveFilter={moveFilter}
@@ -297,21 +312,26 @@ export default function MovesPage() {
                   setExpandedMoveId={setExpandedMoveId}
                 />
               )}
-              {activeTab === "trades" && (
+              {activeTab !== "league" && !selectedTeamId && (
+                <div className="text-center py-8 text-gray-500">
+                  Select a team to view this tab.
+                </div>
+              )}
+              {activeTab === "trades" && selectedTeamId && (
                 <TradesTab
                   impacts={impacts.filter((m) => m.moveType === "trade")}
                   expandedMoveId={expandedMoveId}
                   setExpandedMoveId={setExpandedMoveId}
                 />
               )}
-              {activeTab === "draft" && (
+              {activeTab === "draft" && selectedTeamId && (
                 <DraftReportTab
                   draftPicks={draftData?.draftPicks || []}
                   summary={draftData?.summary}
                   isLoading={draftLoading}
                 />
               )}
-              {activeTab === "timeline" && (
+              {activeTab === "timeline" && selectedTeamId && (
                 <TimelineTab
                   impacts={impacts}
                   timelineData={timelineData}
@@ -322,7 +342,303 @@ export default function MovesPage() {
             </div>
           </div>
         </>
+      ) : (
+        <div className="text-center py-12 text-gray-500">
+          Select a team to view move impact analysis, or use the League Summary tab.
+        </div>
       )}
+    </div>
+  );
+}
+
+// ─── League Summary Tab ─────────────────────────────────────
+
+interface LeagueMoveEntry {
+  id: number;
+  teamId: number;
+  teamName: string;
+  moveType: string;
+  effectiveDate: string;
+  impact: number;
+  isUncertain: boolean;
+  ciLow: number | null;
+  ciHigh: number | null;
+  isIncomplete: boolean;
+  playerGained: { id: number; name: string; positions: string[] } | null;
+  playerLost: { id: number; name: string; positions: string[] } | null;
+}
+
+interface TeamRanking {
+  teamId: number;
+  teamName: string;
+  moveCount: number;
+  netRosterValue: number | null;
+  actualRotoPoints: number | null;
+  draftOnlyRotoPoints: number | null;
+  sumOfImpacts: number;
+}
+
+interface TradePackage {
+  teamId: number;
+  teamName: string;
+  effectiveDate: string;
+  totalImpact: number;
+  playersGained: Array<{ id: number; name: string; positions: string[] }>;
+  playersLost: Array<{ id: number; name: string; positions: string[] }>;
+}
+
+function LeagueSummaryTab({
+  data,
+  isLoading,
+  selectedTeamId,
+}: {
+  data: any;
+  isLoading: boolean;
+  selectedTeamId: number | null;
+}) {
+  if (isLoading) {
+    return <LoadingSpinner message="Loading league-wide summary..." />;
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No league summary data available. Make sure impact computation has been run.
+      </div>
+    );
+  }
+
+  const bestMoves: LeagueMoveEntry[] = data.bestMoves || [];
+  const worstMoves: LeagueMoveEntry[] = data.worstMoves || [];
+  const bestTrades: TradePackage[] = data.bestTrades || [];
+  const worstTrades: TradePackage[] = data.worstTrades || [];
+  const teamRankings: TeamRanking[] = data.teamRankings || [];
+
+  return (
+    <div className="space-y-8">
+      {/* League-wide stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-blue-50 rounded-lg p-4">
+          <div className="text-xs font-medium text-blue-600 uppercase">Total Moves (League)</div>
+          <div className="text-2xl font-bold text-blue-900">{data.totalMovesLeagueWide}</div>
+        </div>
+        <div className="bg-green-50 rounded-lg p-4">
+          <div className="text-xs font-medium text-green-600 uppercase">Best Single Move</div>
+          {bestMoves[0] && (
+            <>
+              <div className="text-sm font-semibold text-green-800 mt-1">
+                {bestMoves[0].playerGained?.name || "—"}
+              </div>
+              <div className="text-xs text-green-600">{bestMoves[0].teamName}</div>
+              <ImpactBadge impact={bestMoves[0].impact} size="sm" />
+            </>
+          )}
+        </div>
+        <div className="bg-red-50 rounded-lg p-4">
+          <div className="text-xs font-medium text-red-600 uppercase">Worst Single Move</div>
+          {worstMoves[0] && (
+            <>
+              <div className="text-sm font-semibold text-red-800 mt-1">
+                {worstMoves[0].playerGained?.name || worstMoves[0].playerLost?.name || "—"}
+              </div>
+              <div className="text-xs text-red-600">{worstMoves[0].teamName}</div>
+              <ImpactBadge impact={worstMoves[0].impact} size="sm" />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Roster Manager Rankings */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-3">Roster Manager Rankings</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Moves</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Net Roster Value</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actual Pts</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Draft-Only Pts</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {teamRankings.map((team, idx) => (
+                <tr
+                  key={team.teamId}
+                  className={team.teamId === selectedTeamId ? "bg-blue-50" : ""}
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    {idx + 1}
+                    {idx === 0 && <span className="ml-1" title="Best roster manager">&#127942;</span>}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {team.teamName}
+                    {team.teamId === selectedTeamId && (
+                      <span className="ml-1 text-xs text-blue-600">(you)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 text-right">{team.moveCount}</td>
+                  <td className="px-4 py-3 text-right">
+                    {team.netRosterValue != null ? (
+                      <ImpactBadge impact={team.netRosterValue} size="sm" />
+                    ) : (
+                      <span className="text-gray-400 text-xs">N/A</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                    {team.actualRotoPoints ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                    {team.draftOnlyRotoPoints ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Best Trades */}
+      {bestTrades.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-purple-800 mb-3">Best Trades</h3>
+          <TradePackageList packages={bestTrades} selectedTeamId={selectedTeamId} />
+        </div>
+      )}
+
+      {/* Worst Trades */}
+      {worstTrades.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-purple-800 mb-3">Worst Trades</h3>
+          <TradePackageList packages={worstTrades} selectedTeamId={selectedTeamId} />
+        </div>
+      )}
+
+      {/* Best Moves */}
+      <div>
+        <h3 className="text-lg font-semibold text-green-800 mb-3">Best Moves (All Types)</h3>
+        <MoveListTable moves={bestMoves} selectedTeamId={selectedTeamId} />
+      </div>
+
+      {/* Worst Moves */}
+      <div>
+        <h3 className="text-lg font-semibold text-red-800 mb-3">Worst Moves (All Types)</h3>
+        <MoveListTable moves={worstMoves} selectedTeamId={selectedTeamId} />
+      </div>
+    </div>
+  );
+}
+
+function MoveListTable({
+  moves,
+  selectedTeamId,
+}: {
+  moves: LeagueMoveEntry[];
+  selectedTeamId: number | null;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-gray-200">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Team</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gained</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lost</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {moves.map((m) => (
+            <tr
+              key={m.id}
+              className={m.teamId === selectedTeamId ? "bg-blue-50" : ""}
+            >
+              <td className="px-4 py-3 text-sm text-gray-600">
+                {new Date(m.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {m.isIncomplete && <span className="ml-1 text-amber-500" title="Incomplete data">&#9888;</span>}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-900">{m.teamName}</td>
+              <td className="px-4 py-3">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${MOVE_TYPE_COLORS[m.moveType] || "text-gray-600 bg-gray-50"}`}>
+                  {MOVE_TYPE_LABELS[m.moveType] || m.moveType}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                {m.playerGained?.name || "—"}
+                {m.playerGained?.positions && (
+                  <span className="ml-1 text-xs text-gray-500">({m.playerGained.positions.join(", ")})</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-600">
+                {m.playerLost?.name || "—"}
+                {m.playerLost?.positions && (
+                  <span className="ml-1 text-xs text-gray-500">({m.playerLost.positions.join(", ")})</span>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <ImpactBadge impact={m.impact} isUncertain={m.isUncertain} size="sm" />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TradePackageList({
+  packages: pkgs,
+  selectedTeamId,
+}: {
+  packages: TradePackage[];
+  selectedTeamId: number | null;
+}) {
+  return (
+    <div className="space-y-2">
+      {pkgs.map((pkg, idx) => (
+        <div
+          key={`${pkg.teamId}-${pkg.effectiveDate}`}
+          className={`border rounded-lg p-4 ${pkg.teamId === selectedTeamId ? "border-blue-300 bg-blue-50/30" : "border-gray-200"}`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-gray-400 w-6">{idx + 1}.</span>
+              <div>
+                <span className="text-sm font-semibold text-gray-900">{pkg.teamName}</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  {new Date(pkg.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            </div>
+            <ImpactBadge impact={pkg.totalImpact} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <span className="text-xs font-medium text-green-700 uppercase">Got</span>
+            {pkg.playersGained.map((p, i) => (
+              <span key={p.id} className="font-medium text-gray-900">
+                {i > 0 && <span className="text-gray-400">, </span>}
+                {p.name}
+                <span className="ml-0.5 text-xs text-gray-500">({p.positions.join(", ")})</span>
+              </span>
+            ))}
+            {pkg.playersGained.length === 0 && <span className="text-gray-400">—</span>}
+            <span className="text-gray-300 mx-1">|</span>
+            <span className="text-xs font-medium text-red-700 uppercase">Gave</span>
+            {pkg.playersLost.map((p, i) => (
+              <span key={p.id} className="text-gray-600">
+                {i > 0 && <span className="text-gray-400">, </span>}
+                {p.name}
+                <span className="ml-0.5 text-xs text-gray-500">({p.positions.join(", ")})</span>
+              </span>
+            ))}
+            {pkg.playersLost.length === 0 && <span className="text-gray-400">—</span>}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -589,6 +905,31 @@ function formatKeyStats(stats: Record<string, number>): string {
 
 // ─── Trades Tab ──────────────────────────────────────────
 
+interface TradeGroup {
+  key: string;
+  effectiveDate: string;
+  legs: MoveImpact[];
+  totalImpact: number;
+  isMultiPlayer: boolean;
+}
+
+function groupTradesByDate(impacts: MoveImpact[]): TradeGroup[] {
+  const byDate = new Map<string, MoveImpact[]>();
+  for (const m of impacts) {
+    const existing = byDate.get(m.effectiveDate) || [];
+    existing.push(m);
+    byDate.set(m.effectiveDate, existing);
+  }
+
+  return Array.from(byDate.entries()).map(([date, legs]) => ({
+    key: date,
+    effectiveDate: date,
+    legs,
+    totalImpact: legs.reduce((sum, l) => sum + (l.shapleyImpact ?? l.impactRotoPoints), 0),
+    isMultiPlayer: legs.length > 1,
+  }));
+}
+
 function TradesTab({
   impacts,
   expandedMoveId,
@@ -598,16 +939,13 @@ function TradesTab({
   expandedMoveId: number | null;
   setExpandedMoveId: (id: number | null) => void;
 }) {
-  // Calculate trade summary
-  const totalTrades = impacts.length;
+  const tradeGroups = groupTradesByDate(impacts);
   const netTradeImpact = impacts.reduce((sum, m) => sum + (m.shapleyImpact ?? m.impactRotoPoints), 0);
 
-  // Sort by absolute impact (descending)
-  const sortedTrades = [...impacts].sort((a, b) => {
-    const impactA = Math.abs(a.shapleyImpact ?? a.impactRotoPoints);
-    const impactB = Math.abs(b.shapleyImpact ?? b.impactRotoPoints);
-    return impactB - impactA;
-  });
+  // Sort groups by absolute total impact (descending)
+  const sortedGroups = [...tradeGroups].sort(
+    (a, b) => Math.abs(b.totalImpact) - Math.abs(a.totalImpact),
+  );
 
   if (impacts.length === 0) {
     return (
@@ -623,7 +961,7 @@ function TradesTab({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="text-xs font-medium text-purple-600 uppercase">Total Trades</div>
-          <div className="text-2xl font-bold text-purple-900">{totalTrades}</div>
+          <div className="text-2xl font-bold text-purple-900">{tradeGroups.length}</div>
         </div>
         <div className="bg-purple-50 rounded-lg p-4">
           <div className="text-xs font-medium text-purple-600 uppercase">Net Trade Impact</div>
@@ -633,94 +971,116 @@ function TradesTab({
         </div>
       </div>
 
-      {/* Trades Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Received</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Top Category</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sortedTrades.map((trade) => {
-              const topSgp = trade.sgpCategoryImpacts
-                ?.filter((c: any) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
-                .sort((a: any, b: any) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as any;
-              const topCatDelta = topSgp ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0) : null;
+      {/* Trades List */}
+      <div className="space-y-2">
+        {sortedGroups.map((group) => {
+          const isExpanded = expandedMoveId === group.legs[0].id;
+          const received = group.legs
+            .map((l) => l.playerGained)
+            .filter(Boolean) as { id: number; name: string; positions: string[] }[];
+          const sent = group.legs
+            .map((l) => l.playerLost)
+            .filter(Boolean) as { id: number; name: string; positions: string[] }[];
 
-              // Use Shapley impact if available, else legacy impact
-              const displayImpact = trade.shapleyImpact ?? trade.impactRotoPoints;
+          return (
+            <div
+              key={group.key}
+              className="border border-gray-200 rounded-lg overflow-hidden"
+            >
+              {/* Trade header row */}
+              <div
+                className="px-4 py-3 cursor-pointer hover:bg-purple-50 flex items-center gap-4"
+                onClick={() => setExpandedMoveId(isExpanded ? null : group.legs[0].id)}
+              >
+                {/* Date */}
+                <div className="text-sm text-gray-600 w-20 shrink-0">
+                  {new Date(group.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </div>
 
-              return (
-                <tr key={trade.id} className={`group ${trade.isUncertain ? "opacity-80" : ""}`}>
-                  <td colSpan={5} className="p-0">
-                    <div
-                      className="px-4 py-3 cursor-pointer hover:bg-purple-50 grid grid-cols-5 items-center"
-                      onClick={() => setExpandedMoveId(expandedMoveId === trade.id ? null : trade.id)}
-                    >
-                      <div className="text-sm text-gray-600">
-                        {new Date(trade.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        {trade.isIncomplete && (
-                          <span className="ml-1 text-amber-500" title="Incomplete data">&#9888;</span>
-                        )}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {trade.playerGained?.name || "—"}
-                        {trade.playerGained?.positions && (
-                          <span className="ml-1 text-xs text-gray-500">
-                            ({trade.playerGained.positions.join(", ")})
+                {/* Players involved */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Received */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-xs font-medium text-green-700 uppercase shrink-0">Got</span>
+                      {received.map((p, i) => (
+                        <span key={p.id} className="text-sm font-medium text-gray-900">
+                          {i > 0 && <span className="text-gray-400 mr-1">,</span>}
+                          {p.name}
+                          <span className="ml-0.5 text-xs text-gray-500">
+                            ({p.positions.join(", ")})
                           </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {trade.playerLost?.name || "—"}
-                        {trade.playerLost?.positions && (
-                          <span className="ml-1 text-xs text-gray-500">
-                            ({trade.playerLost.positions.join(", ")})
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <ImpactBadge
-                          impact={displayImpact}
-                          isUncertain={trade.isUncertain}
-                          ciLow={trade.ciLow}
-                          ciHigh={trade.ciHigh}
-                        />
-                      </div>
-                      <div className="text-right text-xs text-gray-500">
-                        {topSgp ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
-                      </div>
+                        </span>
+                      ))}
                     </div>
 
-                    {expandedMoveId === trade.id && (
-                      <div className="px-4 pb-3">
+                    <span className="text-gray-300 mx-1">|</span>
+
+                    {/* Sent */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-xs font-medium text-red-700 uppercase shrink-0">Gave</span>
+                      {sent.map((p, i) => (
+                        <span key={p.id} className="text-sm text-gray-600">
+                          {i > 0 && <span className="text-gray-400 mr-1">,</span>}
+                          {p.name}
+                          <span className="ml-0.5 text-xs text-gray-500">
+                            ({p.positions.join(", ")})
+                          </span>
+                        </span>
+                      ))}
+                      {sent.length === 0 && <span className="text-sm text-gray-400">—</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total impact */}
+                <div className="shrink-0">
+                  <ImpactBadge impact={group.totalImpact} />
+                </div>
+
+                {/* Expand indicator */}
+                <div className="text-gray-400 shrink-0">
+                  {isExpanded ? "\u25B2" : "\u25BC"}
+                </div>
+              </div>
+
+              {/* Expanded detail */}
+              {isExpanded && (
+                <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                  {group.legs.map((leg, idx) => {
+                    const legImpact = leg.shapleyImpact ?? leg.impactRotoPoints;
+                    return (
+                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-gray-200" : ""}>
+                        {group.isMultiPlayer && (
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-purple-600 uppercase">
+                              Leg {idx + 1}: {leg.playerGained?.name || "—"} for {leg.playerLost?.name || "—"}
+                            </span>
+                            <ImpactBadge impact={legImpact} size="sm" />
+                          </div>
+                        )}
                         <ImpactDetailCard
-                          playerGained={trade.playerGained}
-                          playerLost={trade.playerLost}
-                          moveType={trade.moveType}
-                          effectiveDate={trade.effectiveDate}
-                          impactRotoPoints={displayImpact}
-                          categoryImpacts={trade.categoryImpacts}
-                          sgpCategoryImpacts={trade.sgpCategoryImpacts}
-                          isUncertain={trade.isUncertain}
-                          ciLow={trade.ciLow}
-                          ciHigh={trade.ciHigh}
-                          isIncomplete={trade.isIncomplete}
+                          playerGained={leg.playerGained}
+                          playerLost={leg.playerLost}
+                          moveType={leg.moveType}
+                          effectiveDate={leg.effectiveDate}
+                          impactRotoPoints={legImpact}
+                          categoryImpacts={leg.categoryImpacts}
+                          sgpCategoryImpacts={leg.sgpCategoryImpacts}
+                          isUncertain={leg.isUncertain}
+                          ciLow={leg.ciLow}
+                          ciHigh={leg.ciHigh}
+                          isIncomplete={leg.isIncomplete}
                           onClose={() => setExpandedMoveId(null)}
                         />
                       </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

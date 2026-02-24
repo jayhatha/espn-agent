@@ -125,18 +125,31 @@ export class TransactionImpactAgent {
         }
       }
 
-      // Detect trades: player lost by team A and gained by team B in the same week
+      // Detect trades: require bidirectional player exchange between two teams.
+      // A one-way move (Team B loses player, Team A gains) is a waiver claim, not a trade.
+      // A trade requires: Team A gained from Team B AND Team B gained from Team A.
       const tradeGains = new Set<string>(); // "teamId-playerId"
       const tradeLosses = new Set<string>();
 
+      // Build movement map: for each gained player, who lost them?
+      const movements: Array<{ gainTeam: number; loseTeam: number; playerId: number }> = [];
       for (const g of gained) {
-        // Check if this player was lost by another team
         const lostByAnother = lost.find(
           (l) => l.playerId === g.playerId && l.teamId !== g.teamId,
         );
         if (lostByAnother) {
-          tradeGains.add(`${g.teamId}-${g.playerId}`);
-          tradeLosses.add(`${lostByAnother.teamId}-${lostByAnother.playerId}`);
+          movements.push({ gainTeam: g.teamId, loseTeam: lostByAnother.teamId, playerId: g.playerId });
+        }
+      }
+
+      // Only mark as trade if there's reciprocal movement between the two teams
+      for (const m of movements) {
+        const hasReciprocal = movements.some(
+          (r) => r.gainTeam === m.loseTeam && r.loseTeam === m.gainTeam,
+        );
+        if (hasReciprocal) {
+          tradeGains.add(`${m.gainTeam}-${m.playerId}`);
+          tradeLosses.add(`${m.loseTeam}-${m.playerId}`);
         }
       }
 
@@ -234,23 +247,41 @@ export class TransactionImpactAgent {
     }
 
     for (const [, moves] of byTeam) {
-      const adds = moves.filter((m) => m.move_type === "add" || m.move_type === "trade_in");
-      const drops = moves.filter((m) => m.move_type === "drop" || m.move_type === "trade_out");
+      // Pair trade_in ↔ trade_out first, then add ↔ drop separately.
+      // Mixing them causes cross-contamination (trade_in paired with drop, etc.)
+      const tradeIns = moves.filter((m) => m.move_type === "trade_in");
+      const tradeOuts = moves.filter((m) => m.move_type === "trade_out");
+      const adds = moves.filter((m) => m.move_type === "add");
+      const drops = moves.filter((m) => m.move_type === "drop");
 
-      // Pair them in order (first add with first drop, etc.)
-      const pairCount = Math.min(adds.length, drops.length);
-      for (let i = 0; i < pairCount; i++) {
-        await this.db
-          .updateTable("roster_move")
-          .set({ paired_move_id: drops[i].id })
-          .where("id", "=", adds[i].id)
-          .execute();
-        await this.db
-          .updateTable("roster_move")
-          .set({ paired_move_id: adds[i].id })
-          .where("id", "=", drops[i].id)
-          .execute();
-      }
+      const pairGroup = async (gains: typeof moves, losses: typeof moves) => {
+        const count = Math.min(gains.length, losses.length);
+        for (let i = 0; i < count; i++) {
+          await this.db
+            .updateTable("roster_move")
+            .set({ paired_move_id: losses[i].id })
+            .where("id", "=", gains[i].id)
+            .execute();
+          await this.db
+            .updateTable("roster_move")
+            .set({ paired_move_id: gains[i].id })
+            .where("id", "=", losses[i].id)
+            .execute();
+        }
+      };
+
+      await pairGroup(tradeIns, tradeOuts);
+
+      // Overflow: in unbalanced trades (e.g., 5-for-2), extra trade_ins pair with drops
+      const unpairedTradeIns = tradeIns.slice(Math.min(tradeIns.length, tradeOuts.length));
+      const unpairedTradeOuts = tradeOuts.slice(Math.min(tradeIns.length, tradeOuts.length));
+      await pairGroup(unpairedTradeIns, drops);
+      // Remaining drops after absorbing overflow trade_ins
+      const dropsAfterOverflow = drops.slice(Math.min(unpairedTradeIns.length, drops.length));
+      await pairGroup(adds, dropsAfterOverflow);
+      // Overflow trade_outs pair with remaining adds
+      const addsAfterDrops = adds.slice(Math.min(adds.length, dropsAfterOverflow.length));
+      await pairGroup(addsAfterDrops, unpairedTradeOuts);
     }
   }
 

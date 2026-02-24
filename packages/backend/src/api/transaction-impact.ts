@@ -160,6 +160,170 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
   );
 
   /**
+   * GET /api/leagues/:leagueId/transaction-impacts/league-summary
+   * Returns best/worst moves across all teams, plus per-team roster management rankings.
+   */
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { season?: string; limit?: string };
+  }>(
+    "/api/leagues/:leagueId/transaction-impacts/league-summary",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const limit = request.query.limit ? parseInt(request.query.limit, 10) : 10;
+
+      const startDate = `${season}-04-01`;
+      const endDate = `${season}-10-31`;
+
+      // All impacts across every team, sorted by impact desc
+      const allImpacts = await db
+        .selectFrom("transaction_impact as ti")
+        .innerJoin("team as t", (join) =>
+          join.onRef("t.id", "=", "ti.team_id").on("t.league_id", "=", leagueId),
+        )
+        .leftJoin("player as pg", "pg.id", "ti.player_gained_id")
+        .leftJoin("player as pl", "pl.id", "ti.player_lost_id")
+        .select([
+          "ti.id",
+          "ti.team_id",
+          "t.name as team_name",
+          "ti.move_type",
+          "ti.effective_date",
+          "ti.impact_roto_points",
+          "ti.shapley_impact",
+          "ti.ci_low",
+          "ti.ci_high",
+          "ti.is_uncertain",
+          "ti.is_incomplete",
+          "ti.player_gained_id",
+          "ti.player_lost_id",
+          "pg.name as gained_player_name",
+          "pg.positions as gained_player_positions",
+          "pl.name as lost_player_name",
+          "pl.positions as lost_player_positions",
+        ])
+        .where("ti.league_id", "=", leagueId)
+        .where("ti.effective_date", ">=", startDate)
+        .where("ti.effective_date", "<=", endDate)
+        .where("ti.move_type", "!=", "draft")
+        .orderBy(
+          (qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
+          "desc",
+        )
+        .execute();
+
+      const primaryImpact = (i: any) =>
+        i.shapley_impact != null ? Number(i.shapley_impact) : Number(i.impact_roto_points);
+
+      const formatMove = (i: any) => ({
+        id: i.id,
+        teamId: i.team_id,
+        teamName: i.team_name,
+        moveType: i.move_type,
+        effectiveDate: i.effective_date,
+        impact: Math.round(primaryImpact(i) * 100) / 100,
+        isUncertain: i.is_uncertain ?? false,
+        ciLow: i.ci_low ? Number(i.ci_low) : null,
+        ciHigh: i.ci_high ? Number(i.ci_high) : null,
+        isIncomplete: i.is_incomplete,
+        playerGained: i.player_gained_id
+          ? { id: i.player_gained_id, name: i.gained_player_name, positions: i.gained_player_positions }
+          : null,
+        playerLost: i.player_lost_id
+          ? { id: i.player_lost_id, name: i.lost_player_name, positions: i.lost_player_positions }
+          : null,
+      });
+
+      const bestMoves = allImpacts.slice(0, limit).map(formatMove);
+      const worstMoves = allImpacts.slice(-limit).reverse().map(formatMove);
+
+      // Per-team roster management summary
+      const teamMap = new Map<number, { name: string; totalImpact: number; moveCount: number }>();
+      for (const i of allImpacts) {
+        const existing = teamMap.get(i.team_id);
+        if (existing) {
+          existing.totalImpact += primaryImpact(i);
+          existing.moveCount++;
+        } else {
+          teamMap.set(i.team_id, { name: i.team_name, totalImpact: primaryImpact(i), moveCount: 1 });
+        }
+      }
+
+      // Compute net roster value for each team
+      const agent = new TransactionImpactAgent(db, request.log as any);
+      const teamRankings: Array<{
+        teamId: number;
+        teamName: string;
+        moveCount: number;
+        netRosterValue: number | null;
+        actualRotoPoints: number | null;
+        draftOnlyRotoPoints: number | null;
+        sumOfImpacts: number;
+      }> = [];
+
+      for (const [teamId, data] of teamMap) {
+        const netResult = await agent.computeNetRosterValue(leagueId, season, teamId);
+        teamRankings.push({
+          teamId,
+          teamName: data.name,
+          moveCount: data.moveCount,
+          netRosterValue: netResult ? Math.round(netResult.netRosterValue * 100) / 100 : null,
+          actualRotoPoints: netResult ? Math.round(netResult.actualRotoPoints * 100) / 100 : null,
+          draftOnlyRotoPoints: netResult ? Math.round(netResult.draftOnlyRotoPoints * 100) / 100 : null,
+          sumOfImpacts: Math.round(data.totalImpact * 100) / 100,
+        });
+      }
+
+      teamRankings.sort((a, b) => (b.netRosterValue ?? b.sumOfImpacts) - (a.netRosterValue ?? a.sumOfImpacts));
+
+      // Build trade packages: group trade legs by team+date
+      const tradeImpacts = allImpacts.filter((i) => i.move_type === "trade");
+      const tradePackageMap = new Map<string, typeof tradeImpacts>();
+      for (const t of tradeImpacts) {
+        const key = `${t.team_id}-${t.effective_date}`;
+        if (!tradePackageMap.has(key)) tradePackageMap.set(key, []);
+        tradePackageMap.get(key)!.push(t);
+      }
+
+      const tradePackages = Array.from(tradePackageMap.entries()).map(([, legs]) => {
+        const totalImpact = legs.reduce((s, l) => s + primaryImpact(l), 0);
+        return {
+          teamId: legs[0].team_id,
+          teamName: legs[0].team_name,
+          effectiveDate: legs[0].effective_date,
+          totalImpact: Math.round(totalImpact * 100) / 100,
+          playersGained: legs
+            .filter((l) => l.player_gained_id)
+            .map((l) => ({ id: l.player_gained_id, name: l.gained_player_name, positions: l.gained_player_positions })),
+          playersLost: legs
+            .filter((l) => l.player_lost_id)
+            .map((l) => ({ id: l.player_lost_id, name: l.lost_player_name, positions: l.lost_player_positions })),
+          legs: legs.map(formatMove),
+        };
+      });
+
+      tradePackages.sort((a, b) => b.totalImpact - a.totalImpact);
+      const bestTrades = tradePackages.slice(0, limit);
+      const worstTrades = tradePackages.slice(-limit).reverse();
+
+      return {
+        season,
+        bestMoves,
+        worstMoves,
+        bestTrades,
+        worstTrades,
+        teamRankings,
+        totalMovesLeagueWide: allImpacts.length,
+      };
+    },
+  );
+
+  /**
    * GET /api/leagues/:leagueId/teams/:teamId/draft-report
    * Returns each draft pick's season contribution and roto-points value.
    */
