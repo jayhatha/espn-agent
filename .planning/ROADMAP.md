@@ -134,3 +134,23 @@ Plans:
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
+
+### Phase 10: ESPN Live Draft Assistant
+
+**Goal:** Chrome extension that overlays ESPN's live draft page, providing real-time player recommendations, roster tracking, and value analysis for both snake and auction drafts
+**Depends on:** Phase 9
+**Requirements:** []
+**Success Criteria** (what must be TRUE):
+  1. Extension loads on ESPN draft pages and injects sidebar overlay
+  2. MutationObserver detects picks in real-time and updates draft state
+  3. Snake draft users see BPA recommendations, pair recommendations at turn, and roster summary
+  4. Auction draft users see budget pacing tracker, dollar value recommendations, and spend guidance
+  5. Draft state persists across page refreshes via chrome.storage.local
+**Plans:** 5 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — WXT extension setup, manifest config, baseline rankings bundle, API client
+- [ ] 10-02-PLAN.md — Zustand draft state with chrome.storage.local persistence, snake/auction value calculations
+- [ ] 10-03-PLAN.md — Content script with Shadow DOM sidebar injection, MutationObserver for pick detection
+- [ ] 10-04-PLAN.md — Snake draft UI: BPA recommendations, pair recommendations, roster summary
+- [ ] 10-05-PLAN.md — Auction draft UI: budget pacing tracker, dollar value recommendations
