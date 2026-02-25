@@ -135,7 +135,7 @@ Plans:
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
 | 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
-| 11. Draft Assistant Enhancements | 5/5 | Complete   | 2026-02-25 | - |
+| 11. Draft Assistant Enhancements | 5/5 | Complete    | 2026-02-25 | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
