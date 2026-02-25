@@ -356,4 +356,204 @@ export class DraftRankingsAgent {
 
     return sgp;
   }
+
+  /**
+   * Calculate projected final season standings for a draft roster
+   * Used by extension to show impact of draft picks on projected finish
+   */
+  async calculateProjectedStandings(
+    config: DraftConfiguration,
+    rosters: TeamRoster[],
+    options?: {
+      projectionsRunId?: number;
+    },
+  ): Promise<ProjectedStandingsResult> {
+    this.logger?.info({ numTeams: rosters.length }, "Calculating projected standings");
+
+    // Determine projections run ID
+    let projectionsRunId = options?.projectionsRunId;
+    if (!projectionsRunId) {
+      const latestRun = await this.db
+        .selectFrom("projections_run")
+        .select("id")
+        .where("staleness", "=", "fresh")
+        .orderBy("as_of_date", "desc")
+        .executeTakeFirst();
+
+      if (!latestRun) {
+        throw new Error("No fresh projections available");
+      }
+
+      projectionsRunId = latestRun.id;
+    }
+
+    // For each team, aggregate projected stats from drafted players
+    const teamTotals: TeamProjectedStats[] = [];
+
+    for (const roster of rosters) {
+      const playerIds = roster.players.map(p => p.playerId);
+
+      if (playerIds.length === 0) {
+        // Team with no players - all zero stats
+        teamTotals.push({
+          teamId: roster.teamId,
+          teamName: roster.teamName,
+          stats: {},
+        });
+        continue;
+      }
+
+      // Fetch projections for this team's players
+      const projections = await this.db
+        .selectFrom("player_projection")
+        .innerJoin("player", "player.id", "player_projection.player_id")
+        .select([
+          "player.id",
+          "player_projection.stat_components_json",
+        ])
+        .where("player.id", "in", playerIds)
+        .where("player_projection.projections_run_id", "=", projectionsRunId)
+        .execute();
+
+      // Aggregate stats using component math
+      const aggregated = this.aggregateTeamStats(
+        projections.map(p => p.stat_components_json as StatComponents),
+      );
+
+      teamTotals.push({
+        teamId: roster.teamId,
+        teamName: roster.teamName,
+        stats: aggregated,
+      });
+    }
+
+    // Rank teams per category
+    const standings = this.rankTeams(teamTotals, config.categories, config.totalTeams);
+
+    return {
+      standings,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Aggregate team stats using component-based addition
+   */
+  private aggregateTeamStats(
+    playerStats: StatComponents[],
+  ): StatComponents {
+    // Use component-based aggregation (never average rates)
+    const components: StatComponents = {};
+
+    for (const player of playerStats) {
+      for (const [key, value] of Object.entries(player)) {
+        if (value !== undefined) {
+          components[key] = (components[key] || 0) + value;
+        }
+      }
+    }
+
+    return components;
+  }
+
+  /**
+   * Rank teams by category and compute roto points
+   */
+  private rankTeams(
+    teamTotals: TeamProjectedStats[],
+    categories: Category[],
+    totalTeams: number,
+  ): ProjectedOverallRow[] {
+    const standings: ProjectedOverallRow[] = [];
+
+    // For each category, rank teams
+    const categoryRanks: Record<string, Record<number, number>> = {};
+
+    for (const category of categories) {
+      const sorted = [...teamTotals].sort((a, b) => {
+        const aValue = this.getCategoryValue(a.stats, category);
+        const bValue = this.getCategoryValue(b.stats, category);
+
+        return category.direction === "HIGHER_BETTER"
+          ? bValue - aValue
+          : aValue - bValue;
+      });
+
+      categoryRanks[category.category_id] = {};
+      sorted.forEach((team, index) => {
+        categoryRanks[category.category_id][team.teamId] = index + 1;
+      });
+    }
+
+    // Calculate roto points per team
+    for (const team of teamTotals) {
+      let totalPoints = 0;
+
+      for (const category of categories) {
+        const rank = categoryRanks[category.category_id][team.teamId];
+        const points = totalTeams - rank + 1; // Roto scoring
+        totalPoints += points;
+      }
+
+      standings.push({
+        team_id: team.teamId,
+        teamName: team.teamName,
+        projected_overall_points: totalPoints,
+        projected_overall_rank: 0, // Assigned after sorting
+      });
+    }
+
+    // Sort by total points, assign overall rank
+    standings.sort((a, b) => b.projected_overall_points - a.projected_overall_points);
+    standings.forEach((team, index) => {
+      team.projected_overall_rank = index + 1;
+    });
+
+    return standings;
+  }
+
+  /**
+   * Get category value from stats components
+   */
+  private getCategoryValue(stats: StatComponents, category: Category): number {
+    if (category.type === "RATE" && category.formula_id) {
+      // Calculate rate from components
+      const { calculateFinalRate } = require("../../../shared/dist/index.js");
+      try {
+        return calculateFinalRate(category.formula_id, {}, stats);
+      } catch {
+        return 0;
+      }
+    } else {
+      // Counting stat
+      return stats[category.stat_key] || 0;
+    }
+  }
+}
+
+/**
+ * Types for projected standings calculation
+ */
+interface TeamRoster {
+  teamId: number;
+  teamName: string;
+  players: { playerId: number }[];
+}
+
+interface TeamProjectedStats {
+  teamId: number;
+  teamName: string;
+  stats: StatComponents;
+}
+
+interface ProjectedOverallRow {
+  team_id: number;
+  teamName: string;
+  projected_overall_rank: number;
+  projected_overall_points: number;
+}
+
+interface ProjectedStandingsResult {
+  standings: ProjectedOverallRow[];
+  generatedAt: string;
 }
