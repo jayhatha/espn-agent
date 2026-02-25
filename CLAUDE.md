@@ -169,4 +169,7 @@ Projected values combine current-to-date components + remaining-season projected
 7. ESPN auth cookies stored in plaintext (design doc requires encrypted-at-rest)
 8. No retry/backoff on ESPN API calls
 9. TradeRecommendationAgent doesn't handle rate stat adjustments (counting stats only)
-10. DraftAssistantAgent not implemented
+10. DraftAssistantAgent not implemented (Chrome extension built separately)
+11. **Chrome Extension**: No API token system - extension uses session-based auth via browser cookies (works for local dev, requires tokens for production)
+12. **Chrome Extension**: ESPN DOM selectors are placeholders - must be verified against real ESPN draft page
+13. **Chrome Extension**: User team ID detection not implemented - requires manual configuration

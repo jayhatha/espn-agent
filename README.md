@@ -14,6 +14,97 @@ This is a monorepo containing:
 - **packages/backend**: Node.js/TypeScript backend with Fastify
 - **packages/frontend**: Next.js App Router frontend
 - **packages/shared**: Shared types and utilities
+- **packages/extension**: Chrome extension for live draft assistance
+
+## ESPN Live Draft Assistant (Chrome Extension) 🎯
+
+A Chrome extension that provides real-time draft recommendations directly on the ESPN Fantasy Baseball draft page.
+
+### Features
+
+- **Snake Draft Support**
+  - Best Player Available (BPA) rankings with VBD scoring
+  - Position-based filtering and positional needs detection
+  - Snake turn pair recommendations for back-to-back picks
+  - Real-time roster summary with category totals
+
+- **Auction Draft Support**
+  - Budget pacing tracker (ahead/on-track/behind)
+  - Dollar value recommendations
+  - Recommended max bid calculations
+  - Affordability indicators and value badges
+
+- **Pick Value Tracking**
+  - Overpay/underpay indicators for all teams
+  - Team efficiency leaderboard
+  - Competitive intelligence on draft performance
+
+- **Shadow DOM UI**
+  - Style-isolated sidebar (doesn't conflict with ESPN)
+  - Collapsible interface (400px wide, right-aligned)
+  - Persistent across page scroll and updates
+
+### Quick Start
+
+1. **Build the Extension**
+   ```bash
+   cd packages/extension
+   pnpm install
+   pnpm build
+   ```
+
+2. **Load in Chrome**
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" (toggle in top-right)
+   - Click "Load unpacked"
+   - Select `packages/extension/.output/chrome-mv3` directory
+
+3. **Use During Draft**
+   - Navigate to any ESPN Fantasy Baseball draft page
+   - The assistant sidebar will automatically appear on the right side
+   - Rankings load automatically from bundled baseline data
+   - Pick detection happens in real-time via DOM observation
+
+### Optional: Connect to Backend
+
+To use custom projections and league-specific rankings:
+
+1. **Start the backend server**
+   ```bash
+   # Using Docker
+   ./docker.sh dev-up
+
+   # Or manually
+   cd packages/backend && pnpm dev
+   ```
+
+2. **Generate an API token** (Coming soon)
+   - Feature is planned but not yet implemented
+   - Current workaround: Extension uses session-based auth from browser cookies
+   - Navigate to `http://localhost:3001` and sign in
+   - Extension will inherit your browser session automatically
+
+3. **Configure extension settings**
+   - Click extension icon in Chrome toolbar
+   - Set Backend URL (e.g., `http://localhost:3001`)
+   - Save settings (API token field optional until token system is implemented)
+
+4. **The extension will fetch:**
+   - League-specific rankings based on roster settings
+   - Custom player projections from FanGraphs uploads
+   - Real-time standings projections
+
+**Note:** Extension works standalone with bundled rankings if backend is not available.
+
+### Development
+
+```bash
+cd packages/extension
+pnpm dev    # Start development mode with hot reload
+pnpm build  # Build for production
+```
+
+See `packages/extension/README.md` for detailed extension development instructions.
 
 ## Quick Start (Docker) 🐳
 
