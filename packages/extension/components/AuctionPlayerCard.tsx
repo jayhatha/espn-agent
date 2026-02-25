@@ -2,6 +2,10 @@ import React from "react";
 import type { AuctionValue } from "@espn-fantasy/shared";
 import { useDraftStore } from "../lib/draft-state";
 import { calculateBudgetPacing } from "../lib/value-calculations";
+import {
+  calculateAuctionValue,
+  getValueColorClasses,
+} from "../lib/value-detection";
 
 function normalizePlayerName(name: string): string {
   return name
@@ -25,6 +29,7 @@ function formatNumber(value: unknown, digits: number): string {
 interface AuctionPlayerCardProps {
   player: AuctionValue;
   rank: number;
+  actualPrice?: number; // Actual draft price (if drafted)
 }
 
 type AuctionValueWithOptionalVbd = AuctionValue & {
@@ -34,9 +39,14 @@ type AuctionValueWithOptionalVbd = AuctionValue & {
 export default function AuctionPlayerCard({
   player,
   rank,
+  actualPrice,
 }: AuctionPlayerCardProps) {
   const auctionPlayer = player as AuctionValueWithOptionalVbd;
   const { myRoster, rosterSize, rankings } = useDraftStore();
+
+  // Calculate value indicator
+  const valueIndicator = calculateAuctionValue(player, actualPrice ?? null);
+  const colorClasses = getValueColorClasses(valueIndicator.color);
 
   // Calculate if player is affordable
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
@@ -58,13 +68,38 @@ export default function AuctionPlayerCard({
     <div className="p-3 border-b hover:bg-blue-50 cursor-pointer transition-colors border-gray-200">
       {/* Player name and positions */}
       <div className="flex justify-between items-start mb-1">
-        <div>
+        <div className="flex-1">
           <div className="font-semibold text-gray-900">{player.playerName}</div>
           <div className="text-xs text-gray-500">
             {player.positions.join(", ")}
             {playerRanking?.adp && (
               <span className="ml-2 text-blue-600">
                 ADP: {formatNumber(playerRanking.adp, 1)}
+              </span>
+            )}
+          </div>
+
+          {/* Value indicators */}
+          <div className="flex gap-2 mt-2">
+            {/* Value detection badge - only show for non-fair values */}
+            {valueIndicator.severity !== "fair" && (
+              <span
+                className={`text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+                title={`VBD $${player.dollarValue} vs actual ${actualPrice ? `$${actualPrice}` : "not drafted"}`}
+              >
+                {valueIndicator.label}
+              </span>
+            )}
+
+            {/* Budget pacing indicators */}
+            {!actualPrice && isValuePick && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                ⭐ Value
+              </span>
+            )}
+            {!actualPrice && !isAffordable && (
+              <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                Over budget
               </span>
             )}
           </div>
@@ -77,20 +112,6 @@ export default function AuctionPlayerCard({
             VBD: {formatNumber(auctionPlayer.vbdScore, 1)}
           </div>
         </div>
-      </div>
-
-      {/* Value indicators */}
-      <div className="flex gap-2 mt-2">
-        {isValuePick && (
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-            ⭐ Value
-          </span>
-        )}
-        {!isAffordable && (
-          <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
-            Over budget
-          </span>
-        )}
       </div>
 
       {/* Projected stats (abbreviated) */}

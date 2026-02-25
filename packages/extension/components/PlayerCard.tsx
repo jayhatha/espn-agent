@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import type { DraftRanking } from "@espn-fantasy/shared";
 import { useDraftStore } from "../lib/draft-state";
+import {
+  calculateSnakeDraftValue,
+  getValueColorClasses,
+} from "../lib/value-detection";
 
 interface PlayerCardProps {
   player: DraftRanking;
@@ -24,6 +28,15 @@ export default function PlayerCard({
 }: PlayerCardProps) {
   const { currentPick, myTeamId, totalTeams, allPicks, draftFormat } =
     useDraftStore();
+
+  // Calculate value indicator
+  const valueIndicator = useMemo(() => {
+    return calculateSnakeDraftValue(player, rank, player.adp ?? null);
+  }, [player, rank]);
+
+  const colorClasses = useMemo(() => {
+    return getValueColorClasses(valueIndicator.color);
+  }, [valueIndicator.color]);
 
   // Calculate picks until user's next turn
   const picksUntilMyTurn = useMemo(() => {
@@ -68,7 +81,7 @@ export default function PlayerCard({
     >
       {/* Player name and positions */}
       <div className="flex justify-between items-start mb-1">
-        <div>
+        <div className="flex-1">
           <div className="font-semibold text-gray-900">{player.playerName}</div>
           <div className="text-xs text-gray-500">
             {player.positions.join(", ")} • Tier {player.tier}
@@ -78,6 +91,16 @@ export default function PlayerCard({
               </span>
             )}
           </div>
+
+          {/* Value indicator badge */}
+          {valueIndicator.severity !== "fair" && (
+            <span
+              className={`inline-block mt-1 text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+              title={`VBD rank ${rank} vs ADP ${player.adp ?? "N/A"}`}
+            >
+              {valueIndicator.label}
+            </span>
+          )}
         </div>
         <div className="text-right">
           <div className="text-sm font-bold text-blue-600">#{rank}</div>
