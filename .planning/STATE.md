@@ -73,6 +73,7 @@ Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
 | quick-05 | 9min | 2 | 4 |
 
 *Updated: 2026-02-25 after Phase 11 Plan 04 completion*
+| Phase 11 P03 | 5 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 11]: 10-pick threshold for snake draft value detection - players 10+ picks later than VBD rank are significant value opportunities
 - [Phase 11]: 15% threshold for auction value detection - 15%+ discount/overpay represents meaningful budget deviation
 - [Phase 11]: Hide fair value badges to reduce clutter - only show badges for non-fair values
+- [Phase 11]: Multiple DOM selector strategies for robustness against ESPN changes
+- [Phase 11]: Config cached after initial detection - no re-detection mid-draft for performance
+- [Phase 11]: Keep stale data on refresh failure - better than no rankings during draft
 
 ### Roadmap Evolution
 
