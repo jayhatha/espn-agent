@@ -17,12 +17,13 @@ const ESPN_STAT_MAP: Record<number, {
   21: { key: "RBI", name: "RBI", type: "COUNTING" },
   23: { key: "SB", name: "Stolen Bases", type: "COUNTING" },
   3: { key: "AVG", name: "Batting Average", type: "RATE", formulaId: "avg", requiredComponents: ["AB", "H"] },
-  98: { key: "OBP", name: "On Base Percentage", type: "RATE", formulaId: "obp", requiredComponents: ["AB", "H", "BB", "HBP", "SF"] },
+  17: { key: "OBP", name: "On Base Percentage", type: "RATE", formulaId: "obp", requiredComponents: ["H", "BB", "HBP", "AB", "SF"] },
+  18: { key: "OPS", name: "On-Base Plus Slugging", type: "RATE", formulaId: "ops", requiredComponents: ["H", "BB", "HBP", "AB", "SF", "TB"] },
   // Pitching stats
-  27: { key: "K", name: "Strikeouts", type: "COUNTING" },
-  28: { key: "W", name: "Wins", type: "COUNTING" },
-  32: { key: "SV", name: "Saves", type: "COUNTING" },
-  26: { key: "ERA", name: "Earned Run Average", type: "RATE", formulaId: "era", requiredComponents: ["IP", "ER"] },
+  48: { key: "K", name: "Strikeouts", type: "COUNTING" },
+  53: { key: "W", name: "Wins", type: "COUNTING" },
+  57: { key: "SV", name: "Saves", type: "COUNTING" },
+  47: { key: "ERA", name: "Earned Run Average", type: "RATE", formulaId: "era", requiredComponents: ["ER", "IP"] },
   41: { key: "WHIP", name: "WHIP", type: "RATE", formulaId: "whip", requiredComponents: ["IP", "H", "BB"] },
 };
 
