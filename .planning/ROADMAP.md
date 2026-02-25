@@ -135,7 +135,7 @@ Plans:
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
 | 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
-| 11. Draft Assistant Enhancements | 3/5 | In Progress|  | - |
+| 11. Draft Assistant Enhancements | 4/5 | In Progress|  | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -170,7 +170,7 @@ Plans:
   4. Snake draft shows color-coded value indicators (10+ pick steals = green, reaches = red)
   5. Auction draft shows percentage discount/overpay indicators (15%+ discount = green)
   6. Valuation logic audited and corrected for accuracy
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 - [ ] 11-01-PLAN.md — Audit and fix existing valuation logic (backend + extension)
