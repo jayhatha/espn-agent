@@ -47,6 +47,15 @@ export interface LeagueSettings {
   };
 }
 
+// Draft configuration for generic draft endpoints
+export interface DraftConfiguration {
+  categories: Category[];
+  rosterSlots: Record<string, number>;
+  totalTeams: number;
+  budget?: number;      // Auction only (default: 260)
+  minBid?: number;      // Auction only (default: 1)
+}
+
 // Component stats for rate calculation
 export interface StatComponents {
   // Hitter components
@@ -239,7 +248,7 @@ export interface PlayerIdentityMap {
 export interface User {
   id: number;
   email: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   displayName: string | null;
   avatarUrl: string | null;
   createdAt: Date;
@@ -257,7 +266,7 @@ export interface SignupRequest {
 }
 
 export interface AuthResponse {
-  user: Omit<User, 'createdAt'>;
+  user: Omit<User, "createdAt">;
 }
 
 // Draft and auction types
@@ -271,6 +280,7 @@ export interface DraftRanking {
   categorySGPs: Record<string, number>;
   projectedStats: StatComponents;
   tier: number; // Players grouped into value tiers
+  adp?: number; // Average draft position for comparison
 }
 
 export interface AuctionValue {
@@ -294,7 +304,7 @@ export interface DraftContext {
 
 // Transaction Impact Analysis (Roto WPA) types
 
-export type MoveType = 'draft' | 'add' | 'drop' | 'trade_in' | 'trade_out';
+export type MoveType = "draft" | "add" | "drop" | "trade_in" | "trade_out";
 
 export interface PlayerPeriodStats {
   league_id: number;
@@ -378,6 +388,7 @@ export interface DraftPick {
   timestamp: number;
   cost?: number; // Auction only
   positions: string[];
+  adp?: number; // Average draft position for context
 }
 
 export interface DraftedPlayer {

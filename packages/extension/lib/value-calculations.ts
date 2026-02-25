@@ -1,4 +1,80 @@
-import type { DraftRanking, DraftedPlayer, Category } from '@espn-fantasy/shared';
+import type {
+  DraftRanking,
+  DraftedPlayer,
+  Category,
+  DraftPick,
+} from "@espn-fantasy/shared";
+
+// Pick Value Tracking
+export interface PickValue {
+  pickNumber: number;
+  playerId: number;
+  playerName: string;
+  teamName: string;
+  expectedRank: number;
+  actualPick: number;
+  value: number; // Positive = value (picked later than expected), negative = reach (picked earlier)
+  valueLabel: string; // e.g., "5-pick value" or "8-pick reach"
+}
+
+export function calculatePickValue(
+  pick: DraftPick,
+  rankings: DraftRanking[],
+): PickValue {
+  // Find player in rankings to get expected rank
+  const playerRanking = rankings.find((r) => r.playerId === pick.playerId);
+
+  if (!playerRanking) {
+    return {
+      pickNumber: pick.pickNumber,
+      playerId: pick.playerId,
+      playerName: pick.playerName,
+      teamName: pick.teamName,
+      expectedRank: 0,
+      actualPick: pick.pickNumber,
+      value: 0,
+      valueLabel: "Unranked",
+    };
+  }
+
+  // Find expected rank based on VBD score
+  const sortedRankings = [...rankings].sort((a, b) => b.vbdScore - a.vbdScore);
+  const expectedRank =
+    sortedRankings.findIndex((r) => r.playerId === pick.playerId) + 1;
+
+  // Value = expected rank - actual pick
+  // Positive = picked later than expected (good value)
+  // Negative = picked earlier than expected (reach/overpay)
+  const value = expectedRank - pick.pickNumber;
+
+  let valueLabel: string;
+  if (value > 0) {
+    valueLabel = `${value}-pick value`;
+  } else if (value < 0) {
+    valueLabel = `${Math.abs(value)}-pick reach`;
+  } else {
+    valueLabel = "On target";
+  }
+
+  return {
+    pickNumber: pick.pickNumber,
+    playerId: pick.playerId,
+    playerName: pick.playerName,
+    teamName: pick.teamName,
+    expectedRank,
+    actualPick: pick.pickNumber,
+    value,
+    valueLabel,
+  };
+}
+
+// Calculate value for all picks
+export function calculateAllPickValues(
+  picks: DraftPick[],
+  rankings: DraftRanking[],
+): PickValue[] {
+  return picks.map((pick) => calculatePickValue(pick, rankings));
+}
 
 // Snake Draft: Pair Recommendations at the Turn
 export interface PairRecommendation {
@@ -31,10 +107,16 @@ export function getSnakeTurnPairs(
       const combinedValue = player1.vbdScore + player2.vbdScore;
 
       // Analyze category coverage
-      const categoriesCovered = getCategoriesCovered(player1, player2, currentRoster, categories);
+      const categoriesCovered = getCategoriesCovered(
+        player1,
+        player2,
+        currentRoster,
+        categories,
+      );
 
       // Penalize redundant positions (two catchers bad, catcher + OF good)
-      const positionPenalty = player1.primaryPosition === player2.primaryPosition ? 0.9 : 1.0;
+      const positionPenalty =
+        player1.primaryPosition === player2.primaryPosition ? 0.9 : 1.0;
 
       pairs.push({
         player1,
@@ -74,12 +156,19 @@ function getCategoriesCovered(
   return covered;
 }
 
-function generateRationale(p1: DraftRanking, p2: DraftRanking, categories: string[]): string {
+function generateRationale(
+  p1: DraftRanking,
+  p2: DraftRanking,
+  categories: string[],
+): string {
+  const p1Vbd = Number.isFinite(p1.vbdScore) ? p1.vbdScore : 0;
+  const p2Vbd = Number.isFinite(p2.vbdScore) ? p2.vbdScore : 0;
+
   if (categories.length === 0) {
-    return `Best available value (${p1.vbdScore.toFixed(1)} + ${p2.vbdScore.toFixed(1)} VBD)`;
+    return `Best available value (${p1Vbd.toFixed(1)} + ${p2Vbd.toFixed(1)} VBD)`;
   }
 
-  return `Strengthens ${categories.slice(0, 3).join(', ')} (${p1.vbdScore.toFixed(1)} + ${p2.vbdScore.toFixed(1)} VBD)`;
+  return `Strengthens ${categories.slice(0, 3).join(", ")} (${p1Vbd.toFixed(1)} + ${p2Vbd.toFixed(1)} VBD)`;
 }
 
 // Auction Draft: Budget Pacing
@@ -88,7 +177,7 @@ export interface BudgetPacing {
   remainingRosterSpots: number;
   averageRemainingPerPlayer: number;
   recommendedMaxBid: number;
-  pacingStatus: 'ahead' | 'on-track' | 'behind';
+  pacingStatus: "ahead" | "on-track" | "behind";
 }
 
 export function calculateBudgetPacing(
@@ -97,27 +186,30 @@ export function calculateBudgetPacing(
   rosterSize: number,
 ): BudgetPacing {
   const spentBudget = currentRoster.reduce((sum, p) => sum + (p.cost || 0), 0);
-  const remainingBudget = totalBudget - spentBudget;
-  const remainingRosterSpots = rosterSize - currentRoster.length;
+  const remainingBudget = Math.max(0, totalBudget - spentBudget);
+  const remainingRosterSpots = Math.max(0, rosterSize - currentRoster.length);
 
-  const averageRemainingPerPlayer = remainingRosterSpots > 0
-    ? remainingBudget / remainingRosterSpots
-    : 0;
+  const averageRemainingPerPlayer =
+    remainingRosterSpots > 0 ? remainingBudget / remainingRosterSpots : 0;
 
   // Recommended max bid: 40% of remaining budget (avoid overcommitting)
   const recommendedMaxBid = Math.floor(remainingBudget * 0.4);
 
-  // Pacing status (compare to ideal equal distribution)
-  const idealAveragePerPlayer = totalBudget / rosterSize;
-  const pacingRatio = averageRemainingPerPlayer / idealAveragePerPlayer;
+  // Pacing status: compare remaining budget share vs remaining roster share.
+  // If budget share is materially higher than roster share, team is ahead.
+  const budgetShareRemaining =
+    totalBudget > 0 ? remainingBudget / totalBudget : 0;
+  const rosterShareRemaining =
+    rosterSize > 0 ? remainingRosterSpots / rosterSize : 0;
+  const shareDelta = budgetShareRemaining - rosterShareRemaining;
 
-  let pacingStatus: 'ahead' | 'on-track' | 'behind';
-  if (pacingRatio > 1.2) {
-    pacingStatus = 'ahead'; // Underspending, can be aggressive
-  } else if (pacingRatio < 0.8) {
-    pacingStatus = 'behind'; // Overspent early, need to conserve
+  let pacingStatus: "ahead" | "on-track" | "behind";
+  if (shareDelta > 0.1) {
+    pacingStatus = "ahead";
+  } else if (shareDelta < -0.1) {
+    pacingStatus = "behind";
   } else {
-    pacingStatus = 'on-track';
+    pacingStatus = "on-track";
   }
 
   return {
