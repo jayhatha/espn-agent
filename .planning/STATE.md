@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 11 (Draft Assistant Enhancements)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In Progress
-Last activity: 2026-02-25 - Completed 11-01 (Valuation Logic Audit & Fixes)
+Last activity: 2026-02-25 - Completed 11-05 (Projected Standings Endpoint)
 
-Progress: Phase 11: [████░░░░░░] 40% (2 of 5 plans complete)
+Progress: Phase 11: [██████░░░░] 60% (3 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: Phase 11: [████░░░░░░] 40% (2 of 5 plans complete)
 | 10 | P05 | unknown | 3 | 3 |
 | 10 | P06 | unknown | 3 | 3 |
 | 11 | P01 | 4min | 2 | 5 |
+| 11 | P05 | 2min | 2 | 2 |
 
 **Quick Tasks:**
 
@@ -70,7 +71,7 @@ Progress: Phase 11: [████░░░░░░] 40% (2 of 5 plans complete)
 | quick-04 | 3min | 2 | 1 |
 | quick-05 | 9min | 2 | 4 |
 
-*Updated: 2026-02-25 after Phase 11 Plan 01 completion*
+*Updated: 2026-02-25 after Phase 11 Plan 05 completion*
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 11]: Budget pacing threshold reduced to 5% for earlier auction alerts
 - [Phase 11]: Inflation factor clamped 0.5x-2x to prevent edge case instability
 - [Phase 11]: Sparse position replacement set to -10 to reflect scarcity value
+- [Phase 11]: POST endpoint with config in body avoids URL length limits for complex objects
+- [Phase 11]: Rate limit 50 requests/minute balances draft frequency with server load
 
 ### Roadmap Evolution
 
