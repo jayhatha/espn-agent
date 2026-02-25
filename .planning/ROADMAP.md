@@ -134,6 +134,8 @@ Plans:
 | 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
+| 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
+| 11. Draft Assistant Enhancements | v1.2 | 0/5 | Planning | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -146,12 +148,33 @@ Plans:
   3. Snake draft users see BPA recommendations, pair recommendations at turn, and roster summary
   4. Auction draft users see budget pacing tracker, dollar value recommendations, and spend guidance
   5. Draft state persists across page refreshes via chrome.storage.local
-**Plans:** 2/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md — WXT extension setup, manifest config, baseline rankings bundle, API client
-- [ ] 10-02-PLAN.md — Zustand draft state with chrome.storage.local persistence, snake/auction value calculations
-- [ ] 10-03-PLAN.md — Content script with Shadow DOM sidebar injection, MutationObserver for pick detection
-- [ ] 10-04-PLAN.md — Snake draft UI: BPA recommendations, pair recommendations, roster summary
-- [ ] 10-05-PLAN.md — Auction draft UI: budget pacing tracker, dollar value recommendations
-- [ ] 10-06-PLAN.md — Pick value tracking (overpay/underpay indicators), pre-draft ranking overrides, ADP/countdown display
+- [x] 10-01-PLAN.md — WXT extension setup, manifest config, baseline rankings bundle, API client
+- [x] 10-02-PLAN.md — Zustand draft state with chrome.storage.local persistence, snake/auction value calculations
+- [x] 10-03-PLAN.md — Content script with Shadow DOM sidebar injection, MutationObserver for pick detection
+- [x] 10-04-PLAN.md — Snake draft UI: BPA recommendations, pair recommendations, roster summary
+- [x] 10-05-PLAN.md — Auction draft UI: budget pacing tracker, dollar value recommendations
+- [x] 10-06-PLAN.md — Pick value tracking (overpay/underpay indicators), pre-draft ranking overrides, ADP/countdown display
+
+### Phase 11: Draft Assistant Enhancements - player pool sync, value detection, and league-agnostic projections
+
+**Goal:** Extension provides accurate value-based draft recommendations by syncing player pool data, detecting league configurations, and refreshing projections automatically after each pick
+**Depends on:** Phase 10
+**Requirements:** []
+**Success Criteria** (what must be TRUE):
+  1. Backend syncs ESPN player pool daily (stats, ownership %) to shared database table
+  2. Extension detects league config from ESPN draft page DOM (categories, roster slots, teams)
+  3. Rankings auto-refresh after each pick detection with retry logic
+  4. Snake draft shows color-coded value indicators (10+ pick steals = green, reaches = red)
+  5. Auction draft shows percentage discount/overpay indicators (15%+ discount = green)
+  6. Valuation logic audited and corrected for accuracy
+**Plans:** 5 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Audit and fix existing valuation logic (backend + extension)
+- [ ] 11-02-PLAN.md — Backend player pool sync (DB migration, sync agent, daily cron job)
+- [ ] 11-03-PLAN.md — Extension league config detection and auto-refresh on pick
+- [ ] 11-04-PLAN.md — Extension value detection UI (red/yellow/green badges)
+- [ ] 11-05-PLAN.md — Backend projected standings endpoint (league-agnostic)
