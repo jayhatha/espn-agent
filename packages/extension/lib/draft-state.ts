@@ -55,6 +55,7 @@ interface DraftState {
   sidebarVisible: boolean;
   selectedPosition: string | null;
   showOnlyNeeds: boolean;
+  configWarnings: string[];
 
   // Actions
   initializeDraft: (config: {
@@ -76,6 +77,7 @@ interface DraftState {
   setPlayerOverrideRank: (playerId: number, newRank: number) => void;
   clearPlayerOverride: (playerId: number) => void;
   clearAllOverrides: () => void;
+  setConfigWarnings: (warnings: string[]) => void;
   reset: () => void;
 }
 
@@ -99,6 +101,7 @@ export const useDraftStore = create<DraftState>()(
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
+      configWarnings: [],
 
       // Actions
       initializeDraft: (config) => {
@@ -180,6 +183,8 @@ export const useDraftStore = create<DraftState>()(
       },
 
       clearAllOverrides: () => set({ userRankingOverrides: {} }),
+
+      setConfigWarnings: (warnings) => set({ configWarnings: warnings }),
 
       reset: () =>
         set({

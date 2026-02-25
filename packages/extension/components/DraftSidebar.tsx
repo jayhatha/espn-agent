@@ -18,6 +18,7 @@ export default function DraftSidebar() {
     currentPick,
     myRoster,
     rosterSize,
+    configWarnings,
   } = useDraftStore();
 
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
@@ -100,6 +101,20 @@ export default function DraftSidebar() {
           </button>
         </div>
       </div>
+
+      {/* Config Detection Warning Banner */}
+      {configWarnings.length > 0 && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4">
+          <p className="text-sm text-yellow-700">
+            <strong>Warning:</strong> League config detection incomplete. Using 5x5 defaults.
+          </p>
+          <ul className="text-xs text-yellow-600 mt-2">
+            {configWarnings.map((warning, i) => (
+              <li key={i}>• {warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Draft Status */}
       <div className="bg-gray-100 p-4 border-b">

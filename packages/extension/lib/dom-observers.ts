@@ -108,14 +108,15 @@ function findDraftBoardElement(): Element | null {
 /**
  * Observes ESPN draft board for new picks
  * Returns cleanup function to disconnect observer
+ * Updated to support async pick handlers for auto-refresh
  */
 export function observeDraftBoard(
-  onPick: (pick: DraftPick) => void,
+  onPick: (pick: DraftPick) => void | Promise<void>,
 ): () => void {
   let observedBoard: Element | null = null;
   const emittedPickKeys = new Set<string>();
 
-  const emitPick = (pick: DraftPick) => {
+  const emitPick = async (pick: DraftPick) => {
     const key = getPickDedupKey(pick);
     if (emittedPickKeys.has(key)) {
       return;
@@ -123,7 +124,7 @@ export function observeDraftBoard(
 
     emittedPickKeys.add(key);
     console.log("[ESPN Draft Assistant] Detected pick:", pick);
-    onPick(pick);
+    await onPick(pick); // Support async handlers
   };
 
   const scanCompletedPicks = (scope: ParentNode) => {
@@ -149,10 +150,10 @@ export function observeDraftBoard(
         mutation.addedNodes.forEach((node) => {
           const pickElements = getPickCandidatesFromNode(node);
 
-          pickElements.forEach((pickElement) => {
+          pickElements.forEach(async (pickElement) => {
             const pick = parsePickElement(pickElement);
             if (pick) {
-              emitPick(pick);
+              await emitPick(pick);
             }
           });
         });

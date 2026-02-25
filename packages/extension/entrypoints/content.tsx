@@ -12,12 +12,20 @@ import {
   getAuctionValues,
   getProjectedStandings,
   resolveBackendLeagueId,
+  getRankingsWithRetry,
+  getAuctionValuesWithRetry,
 } from "../lib/api-client";
+import { detectLeagueConfig } from "../lib/draft-config-detector";
+import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
 
 const SIDEBAR_ROOT_ID = "espn-draft-assistant-root";
 const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
+
+// Cache league config for auto-refresh (detected once at page load)
+let cachedLeagueConfig: DraftConfiguration | null = null;
+let configDetectionWarnings: string[] = [];
 
 function normalizePlayerName(name: string): string {
   return name
@@ -27,6 +35,53 @@ function normalizePlayerName(name: string): string {
     .replace(/\b(jr|sr)\.?\b/g, "")
     .replace(/[^a-z0-9]/g, "")
     .trim();
+}
+
+/**
+ * Refresh rankings and projections with cached config
+ * User constraint: auto-refresh after each pick, keep stale data on failure
+ */
+async function refreshRankingsAndProjections(espnLeagueId: string) {
+  const state = useDraftStore.getState();
+
+  // Use cached config (don't re-detect per user constraint)
+  if (!cachedLeagueConfig) {
+    console.warn("[ESPN Draft Assistant] No league config available for refresh");
+    return;
+  }
+
+  try {
+    // Fetch with retry logic
+    const [rankings, auctionValues] = await Promise.all([
+      getRankingsWithRetry(espnLeagueId, {
+        draftFormat: state.draftFormat,
+      }),
+      state.draftFormat === "auction"
+        ? getAuctionValuesWithRetry(espnLeagueId, {
+            budget: state.remainingBudget,
+            rosterSize: state.rosterSize,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Update state
+    state.setRankings(rankings);
+    if (state.draftFormat === "auction") {
+      state.setAuctionValues(auctionValues);
+    }
+
+    console.log("[ESPN Draft Assistant] Rankings refreshed successfully", {
+      rankingsCount: rankings.length,
+      auctionValuesCount: auctionValues.length,
+    });
+  } catch (error) {
+    // User constraint: keep stale data on failure after retries
+    console.error(
+      "[ESPN Draft Assistant] Failed to refresh rankings after retries, keeping stale data",
+      error
+    );
+    // Don't throw - UI keeps showing stale rankings
+  }
 }
 
 export default defineContentScript({
@@ -82,6 +137,54 @@ export default defineContentScript({
 
     await resolveBackendLeagueMapping();
 
+    // Detect league config once at page load (user constraint)
+    const detection = detectLeagueConfig();
+    configDetectionWarnings = detection.warnings;
+
+    // Store warnings for UI display
+    useDraftStore.getState().setConfigWarnings(detection.warnings);
+
+    if (detection.config) {
+      cachedLeagueConfig = detection.config;
+      console.log("[ESPN Draft Assistant] Config detected:", {
+        confidence: detection.confidence,
+        totalTeams: detection.config.totalTeams,
+        categories: detection.config.categories.length,
+        rosterSlots: Object.keys(detection.config.rosterSlots).length,
+      });
+    } else {
+      // Use default 5x5 config per user constraint
+      cachedLeagueConfig = {
+        totalTeams: 12,
+        categories: [
+          { category_id: "R", stat_key: "R", type: "COUNTING", direction: "HIGHER_BETTER", name: "Runs" },
+          { category_id: "HR", stat_key: "HR", type: "COUNTING", direction: "HIGHER_BETTER", name: "Home Runs" },
+          { category_id: "RBI", stat_key: "RBI", type: "COUNTING", direction: "HIGHER_BETTER", name: "RBI" },
+          { category_id: "SB", stat_key: "SB", type: "COUNTING", direction: "HIGHER_BETTER", name: "Stolen Bases" },
+          { category_id: "AVG", stat_key: "AVG", type: "RATE", direction: "HIGHER_BETTER", name: "Batting Average" },
+          { category_id: "W", stat_key: "W", type: "COUNTING", direction: "HIGHER_BETTER", name: "Wins" },
+          { category_id: "SV", stat_key: "SV", type: "COUNTING", direction: "HIGHER_BETTER", name: "Saves" },
+          { category_id: "K", stat_key: "K", type: "COUNTING", direction: "HIGHER_BETTER", name: "Strikeouts" },
+          { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA" },
+          { category_id: "WHIP", stat_key: "WHIP", type: "RATE", direction: "LOWER_BETTER", name: "WHIP" },
+        ],
+        rosterSlots: {
+          "C": 1,
+          "1B": 1,
+          "2B": 1,
+          "3B": 1,
+          "SS": 1,
+          "OF": 3,
+          "UTIL": 1,
+          "SP": 4,
+          "RP": 2,
+          "P": 2,
+          "BN": 3,
+        },
+      };
+      console.warn("[ESPN Draft Assistant] Config detection failed, using 5x5 defaults");
+    }
+
     // Always initialize draft state from current URL context
     const state = useDraftStore.getState();
     const resolvedDraftFormat: "snake" | "auction" =
@@ -90,12 +193,15 @@ export default defineContentScript({
         ? "auction"
         : "snake";
 
-    // TODO: Get these from backend API or ESPN page
+    const totalRosterSize = cachedLeagueConfig
+      ? Object.values(cachedLeagueConfig.rosterSlots).reduce((a, b) => a + b, 0)
+      : 25;
+
     state.initializeDraft({
       leagueId,
       draftFormat: resolvedDraftFormat,
-      totalTeams: 12, // Default, should be parsed from ESPN page
-      rosterSize: 25, // Default, should be from league settings
+      totalTeams: cachedLeagueConfig?.totalTeams || 12,
+      rosterSize: totalRosterSize,
       myTeamId: teamId ?? "user",
       budget: 260, // Auction only
     });
@@ -140,7 +246,7 @@ export default defineContentScript({
       mountSidebar();
     };
 
-    const processDetectedPick = (pick: DraftPick) => {
+    const processDetectedPick = async (pick: DraftPick) => {
       useDraftStore.getState().addPick(pick);
 
       const currentState = useDraftStore.getState();
@@ -149,37 +255,36 @@ export default defineContentScript({
         pick.teamId === "myTeam" ||
         pick.teamName === "My Team";
 
-      if (!isMyPick) {
-        return;
-      }
-
-      const alreadyInRoster = currentState.myRoster.some(
-        (player) => player.playerId === pick.playerId,
-      );
-      if (alreadyInRoster) {
-        return;
-      }
-
-      const matchingRanking = currentState.rankings.find((ranking) => {
-        if (ranking.playerId === pick.playerId) {
-          return true;
-        }
-
-        return (
-          normalizePlayerName(ranking.playerName) ===
-          normalizePlayerName(pick.playerName)
+      if (isMyPick) {
+        const alreadyInRoster = currentState.myRoster.some(
+          (player) => player.playerId === pick.playerId,
         );
-      });
+        if (!alreadyInRoster) {
+          const matchingRanking = currentState.rankings.find((ranking) => {
+            if (ranking.playerId === pick.playerId) {
+              return true;
+            }
 
-      const draftedPlayer = {
-        playerId: pick.playerId,
-        playerName: pick.playerName,
-        positions: pick.positions,
-        pickNumber: pick.pickNumber,
-        cost: pick.cost,
-        projectedStats: matchingRanking?.projectedStats || {},
-      };
-      useDraftStore.getState().updateRoster(draftedPlayer);
+            return (
+              normalizePlayerName(ranking.playerName) ===
+              normalizePlayerName(pick.playerName)
+            );
+          });
+
+          const draftedPlayer = {
+            playerId: pick.playerId,
+            playerName: pick.playerName,
+            positions: pick.positions,
+            pickNumber: pick.pickNumber,
+            cost: pick.cost,
+            projectedStats: matchingRanking?.projectedStats || {},
+          };
+          useDraftStore.getState().updateRoster(draftedPlayer);
+        }
+      }
+
+      // Auto-refresh rankings after each pick (user constraint)
+      await refreshRankingsAndProjections(leagueId.toString());
     };
 
     const refreshAssistantData = async () => {
