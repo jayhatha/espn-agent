@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 10 (ESPN Live Draft Assistant)
-Plan: 6 of 6 in current phase
-Status: Complete
-Last activity: 2026-02-25 - Completed phase 10 with all 6 plans (WXT infrastructure, draft state, Shadow DOM sidebar, snake UI, auction UI, pick tracking)
+Phase: 11 (Draft Assistant Enhancements)
+Plan: 2 of 5 in current phase
+Status: In Progress
+Last activity: 2026-02-25 - Completed 11-02 (Player Pool Sync Infrastructure)
 
-Progress: Phase 10: [██████████] 100% (6 of 6 plans complete)
+Progress: Phase 11: [████░░░░░░] 40% (2 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -58,6 +58,8 @@ Progress: Phase 10: [██████████] 100% (6 of 6 plans complete
 | 10 | P04 | unknown | 4 | 4 |
 | 10 | P05 | unknown | 3 | 3 |
 | 10 | P06 | unknown | 3 | 3 |
+| 11 | P01 | unknown | 1 | 0 |
+| 11 | P02 | 3min | 2 | 4 |
 
 **Quick Tasks:**
 
@@ -70,6 +72,7 @@ Progress: Phase 10: [██████████] 100% (6 of 6 plans complete
 | quick-05 | 9min | 2 | 4 |
 
 *Updated: 2026-02-25 after Phase 10 completion*
+| Phase 11 P02 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -117,12 +120,15 @@ Recent decisions affecting v1.1 work:
 - [Phase 10 P01]: API client uses 3-second timeout to prevent blocking on slow backend
 - [Phase 10 P01]: Manifest V3 permissions limited to storage and tabs for minimal user concern
 - [Phase 10 P01]: Shadow DOM styling via Tailwind for isolation from ESPN page styles
+- [Phase 11]: node-cron over BullMQ for daily sync - simple daily job with no queue coordination needed
+- [Phase 11]: 4 AM ET schedule for player pool sync - ESPN updates overnight after West Coast games
 
 ### Roadmap Evolution
 
 - Phase 07.1 inserted after Phase 7: Historical Stats Accumulation & Dynamic Categories (URGENT) — ESPN backfill produces identical standings across all weeks because `valuesByStat` returns full-season cumulative stats. Fix: accumulate per-period player stats (statSplitTypeId=5), filter active roster, use league-defined scoring categories.
 - Phase 07.2 inserted after Phase 7: Research and fix standings over time (URGENT) — counting stat values are an order of magnitude smaller than expected in backfill snapshots despite cumulative accumulation fix in 07.1.
 - Phase 10 added: ESPN Live Draft Assistant
+- Phase 11 added: Draft Assistant Enhancements - player pool sync, value detection, and league-agnostic projections
 
 ### Pending Todos
 
