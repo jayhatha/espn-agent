@@ -149,6 +149,51 @@ export class DraftRankingsAgent {
       (p) => p.stat_components_json as StatComponents,
     );
 
+    // DIAGNOSTIC: Log category-level statistics to validate SGP spread
+    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number }> = {};
+    for (const category of categories) {
+      let allValues: number[];
+
+      if (category.type === "COUNTING") {
+        allValues = allProjections.map((p) => p[category.stat_key] || 0);
+      } else if (category.type === "RATE" && category.formula_id) {
+        const { calculateFinalRate } = require("../../../shared/dist/index.js");
+        allValues = allProjections.map((p) => {
+          try {
+            return calculateFinalRate(category.formula_id!, {}, p);
+          } catch {
+            return 0;
+          }
+        });
+      } else {
+        continue;
+      }
+
+      const sum = allValues.reduce((acc, val) => acc + val, 0);
+      const mean = sum / allValues.length;
+      const squaredDiffs = allValues.map((val) => Math.pow(val - mean, 2));
+      const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / allValues.length;
+      const stdDev = Math.sqrt(variance);
+      const min = Math.min(...allValues);
+      const max = Math.max(...allValues);
+
+      categoryStats[category.category_id] = { mean, stdDev, min, max };
+    }
+
+    this.logger?.info(
+      {
+        categories: Object.entries(categoryStats).map(([catId, stats]) => ({
+          categoryId: catId,
+          mean: stats.mean.toFixed(2),
+          stdDev: stats.stdDev.toFixed(2),
+          min: stats.min.toFixed(2),
+          max: stats.max.toFixed(2),
+          range: (stats.max - stats.min).toFixed(2),
+        })),
+      },
+      "Category statistics for SGP calculation",
+    );
+
     const playersWithSGP: PlayerWithProjection[] = projections.map((p) => {
       const projectedStats = p.stat_components_json as StatComponents;
       const categorySGPs: Record<string, number> = {};
@@ -217,16 +262,29 @@ export class DraftRankingsAgent {
         replacementSGPs[pos] = -10; // Highly negative = all players valuable
       }
 
-      this.logger?.debug(
+      // DIAGNOSTIC: Always log replacement level details
+      this.logger?.info(
         {
           position: pos,
+          slotCount: rosterSlots[pos],
           eligibleCount: eligiblePlayers.length,
           replacementIndex,
-          replacementSGP: replacementSGPs[pos],
+          replacementSGP: replacementSGPs[pos].toFixed(2),
+          isSparse: replacementIndex > eligiblePlayers.length,
         },
         "Calculated replacement level for position",
       );
     }
+
+    // DIAGNOSTIC: Log overall replacement level summary
+    this.logger?.info(
+      {
+        replacementSGPs: Object.fromEntries(
+          Object.entries(replacementSGPs).map(([pos, sgp]) => [pos, sgp.toFixed(2)])
+        ),
+      },
+      "Replacement level summary",
+    );
 
     // Calculate VBD for each player (max across all eligible positions)
     const rankedPlayers: DraftRanking[] = playersWithSGP.map((player) => {

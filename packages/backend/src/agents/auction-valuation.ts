@@ -133,16 +133,37 @@ export class AuctionValuationAgent {
     // Calculate total positive VBD
     const totalVBD = rankings.reduce((sum, r) => sum + r.vbdScore, 0);
 
+    // DIAGNOSTIC: Log intermediate calculations for debugging
     this.logger?.info(
       {
         totalTeams,
         rosterSize,
+        budget,
+        minBid,
         spendingPool,
         totalVBD,
         playersAboveReplacement: rankings.filter((r) => r.vbdScore > 0).length,
+        totalRankings: rankings.length,
       },
       "Calculated auction parameters",
     );
+
+    // DIAGNOSTIC: Log top 10 players with SGP/VBD breakdown
+    const top10 = rankings.slice(0, 10);
+    if (top10.length > 0) {
+      this.logger?.info(
+        {
+          players: top10.map((r) => ({
+            playerId: r.playerId,
+            playerName: r.playerName,
+            primaryPosition: r.primaryPosition,
+            sgpTotal: r.sgpTotal.toFixed(2),
+            vbdScore: r.vbdScore.toFixed(2),
+          })),
+        },
+        "Top 10 players by VBD",
+      );
+    }
 
     // Convert VBD to dollar values
     const valuations: AuctionValue[] = rankings.map((ranking) => {
@@ -208,6 +229,23 @@ export class AuctionValuationAgent {
 
     // Apply limit
     const result = filteredValuations.slice(0, limit);
+
+    // DIAGNOSTIC: Log top 10 dollar values for comparison
+    const top10Values = result.slice(0, 10);
+    if (top10Values.length > 0) {
+      this.logger?.info(
+        {
+          players: top10Values.map((v) => ({
+            playerName: v.playerName,
+            primaryPosition: v.primaryPosition,
+            dollarValue: v.dollarValue,
+            vbdScore: v.vbdScore.toFixed(2),
+            sgpTotal: v.sgpTotal.toFixed(2),
+          })),
+        },
+        "Top 10 players by dollar value",
+      );
+    }
 
     this.logger?.info(
       {
