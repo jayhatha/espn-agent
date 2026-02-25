@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 11 (Draft Assistant Enhancements)
 Plan: 4 of 5 in current phase
 Status: In Progress
-Last activity: 2026-02-25 - Completed 11-04 (Value Detection UI)
+Last activity: 2026-02-25 - Completed quick task 8: Research and fix auction valuation issues
 
 Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
 
@@ -165,19 +165,18 @@ None yet.
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
-| 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
-| 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
-| 4 | Season selector and historical trade analysis (moves page) | 2026-02-23 | 79ecc41 | [4-season-selector-and-historical-trade-ana](./quick/4-season-selector-and-historical-trade-ana/) |
-| 5 | Inflection point explanations on trends chart (category attribution + transactions) | 2026-02-23 | bf89cb2 | [5-add-inflection-point-explanations-to-ran](./quick/5-add-inflection-point-explanations-to-ran/) |
-| 6 | Delete old/inaccurate/unused md files | 2026-02-23 | aae76f3 | [6-delete-old-inaccurate-unused-md-files](./quick/6-delete-old-inaccurate-unused-md-files/) |
-| 7 | Review and commit phase 10 work (10-03 through 10-06) | 2026-02-25 | 6148fb3 | [7-review-the-other-agent-s-work-on-phase-1](./quick/7-review-the-other-agent-s-work-on-phase-1/) |
-| 8 | Research and fix auction valuation issue (VBD dilution, roster-limited totalVBD) | 2026-02-25 | d06d039 | [8-research-and-fix-auction-valuation-issue](./quick/8-research-and-fix-auction-valuation-issue/) |
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|| 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 |  | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
+| 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e |  | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
+| 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c |  | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
+| 4 | Season selector and historical trade analysis (moves page) | 2026-02-23 | 79ecc41 |  | [4-season-selector-and-historical-trade-ana](./quick/4-season-selector-and-historical-trade-ana/) |
+| 5 | Inflection point explanations on trends chart (category attribution + transactions) | 2026-02-23 | bf89cb2 |  | [5-add-inflection-point-explanations-to-ran](./quick/5-add-inflection-point-explanations-to-ran/) |
+| 6 | Delete old/inaccurate/unused md files | 2026-02-23 | aae76f3 |  | [6-delete-old-inaccurate-unused-md-files](./quick/6-delete-old-inaccurate-unused-md-files/) |
+| 7 | Review and commit phase 10 work (10-03 through 10-06) | 2026-02-25 | 6148fb3 |  | [7-review-the-other-agent-s-work-on-phase-1](./quick/7-review-the-other-agent-s-work-on-phase-1/) |
+| 8 | Research and fix auction valuation issues: values too low, wrong positions. Compare our VBD/SGP approach to ESPN's pre-draft rankings, research industry best practices (z-scores vs SGP), identify root cause, and fix calculations. | 2026-02-25 | 7c5b0b3 | Verified | [8-research-and-fix-auction-valuation-issue](./quick/8-research-and-fix-auction-valuation-issue/) |
 
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed quick task 8: Research and fix auction valuation issue
+Stopped at: Completed quick task 8: Research and fix auction valuation issues
 Resume file: None
