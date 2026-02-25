@@ -11,6 +11,7 @@ Enhance the draft assistant extension with:
 2. Value-based recommendations (identifying bargain players vs overpays)
 3. Refactored projection architecture that works across any league configuration (league-agnostic)
 4. Fixed refresh functionality
+5. Review and fix existing valuation logic (currently broken in both app and extension)
 
 This phase improves existing draft assistant features. New draft modes or capabilities belong in other phases.
 
@@ -58,6 +59,7 @@ This phase improves existing draft assistant features. New draft modes or capabi
 - "Should update potentially changed values after each new pick" — refresh triggered by pick detection, not user action
 - "This player pool will be used throughout the application, so we'll need current player info daily" — justifies daily sync schedule
 - Shared player table stores non-league-specific data that multiple features can reference
+- **CRITICAL**: "Review and fix existing valuation logic in the app and extension. It seems super broken" — audit current valuation calculations before adding new value detection features
 
 </specifics>
 
