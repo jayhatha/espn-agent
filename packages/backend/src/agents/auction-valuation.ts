@@ -174,6 +174,30 @@ export class AuctionValuationAgent {
     // Sort by dollar value descending
     valuations.sort((a, b) => b.dollarValue - a.dollarValue);
 
+    // AUDIT FIX: Validate budget sum for top rostered players
+    const rosteredCount = totalTeams * rosterSize;
+    const topRosteredPlayers = valuations.slice(0, rosteredCount);
+    const totalValuation = topRosteredPlayers.reduce(
+      (sum, v) => sum + v.dollarValue,
+      0,
+    );
+    const expectedTotal = budget * totalTeams;
+    const budgetDelta = Math.abs(totalValuation - expectedTotal);
+    const budgetDeltaPct = expectedTotal > 0 ? budgetDelta / expectedTotal : 0;
+
+    if (budgetDeltaPct > 0.05) {
+      this.logger?.warn(
+        {
+          totalValuation,
+          expectedTotal,
+          budgetDelta,
+          budgetDeltaPct: (budgetDeltaPct * 100).toFixed(1) + "%",
+          rosteredCount,
+        },
+        "Auction valuation sum does not match expected total budget",
+      );
+    }
+
     // Filter by position if requested
     let filteredValuations = valuations;
     if (position) {
@@ -194,6 +218,12 @@ export class AuctionValuationAgent {
         avgValue:
           result.reduce((sum, v) => sum + v.dollarValue, 0) / result.length ||
           0,
+        budgetValidation: {
+          totalValuation,
+          expectedTotal,
+          delta: budgetDelta,
+          deltaPct: (budgetDeltaPct * 100).toFixed(1) + "%",
+        },
       },
       "Auction valuations generated",
     );

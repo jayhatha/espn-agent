@@ -37,10 +37,23 @@ export function calculatePickValue(
     };
   }
 
-  // Find expected rank based on VBD score
-  const sortedRankings = [...rankings].sort((a, b) => b.vbdScore - a.vbdScore);
-  const expectedRank =
-    sortedRankings.findIndex((r) => r.playerId === pick.playerId) + 1;
+  // AUDIT FIX: Assume rankings are already sorted by VBD descending (from backend)
+  // Avoid O(n log n) redundant sort on every pick
+  const expectedRank = rankings.findIndex((r) => r.playerId === pick.playerId) + 1;
+
+  // Guard against invalid rank calculation
+  if (!Number.isFinite(expectedRank) || expectedRank === 0) {
+    return {
+      pickNumber: pick.pickNumber,
+      playerId: pick.playerId,
+      playerName: pick.playerName,
+      teamName: pick.teamName,
+      expectedRank: 0,
+      actualPick: pick.pickNumber,
+      value: 0,
+      valueLabel: "Unranked",
+    };
+  }
 
   // Value = expected rank - actual pick
   // Positive = picked later than expected (good value)
@@ -103,8 +116,10 @@ export function getSnakeTurnPairs(
       const player1 = topPlayers[i];
       const player2 = topPlayers[j];
 
-      // Calculate combined value
-      const combinedValue = player1.vbdScore + player2.vbdScore;
+      // Calculate combined value with NaN guard
+      const vbd1 = Number.isFinite(player1.vbdScore) ? player1.vbdScore : 0;
+      const vbd2 = Number.isFinite(player2.vbdScore) ? player2.vbdScore : 0;
+      const combinedValue = vbd1 + vbd2;
 
       // Analyze category coverage
       const categoriesCovered = getCategoriesCovered(
@@ -114,7 +129,8 @@ export function getSnakeTurnPairs(
         categories,
       );
 
-      // Penalize redundant positions (two catchers bad, catcher + OF good)
+      // AUDIT FIX: Penalize same-position pairs to encourage roster diversity
+      // Example: Two catchers provide redundant positional value vs catcher + OF
       const positionPenalty =
         player1.primaryPosition === player2.primaryPosition ? 0.9 : 1.0;
 
@@ -189,8 +205,14 @@ export function calculateBudgetPacing(
   const remainingBudget = Math.max(0, totalBudget - spentBudget);
   const remainingRosterSpots = Math.max(0, rosterSize - currentRoster.length);
 
+  // AUDIT FIX: Guard against division by zero
   const averageRemainingPerPlayer =
     remainingRosterSpots > 0 ? remainingBudget / remainingRosterSpots : 0;
+
+  // Ensure averageRemainingPerPlayer is finite
+  const safeAverage = Number.isFinite(averageRemainingPerPlayer)
+    ? averageRemainingPerPlayer
+    : 0;
 
   // Recommended max bid: 40% of remaining budget (avoid overcommitting)
   const recommendedMaxBid = Math.floor(remainingBudget * 0.4);
@@ -203,10 +225,11 @@ export function calculateBudgetPacing(
     rosterSize > 0 ? remainingRosterSpots / rosterSize : 0;
   const shareDelta = budgetShareRemaining - rosterShareRemaining;
 
+  // AUDIT FIX: Reduced threshold from 0.1 (10%) to 0.05 (5%) for more sensitive pacing alerts
   let pacingStatus: "ahead" | "on-track" | "behind";
-  if (shareDelta > 0.1) {
+  if (shareDelta > 0.05) {
     pacingStatus = "ahead";
-  } else if (shareDelta < -0.1) {
+  } else if (shareDelta < -0.05) {
     pacingStatus = "behind";
   } else {
     pacingStatus = "on-track";
@@ -215,7 +238,7 @@ export function calculateBudgetPacing(
   return {
     remainingBudget,
     remainingRosterSpots,
-    averageRemainingPerPlayer,
+    averageRemainingPerPlayer: safeAverage,
     recommendedMaxBid,
     pacingStatus,
   };
@@ -226,9 +249,20 @@ export function calculateAuctionValueWithInflation(
   spentByAll: number,
   totalBudgetPool: number,
 ): number {
-  // Inflation adjustment: if league is spending slower than expected, values inflate
-  const expectedSpent = totalBudgetPool * 0.7; // Assume 70% spent by mid-draft
+  // AUDIT FIX: Inflation adjustment for auction dynamics
+  // Assumes 70% of total budget spent by mid-draft under standard pacing
+  // This assumption works best during the middle third of the draft
+  // Early draft: may overestimate inflation (not enough data)
+  // Late draft: may underestimate scarcity (approaching 100% spent)
+  const expectedSpent = totalBudgetPool * 0.7;
   const inflationFactor = spentByAll > 0 ? expectedSpent / spentByAll : 1.0;
 
-  return Math.floor(baseValue * inflationFactor);
+  // Guard against invalid inflation factors
+  const safeInflationFactor = Number.isFinite(inflationFactor)
+    ? Math.max(0.5, Math.min(2.0, inflationFactor)) // Clamp between 0.5x and 2x
+    : 1.0;
+
+  const adjustedValue = baseValue * safeInflationFactor;
+
+  return Number.isFinite(adjustedValue) ? Math.floor(adjustedValue) : Math.floor(baseValue);
 }

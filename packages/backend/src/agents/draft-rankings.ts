@@ -207,11 +207,14 @@ export class DraftRankingsAgent {
       );
 
       // Get replacement player's SGP (or 0 if not enough players)
+      // AUDIT FIX: replacementIndex is 1-based from getReplacementLevel()
+      // Convert to 0-based array index by subtracting 1
       if (replacementIndex <= eligiblePlayers.length) {
         replacementSGPs[pos] = eligiblePlayers[replacementIndex - 1].sgpTotal;
       } else {
-        // Not enough players at this position
-        replacementSGPs[pos] = 0;
+        // AUDIT FIX: Not enough players at this position - set very negative replacement
+        // This makes all players at sparse positions valuable (no true replacement available)
+        replacementSGPs[pos] = -10; // Highly negative = all players valuable
       }
 
       this.logger?.debug(

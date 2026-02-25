@@ -230,8 +230,9 @@ export function getReplacementLevel(
   // Total players at this position that would be rostered
   const totalRostered = slotCount * totalTeams;
 
-  // Replacement level is just after the last rostered player
-  return Math.ceil(totalRostered) + 1;
+  // AUDIT FIX: Replacement level is just after the last rostered player
+  // Guard against invalid inputs (very small leagues or zero slots)
+  return Math.max(1, Math.ceil(totalRostered) + 1);
 }
 
 /**
