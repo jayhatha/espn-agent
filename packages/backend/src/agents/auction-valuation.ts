@@ -130,19 +130,25 @@ export class AuctionValuationAgent {
       minBid,
     );
 
-    // Calculate total positive VBD
-    const totalVBD = rankings.reduce((sum, r) => sum + r.vbdScore, 0);
+    // FIX: Only calculate dollar values for rostered players (top N by VBD)
+    // This prevents dilution when there are many fringe players with small positive VBD
+    const rosteredCount = totalTeams * rosterSize;
+    const rosteredRankings = rankings.slice(0, rosteredCount);
+
+    // Calculate total VBD from rostered players only
+    const totalVBD = rosteredRankings.reduce((sum, r) => r.vbdScore > 0 ? sum + r.vbdScore : sum, 0);
 
     // DIAGNOSTIC: Log intermediate calculations for debugging
     this.logger?.info(
       {
         totalTeams,
         rosterSize,
+        rosteredCount,
         budget,
         minBid,
         spendingPool,
         totalVBD,
-        playersAboveReplacement: rankings.filter((r) => r.vbdScore > 0).length,
+        playersAboveReplacement: rosteredRankings.filter((r) => r.vbdScore > 0).length,
         totalRankings: rankings.length,
       },
       "Calculated auction parameters",
@@ -165,8 +171,8 @@ export class AuctionValuationAgent {
       );
     }
 
-    // Convert VBD to dollar values
-    const valuations: AuctionValue[] = rankings.map((ranking) => {
+    // Convert VBD to dollar values for rostered players
+    const rosteredValuations: AuctionValue[] = rosteredRankings.map((ranking) => {
       let dollarValue: number;
 
       if (ranking.vbdScore > 0) {
@@ -192,11 +198,25 @@ export class AuctionValuationAgent {
       };
     });
 
+    // Add non-rostered players at minimum bid (free agents)
+    const freeAgentRankings = rankings.slice(rosteredCount);
+    const freeAgentValuations: AuctionValue[] = freeAgentRankings.map((ranking) => ({
+      playerId: ranking.playerId,
+      playerName: ranking.playerName,
+      positions: ranking.positions,
+      primaryPosition: ranking.primaryPosition,
+      dollarValue: minBid,
+      vbdScore: ranking.vbdScore,
+      sgpTotal: ranking.sgpTotal,
+    }));
+
+    // Combine rostered + free agents
+    const valuations = [...rosteredValuations, ...freeAgentValuations];
+
     // Sort by dollar value descending
     valuations.sort((a, b) => b.dollarValue - a.dollarValue);
 
-    // AUDIT FIX: Validate budget sum for top rostered players
-    const rosteredCount = totalTeams * rosterSize;
+    // AUDIT FIX: Validate budget sum for rostered players
     const topRosteredPlayers = valuations.slice(0, rosteredCount);
     const totalValuation = topRosteredPlayers.reduce(
       (sum, v) => sum + v.dollarValue,
