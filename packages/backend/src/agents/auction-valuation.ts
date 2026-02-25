@@ -16,6 +16,25 @@ import { DraftRankingsAgent } from "./draft-rankings.js";
  * Per AGENTS.md §6
  *
  * Converts VBD to dollar values with budget constraints
+ *
+ * Methodology:
+ * 1. Calculate SGP (Standings Gain Points) for all players across all categories
+ * 2. Calculate position-specific replacement levels (Nth player at each position where N = teams * slots)
+ * 3. Calculate VBD = player SGP - replacement SGP for their most valuable eligible position
+ * 4. Allocate budget proportionally: dollarValue = (playerVBD / totalVBD) * spendingPool + minBid
+ *
+ * Key implementation details:
+ * - Only rostered players (top N = teams * rosterSize) are used for totalVBD denominator
+ * - This prevents dilution from many fringe free agents with small positive VBD
+ * - Position scarcity is captured via replacement levels (C/RP scarce → high replacement SGP → lower VBD for all but elite)
+ * - Rate stats (AVG, ERA, WHIP) calculated from components before SGP conversion
+ * - Sparse positions (fewer eligible players than roster slots) use -10 replacement SGP (all players valuable)
+ *
+ * Industry alignment:
+ * - VBD/SGP approach aligns with standard fantasy baseball valuation methods (similar to z-scores)
+ * - For 12-team $260 leagues, expect top player ~$40-55 and top 5 average ~$40-55
+ * - Position scarcity premiums reflect typical MLB player pools (catchers and closers scarce, outfielders plentiful)
+ * - Budget validation ensures rostered players sum to total league budget (within 5% tolerance)
  */
 
 export class AuctionValuationAgent {
@@ -265,6 +284,42 @@ export class AuctionValuationAgent {
         },
         "Top 10 players by dollar value",
       );
+    }
+
+    // Industry benchmark validation for standard 12-team $260 leagues
+    if (totalTeams === 12 && budget === 260 && rosteredCount === 300) {
+      const top5Avg = valuations.slice(0, 5).reduce((sum, v) => sum + v.dollarValue, 0) / 5;
+      const top20Avg = valuations.slice(0, 20).reduce((sum, v) => sum + v.dollarValue, 0) / 20;
+      const topPlayer = valuations[0]?.dollarValue || 0;
+
+      this.logger?.info(
+        {
+          topPlayer,
+          top5Avg: top5Avg.toFixed(1),
+          top20Avg: top20Avg.toFixed(1),
+          benchmarks: {
+            expectedTopPlayer: "$40-55",
+            expectedTop5Avg: "$40-55",
+            expectedTop20Avg: "$25-45",
+          },
+        },
+        "Industry benchmark comparison (12-team $260 league)",
+      );
+
+      // Warn if values are significantly outside expected ranges
+      if (top5Avg < 35 || top5Avg > 60) {
+        this.logger?.warn(
+          { top5Avg: top5Avg.toFixed(1), expected: "$40-55" },
+          "Top 5 average auction value outside expected industry range",
+        );
+      }
+
+      if (topPlayer < 40 || topPlayer > 55) {
+        this.logger?.warn(
+          { topPlayer, expected: "$40-55" },
+          "Top player auction value outside expected industry range - may indicate projection quality or SGP compression issues",
+        );
+      }
     }
 
     this.logger?.info(
