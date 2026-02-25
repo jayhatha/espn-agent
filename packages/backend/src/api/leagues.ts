@@ -701,4 +701,76 @@ export async function leaguesRoutes(app: FastifyInstance) {
     },
   );
 
+  // Public endpoint: Search leagues by name (no auth required)
+  // Helps Chrome extension match practice drafts to real leagues
+  app.get<{
+    Querystring: {
+      name?: string;
+      season?: string;
+      limit?: string;
+    };
+  }>(
+    "/api/leagues/search",
+    {
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const { name, season, limit } = request.query;
+      const maxResults = limit ? parseInt(limit, 10) : 10;
+
+      if (!name?.trim()) {
+        return reply.code(400).send({ error: "Name query parameter required" });
+      }
+
+      try {
+        let query = db
+          .selectFrom("league")
+          .select([
+            "id",
+            "espn_league_id",
+            "name",
+            "season",
+            "created_at",
+          ])
+          .where("name", "ilike", `%${name.trim()}%`)
+          .orderBy("created_at", "desc")
+          .limit(Math.min(maxResults, 50));
+
+        if (season) {
+          const seasonNum = parseInt(season, 10);
+          if (!isNaN(seasonNum)) {
+            query = query.where("season", "=", seasonNum);
+          }
+        }
+
+        const leagues = await query.execute();
+
+        return {
+          results: leagues.map((league) => ({
+            id: league.id,
+            espnLeagueId: league.espn_league_id,
+            name: league.name,
+            season: league.season,
+            createdAt: league.created_at,
+          })),
+          meta: {
+            query: name,
+            count: leagues.length,
+          },
+        };
+      } catch (error) {
+        request.log.error({ error }, "Failed to search leagues");
+        return reply.code(500).send({
+          error: "Failed to search leagues",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
 }

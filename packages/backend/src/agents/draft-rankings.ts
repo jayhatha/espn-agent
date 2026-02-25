@@ -5,6 +5,7 @@ import type {
   Category,
   StatComponents,
   DraftRanking,
+  DraftConfiguration,
 } from "../../../shared/dist/index.js";
 import {
   calculateTotalSGP,
@@ -41,18 +42,13 @@ export class DraftRankingsAgent {
     leagueId: number,
     options?: {
       projectionsRunId?: number;
-      limit?: number; // Default 300
-      position?: string; // Filter by position
+      limit?: number;
+      position?: string;
     },
   ): Promise<DraftRanking[]> {
-    const { limit = 300, position } = options || {};
+    this.logger?.info({ leagueId }, "Fetching league config from DB");
 
-    this.logger?.info(
-      { leagueId, limit, position },
-      "Generating draft rankings",
-    );
-
-    // Get league settings
+    // Get league settings from DB
     const latestSettings = await this.db
       .selectFrom("league_settings_version")
       .selectAll()
@@ -76,7 +72,36 @@ export class DraftRankingsAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    const totalTeams = teams.length;
+    const config: DraftConfiguration = {
+      categories,
+      rosterSlots,
+      totalTeams: teams.length,
+    };
+
+    // Delegate to config-based method
+    return this.getRankingsWithConfig(config, options);
+  }
+
+  /**
+   * Get draft rankings using VBD with provided configuration
+   * (League-agnostic version)
+   */
+  async getRankingsWithConfig(
+    config: DraftConfiguration,
+    options?: {
+      projectionsRunId?: number;
+      limit?: number;
+      position?: string;
+    },
+  ): Promise<DraftRanking[]> {
+    const { limit = 300, position } = options || {};
+
+    this.logger?.info(
+      { totalTeams: config.totalTeams, limit, position },
+      "Generating draft rankings with config",
+    );
+
+    const { categories, rosterSlots, totalTeams } = config;
 
     // Determine projections run ID
     let projectionsRunId = options?.projectionsRunId;
@@ -138,7 +163,11 @@ export class DraftRankingsAgent {
         categorySGPs[category.category_id] = sgp;
       }
 
-      const sgpTotal = calculateTotalSGP(projectedStats, allProjections, categories);
+      const sgpTotal = calculateTotalSGP(
+        projectedStats,
+        allProjections,
+        categories,
+      );
 
       return {
         playerId: p.player_id,
@@ -171,7 +200,11 @@ export class DraftRankingsAgent {
       eligiblePlayers.sort((a, b) => b.sgpTotal - a.sgpTotal);
 
       // Get replacement level index
-      const replacementIndex = getReplacementLevel(pos, rosterSlots, totalTeams);
+      const replacementIndex = getReplacementLevel(
+        pos,
+        rosterSlots,
+        totalTeams,
+      );
 
       // Get replacement player's SGP (or 0 if not enough players)
       if (replacementIndex <= eligiblePlayers.length) {

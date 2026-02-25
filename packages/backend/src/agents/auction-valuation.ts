@@ -1,7 +1,10 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import type { AuctionValue } from "../../../shared/dist/index.js";
+import type {
+  AuctionValue,
+  DraftConfiguration,
+} from "../../../shared/dist/index.js";
 import {
   calculateSpendingPool,
   calculateAuctionDollarValue,
@@ -35,31 +38,9 @@ export class AuctionValuationAgent {
       position?: string;
     },
   ): Promise<AuctionValue[]> {
-    const {
-      budget = 260,
-      minBid = 1,
-      limit = 300,
-      position,
-      projectionsRunId,
-    } = options || {};
+    this.logger?.info({ leagueId }, "Fetching league config from DB");
 
-    this.logger?.info(
-      { leagueId, budget, minBid, limit, position },
-      "Generating auction valuations",
-    );
-
-    // Get VBD rankings for all players (use higher limit to ensure we have full pool)
-    const rankings = await this.draftRankingsAgent.getRankings(leagueId, {
-      projectionsRunId,
-      limit: 500,
-    });
-
-    if (rankings.length === 0) {
-      this.logger?.warn("No rankings available for valuation");
-      return [];
-    }
-
-    // Get league settings to calculate roster size
+    // Get league settings from DB
     const latestSettings = await this.db
       .selectFrom("league_settings_version")
       .selectAll()
@@ -73,13 +54,8 @@ export class AuctionValuationAgent {
     }
 
     const settings = latestSettings.settings_json as any;
+    const categories = settings.categories;
     const rosterSlots = settings.roster_slots as Record<string, number>;
-
-    // Calculate total roster size
-    const rosterSize = Object.values(rosterSlots).reduce(
-      (sum, count) => sum + (count as number),
-      0,
-    );
 
     // Get total teams
     const teams = await this.db
@@ -88,7 +64,63 @@ export class AuctionValuationAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    const totalTeams = teams.length;
+    const config: DraftConfiguration = {
+      categories,
+      rosterSlots,
+      totalTeams: teams.length,
+      budget: options?.budget,
+      minBid: options?.minBid,
+    };
+
+    // Delegate to config-based method
+    return this.getValuationsWithConfig(config, options);
+  }
+
+  /**
+   * Get auction valuations with provided configuration
+   * (League-agnostic version)
+   */
+  async getValuationsWithConfig(
+    config: DraftConfiguration,
+    options?: {
+      projectionsRunId?: number;
+      budget?: number;
+      minBid?: number;
+      limit?: number;
+      position?: string;
+    },
+  ): Promise<AuctionValue[]> {
+    const budget = options?.budget || config.budget || 260;
+    const minBid = options?.minBid || config.minBid || 1;
+    const limit = options?.limit || 300;
+    const { position, projectionsRunId } = options || {};
+
+    this.logger?.info(
+      { totalTeams: config.totalTeams, budget, minBid, limit, position },
+      "Generating auction valuations with config",
+    );
+
+    // Get VBD rankings using config (use higher limit to ensure we have full pool)
+    const rankings = await this.draftRankingsAgent.getRankingsWithConfig(
+      config,
+      {
+        projectionsRunId,
+        limit: 500,
+      },
+    );
+
+    if (rankings.length === 0) {
+      this.logger?.warn("No rankings available for valuation");
+      return [];
+    }
+
+    // Calculate total roster size
+    const rosterSize = Object.values(config.rosterSlots).reduce(
+      (sum, count) => sum + (count as number),
+      0,
+    );
+
+    const totalTeams = config.totalTeams;
 
     // Calculate spending pool
     const spendingPool = calculateSpendingPool(
@@ -160,7 +192,8 @@ export class AuctionValuationAgent {
         returned: result.length,
         topValue: result[0]?.dollarValue || 0,
         avgValue:
-          result.reduce((sum, v) => sum + v.dollarValue, 0) / result.length || 0,
+          result.reduce((sum, v) => sum + v.dollarValue, 0) / result.length ||
+          0,
       },
       "Auction valuations generated",
     );

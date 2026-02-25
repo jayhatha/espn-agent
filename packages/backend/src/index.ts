@@ -45,30 +45,50 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Register plugins
   await server.register(cors, {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL || "http://localhost:3000",
+        "https://fantasy.espn.com", // Chrome extension
+      ];
+
+      // Allow requests with no origin (like curl, Postman)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"), false);
+      }
+    },
     credentials: true,
   });
 
   // Register cookie plugin (must be before JWT)
   await server.register(cookie, {
-    secret: process.env.COOKIE_SECRET || process.env.JWT_SECRET || 'development-secret',
+    secret:
+      process.env.COOKIE_SECRET ||
+      process.env.JWT_SECRET ||
+      "development-secret",
   });
 
   // Register JWT plugin for authentication (reads from accessToken cookie or Authorization header)
   await server.register(fastifyJwt, {
-    secret: process.env.JWT_SECRET || 'development-secret-change-in-production',
+    secret: process.env.JWT_SECRET || "development-secret-change-in-production",
     sign: {
-      expiresIn: '15m',
+      expiresIn: "15m",
     },
     cookie: {
-      cookieName: 'accessToken',
+      cookieName: "accessToken",
       signed: false,
     },
   });
 
   // Decorate fastify instance with auth methods
-  server.decorate('authenticate', authenticate);
-  server.decorate('requireAdmin', requireAdmin);
+  server.decorate("authenticate", authenticate);
+  server.decorate("requireAdmin", requireAdmin);
 
   await server.register(multipart, {
     limits: {
@@ -131,7 +151,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     await server.register(setupOAuth);
     server.log.info("OAuth providers (Google, GitHub) enabled");
   } else {
-    server.log.warn("OAuth not configured - set GOOGLE_CLIENT_ID and GITHUB_CLIENT_ID to enable");
+    server.log.warn(
+      "OAuth not configured - set GOOGLE_CLIENT_ID and GITHUB_CLIENT_ID to enable",
+    );
   }
 
   await server.register(leaguesRoutes);
