@@ -415,4 +415,76 @@ export async function draftRoutes(app: FastifyInstance) {
       }
     },
   );
+
+  // POST /api/draft/projected-standings - League-agnostic projected standings
+  app.post<{
+    Body: {
+      config: DraftConfiguration;
+      rosters: TeamRoster[];
+      projectionsRunId?: number;
+    };
+  }>(
+    "/api/draft/projected-standings",
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const { config, rosters, projectionsRunId } = request.body;
+
+      // Validate config
+      if (!config || !config.categories || !config.rosterSlots || !config.totalTeams) {
+        return reply.code(400).send({ error: "Invalid draft configuration" });
+      }
+
+      // Validate rosters
+      if (!Array.isArray(rosters) || rosters.length === 0) {
+        return reply.code(400).send({ error: "Rosters array required" });
+      }
+
+      for (const roster of rosters) {
+        if (!roster.teamId || !roster.players || !Array.isArray(roster.players)) {
+          return reply.code(400).send({ error: "Invalid roster format" });
+        }
+      }
+
+      try {
+        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+
+        const result = await draftAgent.calculateProjectedStandings(
+          config,
+          rosters,
+          { projectionsRunId },
+        );
+
+        return {
+          standings: result.standings,
+          meta: {
+            totalTeams: config.totalTeams,
+            categories: config.categories.map(c => c.name),
+            generatedAt: result.generatedAt,
+          },
+        };
+      } catch (error) {
+        request.log.error({ error }, "Failed to calculate projected standings");
+        return reply.code(500).send({
+          error: "Failed to calculate projected standings",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+}
+
+/**
+ * Types for projected standings API
+ */
+interface TeamRoster {
+  teamId: number;
+  teamName: string;
+  players: { playerId: number }[];
 }
