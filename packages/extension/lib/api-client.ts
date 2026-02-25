@@ -1,5 +1,6 @@
 import baselineRankings from "../assets/baseline-rankings.json";
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
+import { backOff } from "exponential-backoff";
 
 // ESPN stat ID to our stat key mapping
 // Reference: packages/backend/src/adapters/espn.ts
@@ -967,4 +968,51 @@ function generateBaselineAuctionValues(): AuctionValue[] {
       vbdScore: player.vbdScore ?? 0,
     };
   });
+}
+
+/**
+ * Fetch rankings with retry logic (exponential backoff)
+ * User constraint: 2-3 retries with exponential backoff
+ */
+export async function getRankingsWithRetry(
+  espnLeagueId: string,
+  options: GetRankingsOptions = {}
+): Promise<PlayerRanking[]> {
+  return backOff(
+    () => getRankings(espnLeagueId, options),
+    {
+      numOfAttempts: 3,          // User constraint: 2-3 retries
+      startingDelay: 1000,       // 1 second
+      timeMultiple: 2,           // Exponential: 1s, 2s, 4s
+      maxDelay: 5000,            // Cap at 5 seconds
+      jitter: "full",            // Randomize to prevent thundering herd
+      retry: (error: any, attemptNumber: number) => {
+        console.warn(`[API Client] Retry attempt ${attemptNumber} after error:`, error);
+        return true; // Always retry within attempt limit
+      },
+    }
+  );
+}
+
+/**
+ * Fetch auction values with retry logic (exponential backoff)
+ */
+export async function getAuctionValuesWithRetry(
+  espnLeagueId: string,
+  options: GetAuctionValuesOptions = {}
+): Promise<AuctionValue[]> {
+  return backOff(
+    () => getAuctionValues(espnLeagueId, options),
+    {
+      numOfAttempts: 3,
+      startingDelay: 1000,
+      timeMultiple: 2,
+      maxDelay: 5000,
+      jitter: "full",
+      retry: (error: any, attemptNumber: number) => {
+        console.warn(`[API Client] Retry attempt ${attemptNumber} after error:`, error);
+        return true;
+      },
+    }
+  );
 }
