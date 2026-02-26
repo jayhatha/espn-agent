@@ -69,7 +69,22 @@ export function detectLeagueConfig(): DetectionResult {
 }
 
 function detectTeamCount(): number | null {
-  // Strategy 1: Count draft board columns (excluding player name column)
+  // Strategy 1: Count roster dropdown options (practice drafts)
+  const rosterDropdown = document.querySelector('select.dropdown__select');
+  if (rosterDropdown) {
+    const options = rosterDropdown.querySelectorAll('option');
+    // Filter out placeholder options (empty value or text like "Select team")
+    const teamOptions = Array.from(options).filter(opt => {
+      const value = opt.getAttribute('value') || '';
+      const text = (opt.textContent || '').trim();
+      return value && value !== '' && text && !text.toLowerCase().includes('select');
+    });
+    if (teamOptions.length > 0) {
+      return teamOptions.length;
+    }
+  }
+
+  // Strategy 2: Count draft board columns (excluding player name column)
   const draftBoard = document.querySelector('[class*="draft-board"]');
   if (draftBoard) {
     const teamColumns = draftBoard.querySelectorAll('[class*="team-column"]');
@@ -78,7 +93,7 @@ function detectTeamCount(): number | null {
     }
   }
 
-  // Strategy 2: Parse from league info header
+  // Strategy 3: Parse from league info header
   const leagueInfo = document.querySelector('[class*="league-info"]');
   if (leagueInfo) {
     const text = leagueInfo.textContent || "";
@@ -88,7 +103,7 @@ function detectTeamCount(): number | null {
     }
   }
 
-  // Strategy 3: Check URL parameters
+  // Strategy 4: Check URL parameters
   const url = new URL(window.location.href);
   const teams = url.searchParams.get("teams");
   if (teams) {
