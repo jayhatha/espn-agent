@@ -102,7 +102,6 @@ export class SnapshotOrchestratorAgent {
 
     // 2. Fetch ESPN data (with error boundary)
     let rawData: any;
-    let espnFetchSucceeded = true;
     try {
       if (prefetchedData) {
         rawData = prefetchedData;
@@ -155,7 +154,6 @@ export class SnapshotOrchestratorAgent {
         { error, leagueId, snapshotDate, step: "espn_fetch" },
         "ESPN fetch failed, marking snapshot as degraded",
       );
-      espnFetchSucceeded = false;
       isDegraded = true;
       degradedReasons.push("espn_fetch_failed");
 

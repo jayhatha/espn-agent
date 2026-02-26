@@ -3,7 +3,6 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import {
   calculateFinalRate,
-  combineComponents,
   type RosterValidationResult,
 } from "../../../shared/dist/index.js";
 
