@@ -552,14 +552,14 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
     {
       player_id: 101,
       projections_run_id: 1,
-      stat_components_json: { H: 50, AB: 200 },
+      stat_components_json: JSON.stringify({ H: 50, AB: 200 }),
       h: 50,
       ab: 200,
     },
     {
       player_id: 102,
       projections_run_id: 1,
-      stat_components_json: { H: 70, AB: 200 },
+      stat_components_json: JSON.stringify({ H: 70, AB: 200 }),
       h: 70,
       ab: 200,
     },
@@ -614,14 +614,14 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
     {
       player_id: 201,
       projections_run_id: 2,
-      stat_components_json: { IP: 150, ER: 60 },
+      stat_components_json: JSON.stringify({ IP: 150, ER: 60 }),
       ip: 150,
       er: 60,
     },
     {
       player_id: 202,
       projections_run_id: 2,
-      stat_components_json: { IP: 150, ER: 45 },
+      stat_components_json: JSON.stringify({ IP: 150, ER: 45 }),
       ip: 150,
       er: 45,
     },
@@ -676,7 +676,7 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
     {
       player_id: 301,
       projections_run_id: 3,
-      stat_components_json: { H: 30, BB: 20, HBP: 2, AB: 150, SF: 5 },
+      stat_components_json: JSON.stringify({ H: 30, BB: 20, HBP: 2, AB: 150, SF: 5 }),
       h: 30,
       bb: 20,
       hbp: 2,
@@ -686,7 +686,7 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
     {
       player_id: 302,
       projections_run_id: 3,
-      stat_components_json: { H: 45, BB: 10, HBP: 1, AB: 150, SF: 3 },
+      stat_components_json: JSON.stringify({ H: 45, BB: 10, HBP: 1, AB: 150, SF: 3 }),
       h: 45,
       bb: 10,
       hbp: 1,
@@ -743,7 +743,7 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
     {
       player_id: 401,
       projections_run_id: 4,
-      stat_components_json: { IP: 100, H: 95, BB: 35 },
+      stat_components_json: JSON.stringify({ IP: 100, H: 95, BB: 35 }),
       ip: 100,
       h: 95,
       bb: 35,
@@ -751,7 +751,7 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
     {
       player_id: 402,
       projections_run_id: 4,
-      stat_components_json: { IP: 100, H: 80, BB: 25 },
+      stat_components_json: JSON.stringify({ IP: 100, H: 80, BB: 25 }),
       ip: 100,
       h: 80,
       bb: 25,
@@ -805,7 +805,7 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
     {
       player_id: 501,
       projections_run_id: 5,
-      stat_components_json: { H: 50, AB: 200 },
+      stat_components_json: JSON.stringify({ H: 50, AB: 200 }),
       h: 50,
       ab: 200,
     },
@@ -924,7 +924,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     {
       player_id: 701,
       projections_run_id: 7,
-      stat_components_json: { H: 50, AB: 200, HR: 10 },
+      stat_components_json: JSON.stringify({ H: 50, AB: 200, HR: 10 }),
       h: 50,
       ab: 200,
       hr: 10,
@@ -932,7 +932,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     {
       player_id: 702,
       projections_run_id: 7,
-      stat_components_json: { H: 40, AB: 150, HR: 15 },
+      stat_components_json: JSON.stringify({ H: 40, AB: 150, HR: 15 }),
       h: 40,
       ab: 150,
       hr: 15,
@@ -940,7 +940,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     {
       player_id: 703,
       projections_run_id: 7,
-      stat_components_json: { H: 70, AB: 200, HR: 20 },
+      stat_components_json: JSON.stringify({ H: 70, AB: 200, HR: 20 }),
       h: 70,
       ab: 200,
       hr: 20,
@@ -948,7 +948,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     {
       player_id: 704,
       projections_run_id: 7,
-      stat_components_json: { H: 60, AB: 180, HR: 12 },
+      stat_components_json: JSON.stringify({ H: 60, AB: 180, HR: 12 }),
       h: 60,
       ab: 180,
       hr: 12,

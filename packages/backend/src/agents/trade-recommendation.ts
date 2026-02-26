@@ -4,35 +4,8 @@ import type { Database } from "../db/schema.js";
 import {
   calculateFinalRate,
   type RosterValidationResult,
+  type StatComponents,
 } from "../../../shared/dist/index.js";
-
-/**
- * Stat components stored in player_projection.stat_components_json
- * Uses uppercase keys matching FanGraphs CSV headers
- */
-interface StatComponents {
-  // Batting
-  AB?: number;
-  H?: number;
-  R?: number;
-  HR?: number;
-  RBI?: number;
-  SB?: number;
-  BB?: number;
-  HBP?: number;
-  SF?: number;
-  TB?: number;
-  // Pitching
-  IP?: number;
-  ER?: number;
-  H_P?: number;  // Hits allowed (pitching)
-  BB_P?: number; // Walks allowed (pitching)
-  K?: number;
-  W?: number;
-  SV?: number;
-  QS?: number;
-  HLD?: number;
-}
 
 /**
  * Trade Recommendation Agent
@@ -878,7 +851,7 @@ export class TradeRecommendationAgent {
         for (const givePlayer of trade.givePlayers) {
           const proj = projections.get(givePlayer.playerId);
           if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents = proj.stat_components_json as Record<string, number>;
+            const playerComponents = JSON.parse(proj.stat_components_json) as Record<string, number>;
             for (const [key, value] of Object.entries(playerComponents)) {
               adjustedComponents[key] = (adjustedComponents[key] || 0) - (value || 0);
             }
@@ -889,7 +862,7 @@ export class TradeRecommendationAgent {
         for (const receivePlayer of trade.receivePlayers) {
           const proj = projections.get(receivePlayer.playerId);
           if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents = proj.stat_components_json as Record<string, number>;
+            const playerComponents = JSON.parse(proj.stat_components_json) as Record<string, number>;
             for (const [key, value] of Object.entries(playerComponents)) {
               adjustedComponents[key] = (adjustedComponents[key] || 0) + (value || 0);
             }
@@ -1036,51 +1009,23 @@ export class TradeRecommendationAgent {
     const statKey = category.statKey;
     const components: StatComponents = JSON.parse(projection.stat_components_json);
 
-    // Handle rate stats using component math
+    // Map statKey to formula_id for calculateFinalRate
+    const formulaIdMap: Record<string, string> = {
+      AVG: "avg",
+      OBP: "obp",
+      SLG: "slg",
+      OPS: "ops",
+      ERA: "era",
+      WHIP: "whip",
+    };
+
+    // Handle rate stats using shared calculateFinalRate function
+    if (formulaIdMap[statKey]) {
+      return calculateFinalRate(formulaIdMap[statKey], {}, components);
+    }
+
+    // Counting stats - direct access
     switch (statKey) {
-      case "AVG":
-        return (components.H || 0) / Math.max(1, components.AB || 1);
-      case "OBP":
-        return (
-          ((components.H || 0) +
-            (components.BB || 0) +
-            (components.HBP || 0)) /
-          Math.max(
-            1,
-            (components.AB || 0) +
-              (components.BB || 0) +
-              (components.HBP || 0) +
-              (components.SF || 0),
-          )
-        );
-      case "SLG":
-        return (components.TB || 0) / Math.max(1, components.AB || 1);
-      case "OPS": {
-        const obp =
-          ((components.H || 0) +
-            (components.BB || 0) +
-            (components.HBP || 0)) /
-          Math.max(
-            1,
-            (components.AB || 0) +
-              (components.BB || 0) +
-              (components.HBP || 0) +
-              (components.SF || 0),
-          );
-        const slg =
-          (components.TB || 0) / Math.max(1, components.AB || 1);
-        return obp + slg;
-      }
-      case "ERA":
-        return (
-          (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1)
-        );
-      case "WHIP":
-        return (
-          ((components.H_P || 0) + (components.BB_P || 0)) /
-          Math.max(0.1, components.IP || 0.1)
-        );
-      // Counting stats
       case "R":
         return components.R || 0;
       case "HR":
