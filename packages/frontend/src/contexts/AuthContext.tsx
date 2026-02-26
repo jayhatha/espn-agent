@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { API_URL } from "@/lib/constants";
 
 interface User {
   id: number;
@@ -28,8 +29,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Refresh interval: 14 minutes (access token expires at 15 min)
 const REFRESH_INTERVAL_MS = 14 * 60 * 1000;

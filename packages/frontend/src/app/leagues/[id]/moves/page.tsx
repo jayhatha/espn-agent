@@ -16,6 +16,7 @@ import {
   ReferenceDot,
 } from "recharts";
 import { api } from "@/lib/api";
+import { COLORS } from "@/lib/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -1140,12 +1141,6 @@ function TradesTab({
 }
 
 // ─── Timeline Tab ────────────────────────────────────────────
-
-const COLORS = [
-  "#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6",
-  "#EC4899", "#06B6D4", "#F97316", "#6366F1", "#14B8A6",
-  "#D946EF", "#84CC16",
-];
 
 function TimelineTab({
   impacts,

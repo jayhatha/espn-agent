@@ -15,6 +15,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "@/lib/api";
+import { COLORS } from "@/lib/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { TransactionMarker } from "@/components/league/TransactionMarker";
@@ -72,19 +73,6 @@ interface Team {
 }
 
 type ViewMode = "overall" | "category" | "projected" | "values";
-
-const COLORS = [
-  "#3b82f6", // blue
-  "#ef4444", // red
-  "#10b981", // green
-  "#f59e0b", // amber
-  "#8b5cf6", // purple
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-  "#f97316", // orange
-  "#14b8a6", // teal
-  "#a855f7", // violet
-];
 
 export default function TrendsPage() {
   const params = useParams();
