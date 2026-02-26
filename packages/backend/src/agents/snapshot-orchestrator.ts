@@ -80,16 +80,30 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
+    // Track degradation reasons across all steps
+    const degradedReasons: string[] = [];
+    let isDegraded = false;
+
+    // 1. Fetch league info
+    let league: any;
     try {
-      // 1. Fetch league info
-      const league = await this.db
+      league = await this.db
         .selectFrom("league")
         .selectAll()
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate },
+        "Failed to fetch league info from database",
+      );
+      throw error; // Fatal error - can't proceed without league info
+    }
 
-      // 2. Use pre-fetched data (backfill) or fetch fresh from ESPN
-      let rawData: any;
+    // 2. Fetch ESPN data (with error boundary)
+    let rawData: any;
+    let espnFetchSucceeded = true;
+    try {
       if (prefetchedData) {
         rawData = prefetchedData;
         this.logger?.info({ leagueId, snapshotDate }, "Using pre-fetched ESPN data");
@@ -136,35 +150,116 @@ export class SnapshotOrchestratorAgent {
           })
           .execute();
       }
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate, step: "espn_fetch" },
+        "ESPN fetch failed, marking snapshot as degraded",
+      );
+      espnFetchSucceeded = false;
+      isDegraded = true;
+      degradedReasons.push("espn_fetch_failed");
 
-      // 3. Normalize data
-      const normalized = this.espnAdapter.normalizeLeagueData(rawData);
+      // Check if prior successful snapshot exists - don't overwrite it
+      const priorSnapshot = await this.db
+        .selectFrom("league_daily_snapshot")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "<", snapshotDate)
+        .where("is_degraded", "=", false)
+        .orderBy("snapshot_date", "desc")
+        .executeTakeFirst();
 
-      // 4. Determine settings version
-      const settingsVersionId = await this.getOrCreateSettingsVersion(
+      if (priorSnapshot) {
+        this.logger?.info(
+          { leagueId, priorSnapshotDate: priorSnapshot.snapshot_date },
+          "Prior successful snapshot exists, not overwriting with degraded data",
+        );
+        // Write degraded snapshot marker but don't proceed with data writes
+        await this.db
+          .insertInto("league_daily_snapshot")
+          .values({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            created_at: new Date(),
+            settings_version_id: priorSnapshot.settings_version_id,
+            projections_run_id: priorSnapshot.projections_run_id,
+            is_degraded: true,
+            degraded_reasons: ["espn_fetch_failed"],
+          })
+          .onConflict((oc) =>
+            oc.columns(["league_id", "snapshot_date"]).doUpdateSet({
+              is_degraded: true,
+              degraded_reasons: ["espn_fetch_failed"],
+            }),
+          )
+          .execute();
+        return;
+      }
+
+      // No prior snapshot, can't proceed
+      throw error;
+    }
+
+    // 3. Normalize data (with error boundary)
+    let normalized: any;
+    try {
+      normalized = this.espnAdapter.normalizeLeagueData(rawData);
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate, step: "normalize" },
+        "Failed to normalize ESPN data",
+      );
+      isDegraded = true;
+      degradedReasons.push("normalize_failed");
+      throw error; // Can't proceed without normalized data
+    }
+
+    // 4. Determine settings version
+    let settingsVersionId: number;
+    try {
+      settingsVersionId = await this.getOrCreateSettingsVersion(
         leagueId,
         snapshotDate,
         normalized.settings,
       );
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate, step: "settings_version" },
+        "Failed to determine settings version",
+      );
+      throw error; // Fatal - can't write snapshot without settings version
+    }
 
-      // 5. Select projections run
-      const projectionsRun = await this.db
+    // 5. Select projections run
+    let projectionsRun: any;
+    try {
+      projectionsRun = await this.db
         .selectFrom("projections_run")
         .selectAll()
         .where("as_of_date", "<=", snapshotDate)
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 
-      const isDegraded =
-        !projectionsRun || projectionsRun.as_of_date !== snapshotDate;
-      const degradedReasons: string[] = [];
-      if (isDegraded && projectionsRun) {
-        degradedReasons.push("projections_stale");
-      } else if (!projectionsRun) {
-        degradedReasons.push("projections_missing");
+      if (!projectionsRun || projectionsRun.as_of_date !== snapshotDate) {
+        isDegraded = true;
+        if (projectionsRun) {
+          degradedReasons.push("projections_stale");
+        } else {
+          degradedReasons.push("projections_missing");
+        }
       }
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate, step: "projections_check" },
+        "Failed to check projections, marking as degraded",
+      );
+      isDegraded = true;
+      degradedReasons.push("projections_check_failed");
+      projectionsRun = null; // Continue without projections
+    }
 
-      // 6. Begin transaction and write snapshot
+    // 6. Begin transaction and write snapshot (with error boundary)
+    try {
       await this.db.transaction().execute(async (trx) => {
         // Write snapshot
         await trx
@@ -229,15 +324,45 @@ export class SnapshotOrchestratorAgent {
 
         this.logger?.info({ leagueId, snapshotDate }, "Snapshot data written");
       });
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate, step: "database_write" },
+        "Failed to write snapshot data to database",
+      );
+      isDegraded = true;
+      degradedReasons.push("database_write_failed");
+      throw error; // Fatal - can't continue if database writes fail
+    }
 
-      // 7. Compute projected standings
-      if (projectionsRun) {
+    // 7. Compute projected standings (with error boundary)
+    if (projectionsRun) {
+      try {
         await this.standingsAgent.computeProjectedStandings(
           leagueId,
           snapshotDate,
           projectionsRun.id,
         );
+      } catch (error) {
+        this.logger?.error(
+          { error, leagueId, snapshotDate, step: "projection_compute" },
+          "Failed to compute projected standings, marking as degraded",
+        );
+        isDegraded = true;
+        degradedReasons.push("projection_compute_failed");
+
+        // Update snapshot to mark as degraded
+        await this.db
+          .updateTable("league_daily_snapshot")
+          .set({
+            is_degraded: true,
+            degraded_reasons: degradedReasons,
+          })
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .execute();
+        // Continue to enrichment steps - projections are optional
       }
+    }
 
       // 8. Fetch free agents and transactions in parallel (non-blocking)
       // Build espnTeamIdToDbId map outside the transaction for use here
@@ -287,17 +412,10 @@ export class SnapshotOrchestratorAgent {
         );
       }
 
-      this.logger?.info(
-        { leagueId, snapshotDate, transactionCount },
-        "Snapshot job completed successfully",
-      );
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate },
-        "Snapshot job failed",
-      );
-      throw error;
-    }
+    this.logger?.info(
+      { leagueId, snapshotDate, transactionCount, isDegraded, degradedReasons },
+      "Snapshot job completed successfully",
+    );
   }
 
   private async writePlayersAndRosters(
