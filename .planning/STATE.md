@@ -67,6 +67,7 @@ Progress: Phase 13: [████████░░] 83% (5 of 6 plans complete)
 | 12 | P04 | 7min | 3 | 2 |
 | 12 | P05 | 10min | 2 | 2 |
 | 13 | P01 | 10min | 2 | 6 |
+| 13 | P04 | 5min | 2 | 7 |
 | 13 | P05 | 3min | 3 | 3 |
 
 **Quick Tasks:**
@@ -88,6 +89,7 @@ Progress: Phase 13: [████████░░] 83% (5 of 6 plans complete)
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
 | Phase 13 P02 | 10 | 3 tasks | 6 files |
 | Phase 13 P05 | 3 | 3 tasks | 3 files |
+| Phase 13 P04 | 5 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -168,10 +170,14 @@ Recent decisions affecting v1.1 work:
 - [Phase 13 P01]: Pre-fetch optimization in waiver-recommendation reduces O(N*M) queries to single batch SELECT
 - [Phase 13 P01]: StatComponents interface with uppercase keys matches FanGraphs CSV format for projection data
 - [Phase 13]: Signed cookies for OAuth state storage with 10-minute TTL to prevent CSRF attacks
+- [Phase 13 P04]: Interface definitions at file level for clear visibility and reusability
+- [Phase 13 P04]: Shared constants in lib/constants.ts to eliminate duplication (COLORS, API_URL)
 - [Phase 13]: LRU cache with 500 max items and 1-hour TTL prevents unbounded memory growth
 - [Phase 13]: 2-second throttle applied to all ESPN methods prevents 429 errors
 - [Phase 13]: Remove validateStatus to allow axios-retry on 429
 - [Phase 13]: Graceful degradation on schema mismatch (log warning, continue) alerts devs without breaking app
+- [Phase 13]: Interface definitions at file level for clear visibility and reusability
+- [Phase 13]: Shared constants in lib/constants.ts to eliminate duplication (COLORS, API_URL)
 
 ### Roadmap Evolution
 
