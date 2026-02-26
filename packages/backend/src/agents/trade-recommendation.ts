@@ -7,6 +7,34 @@ import {
 } from "../../../shared/dist/index.js";
 
 /**
+ * Stat components stored in player_projection.stat_components_json
+ * Uses uppercase keys matching FanGraphs CSV headers
+ */
+interface StatComponents {
+  // Batting
+  AB?: number;
+  H?: number;
+  R?: number;
+  HR?: number;
+  RBI?: number;
+  SB?: number;
+  BB?: number;
+  HBP?: number;
+  SF?: number;
+  TB?: number;
+  // Pitching
+  IP?: number;
+  ER?: number;
+  H_P?: number;  // Hits allowed (pitching)
+  BB_P?: number; // Walks allowed (pitching)
+  K?: number;
+  W?: number;
+  SV?: number;
+  QS?: number;
+  HLD?: number;
+}
+
+/**
  * Trade Recommendation Agent
  *
  * Analyzes proposed trades and generates trade recommendations
@@ -987,8 +1015,9 @@ export class TradeRecommendationAgent {
   private isCategoryRelevant(category: any, projection: any): boolean {
     // Check if the projection has data for this category
     // Batting categories apply to batters (has AB), pitching to pitchers (has IP)
-    const isBatter = projection.ab != null && Number(projection.ab) > 0;
-    const isPitcher = projection.ip != null && Number(projection.ip) > 0;
+    const components: StatComponents = JSON.parse(projection.stat_components_json);
+    const isBatter = components.AB != null && Number(components.AB) > 0;
+    const isPitcher = components.IP != null && Number(components.IP) > 0;
 
     const batterCategories = ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"];
     const pitcherCategories = ["W", "SV", "K", "ERA", "WHIP", "QS", "HLD"];
@@ -1005,70 +1034,71 @@ export class TradeRecommendationAgent {
 
   private getProjectedCategoryValue(category: any, projection: any): number {
     const statKey = category.statKey;
+    const components: StatComponents = JSON.parse(projection.stat_components_json);
 
     // Handle rate stats using component math
     switch (statKey) {
       case "AVG":
-        return Number(projection.h || 0) / Math.max(1, Number(projection.ab || 1));
+        return (components.H || 0) / Math.max(1, components.AB || 1);
       case "OBP":
         return (
-          (Number(projection.h || 0) +
-            Number(projection.bb || 0) +
-            Number(projection.hbp || 0)) /
+          ((components.H || 0) +
+            (components.BB || 0) +
+            (components.HBP || 0)) /
           Math.max(
             1,
-            Number(projection.ab || 0) +
-              Number(projection.bb || 0) +
-              Number(projection.hbp || 0) +
-              Number(projection.sf || 0),
+            (components.AB || 0) +
+              (components.BB || 0) +
+              (components.HBP || 0) +
+              (components.SF || 0),
           )
         );
       case "SLG":
-        return Number(projection.tb || 0) / Math.max(1, Number(projection.ab || 1));
+        return (components.TB || 0) / Math.max(1, components.AB || 1);
       case "OPS": {
         const obp =
-          (Number(projection.h || 0) +
-            Number(projection.bb || 0) +
-            Number(projection.hbp || 0)) /
+          ((components.H || 0) +
+            (components.BB || 0) +
+            (components.HBP || 0)) /
           Math.max(
             1,
-            Number(projection.ab || 0) +
-              Number(projection.bb || 0) +
-              Number(projection.hbp || 0) +
-              Number(projection.sf || 0),
+            (components.AB || 0) +
+              (components.BB || 0) +
+              (components.HBP || 0) +
+              (components.SF || 0),
           );
         const slg =
-          Number(projection.tb || 0) / Math.max(1, Number(projection.ab || 1));
+          (components.TB || 0) / Math.max(1, components.AB || 1);
         return obp + slg;
       }
       case "ERA":
         return (
-          (9 * Number(projection.er || 0)) / Math.max(0.1, Number(projection.ip || 0.1))
+          (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1)
         );
       case "WHIP":
         return (
-          (Number(projection.h_p || 0) + Number(projection.bb_p || 0)) /
-          Math.max(0.1, Number(projection.ip || 0.1))
+          ((components.H_P || 0) + (components.BB_P || 0)) /
+          Math.max(0.1, components.IP || 0.1)
         );
       // Counting stats
       case "R":
-        return Number(projection.r || 0);
+        return components.R || 0;
       case "HR":
-        return Number(projection.hr || 0);
+        return components.HR || 0;
       case "RBI":
-        return Number(projection.rbi || 0);
+        return components.RBI || 0;
       case "SB":
-        return Number(projection.sb || 0);
+        return components.SB || 0;
       case "W":
-        return Number(projection.w || 0);
+        return components.W || 0;
       case "SV":
-        return Number(projection.sv || 0);
+        return components.SV || 0;
       case "K":
-        return Number(projection.k || 0);
+        return components.K || 0;
       case "QS":
-        return Number(projection.qs || 0);
+        return components.QS || 0;
       case "HLD":
-        return Number(projection.hld || 0);
+        return components.HLD || 0;
       default:
         return 0;
     }
