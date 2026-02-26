@@ -496,6 +496,12 @@ export async function resolveBackendLeagueId(
   pageTitle?: string,
 ): Promise<string | null> {
   try {
+    // For practice drafts, skip backend league resolution - use ESPN ID directly
+    if (isPracticeDraft()) {
+      console.log("[API Client] Practice draft detected - using ESPN league ID directly");
+      return espnLeagueId;
+    }
+
     const { backendUrl, apiToken } = await chrome.storage.local.get([
       "backendUrl",
       "apiToken",
