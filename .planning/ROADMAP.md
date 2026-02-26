@@ -201,3 +201,29 @@ Plans:
 - [x] 12-01-PLAN.md — Fix critical bugs: injury data extraction, draft recommendations endpoint, DOM selector validation — completed 2026-02-26
 - [ ] 12-02-PLAN.md — Wire up free agent fetch and make fuzzy player matching primary path
 - [ ] 12-03-PLAN.md — Replace hardcoded API URLs and add empty array guards
+
+### Phase 13: Clean up tech debt
+
+**Goal:** Fix critical bugs silently producing incorrect data, close security vulnerabilities, eliminate performance bottlenecks, and improve type safety across backend and frontend
+**Depends on:** Phase 12
+**Requirements:** DEBT-01, DEBT-02, DEBT-03, DEBT-04, DEBT-05, DEBT-06, DEBT-07, DEBT-08, DEBT-09, DEBT-10
+**Success Criteria** (what must be TRUE):
+  1. TradeRecommendationAgent accesses projection data correctly (no silent failures)
+  2. N+1 query patterns replaced with batch operations (120+ INSERTs → 1 batch)
+  3. All API request bodies validated with Zod schemas (no crashes on malformed input)
+  4. OAuth CSRF state validated on callback (no security vulnerabilities)
+  5. BullMQ failed jobs moved to DLQ for inspection (no silent failures)
+  6. Workers don't call process.exit() (no crashes affecting co-located workers)
+  7. Frontend `any` types replaced with proper interfaces (28 violations fixed)
+  8. Shared frontend components extracted (no duplication)
+  9. ESPNAdapter uses bounded LRU cache (no memory leaks)
+  10. Critical paths have test coverage (TradeRecommendation, ESPNAdapter, auth routes)
+**Plans:** 6 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Fix TradeRecommendationAgent projection access bug and batch N+1 operations
+- [ ] 13-02-PLAN.md — Add Zod request validation and OAuth CSRF validation
+- [ ] 13-03-PLAN.md — Configure BullMQ DLQ and fix worker stability
+- [ ] 13-04-PLAN.md — Replace frontend any types and extract shared components
+- [ ] 13-05-PLAN.md — ESPNAdapter improvements: LRU cache, rate limiting, schema validation
+- [ ] 13-06-PLAN.md — Add tests for critical paths
