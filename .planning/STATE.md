@@ -75,6 +75,7 @@ Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
 
 *Updated: 2026-02-25 after Phase 11 Plan 04 completion*
 | Phase 11 P03 | 5 | 2 tasks | 6 files |
+| Phase 12 P03 | 27 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 11]: Multiple DOM selector strategies for robustness against ESPN changes
 - [Phase 11]: Config cached after initial detection - no re-detection mid-draft for performance
 - [Phase 11]: Keep stale data on refresh failure - better than no rankings during draft
+- [Phase 12]: Empty array guards already in place across all priority agents
+- [Phase 12]: Hardcoded API URLs replaced with centralized api client imported from lib/api.ts
 
 ### Roadmap Evolution
 
@@ -142,6 +145,7 @@ Recent decisions affecting v1.1 work:
 - Phase 07.2 inserted after Phase 7: Research and fix standings over time (URGENT) — counting stat values are an order of magnitude smaller than expected in backfill snapshots despite cumulative accumulation fix in 07.1.
 - Phase 10 added: ESPN Live Draft Assistant
 - Phase 11 added: Draft Assistant Enhancements - player pool sync, value detection, and league-agnostic projections
+- Phase 12 added: address codebase concerns
 
 ### Pending Todos
 
