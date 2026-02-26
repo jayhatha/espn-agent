@@ -195,7 +195,7 @@ Plans:
   8. Transactions tracked during snapshot with deduplication
   9. Snapshot orchestrator has error boundaries for partial failures
   10. Trade recommendations include rate stat adjustments (AVG, ERA, WHIP)
-**Plans:** 1/3 plans executed
+**Plans:** 3/5 plans executed
 
 Plans:
 - [x] 12-01-PLAN.md — Fix critical bugs: injury data extraction, draft recommendations endpoint, DOM selector validation — completed 2026-02-26

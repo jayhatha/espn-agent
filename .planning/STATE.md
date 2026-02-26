@@ -62,6 +62,7 @@ Progress: Phase 12: [████░░░░░░] 40% (2 of 5 plans complete)
 | 11 | P04 | 3min | 2 | 3 |
 | 11 | P05 | 2min | 2 | 2 |
 | 12 | P01 | 15min | 3 | 8 |
+| 12 | P02 | 10min | 2 | 5 |
 
 **Quick Tasks:**
 
@@ -138,6 +139,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 11]: Multiple DOM selector strategies for robustness against ESPN changes
 - [Phase 11]: Config cached after initial detection - no re-detection mid-draft for performance
 - [Phase 11]: Keep stale data on refresh failure - better than no rankings during draft
+- [Phase 12 P02]: Persistent free agent storage in league_free_agent_snapshot table enables historical queries and reduces ESPN API load
+- [Phase 12 P02]: Four-tier free agent strategy (provided list → snapshot → raw payload → projections) ensures waiver recommendations work even with missing data
+- [Phase 12 P02]: Position boosting (1.05x confidence) in fuzzy matcher improves accuracy for multi-position players with minimal performance cost
 - [Phase 12]: Empty array guards already in place across all priority agents
 - [Phase 12]: Hardcoded API URLs replaced with centralized api client imported from lib/api.ts
 - [Phase 12 P01]: Dual storage for injuries - current status on player table for queries, historical events in injury_event table for tracking
@@ -186,6 +190,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-25
-Stopped at: Completed quick task 8: Research and fix auction valuation issues
+Last session: 2026-02-26
+Stopped at: Completed Phase 12 Plan 02: Wire free agents and fuzzy matching
 Resume file: None
