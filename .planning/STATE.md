@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 12 (Address Codebase Concerns)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In Progress
-Last activity: 2026-02-26 - Completed 12-02: Wire free agents and fuzzy matching
+Last activity: 2026-02-26 - Completed 12-04: Snapshot orchestrator reliability
 
-Progress: Phase 12: [████░░░░░░] 40% (2 of 5 plans complete)
+Progress: Phase 12: [██████░░░░] 60% (3 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: Phase 12: [████░░░░░░] 40% (2 of 5 plans complete)
 | Phase 11 P03 | 5 | 2 tasks | 6 files |
 | Phase 12 P03 | 27 | 2 tasks | 3 files |
 | Phase 12 P02 | 10 | 2 tasks | 5 files |
+| Phase 12 P04 | 7 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 12 P01]: Dual storage for injuries - current status on player table for queries, historical events in injury_event table for tracking
 - [Phase 12 P01]: Normalize ESPN injury statuses to 4 simplified states (IL, DTD, OUT, HEALTHY) for consistency
 - [Phase 12 P01]: Console-based logging in extension with DOM snapshots for diagnosing ESPN page changes
+- [Phase 12 P04]: Circuit breaker opens after 5 consecutive failures for 60s to prevent ESPN API abuse during outages
+- [Phase 12 P04]: Don't overwrite successful prior snapshots with degraded new ones - protects good data during failures
+- [Phase 12 P04]: 429 rate limit handling with Retry-After header support for graceful ESPN throttling
 
 ### Roadmap Evolution
 
@@ -191,5 +195,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed Phase 12 Plan 02: Wire free agents and fuzzy matching
+Stopped at: Completed Phase 12 Plan 04: Snapshot orchestrator reliability
 Resume file: None
