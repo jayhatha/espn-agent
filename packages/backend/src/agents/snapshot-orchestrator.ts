@@ -1039,9 +1039,10 @@ export class SnapshotOrchestratorAgent {
       limit: 300,
     });
 
-    // Store free agent players in the player table
+    // Store free agent players in the player table and track in snapshot
     for (const fa of freeAgents) {
-      await this.db
+      // Upsert player
+      const playerResult = await this.db
         .insertInto("player")
         .values({
           espn_player_id: fa.playerId,
@@ -1057,12 +1058,32 @@ export class SnapshotOrchestratorAgent {
             positions: fa.positions,
           }),
         )
+        .returning("id")
+        .executeTakeFirstOrThrow();
+
+      // Store in free agent snapshot table
+      await this.db
+        .insertInto("league_free_agent_snapshot")
+        .values({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          player_id: playerResult.id,
+          ownership_pct: fa.pctOwned,
+          started_pct: fa.pctStarted,
+          created_at: new Date(),
+        })
+        .onConflict((oc) =>
+          oc.columns(["league_id", "snapshot_date", "player_id"]).doUpdateSet({
+            ownership_pct: fa.pctOwned,
+            started_pct: fa.pctStarted,
+          }),
+        )
         .execute();
     }
 
     this.logger?.info(
       { leagueId, snapshotDate, freeAgentCount: freeAgents.length },
-      "Free agents fetched and stored",
+      "Free agents fetched and stored in snapshot",
     );
   }
 

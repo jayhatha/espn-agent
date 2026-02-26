@@ -81,45 +81,57 @@ export class WaiverRecommendationAgent {
       .where("team_id", "=", teamId)
       .execute();
 
-    // Get free agents using three-tier strategy
+    // Get free agents using four-tier strategy
     let freeAgents: number[];
     if (freeAgentPlayerIds) {
       // Tier 1: Use provided list
       freeAgents = freeAgentPlayerIds;
     } else {
-      // Tier 2: Try to parse from latest raw ESPN payload
-      const latestPayload = await this.db
-        .selectFrom("league_raw_payload")
-        .select("response_json")
+      // Tier 2: Query league_free_agent_snapshot table (primary source)
+      const snapshotFreeAgents = await this.db
+        .selectFrom("league_free_agent_snapshot")
+        .select("player_id")
         .where("league_id", "=", leagueId)
-        .orderBy("fetched_at", "desc")
-        .executeTakeFirst();
+        .where("snapshot_date", "=", snapshotDate)
+        .execute();
 
-      if (latestPayload) {
-        // Parse free agents from raw payload (ESPN may not include them, so this could still be empty)
-        const normalized = this.espnAdapter.normalizeLeagueData(
-          latestPayload.response_json as Record<string, unknown>,
-        );
+      if (snapshotFreeAgents.length > 0) {
+        freeAgents = snapshotFreeAgents.map((fa) => fa.player_id);
+      } else {
+        // Tier 3: Try to parse from latest raw ESPN payload (fallback for old snapshots)
+        const latestPayload = await this.db
+          .selectFrom("league_raw_payload")
+          .select("response_json")
+          .where("league_id", "=", leagueId)
+          .orderBy("fetched_at", "desc")
+          .executeTakeFirst();
 
-        // Map ESPN player IDs to internal player IDs
-        const espnPlayerIds = normalized.freeAgents?.map((fa) => fa.playerId) || [];
+        if (latestPayload) {
+          // Parse free agents from raw payload (ESPN may not include them, so this could still be empty)
+          const normalized = this.espnAdapter.normalizeLeagueData(
+            latestPayload.response_json as Record<string, unknown>,
+          );
 
-        if (espnPlayerIds.length > 0) {
-          const freeAgentPlayers = await this.db
-            .selectFrom("player")
-            .select("id")
-            .where("espn_player_id", "in", espnPlayerIds)
-            .execute();
+          // Map ESPN player IDs to internal player IDs
+          const espnPlayerIds = normalized.freeAgents?.map((fa) => fa.playerId) || [];
 
-          freeAgents = freeAgentPlayers.map((p) => p.id);
+          if (espnPlayerIds.length > 0) {
+            const freeAgentPlayers = await this.db
+              .selectFrom("player")
+              .select("id")
+              .where("espn_player_id", "in", espnPlayerIds)
+              .execute();
+
+            freeAgents = freeAgentPlayers.map((p) => p.id);
+          } else {
+            freeAgents = [];
+          }
         } else {
           freeAgents = [];
         }
-      } else {
-        freeAgents = [];
       }
 
-      // Tier 3: Fallback to projection-based free agents if still empty
+      // Tier 4: Fallback to projection-based free agents if still empty
       if (freeAgents.length === 0) {
         const snapshot = await this.db
           .selectFrom("league_daily_snapshot")
