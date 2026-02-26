@@ -1,6 +1,7 @@
 import baselineRankings from "../assets/baseline-rankings.json";
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 import { backOff } from "exponential-backoff";
+import { isPracticeDraft } from "./draft-config-detector";
 
 // ESPN stat ID to our stat key mapping
 // Reference: packages/backend/src/adapters/espn.ts
@@ -124,6 +125,12 @@ async function fetchEspnLeagueSettings(
   espnLeagueId: string,
   season?: number
 ): Promise<DraftConfiguration | null> {
+  // Skip ESPN API call for practice drafts - they have no real league data
+  if (isPracticeDraft()) {
+    console.log("[API Client] Practice draft detected - skipping ESPN API call");
+    return null;
+  }
+
   try {
     const year = season || new Date().getFullYear();
     const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${year}/segments/0/leagues/${espnLeagueId}?view=mSettings`;

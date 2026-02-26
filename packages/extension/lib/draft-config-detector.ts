@@ -4,6 +4,18 @@ export interface DetectionResult {
   config: DraftConfiguration | null;
   confidence: "high" | "low" | "failed";
   warnings: string[];
+  isPracticeDraft: boolean;
+}
+
+/**
+ * Detect if this is a practice draft (no real league data)
+ */
+export function isPracticeDraft(): boolean {
+  const h1 = document.querySelector('h1');
+  if (h1 && h1.textContent?.includes('Practice Draft')) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -12,6 +24,11 @@ export interface DetectionResult {
  */
 export function detectLeagueConfig(): DetectionResult {
   const warnings: string[] = [];
+  const isPractice = isPracticeDraft();
+
+  if (isPractice) {
+    warnings.push("Practice draft detected - using DOM-based detection");
+  }
 
   // 1. Detect total teams
   const totalTeams = detectTeamCount();
@@ -39,6 +56,7 @@ export function detectLeagueConfig(): DetectionResult {
         : null,
       confidence: totalTeams || categories || rosterSlots ? "low" : "failed",
       warnings,
+      isPracticeDraft: isPractice,
     };
   }
 
@@ -46,6 +64,7 @@ export function detectLeagueConfig(): DetectionResult {
     config: { totalTeams, categories, rosterSlots },
     confidence: "high",
     warnings,
+    isPracticeDraft: isPractice,
   };
 }
 
