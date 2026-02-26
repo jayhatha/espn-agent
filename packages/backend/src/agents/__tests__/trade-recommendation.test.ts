@@ -224,6 +224,63 @@ describe("TradeRecommendationAgent - Rate Stat Component Math", () => {
       expect(avgImpact!.projectedValue).toBe(avgImpact!.currentValue);
     });
   });
+
+  describe("Multi-player trade (2-for-2) with mixed counting and rate stats", () => {
+    it("should correctly calculate both counting stats (HR) and rate stats (AVG)", async () => {
+      // Team projected: { H: 1500, AB: 5000, HR: 200 } → AVG = 0.300, HR = 200
+      // Trade away 2 players:
+      //   Player A: { H: 50, AB: 200, HR: 10 } → AVG = 0.250
+      //   Player B: { H: 40, AB: 150, HR: 15 } → AVG = 0.267
+      // Receive 2 players:
+      //   Player C: { H: 70, AB: 200, HR: 20 } → AVG = 0.350
+      //   Player D: { H: 60, AB: 180, HR: 12 } → AVG = 0.333
+      //
+      // Expected components after trade:
+      //   H: 1500 - 50 - 40 + 70 + 60 = 1540
+      //   AB: 5000 - 200 - 150 + 200 + 180 = 5030
+      //   HR: 200 - 10 - 15 + 20 + 12 = 207
+      // Expected AVG = 1540/5030 = 0.3062 (rate stat with component math)
+      // Expected HR = 207 (counting stat with simple addition)
+
+      const leagueId = 7;
+      const teamId = 7;
+      const snapshotDate = "2026-02-19";
+
+      setupMockForMultiPlayerTest(mockDb, leagueId, teamId, snapshotDate);
+
+      const trade = {
+        givePlayers: [
+          { playerId: 701, playerName: "Player A" },
+          { playerId: 702, playerName: "Player B" },
+        ],
+        receivePlayers: [
+          { playerId: 703, playerName: "Player C" },
+          { playerId: 704, playerName: "Player D" },
+        ],
+      };
+
+      const result = await agent.analyzeTradeImpact(
+        leagueId,
+        teamId,
+        snapshotDate,
+        trade,
+      );
+
+      // Check AVG (rate stat)
+      const avgImpact = result.categoryImpacts.find(
+        (c) => c.categoryId === "AVG",
+      );
+      expect(avgImpact).toBeDefined();
+      expect(avgImpact!.projectedValue).toBeCloseTo(0.3062, 3);
+
+      // Check HR (counting stat)
+      const hrImpact = result.categoryImpacts.find(
+        (c) => c.categoryId === "HR",
+      );
+      expect(hrImpact).toBeDefined();
+      expect(hrImpact!.projectedValue).toBe(207);
+    });
+  });
 });
 
 // Mock database helper
@@ -635,4 +692,102 @@ function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamI
 
   // Empty projections list (no projections found)
   mockDb._setMockResult("player_projection_projections_run_player_list", []);
+}
+
+function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+  mockDb._setMockResult("league_daily_snapshot_single", {
+    league_id: leagueId,
+    snapshot_date: snapshotDate,
+    projections_run_id: 7,
+  });
+
+  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
+    settings_json: {
+      categories: [
+        { category_id: "AVG", statKey: "AVG", name: "Batting Average", type: "RATE" },
+        { category_id: "HR", statKey: "HR", name: "Home Runs", type: "COUNTING" },
+      ],
+    },
+  });
+
+  mockDb._setMockResult("team_daily_projected_overall_single", {
+    projected_overall_points: 10,
+  });
+
+  mockDb._setMockResult("team_daily_projected_category_list", [
+    {
+      category_id: "AVG",
+      projected_value: 0.300,
+      projected_rank: 5,
+      projected_roto_points: 5,
+      projected_components_json: { H: 1500, AB: 5000 },
+    },
+    {
+      category_id: "HR",
+      projected_value: 200,
+      projected_rank: 5,
+      projected_roto_points: 5,
+      projected_components_json: {},
+    },
+  ]);
+
+  // All teams' projected categories (for re-ranking after trade)
+  mockDb._setMockResult("team_daily_projected_category_list", [
+    {
+      team_id: teamId,
+      category_id: "AVG",
+      projected_value: 0.300,
+      projected_components_json: { H: 1500, AB: 5000 },
+    },
+    {
+      team_id: teamId,
+      category_id: "HR",
+      projected_value: 200,
+      projected_components_json: {},
+    },
+    { team_id: 70, category_id: "AVG", projected_value: 0.280, projected_components_json: {} },
+    { team_id: 70, category_id: "HR", projected_value: 180, projected_components_json: {} },
+    { team_id: 71, category_id: "AVG", projected_value: 0.310, projected_components_json: {} },
+    { team_id: 71, category_id: "HR", projected_value: 210, projected_components_json: {} },
+  ]);
+
+  mockDb._setMockResult("team_roster_snapshot_player_list", [
+    { player_id: 701, player_name: "Player A", positions: ["OF"], roster_status: "active" },
+    { player_id: 702, player_name: "Player B", positions: ["1B"], roster_status: "active" },
+  ]);
+
+  mockDb._setMockResult("player_projection_projections_run_player_list", [
+    {
+      player_id: 701,
+      projections_run_id: 7,
+      stat_components_json: { H: 50, AB: 200, HR: 10 },
+      h: 50,
+      ab: 200,
+      hr: 10,
+    },
+    {
+      player_id: 702,
+      projections_run_id: 7,
+      stat_components_json: { H: 40, AB: 150, HR: 15 },
+      h: 40,
+      ab: 150,
+      hr: 15,
+    },
+    {
+      player_id: 703,
+      projections_run_id: 7,
+      stat_components_json: { H: 70, AB: 200, HR: 20 },
+      h: 70,
+      ab: 200,
+      hr: 20,
+    },
+    {
+      player_id: 704,
+      projections_run_id: 7,
+      stat_components_json: { H: 60, AB: 180, HR: 12 },
+      h: 60,
+      ab: 180,
+      hr: 12,
+    },
+  ]);
 }
