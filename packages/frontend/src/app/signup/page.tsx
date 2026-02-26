@@ -1,0 +1,165 @@
+"use client";
+
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function SignupPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const { signup, loginWithGoogle, loginWithGitHub } = useAuth();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    try {
+      await signup(email, password, displayName);
+      router.push("/");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
+        <div>
+          <h2 className="text-3xl font-bold text-center">Create Account</h2>
+          <p className="mt-2 text-center text-gray-600">
+            ESPN Fantasy Baseball Assistant
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label
+              htmlFor="displayName"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Display Name
+            </label>
+            <input
+              id="displayName"
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="mt-1 block w-full rounded border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 block w-full rounded border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 block w-full rounded border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Minimum 8 characters, must include uppercase, lowercase, and
+              number
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+          >
+            Create Account
+          </button>
+        </form>
+
+        <div className="space-y-3">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">
+                Or sign up with
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={loginWithGoogle}
+            className="w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path
+                fill="#EA4335"
+                d="M5.27 9.76A7.5 7.5 0 0 1 12 4.5c1.98 0 3.73.72 5.11 1.89l3.81-3.81A11.95 11.95 0 0 0 12 0C7.31 0 3.25 2.61 1.27 6.38l3.99 3.38z"
+              />
+              <path
+                fill="#34A853"
+                d="M16.04 18.01A7.5 7.5 0 0 1 5.27 14.24l-3.99 3.38A11.95 11.95 0 0 0 12 24c3.24 0 6.14-1.3 8.27-3.39l-4.23-3.6z"
+              />
+              <path
+                fill="#4A90E2"
+                d="M12 24c3.24 0 6.06-1.05 8.09-2.85l-4.05-3.34c-.98.66-2.23 1.05-4.04 1.05a7.5 7.5 0 0 1-7.05-4.86l-3.99 3.38C3.25 21.39 7.31 24 12 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.52 5.52 0 0 1-2.43 3.63l4.05 3.34c2.36-2.18 3.4-5.4 3.4-9.21z"
+              />
+            </svg>
+            Sign up with Google
+          </button>
+
+          <button
+            onClick={loginWithGitHub}
+            className="w-full bg-gray-800 text-white py-2 px-4 rounded hover:bg-gray-900 flex items-center justify-center gap-2 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+            </svg>
+            Sign up with GitHub
+          </button>
+        </div>
+
+        <p className="text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="text-blue-600 hover:text-blue-500 underline"
+          >
+            Sign in
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

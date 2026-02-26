@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import { ESPNAdapter, ESPN_STAT_MAP, type ESPNAuthCookies } from "../adapters/espn.js";
+import { ESPNAdapter, ESPN_STAT_MAP } from "../adapters/espn.js";
 
 /**
  * Player Pool Sync Agent

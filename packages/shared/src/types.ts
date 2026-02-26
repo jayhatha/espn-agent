@@ -89,6 +89,9 @@ export interface Player {
   positions: string[];
   bats_throws: string | null;
   created_at: Date;
+  pct_owned?: number | null; // Player pool sync columns
+  current_season_stats_json?: Record<string, number> | null;
+  last_synced_at?: Date | null;
 }
 
 // Team
