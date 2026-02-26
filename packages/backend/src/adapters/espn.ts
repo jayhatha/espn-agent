@@ -3,6 +3,12 @@ import crypto from "crypto";
 import type { Logger } from "pino";
 import { LRUCache } from "lru-cache";
 import { createRetryableAxios } from "../utils/retry.js";
+import {
+  ESPNLeagueResponseSchema,
+  ESPNFreeAgentsResponseSchema,
+  ESPNTransactionsResponseSchema,
+  validateEspnResponse
+} from "../utils/espn-schemas.js";
 
 /**
  * ESPN Adapter Agent
@@ -389,9 +395,17 @@ export class ESPNAdapter {
         );
       }
 
-      const schemaFingerprint = this.computeSchemaFingerprint(response.data);
+      // Validate response schema
+      const validatedData = validateEspnResponse(
+        ESPNLeagueResponseSchema,
+        response.data,
+        `fetchHistoricalWeek(${leagueId}, ${season}, ${scoringPeriodId})`,
+        this.logger
+      );
+
+      const schemaFingerprint = this.computeSchemaFingerprint(validatedData);
       const result: ESPNRawResponse = {
-        data: response.data,
+        data: validatedData,
         schemaFingerprint,
         fetchedAt: new Date(),
       };
@@ -506,9 +520,17 @@ export class ESPNAdapter {
         );
       }
 
-      const schemaFingerprint = this.computeSchemaFingerprint(response.data);
+      // Validate response schema
+      const validatedData = validateEspnResponse(
+        ESPNLeagueResponseSchema,
+        response.data,
+        `fetchLeague(${leagueId}, ${season})`,
+        this.logger
+      );
+
+      const schemaFingerprint = this.computeSchemaFingerprint(validatedData);
       const result: ESPNRawResponse = {
-        data: response.data,
+        data: validatedData,
         schemaFingerprint,
         fetchedAt: new Date(),
       };
@@ -619,7 +641,15 @@ export class ESPNAdapter {
         );
       }
 
-      const players = (response.data?.players as any[]) || [];
+      // Validate response schema
+      const validatedData = validateEspnResponse(
+        ESPNFreeAgentsResponseSchema,
+        response.data,
+        `fetchFreeAgents(${leagueId}, ${season})`,
+        this.logger
+      );
+
+      const players = (validatedData?.players as any[]) || [];
       const freeAgents: ESPNFreeAgent[] = [];
 
       for (const entry of players) {
@@ -705,7 +735,15 @@ export class ESPNAdapter {
         );
       }
 
-      const rawTransactions = (response.data?.transactions as any[]) || [];
+      // Validate response schema
+      const validatedData = validateEspnResponse(
+        ESPNTransactionsResponseSchema,
+        response.data,
+        `fetchTransactions(${leagueId}, ${season})`,
+        this.logger
+      );
+
+      const rawTransactions = (validatedData?.transactions as any[]) || [];
 
       if (rawTransactions.length === 0) {
         this.logger?.info({ leagueId }, "No transactions found in ESPN response");
