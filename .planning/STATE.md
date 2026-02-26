@@ -84,6 +84,7 @@ Progress: Phase 12: [██████████] 100% (5 of 5 plans complete
 | Phase 12 P02 | 10 | 2 tasks | 5 files |
 | Phase 12 P04 | 7 | 3 tasks | 2 files |
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
+| Phase 13 P02 | 10 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -159,6 +160,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 13]: DLQ keeps failed jobs for 30 days enabling post-mortem analysis
 - [Phase 13]: Morning report worker uses conditional initialization not process.exit
 - [Phase 13]: Player pool worker migrated to BullMQ for consistency and reliability
+- [Phase 13]: Zod schemas over manual validation for type-safe validation with automatic TypeScript inference
+- [Phase 13]: Signed cookies for OAuth state storage with 10-minute TTL to prevent CSRF attacks
 
 ### Roadmap Evolution
 
