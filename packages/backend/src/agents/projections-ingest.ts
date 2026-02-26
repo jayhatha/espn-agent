@@ -329,8 +329,8 @@ export class ProjectionsIngestAgent {
         CS: parseFloat(row.CS as string) || 0,
       };
 
-      // Match player using identity resolution with fuzzy matching fallback
-      const matchResult = await this.matchPlayer(playerName, team);
+      // Match player using identity resolution with fuzzy matching (includes position boosting)
+      const matchResult = await this.matchPlayer(playerName, team, positions.length > 0 ? positions : undefined);
 
       if (!matchResult) {
         unmatchedPlayers.push(playerName);
@@ -449,8 +449,8 @@ export class ProjectionsIngestAgent {
         QS: parseFloat((row.QS as string) || "0") || 0,
       };
 
-      // Match player using identity resolution with fuzzy matching fallback
-      const matchResult = await this.matchPlayer(playerName, team);
+      // Match player using identity resolution with fuzzy matching (includes position boosting)
+      const matchResult = await this.matchPlayer(playerName, team, positions.length > 0 ? positions : undefined);
 
       if (!matchResult) {
         unmatchedPlayers.push(playerName);
