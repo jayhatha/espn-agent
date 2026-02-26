@@ -7,6 +7,53 @@ import { api } from "@/lib/api";
 import { StatCard } from "@/components/ui/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
 
+interface User {
+  id: number;
+  email: string;
+  display_name?: string;
+  role: "user" | "admin";
+  created_at: string;
+  last_login_at?: string;
+}
+
+interface League {
+  id: number;
+  name: string;
+  espn_league_id: number;
+  season: number;
+  snapshot_date?: string;
+  status: "healthy" | "degraded" | "error";
+  is_degraded?: boolean;
+  degraded_reasons?: string[];
+}
+
+interface ProjectionRun {
+  id: number;
+  as_of_date: string;
+  source: string;
+  system: string;
+  ingested_at: string;
+  staleness: "fresh" | "stale" | "outdated";
+}
+
+interface BackfillJob {
+  id: string;
+  status: "completed" | "failed" | "active" | "waiting";
+  data?: {
+    leagueId?: number;
+    season?: number;
+  };
+  progress?: {
+    percentage?: number;
+  };
+  createdAt?: string;
+}
+
+interface BackfillJobResponse {
+  jobId: string;
+  message?: string;
+}
+
 function AdminPageContent() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -117,7 +164,7 @@ function AdminPageContent() {
         clearExisting: data.clearExisting,
       });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: BackfillJobResponse) => {
       setActiveJobId(data.jobId);
       setBackfillSuccess(`Backfill job started: ${data.message || data.jobId}`);
       setBackfillError(null);
@@ -353,7 +400,7 @@ function AdminPageContent() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {usersData.users.map((user: any) => {
+                {usersData.users.map((user: User) => {
                   const isSelf = currentUser?.id === user.id;
                   return (
                     <tr key={user.id} className="hover:bg-gray-50">
@@ -677,7 +724,7 @@ function AdminPageContent() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {projectionsData?.runs?.map((run: any) => (
+                {projectionsData?.runs?.map((run: ProjectionRun) => (
                   <tr key={run.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {run.as_of_date}
@@ -761,7 +808,7 @@ function AdminPageContent() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {leaguesData.leagues.map((league: any) => (
+                {leaguesData.leagues.map((league: League) => (
                   <tr key={league.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {league.name}
@@ -825,7 +872,7 @@ function AdminPageContent() {
                 required
               >
                 <option value="">Select a league</option>
-                {leaguesData?.leagues?.map((league: any) => (
+                {leaguesData?.leagues?.map((league: League) => (
                   <option key={league.id} value={league.id}>
                     {league.name}
                   </option>
@@ -1023,7 +1070,7 @@ function AdminPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {backfillJobsData.jobs.map((job: any) => (
+                  {backfillJobsData.jobs.map((job: BackfillJob) => (
                     <tr key={job.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-900">
                         {job.id.length > 20 ? `${job.id.substring(0, 20)}...` : job.id}

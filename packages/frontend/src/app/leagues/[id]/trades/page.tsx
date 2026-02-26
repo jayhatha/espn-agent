@@ -65,7 +65,19 @@ interface RosterPlayer {
   positions: string[];
   rosterStatus: string;
   rosterSlot: string;
-  projections: any;
+  projections: {
+    R?: number;
+    HR?: number;
+    RBI?: number;
+    SB?: number;
+    AVG?: number;
+    OBP?: number;
+    W?: number;
+    SV?: number;
+    K?: number;
+    ERA?: number;
+    WHIP?: number;
+  } | null;
 }
 
 interface Team {

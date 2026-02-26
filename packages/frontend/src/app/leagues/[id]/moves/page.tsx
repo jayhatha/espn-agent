@@ -25,6 +25,59 @@ import ImpactDetailCard from "@/components/league/ImpactDetailCard";
 type TabView = "timeline" | "leaderboard" | "draft" | "trades" | "league";
 type MoveFilter = "all" | "draft" | "add_drop" | "trade";
 
+interface Team {
+  id: number;
+  name: string;
+}
+
+interface LeagueMoveEntry {
+  playerGained: { id: number; name: string; positions: string[] } | null;
+  playerLost: { id: number; name: string; positions: string[] } | null;
+  teamName: string;
+  impact: number;
+}
+
+interface TradePackage {
+  teamName: string;
+  impact: number;
+}
+
+interface TeamRanking {
+  teamId: number;
+  teamName: string;
+  moveCount: number;
+  netRosterValue: number | null;
+  actualRotoPoints: number | null;
+  draftOnlyRotoPoints: number | null;
+  sumOfImpacts: number;
+}
+
+interface TimelineDataPoint {
+  snapshot_date: string;
+  overall_points: number;
+}
+
+interface TimelineData {
+  data: TimelineDataPoint[];
+}
+
+interface LeagueSummaryData {
+  totalMovesLeagueWide: number;
+  bestMoves: LeagueMoveEntry[];
+  worstMoves: LeagueMoveEntry[];
+  bestTrades: TradePackage[];
+  worstTrades: TradePackage[];
+  teamRankings: TeamRanking[];
+}
+
+interface SgpCategoryImpact {
+  categoryId: string;
+  shapleyDelta?: number;
+  sgpDelta?: number;
+  rawDelta: number;
+  sgpFactor: number;
+}
+
 interface MoveImpact {
   id: number;
   moveType: string;
@@ -188,7 +241,7 @@ export default function MovesPage() {
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
           >
             <option value="">Select a team</option>
-            {teams.map((t: any) => (
+            {teams.map((t: Team) => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
@@ -392,7 +445,7 @@ function LeagueSummaryTab({
   isLoading,
   selectedTeamId,
 }: {
-  data: any;
+  data: LeagueSummaryData | null;
   isLoading: boolean;
   selectedTeamId: number | null;
 }) {
@@ -693,8 +746,8 @@ function LeaderboardTab({
           <tbody className="divide-y divide-gray-100">
             {impacts.map((move) => {
               const topSgp = move.sgpCategoryImpacts
-                ?.filter((c: any) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
-                .sort((a: any, b: any) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as any;
+                ?.filter((c: SgpCategoryImpact) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
+                .sort((a: SgpCategoryImpact, b: SgpCategoryImpact) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as SgpCategoryImpact | undefined;
               const topCatDelta = topSgp ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0) : null;
 
               // Use Shapley impact if available, else legacy impact
@@ -733,7 +786,7 @@ function LeaderboardTab({
                         />
                       </div>
                       <div className="text-right text-xs text-gray-500">
-                        {topSgp ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
+                        {topSgp && topCatDelta !== null ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
                       </div>
                     </div>
 
@@ -1101,9 +1154,9 @@ function TimelineTab({
   teams,
 }: {
   impacts: MoveImpact[];
-  timelineData: any;
+  timelineData: TimelineData;
   selectedTeamId: number;
-  teams: any[];
+  teams: Team[];
 }) {
   if (!timelineData?.data?.length) {
     return (
@@ -1114,12 +1167,12 @@ function TimelineTab({
   }
 
   // Build chart data from timeline
-  const chartData = timelineData.data.map((point: any) => ({
+  const chartData = timelineData.data.map((point: TimelineDataPoint) => ({
     date: point.snapshot_date,
     points: point.overall_points,
   }));
 
-  const selectedTeam = teams.find((t: any) => t.id === selectedTeamId);
+  const selectedTeam = teams.find((t: Team) => t.id === selectedTeamId);
   const teamName = selectedTeam?.name || `Team ${selectedTeamId}`;
 
   // Map impacts to chart dates for annotation
@@ -1157,7 +1210,7 @@ function TimelineTab({
             />
             {/* Annotate move dates */}
             {Array.from(impactsByDate.entries()).map(([date, moves]) => {
-              const dataPoint = chartData.find((d: any) => d.date === date);
+              const dataPoint = chartData.find((d: { date: string; points: number }) => d.date === date);
               if (!dataPoint) return null;
               const netImpact = moves.reduce((s, m) => s + m.impactRotoPoints, 0);
               const color = netImpact > 0 ? "#10B981" : netImpact < 0 ? "#EF4444" : "#9CA3AF";
