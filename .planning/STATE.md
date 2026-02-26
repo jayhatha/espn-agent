@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 11 (Draft Assistant Enhancements)
-Plan: 4 of 5 in current phase
+Phase: 12 (Address Codebase Concerns)
+Plan: 2 of 5 in current phase
 Status: In Progress
-Last activity: 2026-02-25 - Completed quick task 8: Research and fix auction valuation issues
+Last activity: 2026-02-26 - Completed 12-02: Wire free agents and fuzzy matching
 
-Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
+Progress: Phase 12: [████░░░░░░] 40% (2 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
 | 11 | P01 | 4min | 2 | 5 |
 | 11 | P04 | 3min | 2 | 3 |
 | 11 | P05 | 2min | 2 | 2 |
+| 12 | P01 | 15min | 3 | 8 |
 
 **Quick Tasks:**
 
@@ -76,6 +77,7 @@ Progress: Phase 11: [████████░░] 80% (4 of 5 plans complete)
 *Updated: 2026-02-25 after Phase 11 Plan 04 completion*
 | Phase 11 P03 | 5 | 2 tasks | 6 files |
 | Phase 12 P03 | 27 | 2 tasks | 3 files |
+| Phase 12 P02 | 10 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -138,6 +140,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 11]: Keep stale data on refresh failure - better than no rankings during draft
 - [Phase 12]: Empty array guards already in place across all priority agents
 - [Phase 12]: Hardcoded API URLs replaced with centralized api client imported from lib/api.ts
+- [Phase 12 P01]: Dual storage for injuries - current status on player table for queries, historical events in injury_event table for tracking
+- [Phase 12 P01]: Normalize ESPN injury statuses to 4 simplified states (IL, DTD, OUT, HEALTHY) for consistency
+- [Phase 12 P01]: Console-based logging in extension with DOM snapshots for diagnosing ESPN page changes
 
 ### Roadmap Evolution
 
