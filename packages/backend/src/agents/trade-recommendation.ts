@@ -2,12 +2,8 @@ import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import {
-  calculateAVG,
-  calculateOBP,
-  calculateSLG,
-  calculateOPS,
-  calculateERA,
-  calculateWHIP,
+  calculateFinalRate,
+  combineComponents,
   type RosterValidationResult,
 } from "../../../shared/dist/index.js";
 
@@ -873,30 +869,23 @@ export class TradeRecommendationAgent {
           }
         }
 
-        // Calculate the new rate from adjusted components
+        // Calculate the new rate from adjusted components using calculateFinalRate
         let projectedValue: number;
-        switch (catId) {
-          case "AVG":
-            projectedValue = calculateAVG(adjustedComponents);
-            break;
-          case "OBP":
-            projectedValue = calculateOBP(adjustedComponents);
-            break;
-          case "SLG":
-            projectedValue = calculateSLG(adjustedComponents);
-            break;
-          case "OPS":
-            projectedValue = calculateOPS(adjustedComponents);
-            break;
-          case "ERA":
-            projectedValue = calculateERA(adjustedComponents);
-            break;
-          case "WHIP":
-            projectedValue = calculateWHIP(adjustedComponents);
-            break;
-          default:
-            // Fallback: preserve current value for unknown rate stats
-            projectedValue = current.value;
+        try {
+          // Use calculateFinalRate with empty current components since we've already
+          // combined everything into adjustedComponents
+          projectedValue = calculateFinalRate(
+            catId.toLowerCase(), // Convert "AVG" to "avg", "ERA" to "era", etc.
+            {}, // Empty current components
+            adjustedComponents // All combined components (current + projected - given + received)
+          );
+        } catch (error) {
+          // Fallback: preserve current value for unknown rate stats or calculation errors
+          this.logger?.warn(
+            { catId, error },
+            "Failed to calculate rate stat using calculateFinalRate, preserving current value"
+          );
+          projectedValue = current.value;
         }
 
         userTeamCategories.set(catId, {
