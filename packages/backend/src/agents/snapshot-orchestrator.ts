@@ -547,24 +547,31 @@ export class SnapshotOrchestratorAgent {
       .execute();
 
     // Write category totals for each team
+    // Build array for batch insert of category totals
+    const categoryTotalsRows = [];
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
       for (const cat of categories) {
         const value = team.statValues[cat.espnStatId] ?? 0;
-        await trx
-          .insertInto("team_daily_category_totals")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            category_id: cat.statKey,
-            value,
-            components_json: null,
-          })
-          .execute();
+        categoryTotalsRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          category_id: cat.statKey,
+          value,
+          components_json: null,
+        });
       }
+    }
+
+    // Batch insert category totals
+    if (categoryTotalsRows.length > 0) {
+      await trx
+        .insertInto("team_daily_category_totals")
+        .values(categoryTotalsRows)
+        .execute();
     }
 
     // Rank teams per category and compute roto points (with tie handling)
@@ -590,22 +597,29 @@ export class SnapshotOrchestratorAgent {
       // Tied teams share the average of the positions they occupy.
       const ranked = this.assignRanksWithTies(teamValues, numTeams);
 
+      // Build array for batch insert
+      const categoryRanksRows = [];
       for (const { dbTeamId, rank, rotoPoints } of ranked) {
         teamOverallPoints.set(
           dbTeamId,
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
         );
 
+        categoryRanksRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          category_id: cat.statKey,
+          rank,
+          roto_points: rotoPoints,
+        });
+      }
+
+      // Batch insert category ranks
+      if (categoryRanksRows.length > 0) {
         await trx
           .insertInto("team_daily_category_ranks")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            category_id: cat.statKey,
-            rank,
-            roto_points: rotoPoints,
-          })
+          .values(categoryRanksRows)
           .execute();
       }
     }
@@ -615,6 +629,8 @@ export class SnapshotOrchestratorAgent {
       .map(([teamId, points]) => ({ teamId, points }))
       .sort((a, b) => b.points - a.points);
 
+    // Build array for batch insert
+    const overallRows = [];
     for (let i = 0; i < overallRankings.length; i++) {
       // Compute overall rank with ties
       let rank = i + 1;
@@ -625,15 +641,20 @@ export class SnapshotOrchestratorAgent {
         rank = j + 1;
       }
 
+      overallRows.push({
+        league_id: leagueId,
+        snapshot_date: snapshotDate,
+        team_id: overallRankings[i].teamId,
+        overall_points: overallRankings[i].points,
+        overall_rank: rank,
+      });
+    }
+
+    // Batch insert overall standings
+    if (overallRows.length > 0) {
       await trx
         .insertInto("team_daily_overall")
-        .values({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: overallRankings[i].teamId,
-          overall_points: overallRankings[i].points,
-          overall_rank: rank,
-        })
+        .values(overallRows)
         .execute();
     }
 

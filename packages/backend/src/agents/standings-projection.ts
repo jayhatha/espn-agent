@@ -277,6 +277,8 @@ export class StandingsProjectionAgent {
       // Assign ranks and roto points
       const numTeams = values.length;
 
+      // Build array for batch insert
+      const categoryRows = [];
       for (let i = 0; i < values.length; i++) {
         const rank = i + 1;
         const rotoPoints = numTeams - rank + 1;
@@ -284,19 +286,23 @@ export class StandingsProjectionAgent {
         const currentPoints = teamOverallPoints.get(values[i].teamId) || 0;
         teamOverallPoints.set(values[i].teamId, currentPoints + rotoPoints);
 
-        // Store category projection
+        categoryRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: values[i].teamId,
+          category_id: category.category_id,
+          projected_value: values[i].value,
+          projected_rank: rank,
+          projected_roto_points: rotoPoints,
+          projected_components_json: values[i].components,
+        });
+      }
+
+      // Batch insert category projections
+      if (categoryRows.length > 0) {
         await this.db
           .insertInto("team_daily_projected_category")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: values[i].teamId,
-            category_id: category.category_id,
-            projected_value: values[i].value,
-            projected_rank: rank,
-            projected_roto_points: rotoPoints,
-            projected_components_json: values[i].components,
-          })
+          .values(categoryRows)
           .execute();
       }
     }
@@ -306,16 +312,19 @@ export class StandingsProjectionAgent {
       .map(([teamId, points]) => ({ teamId, points }))
       .sort((a, b) => b.points - a.points);
 
-    for (let i = 0; i < overallRankings.length; i++) {
+    // Batch insert overall projections
+    if (overallRankings.length > 0) {
       await this.db
         .insertInto("team_daily_projected_overall")
-        .values({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: overallRankings[i].teamId,
-          projected_overall_points: overallRankings[i].points,
-          projected_overall_rank: i + 1,
-        })
+        .values(
+          overallRankings.map((ranking, i) => ({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: ranking.teamId,
+            projected_overall_points: ranking.points,
+            projected_overall_rank: i + 1,
+          })),
+        )
         .execute();
     }
   }

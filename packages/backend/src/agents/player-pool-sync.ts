@@ -138,56 +138,70 @@ export class PlayerPoolSyncAgent {
         "Parsed player data, starting upsert"
       );
 
-      // Upsert players to database
-      let playersUpdated = 0;
-      let playersInserted = 0;
-
-      for (const playerData of playerDataList) {
-        try {
-          // Check if player exists
-          const existing = await this.db
+      // Batch check which players already exist
+      const espnPlayerIds = playerDataList.map((p) => p.espnPlayerId);
+      const existingPlayers = espnPlayerIds.length > 0
+        ? await this.db
             .selectFrom("player")
-            .select("id")
-            .where("espn_player_id", "=", playerData.espnPlayerId)
-            .executeTakeFirst();
+            .select(["id", "espn_player_id"])
+            .where("espn_player_id", "in", espnPlayerIds)
+            .execute()
+        : [];
 
-          if (existing) {
-            // Update existing player
-            await this.db
-              .updateTable("player")
-              .set({
-                pct_owned: playerData.pctOwned,
-                current_season_stats_json: playerData.currentSeasonStats,
-                last_synced_at: new Date(),
-              })
-              .where("espn_player_id", "=", playerData.espnPlayerId)
-              .execute();
+      const existingIdSet = new Set(existingPlayers.map((p) => p.espn_player_id));
 
-            playersUpdated++;
-          } else {
-            // Insert new player
-            await this.db
-              .insertInto("player")
-              .values({
-                espn_player_id: playerData.espnPlayerId,
-                name: playerData.name,
-                mlb_team: playerData.mlbTeam,
-                positions: playerData.positions,
+      // Separate into inserts and updates
+      const playersToInsert = playerDataList.filter(
+        (p) => !existingIdSet.has(p.espnPlayerId)
+      );
+      const playersToUpdate = playerDataList.filter((p) =>
+        existingIdSet.has(p.espnPlayerId)
+      );
+
+      // Batch insert new players
+      let playersInserted = 0;
+      if (playersToInsert.length > 0) {
+        try {
+          await this.db
+            .insertInto("player")
+            .values(
+              playersToInsert.map((p) => ({
+                espn_player_id: p.espnPlayerId,
+                name: p.name,
+                mlb_team: p.mlbTeam,
+                positions: p.positions,
                 bats_throws: null,
-                pct_owned: playerData.pctOwned,
-                current_season_stats_json: playerData.currentSeasonStats,
+                pct_owned: p.pctOwned,
+                current_season_stats_json: p.currentSeasonStats,
                 last_synced_at: new Date(),
-              })
-              .execute();
+              }))
+            )
+            .execute();
+          playersInserted = playersToInsert.length;
+        } catch (error) {
+          this.logger?.error({ error }, "Failed to batch insert players");
+        }
+      }
 
-            playersInserted++;
-          }
+      // Batch update existing players
+      let playersUpdated = 0;
+      for (const playerData of playersToUpdate) {
+        try {
+          await this.db
+            .updateTable("player")
+            .set({
+              pct_owned: playerData.pctOwned,
+              current_season_stats_json: playerData.currentSeasonStats,
+              last_synced_at: new Date(),
+            })
+            .where("espn_player_id", "=", playerData.espnPlayerId)
+            .execute();
+          playersUpdated++;
         } catch (error) {
           this.logger?.error(
             { error, playerId: playerData.espnPlayerId },
-            "Failed to upsert player"
+            "Failed to update player"
           );
-          // Continue processing other players
         }
       }
 

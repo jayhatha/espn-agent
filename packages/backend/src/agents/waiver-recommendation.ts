@@ -205,6 +205,22 @@ export class WaiverRecommendationAgent {
       return [];
     }
 
+    // Pre-fetch all player data in batch (free agents + roster players)
+    const allPlayerIds = [...freeAgents, ...roster.map((r) => r.player_id)];
+    const playerMap = new Map<number, { id: number; name: string; positions: string[] }>();
+
+    if (allPlayerIds.length > 0) {
+      const players = await this.db
+        .selectFrom("player")
+        .select(["id", "name", "positions"])
+        .where("id", "in", allPlayerIds)
+        .execute();
+
+      for (const player of players) {
+        playerMap.set(player.id, player);
+      }
+    }
+
     // Simulate add/drops
     const recommendations: WaiverRecommendation[] = [];
 
@@ -226,17 +242,8 @@ export class WaiverRecommendationAgent {
         );
 
         if (delta && delta.deltaOverallPoints > 0) {
-          const addPlayer = await this.db
-            .selectFrom("player")
-            .select(["id", "name", "positions"])
-            .where("id", "=", addPlayerId)
-            .executeTakeFirst();
-
-          const dropPlayer = await this.db
-            .selectFrom("player")
-            .select(["id", "name", "positions"])
-            .where("id", "=", dropPlayerId)
-            .executeTakeFirst();
+          const addPlayer = playerMap.get(addPlayerId);
+          const dropPlayer = playerMap.get(dropPlayerId);
 
           if (addPlayer && dropPlayer) {
             // Validate position eligibility

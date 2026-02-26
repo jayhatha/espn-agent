@@ -350,7 +350,8 @@ export class HistoricalBackfillAgent {
                 : b.value - a.value,
             );
 
-            // Assign ranks with tie handling
+            // Assign ranks with tie handling and build batch insert array
+            const categoryRanksRows = [];
             let i = 0;
             while (i < sorted.length) {
               let j = i;
@@ -364,19 +365,24 @@ export class HistoricalBackfillAgent {
                   sorted[k].team_id,
                   (teamOverallPoints.get(sorted[k].team_id) || 0) + avgPoints,
                 );
-                await this.db
-                  .insertInto("team_daily_category_ranks")
-                  .values({
-                    league_id: leagueId,
-                    snapshot_date: previousSnapshotDate,
-                    team_id: sorted[k].team_id,
-                    category_id: cat.statKey,
-                    rank,
-                    roto_points: avgPoints,
-                  })
-                  .execute();
+                categoryRanksRows.push({
+                  league_id: leagueId,
+                  snapshot_date: previousSnapshotDate,
+                  team_id: sorted[k].team_id,
+                  category_id: cat.statKey,
+                  rank,
+                  roto_points: avgPoints,
+                });
               }
               i = j;
+            }
+
+            // Batch insert category ranks
+            if (categoryRanksRows.length > 0) {
+              await this.db
+                .insertInto("team_daily_category_ranks")
+                .values(categoryRanksRows)
+                .execute();
             }
           }
 
@@ -385,6 +391,8 @@ export class HistoricalBackfillAgent {
             .map(([teamId, points]) => ({ teamId, points }))
             .sort((a, b) => b.points - a.points);
 
+          // Build array for batch insert
+          const overallRows = [];
           for (let i = 0; i < overallRankings.length; i++) {
             let rank = i + 1;
             if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
@@ -392,15 +400,20 @@ export class HistoricalBackfillAgent {
               while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
               rank = j + 1;
             }
+            overallRows.push({
+              league_id: leagueId,
+              snapshot_date: previousSnapshotDate,
+              team_id: overallRankings[i].teamId,
+              overall_points: overallRankings[i].points,
+              overall_rank: rank,
+            });
+          }
+
+          // Batch insert overall standings
+          if (overallRows.length > 0) {
             await this.db
               .insertInto("team_daily_overall")
-              .values({
-                league_id: leagueId,
-                snapshot_date: previousSnapshotDate,
-                team_id: overallRankings[i].teamId,
-                overall_points: overallRankings[i].points,
-                overall_rank: rank,
-              })
+              .values(overallRows)
               .execute();
           }
 
