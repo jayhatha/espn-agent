@@ -3,6 +3,7 @@ import { getDb } from "../db/connection.js";
 import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
 import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-recommendation.js";
+import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
 
@@ -959,15 +960,58 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     },
   );
 
-  // Draft recommendations (placeholder)
-  app.get(
+  // Draft recommendations
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { limit?: string; position?: string };
+  }>(
     "/api/leagues/:leagueId/draft/recommendations",
     {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async () => {
-      return { message: "Draft recommendations - to be implemented" };
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const { limit, position } = request.query;
+
+      try {
+        request.log.info({ leagueId }, "Generating draft rankings");
+
+        // Check if fresh projections exist
+        const freshProjection = await db
+          .selectFrom("projections_run")
+          .select("id")
+          .where("staleness", "=", "fresh")
+          .orderBy("as_of_date", "desc")
+          .executeTakeFirst();
+
+        if (!freshProjection) {
+          return reply.code(503).send({
+            error: "No fresh projections available",
+            message: "Draft recommendations require up-to-date projections. Please upload a FanGraphs CSV or wait for projections to refresh.",
+            degraded: true,
+          });
+        }
+
+        // Instantiate agent and generate rankings
+        const draftAgent = new DraftRankingsAgent(db);
+        const rankings = await draftAgent.getRankings(leagueId, {
+          limit: limit ? parseInt(limit, 10) : 300,
+          position: position || undefined,
+        });
+
+        return {
+          rankings,
+          projectionsRunId: freshProjection.id,
+          total: rankings.length,
+        };
+      } catch (error) {
+        request.log.error({ error }, "Failed to generate draft rankings");
+        return reply.code(500).send({
+          error: "Failed to generate draft rankings",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
   );
 }
