@@ -29,8 +29,14 @@ export async function slackRoutes(app: FastifyInstance) {
     // Generate CSRF state token
     const state = crypto.randomBytes(32).toString("hex");
 
-    // TODO: Store state in Redis with expiration (5 minutes)
-    // For now, we'll just return it and validate on callback
+    // Store in signed cookie with short TTL
+    reply.setCookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 600,
+      signed: true
+    });
 
     const scopes = ["chat:write", "im:write", "commands"].join(",");
     const authUrl =
@@ -74,7 +80,19 @@ export async function slackRoutes(app: FastifyInstance) {
         );
       }
 
-      // TODO: Validate state token against Redis storage
+      // CRITICAL: Validate state parameter to prevent CSRF attacks
+      const callbackState = state;
+      const storedState = request.cookies.oauth_state;
+
+      if (!callbackState || !storedState || callbackState !== storedState) {
+        request.log.error({ callbackState, storedState }, "CSRF state mismatch");
+        return reply.redirect(
+          `${FRONTEND_URL}/integrations/slack/error?reason=invalid_state`
+        );
+      }
+
+      // Clear state cookie (single use)
+      reply.clearCookie("oauth_state");
 
       if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET || !SLACK_REDIRECT_URI) {
         request.log.error("Slack OAuth credentials not configured");
