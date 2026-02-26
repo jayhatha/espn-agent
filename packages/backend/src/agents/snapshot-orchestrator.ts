@@ -275,8 +275,12 @@ export class SnapshotOrchestratorAgent {
           .execute();
       }
 
-      // If transaction fetch failed, just log a warning (non-blocking)
-      if (transactionResult.status === "rejected") {
+      // Track transaction count in snapshot metadata
+      let transactionCount = 0;
+      if (transactionResult.status === "fulfilled") {
+        transactionCount = transactionResult.value || 0;
+      } else {
+        // Transaction fetch failed, just log a warning (non-blocking)
         this.logger?.warn(
           { error: transactionResult.reason, leagueId },
           "Transaction fetch failed, continuing without transactions",
@@ -284,7 +288,7 @@ export class SnapshotOrchestratorAgent {
       }
 
       this.logger?.info(
-        { leagueId, snapshotDate },
+        { leagueId, snapshotDate, transactionCount },
         "Snapshot job completed successfully",
       );
     } catch (error) {
@@ -1090,6 +1094,7 @@ export class SnapshotOrchestratorAgent {
   /**
    * Fetch transactions from ESPN and upsert into league_transaction_event
    * Non-blocking: failure does not stop the snapshot pipeline
+   * Returns the count of new transactions ingested
    */
   private async fetchAndStoreTransactions(
     espnLeagueId: number,
@@ -1098,7 +1103,7 @@ export class SnapshotOrchestratorAgent {
     leagueId: number,
     snapshotDate: string,
     espnTeamIdToDbId: Map<number, number>,
-  ): Promise<void> {
+  ): Promise<number> {
     const transactions = await this.espnAdapter.fetchTransactions({
       leagueId: espnLeagueId,
       season,
@@ -1107,7 +1112,7 @@ export class SnapshotOrchestratorAgent {
 
     if (transactions.length === 0) {
       this.logger?.info({ leagueId }, "No transactions to ingest");
-      return;
+      return 0;
     }
 
     let newTransactions = 0;
@@ -1205,5 +1210,7 @@ export class SnapshotOrchestratorAgent {
       { leagueId, snapshotDate, totalTransactions: transactions.length, newTransactions },
       "Transactions ingested",
     );
+
+    return newTransactions;
   }
 }
