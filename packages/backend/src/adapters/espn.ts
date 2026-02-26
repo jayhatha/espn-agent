@@ -12,6 +12,17 @@ import { createRetryableAxios } from "../utils/retry.js";
  * caches responses, and detects schema drift
  */
 
+// Throttle helper - ensures minimum 2s between ESPN API calls
+let lastEspnCall = 0;
+async function throttleEspnCall() {
+  const now = Date.now();
+  const timeSinceLastCall = now - lastEspnCall;
+  if (timeSinceLastCall < 2000) {
+    await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastCall));
+  }
+  lastEspnCall = Date.now();
+}
+
 export interface ESPNAuthCookies {
   SWID?: string;
   espn_s2?: string;
@@ -271,9 +282,7 @@ export class ESPNAdapter {
    */
   async getFinalScoringPeriod(season: number): Promise<number | undefined> {
     try {
-      const response = await this.client.get(`/seasons/${season}`, {
-        validateStatus: (status) => status < 500,
-      });
+      const response = await this.client.get(`/seasons/${season}`);
       if (response.status === 200 && response.data?.currentScoringPeriod?.id) {
         return response.data.currentScoringPeriod.id as number;
       }
@@ -342,20 +351,18 @@ export class ESPNAdapter {
 
       this.lastRequestTime = Date.now();
 
-      const response = await this.client.get(url, {
-        params,
-        headers,
-        validateStatus: (status) => status < 500,
-      });
-
-      // Check for 429 rate limit
-      if (response.status === 429) {
-        const retryAfter = response.headers["retry-after"];
-        this.logger?.warn(
-          { scoringPeriodId, retryAfter },
-          "ESPN rate limit hit (429), axios-retry will handle exponential backoff",
-        );
-        throw new Error(`ESPN rate limit exceeded (429). Retry-After: ${retryAfter}`);
+      let response;
+      try {
+        response = await this.client.get(url, {
+          params,
+          headers,
+        });
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 60;
+          this.logger?.warn({ scoringPeriodId, retryAfter }, "ESPN rate limit hit - backing off");
+        }
+        throw error;
       }
 
       // Check if ESPN returned HTML instead of JSON (auth issue)
@@ -459,11 +466,21 @@ export class ESPNAdapter {
         "Fetching ESPN league data",
       );
 
-      const response = await this.client.get(url, {
-        params,
-        headers,
-        validateStatus: (status) => status < 500, // Don't throw on 4xx errors
-      });
+      await throttleEspnCall();
+
+      let response;
+      try {
+        response = await this.client.get(url, {
+          params,
+          headers,
+        });
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 60;
+          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+        }
+        throw error;
+      }
 
       // Check if ESPN returned HTML instead of JSON (auth issue)
       if (
@@ -580,11 +597,21 @@ export class ESPNAdapter {
         "Fetching ESPN free agents",
       );
 
-      const response = await this.client.get(url, {
-        params,
-        headers,
-        validateStatus: (status) => status < 500,
-      });
+      await throttleEspnCall();
+
+      let response;
+      try {
+        response = await this.client.get(url, {
+          params,
+          headers,
+        });
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 60;
+          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+        }
+        throw error;
+      }
 
       if (response.status !== 200) {
         throw new Error(
@@ -656,11 +683,21 @@ export class ESPNAdapter {
         "Fetching ESPN transactions",
       );
 
-      const response = await this.client.get(url, {
-        params,
-        headers,
-        validateStatus: (status) => status < 500,
-      });
+      await throttleEspnCall();
+
+      let response;
+      try {
+        response = await this.client.get(url, {
+          params,
+          headers,
+        });
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 60;
+          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+        }
+        throw error;
+      }
 
       if (response.status !== 200) {
         throw new Error(
