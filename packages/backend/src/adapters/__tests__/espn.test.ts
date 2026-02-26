@@ -44,11 +44,11 @@ describe("ESPNAdapter", () => {
       const mockClient = vi.spyOn(adapter["client"], "get").mockResolvedValue(mockResponse);
 
       // First call - no delay
-      const promise1 = adapter.fetchLeague(123, 2026, {});
+      const promise1 = adapter.fetchLeague({ leagueId: 123, season: 2026 });
       await vi.advanceTimersByTimeAsync(0);
 
       // Second call - should wait 2s
-      const promise2 = adapter.fetchLeague(456, 2026, {});
+      const promise2 = adapter.fetchLeague({ leagueId: 456, season: 2026 });
 
       // Should have called client once (first call)
       expect(mockClient).toHaveBeenCalledTimes(1);
@@ -77,7 +77,7 @@ describe("ESPNAdapter", () => {
 
       // The adapter will retry on 429 via axios-retry, which will eventually fail after retries exhausted
       // With fake timers, we need to advance through all retry attempts
-      const promise = adapter.fetchLeague(123, 2026, {});
+      const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
 
       // Advance through all retry attempts (axios-retry does exponential backoff)
       await vi.advanceTimersByTimeAsync(60000); // Advance enough to exhaust retries
@@ -116,7 +116,7 @@ describe("ESPNAdapter", () => {
         .mockResolvedValueOnce(mockFreeAgentsResponse);
 
       // Mix of fetchLeague and fetchFreeAgents
-      const promise1 = adapter.fetchLeague(123, 2026, {});
+      const promise1 = adapter.fetchLeague({ leagueId: 123, season: 2026 });
       await vi.advanceTimersByTimeAsync(0);
 
       const promise2 = adapter.fetchFreeAgents({ leagueId: 123, season: 2026 });
@@ -148,7 +148,7 @@ describe("ESPNAdapter", () => {
 
       // Fill cache beyond max
       for (let i = 0; i < 600; i++) {
-        cache.set(`key-${i}`, { data: i });
+        cache.set(`key-${i}`, { data: i, expiresAt: Date.now() + 3600000 });
       }
 
       // Size should be at most 500
@@ -193,7 +193,7 @@ describe("ESPNAdapter", () => {
         .mockResolvedValueOnce(mockResponse);
 
       // Start the fetch
-      const promise = adapter.fetchLeague(123, 2026, {});
+      const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
 
       // Advance timers to allow axios-retry to complete
       await vi.advanceTimersByTimeAsync(10000);
@@ -232,7 +232,7 @@ describe("ESPNAdapter", () => {
         .mockResolvedValueOnce(mockResponse);
 
       // Start the fetch
-      const promise = adapter.fetchLeague(123, 2026, {});
+      const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
 
       // Advance timers to allow retry delay (Retry-After: 1s + axios-retry backoff)
       await vi.advanceTimersByTimeAsync(10000);

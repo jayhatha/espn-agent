@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { TradeRecommendationAgent } from "../trade-recommendation.js";
-import { createMockLogger, createMockProjection } from "../../__tests__/test-helpers.js";
+import { createMockProjection } from "../../__tests__/test-helpers.js";
 
 /**
  * Trade Recommendation Agent Tests
