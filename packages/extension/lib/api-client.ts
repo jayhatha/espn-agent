@@ -1,7 +1,7 @@
 import baselineRankings from "../assets/baseline-rankings.json";
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 import { backOff } from "exponential-backoff";
-import { isPracticeDraft } from "./draft-config-detector";
+import { isPracticeDraft, detectLeagueConfig } from "./draft-config-detector";
 
 // ESPN stat ID to our stat key mapping
 // Reference: packages/backend/src/adapters/espn.ts
@@ -787,11 +787,24 @@ export async function getRankings(
 
     // Fetch ESPN settings for league-agnostic draft
     console.log("[API Client] Fetching ESPN settings for league:", espnLeagueId);
-    const espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
+    let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
 
+    // If ESPN settings failed (e.g., practice draft), try DOM detection
     if (!espnConfig) {
-      console.warn("[API Client] Failed to fetch ESPN settings, using baseline");
-      return baselineRankings as PlayerRanking[];
+      console.log("[API Client] ESPN settings not available, attempting DOM detection");
+      const domDetection = detectLeagueConfig();
+
+      if (domDetection.config && domDetection.confidence !== "failed") {
+        console.log("[API Client] Using DOM-detected config:", {
+          confidence: domDetection.confidence,
+          isPracticeDraft: domDetection.isPracticeDraft,
+          warnings: domDetection.warnings
+        });
+        espnConfig = domDetection.config;
+      } else {
+        console.warn("[API Client] DOM detection failed, using baseline rankings");
+        return baselineRankings as PlayerRanking[];
+      }
     }
 
     // Build query params with JSON-encoded config
@@ -849,11 +862,20 @@ export async function getAuctionValues(
 
     // Fetch ESPN settings
     console.log("[API Client] Fetching ESPN settings for auction values");
-    const espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
+    let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
 
+    // If ESPN settings failed (e.g., practice draft), try DOM detection
     if (!espnConfig) {
-      console.warn("[API Client] Failed to fetch ESPN settings, no auction values");
-      return [];
+      console.log("[API Client] ESPN settings not available, attempting DOM detection");
+      const domDetection = detectLeagueConfig();
+
+      if (domDetection.config && domDetection.confidence !== "failed") {
+        console.log("[API Client] Using DOM-detected config for auction values");
+        espnConfig = domDetection.config;
+      } else {
+        console.warn("[API Client] DOM detection failed, no auction values available");
+        return [];
+      }
     }
 
     // Build query params
