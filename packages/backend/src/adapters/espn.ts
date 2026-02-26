@@ -1,6 +1,7 @@
 import { type AxiosInstance } from "axios";
 import crypto from "crypto";
 import type { Logger } from "pino";
+import { LRUCache } from "lru-cache";
 import { createRetryableAxios } from "../utils/retry.js";
 
 /**
@@ -225,7 +226,7 @@ const ESPN_TRANSACTION_TYPE_MAP: Record<number, ESPNTransaction["type"]> = {
 export class ESPNAdapter {
   private client: AxiosInstance;
   private logger?: Logger;
-  private cache?: Map<string, { data: unknown; expiresAt: number }>;
+  private cache: LRUCache<string, { data: unknown; expiresAt: number }>;
   private lastRequestTime: number = 0;
 
   constructor(logger?: Logger) {
@@ -249,7 +250,18 @@ export class ESPNAdapter {
       return parts.join("&");
     };
     this.logger = logger;
-    this.cache = new Map();
+    this.cache = new LRUCache<string, { data: unknown; expiresAt: number }>({
+      max: 500,              // Maximum 500 cached responses
+      ttl: 1000 * 60 * 60,   // 1 hour TTL
+      updateAgeOnGet: true,  // Refresh TTL on access
+      updateAgeOnHas: false, // Don't refresh on has() checks
+      dispose: (_value, key, reason) => {
+        // Log when entries evicted
+        if (reason === "evict" || reason === "delete") {
+          this.logger?.debug({ key, reason }, "Cache entry evicted");
+        }
+      }
+    });
   }
 
   /**
@@ -888,18 +900,18 @@ export class ESPNAdapter {
   }
 
   private getCached(key: string): unknown | null {
-    const cached = this.cache?.get(key);
+    const cached = this.cache.get(key);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
     if (cached) {
-      this.cache?.delete(key);
+      this.cache.delete(key);
     }
     return null;
   }
 
   private setCache(key: string, data: unknown, ttlMs: number): void {
-    this.cache?.set(key, {
+    this.cache.set(key, {
       data,
       expiresAt: Date.now() + ttlMs,
     });
