@@ -9,20 +9,24 @@ import type { MorningReportData } from "../agents/morning-report.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
-// Check if Slack is enabled before starting worker
-if (!isSlackEnabled()) {
-  logger.warn(
-    "Slack integration disabled - morning report worker will not start. Set FEATURE_SLACK_ENABLED=true to enable.",
-  );
-  process.exit(0);
-}
-
 const connection = new IORedis(
   process.env.REDIS_URL || "redis://localhost:6379",
   { maxRetriesPerRequest: null },
 );
 
-export const morningReportQueue = new Queue("morning-reports", { connection: connection as any });
+export const morningReportQueue = new Queue("morning-reports", {
+  connection: connection as any,
+});
+
+// Check if Slack is enabled before starting worker
+if (!isSlackEnabled()) {
+  logger.warn(
+    "Slack disabled - morning report worker inactive. Set FEATURE_SLACK_ENABLED=true to enable.",
+  );
+} else {
+  // Only start worker if Slack is enabled
+  startWorker();
+}
 
 interface MorningReportJobData {
   slackUserLinkId: string;
@@ -30,116 +34,144 @@ interface MorningReportJobData {
   reportDate: string;
 }
 
-const worker = new Worker<MorningReportJobData>(
-  "morning-reports",
-  async (job: Job<MorningReportJobData>) => {
-    const { slackUserLinkId, leagueId, reportDate } = job.data;
+function startWorker() {
+  const worker = new Worker<MorningReportJobData>(
+    "morning-reports",
+    async (job: Job<MorningReportJobData>) => {
+      const { slackUserLinkId, leagueId, reportDate } = job.data;
 
-    logger.info(
-      { jobId: job.id, slackUserLinkId, leagueId, reportDate },
-      "Processing morning report job",
-    );
-
-    const db = getDb();
-    const reportAgent = new MorningReportAgent(db, logger);
-    const slackGateway = new SlackGateway(db, logger);
-
-    try {
-      // Generate report
-      const { reportId, data } = await reportAgent.generateReport(
-        slackUserLinkId,
-        leagueId,
-        reportDate,
+      logger.info(
+        { jobId: job.id, slackUserLinkId, leagueId, reportDate },
+        "Processing morning report job",
       );
 
-      logger.info({ reportId, jobId: job.id }, "Report generated");
+      const db = getDb();
+      const reportAgent = new MorningReportAgent(db, logger);
+      const slackGateway = new SlackGateway(db, logger);
 
-      // Get notification target
-      const target = await db
-        .selectFrom("slack_notification_target")
-        .selectAll()
-        .where("slack_user_link_id", "=", slackUserLinkId)
-        .where("league_id", "=", leagueId)
-        .where("is_enabled", "=", true)
-        .executeTakeFirst();
-
-      if (!target) {
-        logger.warn(
-          { slackUserLinkId, leagueId },
-          "No enabled notification target found",
+      try {
+        // Generate report
+        const { reportId, data } = await reportAgent.generateReport(
+          slackUserLinkId,
+          leagueId,
+          reportDate,
         );
-        return { success: false, reason: "no_target" };
-      }
 
-      // Determine channel (channel_id or DM)
-      let channelId = target.channel_id;
-      if (target.target_type === "dm") {
-        const userLink = await db
-          .selectFrom("slack_user_link")
+        logger.info({ reportId, jobId: job.id }, "Report generated");
+
+        // Get notification target
+        const target = await db
+          .selectFrom("slack_notification_target")
           .selectAll()
-          .where("id", "=", slackUserLinkId)
-          .executeTakeFirstOrThrow();
+          .where("slack_user_link_id", "=", slackUserLinkId)
+          .where("league_id", "=", leagueId)
+          .where("is_enabled", "=", true)
+          .executeTakeFirst();
 
-        channelId = await slackGateway.openDmChannel(
-          target.team_id,
-          userLink.slack_user_id,
-        );
-        logger.info({ channelId, userId: userLink.slack_user_id }, "Opened DM channel");
+        if (!target) {
+          logger.warn(
+            { slackUserLinkId, leagueId },
+            "No enabled notification target found",
+          );
+          return { success: false, reason: "no_target" };
+        }
+
+        // Determine channel (channel_id or DM)
+        let channelId = target.channel_id;
+        if (target.target_type === "dm") {
+          const userLink = await db
+            .selectFrom("slack_user_link")
+            .selectAll()
+            .where("id", "=", slackUserLinkId)
+            .executeTakeFirstOrThrow();
+
+          channelId = await slackGateway.openDmChannel(
+            target.team_id,
+            userLink.slack_user_id,
+          );
+          logger.info(
+            { channelId, userId: userLink.slack_user_id },
+            "Opened DM channel",
+          );
+        }
+
+        if (!channelId) {
+          logger.error({ target }, "No channel ID available");
+          return { success: false, reason: "no_channel" };
+        }
+
+        // Build Slack Block Kit message
+        const blocks = buildMorningReportBlocks(data, reportId);
+
+        // Send message
+        const result = await slackGateway.postMessage(target.team_id, {
+          channel: channelId,
+          text: `Morning Report - ${reportDate}`,
+          blocks,
+          thread_ts: target.thread_ts || undefined,
+        });
+
+        if (!result.ok) {
+          logger.error({ result, jobId: job.id }, "Failed to post Slack message");
+          return {
+            success: false,
+            reason: "slack_api_error",
+            error: result.error,
+          };
+        }
+
+        // Store message reference
+        if (result.ts) {
+          await db
+            .insertInto("slack_message_ref")
+            .values({
+              team_id: target.team_id,
+              channel_id: result.channel!,
+              message_ts: result.ts,
+              report_id: reportId,
+              action_id: null,
+              created_at: new Date(),
+            })
+            .execute();
+
+          logger.info(
+            { reportId, messageTs: result.ts },
+            "Stored message reference",
+          );
+        }
+
+        logger.info({ jobId: job.id, reportId }, "Morning report sent successfully");
+        return { success: true, reportId, messageTs: result.ts };
+      } catch (error) {
+        logger.error({ error, jobId: job.id }, "Morning report job failed");
+        throw error;
       }
+    },
+    {
+      connection: connection as any,
+      concurrency: 5, // Process up to 5 reports concurrently
+    },
+  );
 
-      if (!channelId) {
-        logger.error({ target }, "No channel ID available");
-        return { success: false, reason: "no_channel" };
-      }
+  // Event listeners
+  worker.on("completed", (job) => {
+    logger.info({ jobId: job.id }, "Morning report job completed");
+  });
 
-      // Build Slack Block Kit message
-      const blocks = buildMorningReportBlocks(data, reportId);
+  worker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, error: err }, "Morning report job failed");
+  });
 
-      // Send message
-      const result = await slackGateway.postMessage(target.team_id, {
-        channel: channelId,
-        text: `Morning Report - ${reportDate}`,
-        blocks,
-        thread_ts: target.thread_ts || undefined,
-      });
+  // Graceful shutdown
+  process.on("SIGTERM", async () => {
+    logger.info("SIGTERM received, closing morning report worker...");
+    await worker.close();
+    await connection.quit();
+    process.exit(0);
+  });
 
-      if (!result.ok) {
-        logger.error({ result, jobId: job.id }, "Failed to post Slack message");
-        return { success: false, reason: "slack_api_error", error: result.error };
-      }
-
-      // Store message reference
-      if (result.ts) {
-        await db
-          .insertInto("slack_message_ref")
-          .values({
-            team_id: target.team_id,
-            channel_id: result.channel!,
-            message_ts: result.ts,
-            report_id: reportId,
-            action_id: null,
-            created_at: new Date(),
-          })
-          .execute();
-
-        logger.info(
-          { reportId, messageTs: result.ts },
-          "Stored message reference",
-        );
-      }
-
-      logger.info({ jobId: job.id, reportId }, "Morning report sent successfully");
-      return { success: true, reportId, messageTs: result.ts };
-    } catch (error) {
-      logger.error({ error, jobId: job.id }, "Morning report job failed");
-      throw error;
-    }
-  },
-  {
-    connection: connection as any,
-    concurrency: 5, // Process up to 5 reports concurrently
-  },
-);
+  logger.info("Morning report worker started");
+}
 
 /**
  * Build Slack Block Kit message blocks for morning report
@@ -268,22 +300,3 @@ function buildMorningReportBlocks(
 
   return blocks;
 }
-
-// Event listeners
-worker.on("completed", (job) => {
-  logger.info({ jobId: job.id }, "Morning report job completed");
-});
-
-worker.on("failed", (job, err) => {
-  logger.error({ jobId: job?.id, error: err }, "Morning report job failed");
-});
-
-// Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, closing morning report worker...");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
-});
-
-logger.info("Morning report worker started");

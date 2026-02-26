@@ -39,7 +39,8 @@ export const ProposedTradeSchema = z.object({
 
 export const WaiverEvaluationSchema = z.object({
   addPlayerId: z.number().int().positive(),
-  dropPlayerId: z.number().int().positive().optional()
+  dropPlayerId: z.number().int().positive(),
+  snapshotDate: z.string().optional()
 });
 
 // parseInt validation helper
