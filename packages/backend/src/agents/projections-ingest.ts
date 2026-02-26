@@ -306,6 +306,13 @@ export class ProjectionsIngestAgent {
       totalProcessed++;
       const team = (row.Team as string) || undefined;
 
+      // Extract positions from CSV (e.g., "SS, 2B" or "SS/2B")
+      const positionsStr = (row.Pos as string) || (row.Position as string) || "";
+      const positions = positionsStr
+        .split(/[,/]/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0 && p !== "IL" && p !== "NA" && p !== "BE"); // Filter out roster slots, not positions
+
       const components: StatComponents = {
         AB: parseFloat(row.AB as string) || 0,
         H: parseFloat(row.H as string) || 0,
@@ -335,6 +342,15 @@ export class ProjectionsIngestAgent {
         exactMatches++;
       } else {
         fuzzyMatches++;
+      }
+
+      // Update player positions from CSV if available
+      if (positions.length > 0) {
+        await this.db
+          .updateTable("player")
+          .set({ positions })
+          .where("id", "=", matchResult.playerId)
+          .execute();
       }
 
       // Upsert projection
@@ -409,6 +425,13 @@ export class ProjectionsIngestAgent {
       totalProcessed++;
       const team = (row.Team as string) || undefined;
 
+      // Extract positions from CSV (e.g., "SP", "RP", "SP/RP")
+      const positionsStr = (row.Pos as string) || (row.Position as string) || "";
+      const positions = positionsStr
+        .split(/[,/]/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+
       const strikeouts = hasK
         ? parseFloat(row.K as string) || 0
         : parseFloat(row.SO as string) || 0;
@@ -439,6 +462,15 @@ export class ProjectionsIngestAgent {
         exactMatches++;
       } else {
         fuzzyMatches++;
+      }
+
+      // Update player positions from CSV if available
+      if (positions.length > 0) {
+        await this.db
+          .updateTable("player")
+          .set({ positions })
+          .where("id", "=", matchResult.playerId)
+          .execute();
       }
 
       await this.db
