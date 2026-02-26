@@ -4,6 +4,7 @@ import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
+import { ConnectLeagueSchema } from "../utils/validation.js";
 
 /**
  * Leagues API Routes
@@ -35,7 +36,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { espnLeagueId, season, auth, name, timezone, teamEspnId } = request.body;
+      const validation = ConnectLeagueSchema.safeParse(request.body);
+      if (!validation.success) {
+        return reply.code(400).send({
+          error: "Validation failed",
+          details: validation.error.errors
+        });
+      }
+      const { espnLeagueId, season, auth, name, timezone, teamEspnId } = validation.data;
 
       try {
         // Check if league already exists

@@ -7,39 +7,21 @@ import {
   clearAuthCookies,
   issueTokenPair,
 } from "../utils/auth-cookies.js";
+import { SignupSchema, LoginSchema } from "../utils/validation.js";
 
 const PASSWORD_HASH_ROUNDS = 13;
 
 export async function authRoutes(fastify: FastifyInstance) {
   // POST /api/auth/signup - User registration
   fastify.post("/api/auth/signup", async (request, reply) => {
-    const { email, password, displayName } = request.body as {
-      email: string;
-      password: string;
-      displayName?: string;
-    };
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return reply.code(400).send({ error: "Invalid email format" });
-    }
-
-    // Validate password strength (8+ chars, uppercase, lowercase, number)
-    if (password.length < 8) {
-      return reply
-        .code(400)
-        .send({ error: "Password must be at least 8 characters" });
-    }
-    if (
-      !/[A-Z]/.test(password) ||
-      !/[a-z]/.test(password) ||
-      !/[0-9]/.test(password)
-    ) {
+    const validation = SignupSchema.safeParse(request.body);
+    if (!validation.success) {
       return reply.code(400).send({
-        error: "Password must contain uppercase, lowercase, and number",
+        error: "Validation failed",
+        details: validation.error.errors,
       });
     }
+    const { email, password, displayName } = validation.data;
 
     // Lowercase email for case-insensitive uniqueness
     const normalizedEmail = email.toLowerCase();
@@ -92,10 +74,14 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // POST /api/auth/login - User login
   fastify.post("/api/auth/login", async (request, reply) => {
-    const { email, password } = request.body as {
-      email: string;
-      password: string;
-    };
+    const validation = LoginSchema.safeParse(request.body);
+    if (!validation.success) {
+      return reply.code(400).send({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+    const { email, password } = validation.data;
 
     // Lowercase email for lookup
     const normalizedEmail = email.toLowerCase();

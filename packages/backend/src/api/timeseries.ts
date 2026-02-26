@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
+import { parseIntParam } from "../utils/validation.js";
 
 /**
  * Time Series API Routes
@@ -27,18 +28,26 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       onRequest: [authenticate],
       preHandler: [requireLeagueAccess],
     },
-    async (request) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+    async (request, reply) => {
+      try {
+        const leagueId = parseIntParam(request.params.leagueId, "leagueId");
 
-      const result = await db
-        .selectFrom("league_daily_snapshot")
-        .select(sql<number>`DISTINCT EXTRACT(YEAR FROM snapshot_date::date)::integer`.as("season"))
-        .where("league_id", "=", leagueId)
-        .orderBy("season", "desc")
-        .execute();
+        const result = await db
+          .selectFrom("league_daily_snapshot")
+          .select(
+            sql<number>`DISTINCT EXTRACT(YEAR FROM snapshot_date::date)::integer`.as(
+              "season",
+            ),
+          )
+          .where("league_id", "=", leagueId)
+          .orderBy("season", "desc")
+          .execute();
 
-      const seasons = result.map((r) => r.season);
-      return { seasons };
+        const seasons = result.map((r) => r.season);
+        return { seasons };
+      } catch (err) {
+        return reply.code(400).send({ error: err instanceof Error ? err.message : "Invalid request" });
+      }
     },
   );
 
@@ -59,7 +68,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       },
     },
     async (request) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, season } = request.query;
 
       let query = db
@@ -102,7 +111,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, categoryId, season } = request.query;
 
       if (!categoryId) {
@@ -150,7 +159,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, categoryId, season } = request.query;
 
       if (!categoryId) {
@@ -204,7 +213,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, season } = request.query;
 
       let query = db
@@ -247,7 +256,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { snapshotDate } = request.query;
 
       // Get latest snapshot date if not provided
@@ -261,7 +270,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .executeTakeFirst();
 
         if (!latest) {
-          return reply.code(404).send({ error: "No snapshots found for this league" });
+          return reply
+            .code(404)
+            .send({ error: "No snapshots found for this league" });
         }
         targetDate = latest.snapshot_date;
       }
@@ -320,7 +331,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       // Merge current totals + ranks into a single array
       const ranksMap = new Map(
-        currentCategoryRanks.map((r) => [`${r.team_id}_${r.category_id}`, r])
+        currentCategoryRanks.map((r) => [`${r.team_id}_${r.category_id}`, r]),
       );
       const currentCategoryStandings = currentCategoryTotals.map((t) => {
         const rankRow = ranksMap.get(`${t.team_id}_${t.category_id}`);
@@ -387,7 +398,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
 
       // Get the latest settings version for this league
       const settingsVersion = await db
@@ -398,10 +409,13 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .executeTakeFirst();
 
       if (!settingsVersion) {
-        return reply.code(404).send({ error: "No settings found for this league" });
+        return reply
+          .code(404)
+          .send({ error: "No settings found for this league" });
       }
 
-      const categories = (settingsVersion.settings_json as any).categories || [];
+      const categories =
+        (settingsVersion.settings_json as any).categories || [];
       return { categories };
     },
   );
@@ -417,7 +431,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, season } = request.query;
 
       let query = db
@@ -492,14 +506,12 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       // Enrich annotations with player names and team names
       const enrichedAnnotations = annotations.map((ann) => {
-        const players_added_details = (ann.players_added as number[] || []).map(
-          (id) =>
-            playerMap.get(id) || { id, name: "Unknown Player" },
-        );
-        const players_dropped_details = (ann.players_dropped as number[] || []).map(
-          (id) =>
-            playerMap.get(id) || { id, name: "Unknown Player" },
-        );
+        const players_added_details = (
+          (ann.players_added as number[]) || []
+        ).map((id) => playerMap.get(id) || { id, name: "Unknown Player" });
+        const players_dropped_details = (
+          (ann.players_dropped as number[]) || []
+        ).map((id) => playerMap.get(id) || { id, name: "Unknown Player" });
         const team_name = teamMap.get(ann.team_id);
 
         return {
@@ -517,7 +529,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   // Inflection points (biggest ranking changes)
   app.get<{
     Params: { leagueId: string };
-    Querystring: TimeSeriesQuery & { teamId: string; limit?: string; categoryId?: string };
+    Querystring: TimeSeriesQuery & {
+      teamId: string;
+      limit?: string;
+      categoryId?: string;
+    };
   }>(
     "/api/leagues/:leagueId/timeseries/inflection-points",
     {
@@ -525,8 +541,15 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseInt(request.params.leagueId, 10);
-      const { teamId, from, to, season, limit: limitStr, categoryId } = request.query;
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+      const {
+        teamId,
+        from,
+        to,
+        season,
+        limit: limitStr,
+        categoryId,
+      } = request.query;
 
       if (!teamId) {
         return reply.code(400).send({ error: "teamId is required" });
@@ -553,7 +576,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         if (from) catQuery = catQuery.where("snapshot_date", ">=", from);
         if (to) catQuery = catQuery.where("snapshot_date", "<=", to);
 
-        const catSnapshots = await catQuery.orderBy("snapshot_date", "asc").execute();
+        const catSnapshots = await catQuery
+          .orderBy("snapshot_date", "asc")
+          .execute();
 
         // Compute rank deltas between consecutive snapshots
         const catDeltas: Array<{
@@ -569,7 +594,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         for (let i = 1; i < catSnapshots.length; i++) {
           const prev = catSnapshots[i - 1];
           const curr = catSnapshots[i];
-          const rankDelta = (prev.rank) - (curr.rank); // positive = improved (lower rank is better)
+          const rankDelta = prev.rank - curr.rank; // positive = improved (lower rank is better)
 
           if (rankDelta !== 0) {
             catDeltas.push({
@@ -617,17 +642,26 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
               byDate.get(d)!.push(m);
             }
 
-            const enrichedTransactions = Array.from(byDate.entries()).map(([date, moves]) => ({
-              id: moves[0].id,
-              eventType: moves.some((m) => m.move_type.startsWith("trade")) ? "trade" : "waiver",
-              eventDate: date,
-              playersAdded: moves
-                .filter((m) => m.move_type === "add" || m.move_type === "trade_in")
-                .map((m) => ({ id: m.player_id, name: m.player_name })),
-              playersDropped: moves
-                .filter((m) => m.move_type === "drop" || m.move_type === "trade_out")
-                .map((m) => ({ id: m.player_id, name: m.player_name })),
-            }));
+            const enrichedTransactions = Array.from(byDate.entries()).map(
+              ([date, moves]) => ({
+                id: moves[0].id,
+                eventType: moves.some((m) => m.move_type.startsWith("trade"))
+                  ? "trade"
+                  : "waiver",
+                eventDate: date,
+                playersAdded: moves
+                  .filter(
+                    (m) => m.move_type === "add" || m.move_type === "trade_in",
+                  )
+                  .map((m) => ({ id: m.player_id, name: m.player_name })),
+                playersDropped: moves
+                  .filter(
+                    (m) =>
+                      m.move_type === "drop" || m.move_type === "trade_out",
+                  )
+                  .map((m) => ({ id: m.player_id, name: m.player_name })),
+              }),
+            );
 
             return {
               date: delta.date,
@@ -777,17 +811,25 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             byDate.get(d)!.push(m);
           }
 
-          const enrichedTransactions = Array.from(byDate.entries()).map(([date, moves]) => ({
-            id: moves[0].id,
-            eventType: moves.some((m) => m.move_type.startsWith("trade")) ? "trade" : "waiver",
-            eventDate: date,
-            playersAdded: moves
-              .filter((m) => m.move_type === "add" || m.move_type === "trade_in")
-              .map((m) => ({ id: m.player_id, name: m.player_name })),
-            playersDropped: moves
-              .filter((m) => m.move_type === "drop" || m.move_type === "trade_out")
-              .map((m) => ({ id: m.player_id, name: m.player_name })),
-          }));
+          const enrichedTransactions = Array.from(byDate.entries()).map(
+            ([date, moves]) => ({
+              id: moves[0].id,
+              eventType: moves.some((m) => m.move_type.startsWith("trade"))
+                ? "trade"
+                : "waiver",
+              eventDate: date,
+              playersAdded: moves
+                .filter(
+                  (m) => m.move_type === "add" || m.move_type === "trade_in",
+                )
+                .map((m) => ({ id: m.player_id, name: m.player_name })),
+              playersDropped: moves
+                .filter(
+                  (m) => m.move_type === "drop" || m.move_type === "trade_out",
+                )
+                .map((m) => ({ id: m.player_id, name: m.player_name })),
+            }),
+          );
 
           return {
             date: delta.date,
