@@ -35,6 +35,26 @@ export class SnapshotOrchestratorAgent {
   }
 
   /**
+   * Normalize ESPN injury status to simplified format
+   */
+  private normalizeInjuryStatus(espnStatus: string | null | undefined): string | null {
+    if (!espnStatus) return null;
+
+    const status = espnStatus.toUpperCase();
+    if (status.includes('INJURY_RESERVE') || status.includes('IL') || status.includes('INJURED_LIST')) {
+      return 'IL';
+    }
+    if (status.includes('DAY_TO_DAY') || status.includes('DTD') || status.includes('QUESTIONABLE')) {
+      return 'DTD';
+    }
+    if (status.includes('OUT') || status.includes('SUSPENDED')) {
+      return 'OUT';
+    }
+    // If healthy or unknown status, return null
+    return null;
+  }
+
+  /**
    * Execute daily snapshot job
    */
   async executeSnapshot(options: SnapshotJobOptions): Promise<void> {
@@ -295,7 +315,17 @@ export class SnapshotOrchestratorAgent {
       if (!dbTeamId) continue;
 
       for (const entry of team.roster) {
-        // Upsert player
+        // Normalize injury status from ESPN
+        const injuryStatus = this.normalizeInjuryStatus(entry.injuryStatus);
+
+        // Check if player exists to detect injury status changes
+        const existingPlayer = await trx
+          .selectFrom("player")
+          .select(["id", "injury_status"])
+          .where("espn_player_id", "=", entry.espnPlayerId)
+          .executeTakeFirst();
+
+        // Upsert player with injury status
         const playerResult = await trx
           .insertInto("player")
           .values({
@@ -303,6 +333,8 @@ export class SnapshotOrchestratorAgent {
             name: entry.name,
             mlb_team: entry.mlbTeam,
             positions: entry.positions,
+            injury_status: injuryStatus,
+            injury_updated_at: injuryStatus ? new Date() : undefined,
             created_at: new Date(),
           })
           .onConflict((oc) =>
@@ -310,10 +342,44 @@ export class SnapshotOrchestratorAgent {
               name: entry.name,
               mlb_team: entry.mlbTeam,
               positions: entry.positions,
+              injury_status: injuryStatus,
+              injury_updated_at: injuryStatus ? new Date() : undefined,
             }),
           )
           .returning("id")
           .executeTakeFirstOrThrow();
+
+        // Track injury status changes in injury_event table
+        if (existingPlayer && existingPlayer.injury_status !== injuryStatus) {
+          // Status changed - record event
+          await trx
+            .insertInto("injury_event")
+            .values({
+              player_id: playerResult.id,
+              event_date: snapshotDate,
+              injury_status: injuryStatus || 'HEALTHY',
+              notes: `Status changed from ${existingPlayer.injury_status || 'HEALTHY'} to ${injuryStatus || 'HEALTHY'}`,
+              created_at: new Date(),
+            })
+            .execute();
+
+          this.logger?.debug(
+            { playerId: playerResult.id, playerName: entry.name, oldStatus: existingPlayer.injury_status, newStatus: injuryStatus },
+            "Injury status changed"
+          );
+        } else if (!existingPlayer && injuryStatus) {
+          // New player with injury status - record event
+          await trx
+            .insertInto("injury_event")
+            .values({
+              player_id: playerResult.id,
+              event_date: snapshotDate,
+              injury_status: injuryStatus,
+              notes: `Initial injury status: ${injuryStatus}`,
+              created_at: new Date(),
+            })
+            .execute();
+        }
 
         // Write roster snapshot
         await trx

@@ -39,6 +39,7 @@ export interface Database {
   player_identity_map: PlayerIdentityMap;
   league_raw_payload: WithGeneratedId<LeagueRawPayload>;
   league_daily_snapshot: LeagueDailySnapshot;
+  league_free_agent_snapshot: LeagueFreeAgentSnapshot;
   team_daily_category_totals: TeamDailyCategoryTotals;
   team_daily_category_ranks: TeamDailyCategoryRanks;
   team_daily_overall: TeamDailyOverall;
@@ -63,6 +64,8 @@ export interface Database {
   agent_action: AgentAction;
   agent_action_decision: AgentActionDecision;
   slack_message_ref: SlackMessageRef;
+  // Injury tracking
+  injury_event: WithGeneratedId<InjuryEvent>;
 }
 
 export interface LeagueSettingsVersion {
@@ -187,5 +190,23 @@ export interface SlackMessageRef {
   message_ts: string;
   report_id: string | null;
   action_id: string | null;
+  created_at: Date;
+}
+
+export interface InjuryEvent {
+  id: number;
+  player_id: number;
+  event_date: string; // DATE
+  injury_status: string;
+  notes: string | null;
+  created_at: Date;
+}
+
+export interface LeagueFreeAgentSnapshot {
+  league_id: number;
+  snapshot_date: string; // DATE
+  player_id: number;
+  ownership_pct: number | null;
+  started_pct: number | null;
   created_at: Date;
 }

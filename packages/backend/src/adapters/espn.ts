@@ -50,6 +50,7 @@ export interface ESPNRosterEntry {
   rosterStatus: "active" | "bench" | "il" | "na" | "unknown";
   rosterSlot: string;
   acquisitionType: string;
+  injuryStatus?: string | null; // ESPN injury status (e.g., "INJURY_RESERVE", "DAY_TO_DAY", "OUT")
 }
 
 export interface ESPNTeamData {
@@ -788,6 +789,9 @@ export class ESPNAdapter {
           else if (lineupSlotId === 17) rosterStatus = "il";
           else if (lineupSlotId >= 0 && lineupSlotId <= 15) rosterStatus = "active";
 
+          // Extract injury status from ESPN (if available)
+          const injuryStatus = player.injuryStatus || null;
+
           rosterEntries.push({
             espnPlayerId: entry.playerId,
             name: player.fullName || `Player ${entry.playerId}`,
@@ -799,6 +803,7 @@ export class ESPNAdapter {
             rosterStatus,
             rosterSlot: ESPN_LINEUP_SLOT_MAP[lineupSlotId] || `slot_${lineupSlotId}`,
             acquisitionType: entry.acquisitionType || "UNKNOWN",
+            injuryStatus,
           });
         }
 

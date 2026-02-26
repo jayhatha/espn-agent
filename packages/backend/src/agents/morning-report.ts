@@ -159,9 +159,32 @@ export class MorningReportAgent {
       waiverRecs = [];
     }
 
-    // TODO: Fetch injuries from injury_event table when content ingestion is implemented
-    // For now, return empty array
-    const injuries: Array<{ playerName: string; status: string; impact: string }> = [];
+    // Fetch current injuries from player table
+    const injuredPlayers = await this.db
+      .selectFrom("player")
+      .innerJoin("team_roster_snapshot", "team_roster_snapshot.player_id", "player.id")
+      .select([
+        "player.name as playerName",
+        "player.injury_status as status",
+        "player.positions",
+      ])
+      .where("team_roster_snapshot.team_id", "=", userLink.team_id_fantasy)
+      .where("team_roster_snapshot.league_id", "=", leagueId)
+      .where("team_roster_snapshot.snapshot_date", "=", snapshot.snapshot_date)
+      .where("player.injury_status", "is not", null)
+      .execute();
+
+    const injuries: Array<{ playerName: string; status: string; impact: string }> =
+      injuredPlayers.map(p => ({
+        playerName: p.playerName,
+        status: p.status || 'UNKNOWN',
+        impact: this.describeInjuryImpact(p.status || 'UNKNOWN'),
+      }));
+
+    this.logger?.debug(
+      { injuryCount: injuries.length },
+      "Fetched injury alerts"
+    );
 
     // Assemble report data
     const reportData: MorningReportData = {
@@ -174,11 +197,22 @@ export class MorningReportAgent {
         projectedPoints: projected?.projected_overall_points || 0,
       },
       injuries,
-      waiverHighlights: waiverRecs.slice(0, 3).map((rec) => ({
-        playerName: rec.addPlayerName,
-        positions: [], // TODO: Add positions from player table
-        reason: rec.explanation,
-      })),
+      waiverHighlights: await Promise.all(
+        waiverRecs.slice(0, 3).map(async (rec) => {
+          // Fetch positions from player table
+          const player = await this.db
+            .selectFrom("player")
+            .select("positions")
+            .where("id", "=", rec.addPlayerId)
+            .executeTakeFirst();
+
+          return {
+            playerName: rec.addPlayerName,
+            positions: player?.positions || [],
+            reason: rec.explanation,
+          };
+        })
+      ),
       actions: [], // Will be populated after creating action records
     };
 
@@ -250,6 +284,22 @@ export class MorningReportAgent {
     );
 
     return { reportId, data: reportData };
+  }
+
+  /**
+   * Describe injury impact for morning report
+   */
+  private describeInjuryImpact(status: string): string {
+    switch (status) {
+      case 'IL':
+        return 'On injured list - likely out multiple games';
+      case 'DTD':
+        return 'Day-to-day - monitor status before games';
+      case 'OUT':
+        return 'Out for upcoming games';
+      default:
+        return 'Injury status updated';
+    }
   }
 
   /**

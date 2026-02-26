@@ -92,6 +92,8 @@ export interface Player {
   pct_owned?: number | null; // Player pool sync columns
   current_season_stats_json?: Record<string, number> | null;
   last_synced_at?: Date | null;
+  injury_status?: string | null; // 'IL', 'DTD', 'OUT', 'HEALTHY', or NULL
+  injury_updated_at?: Date | null;
 }
 
 // Team
