@@ -16,18 +16,7 @@ export default function ProjectionsUploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      // Read file content and convert to base64
-      const text = await file.text();
-      const asOfDate = new Date().toISOString().split('T')[0];
-
-      // Determine if it's batters or pitchers based on file name or content
-      const isBatters = file.name.toLowerCase().includes('bat') ||
-                        file.name.toLowerCase().includes('hit');
-
-      return api.uploadProjections({
-        [isBatters ? 'battersCsv' : 'pitchersCsv']: text,
-        asOfDate,
-      });
+      return api.uploadProjections(file);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });

@@ -83,16 +83,15 @@ function AdminPageContent() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: { batter: File | null; pitcher: File | null }) => {
-      // Read file contents and convert to CSV strings
-      const battersCsv = files.batter ? await files.batter.text() : undefined;
-      const pitchersCsv = files.pitcher ? await files.pitcher.text() : undefined;
-      const asOfDate = new Date().toISOString().split('T')[0];
-
-      return api.uploadProjections({
-        battersCsv,
-        pitchersCsv,
-        asOfDate,
-      });
+      // Upload files sequentially
+      const results = [];
+      if (files.batter) {
+        results.push(await api.uploadProjections(files.batter));
+      }
+      if (files.pitcher) {
+        results.push(await api.uploadProjections(files.pitcher));
+      }
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projections"] });

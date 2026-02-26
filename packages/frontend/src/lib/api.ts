@@ -107,14 +107,15 @@ export const api = {
   },
 
   // Projections
-  async uploadProjections(data: {
-    battersCsv?: string;
-    pitchersCsv?: string;
-    asOfDate: string;
-  }) {
+  async uploadProjections(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
     return fetchAPI('/api/projections/upload', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: formData,
+      // Don't set Content-Type - browser will set it with boundary for multipart
+      headers: {},
     });
   },
 
