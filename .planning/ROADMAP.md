@@ -135,7 +135,9 @@ Plans:
 | 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
 | 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
 | 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
-| 11. Draft Assistant Enhancements | 5/5 | Complete    | 2026-02-25 | - |
+| 11. Draft Assistant Enhancements | v1.2 | 5/5 | Complete | 2026-02-25 |
+| 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
+| 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -221,9 +223,9 @@ Plans:
 **Plans:** 6/6 plans complete
 
 Plans:
-- [ ] 13-01-PLAN.md — Fix TradeRecommendationAgent projection access bug and batch N+1 operations
-- [ ] 13-02-PLAN.md — Add Zod request validation and OAuth CSRF validation
-- [ ] 13-03-PLAN.md — Configure BullMQ DLQ and fix worker stability
-- [ ] 13-04-PLAN.md — Replace frontend any types and extract shared components
-- [ ] 13-05-PLAN.md — ESPNAdapter improvements: LRU cache, rate limiting, schema validation
-- [ ] 13-06-PLAN.md — Add tests for critical paths
+- [x] 13-01-PLAN.md — Fix TradeRecommendationAgent projection access bug and batch N+1 operations — completed 2026-02-26
+- [x] 13-02-PLAN.md — Add Zod request validation and OAuth CSRF validation — completed 2026-02-26
+- [x] 13-03-PLAN.md — Configure BullMQ DLQ and fix worker stability — completed 2026-02-26
+- [x] 13-04-PLAN.md — Replace frontend any types and extract shared components — completed 2026-02-26
+- [x] 13-05-PLAN.md — ESPNAdapter improvements: LRU cache, rate limiting, schema validation — completed 2026-02-26
+- [x] 13-06-PLAN.md — Add tests for critical paths — completed 2026-02-26
