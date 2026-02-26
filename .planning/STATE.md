@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 13 (Clean Up Tech Debt)
-Plan: 1 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: Active
-Last activity: 2026-02-26 - Completed 13-01: Fix critical data correctness bug & eliminate N+1 patterns
+Last activity: 2026-02-26 - Completed 13-05: Harden ESPN adapter (cache, throttle, validation)
 
-Progress: Phase 13: [█░░░░░░░░░] 17% (1 of 6 plans complete)
+Progress: Phase 13: [████████░░] 83% (5 of 6 plans complete)
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: Phase 13: [█░░░░░░░░░] 17% (1 of 6 plans complete)
 | 12 | P04 | 7min | 3 | 2 |
 | 12 | P05 | 10min | 2 | 2 |
 | 13 | P01 | 10min | 2 | 6 |
+| 13 | P05 | 3min | 3 | 3 |
 
 **Quick Tasks:**
 
@@ -86,6 +87,7 @@ Progress: Phase 13: [█░░░░░░░░░] 17% (1 of 6 plans complete)
 | Phase 12 P04 | 7 | 3 tasks | 2 files |
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
 | Phase 13 P02 | 10 | 3 tasks | 6 files |
+| Phase 13 P05 | 3 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -166,6 +168,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 13 P01]: Pre-fetch optimization in waiver-recommendation reduces O(N*M) queries to single batch SELECT
 - [Phase 13 P01]: StatComponents interface with uppercase keys matches FanGraphs CSV format for projection data
 - [Phase 13]: Signed cookies for OAuth state storage with 10-minute TTL to prevent CSRF attacks
+- [Phase 13]: LRU cache with 500 max items and 1-hour TTL prevents unbounded memory growth
+- [Phase 13]: 2-second throttle applied to all ESPN methods prevents 429 errors
+- [Phase 13]: Remove validateStatus to allow axios-retry on 429
+- [Phase 13]: Graceful degradation on schema mismatch (log warning, continue) alerts devs without breaking app
 
 ### Roadmap Evolution
 
