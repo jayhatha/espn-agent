@@ -231,10 +231,9 @@ describe("Auth validation (DEBT-03)", () => {
       expect(() => parseIntParam("", "teamId")).toThrow("Invalid teamId");
     });
 
-    it("should truncate decimal number (parseInt behavior)", () => {
-      // Note: parseInt truncates decimals, doesn't throw
-      const result = parseIntParam("12.5", "playerId");
-      expect(result).toBe(12);
+    it("should reject decimal numbers", () => {
+      // Decimal numbers are invalid for IDs and counts
+      expect(() => parseIntParam("12.5", "playerId")).toThrow("must be an integer");
     });
 
     it("should throw on NaN result", () => {

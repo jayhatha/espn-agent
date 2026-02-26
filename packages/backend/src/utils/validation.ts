@@ -45,6 +45,11 @@ export const WaiverEvaluationSchema = z.object({
 
 // parseInt validation helper
 export function parseIntParam(value: string, paramName: string): number {
+  // Reject decimal numbers explicitly
+  if (value.includes('.')) {
+    throw new Error(`Invalid ${paramName}: must be an integer (no decimals)`);
+  }
+
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
     throw new Error(`Invalid ${paramName}: must be a valid integer`);
