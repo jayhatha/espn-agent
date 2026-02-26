@@ -87,13 +87,74 @@ function getPickCandidatesFromNode(node: Node): Element[] {
   return candidates;
 }
 
+/**
+ * Validate selector array and find first matching element
+ * Logs warnings if primary selector fails but fallback succeeds
+ * Logs errors if all selectors fail with DOM structure snapshot
+ */
+function validateAndFindElement(
+  selectorArray: string,
+  selectorName: string,
+): Element | null {
+  const selectors = selectorArray.split(", ");
+
+  for (let i = 0; i < selectors.length; i++) {
+    const selector = selectors[i];
+    const element = document.querySelector(selector);
+
+    if (element) {
+      if (i > 0) {
+        // Primary selector failed, but fallback succeeded
+        console.warn(
+          `[ESPN Draft Assistant] Primary ${selectorName} selector failed, using fallback #${i + 1}: "${selector}"`,
+        );
+      }
+      return element;
+    }
+  }
+
+  // All selectors failed - log error with DOM snapshot
+  console.error(
+    `[ESPN Draft Assistant] All ${selectorName} selectors failed. ESPN DOM may have changed.`,
+  );
+  console.error(
+    "[ESPN Draft Assistant] Document body classes:",
+    document.body?.className || "none",
+  );
+  console.error(
+    "[ESPN Draft Assistant] Document body children count:",
+    document.body?.children.length || 0,
+  );
+
+  // Log first 5 elements with their classes for debugging
+  if (document.body) {
+    const elements = Array.from(document.body.querySelectorAll("*")).slice(
+      0,
+      5,
+    );
+    console.error(
+      "[ESPN Draft Assistant] First 5 elements:",
+      elements.map((el) => ({
+        tag: el.tagName,
+        class: el.className,
+        id: el.id,
+      })),
+    );
+  }
+
+  return null;
+}
+
 function findDraftBoardElement(): Element | null {
-  const directMatch = document.querySelector(DRAFT_BOARD_SELECTORS);
+  const directMatch = validateAndFindElement(
+    DRAFT_BOARD_SELECTORS,
+    "draft board",
+  );
   if (directMatch) {
     return directMatch;
   }
 
-  const pickElement = document.querySelector(PICK_ROW_SELECTORS);
+  const pickElement = validateAndFindElement(PICK_ROW_SELECTORS, "pick row");
   if (!pickElement) {
     return null;
   }
@@ -132,9 +193,25 @@ export function observeDraftBoard(
       COMPLETED_PICK_SELECTORS,
     );
     completedPickElements.forEach((pickElement) => {
-      const pick = parsePickElement(pickElement);
-      if (pick) {
-        emitPick(pick);
+      try {
+        const pick = parsePickElement(pickElement);
+        if (pick) {
+          emitPick(pick);
+        }
+      } catch (error) {
+        console.error(
+          "[ESPN Draft Assistant] Error parsing pick element:",
+          error,
+        );
+        console.error(
+          "[ESPN Draft Assistant] Pick element structure:",
+          {
+            tag: pickElement.tagName,
+            classes: pickElement.className,
+            childCount: pickElement.children.length,
+          },
+        );
+        // Continue observing despite extraction failure
       }
     });
   };
@@ -151,9 +228,25 @@ export function observeDraftBoard(
           const pickElements = getPickCandidatesFromNode(node);
 
           pickElements.forEach(async (pickElement) => {
-            const pick = parsePickElement(pickElement);
-            if (pick) {
-              await emitPick(pick);
+            try {
+              const pick = parsePickElement(pickElement);
+              if (pick) {
+                await emitPick(pick);
+              }
+            } catch (error) {
+              console.error(
+                "[ESPN Draft Assistant] Error parsing pick from mutation:",
+                error,
+              );
+              console.error(
+                "[ESPN Draft Assistant] Pick element context:",
+                {
+                  tag: pickElement.tagName,
+                  classes: pickElement.className,
+                  parentTag: pickElement.parentElement?.tagName,
+                },
+              );
+              // Continue observing despite extraction failure
             }
           });
         });
