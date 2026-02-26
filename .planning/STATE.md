@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 12 (Address Codebase Concerns)
-Plan: 5 of 5 in current phase
-Status: Complete
-Last activity: 2026-02-26 - Completed 12-05: Complete trade recommendation rate stats
+Phase: 13 (Clean Up Tech Debt)
+Plan: 1 of 6 in current phase
+Status: Active
+Last activity: 2026-02-26 - Completed 13-01: Fix critical data correctness bug & eliminate N+1 patterns
 
-Progress: Phase 12: [██████████] 100% (5 of 5 plans complete)
+Progress: Phase 13: [█░░░░░░░░░] 17% (1 of 6 plans complete)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: Phase 12: [██████████] 100% (5 of 5 plans complete
 | 12 | P03 | 27min | 2 | 3 |
 | 12 | P04 | 7min | 3 | 2 |
 | 12 | P05 | 10min | 2 | 2 |
+| 13 | P01 | 10min | 2 | 6 |
 
 **Quick Tasks:**
 
@@ -161,6 +162,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 13]: Morning report worker uses conditional initialization not process.exit
 - [Phase 13]: Player pool worker migrated to BullMQ for consistency and reliability
 - [Phase 13]: Zod schemas over manual validation for type-safe validation with automatic TypeScript inference
+- [Phase 13 P01]: Batch operations with empty array guards prevent Kysely invalid SQL (WHERE col IN () crashes)
+- [Phase 13 P01]: Pre-fetch optimization in waiver-recommendation reduces O(N*M) queries to single batch SELECT
+- [Phase 13 P01]: StatComponents interface with uppercase keys matches FanGraphs CSV format for projection data
 - [Phase 13]: Signed cookies for OAuth state storage with 10-minute TTL to prevent CSRF attacks
 
 ### Roadmap Evolution
