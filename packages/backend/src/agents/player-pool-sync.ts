@@ -157,7 +157,7 @@ export class PlayerPoolSyncAgent {
               .updateTable("player")
               .set({
                 pct_owned: playerData.pctOwned,
-                current_season_stats_json: JSON.stringify(playerData.currentSeasonStats),
+                current_season_stats_json: playerData.currentSeasonStats,
                 last_synced_at: new Date(),
               })
               .where("espn_player_id", "=", playerData.espnPlayerId)
@@ -175,7 +175,7 @@ export class PlayerPoolSyncAgent {
                 positions: playerData.positions,
                 bats_throws: null,
                 pct_owned: playerData.pctOwned,
-                current_season_stats_json: JSON.stringify(playerData.currentSeasonStats),
+                current_season_stats_json: playerData.currentSeasonStats,
                 last_synced_at: new Date(),
               })
               .execute();
