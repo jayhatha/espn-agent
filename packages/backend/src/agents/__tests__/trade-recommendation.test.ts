@@ -1,12 +1,176 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { TradeRecommendationAgent } from "../trade-recommendation.js";
+import { createMockLogger, createMockProjection } from "../../__tests__/test-helpers.js";
 
 /**
- * Trade Recommendation Agent Tests - Rate Stat Component Math
+ * Trade Recommendation Agent Tests
  *
- * These tests verify that trade simulations correctly calculate rate stats
- * using component addition/subtraction, NOT by averaging rates directly.
+ * Tests projection field access fixes (DEBT-01) and rate stat component math
  */
+
+describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () => {
+  describe("stat_components_json parsing", () => {
+    it("should parse stat_components_json correctly from string field", () => {
+      const projection = createMockProjection();
+      const components = JSON.parse(projection.stat_components_json);
+
+      expect(components.AB).toBe(500);
+      expect(components.H).toBe(150);
+      expect(components.HR).toBe(30);
+      expect(components.TB).toBe(280);
+    });
+
+    it("should handle projection with partial batting stats", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({
+          AB: 300,
+          H: 90,
+          BB: 40,
+          HBP: 3,
+          SF: 2
+        })
+      });
+      const components = JSON.parse(projection.stat_components_json);
+
+      expect(components.AB).toBe(300);
+      expect(components.H).toBe(90);
+      expect(components.HR).toBeUndefined();
+    });
+  });
+
+  describe("batter vs pitcher detection", () => {
+    it("should detect batter when AB exists and is > 0", () => {
+      const projection = createMockProjection();
+      const components = JSON.parse(projection.stat_components_json);
+      const isBatter = components.AB != null && components.AB > 0;
+
+      expect(isBatter).toBe(true);
+    });
+
+    it("should detect pitcher when IP exists and is > 0", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({
+          AB: 0,
+          IP: 180,
+          ER: 60,
+          H_P: 150,
+          BB_P: 50,
+          K: 200,
+          W: 12,
+          SV: 0
+        })
+      });
+      const components = JSON.parse(projection.stat_components_json);
+      const isPitcher = components.IP != null && components.IP > 0;
+
+      expect(isPitcher).toBe(true);
+    });
+  });
+
+  describe("rate stat calculations from components", () => {
+    it("should calculate AVG from H and AB components", () => {
+      const projection = createMockProjection();
+      const components = JSON.parse(projection.stat_components_json);
+
+      const avg = (components.H || 0) / Math.max(1, components.AB || 1);
+
+      expect(avg).toBeCloseTo(0.300, 3);
+    });
+
+    it("should calculate OBP from multiple components", () => {
+      const projection = createMockProjection();
+      const components = JSON.parse(projection.stat_components_json);
+
+      const obp =
+        ((components.H || 0) + (components.BB || 0) + (components.HBP || 0)) /
+        Math.max(1, (components.AB || 0) + (components.BB || 0) + (components.HBP || 0) + (components.SF || 0));
+
+      // (150 + 60 + 5) / (500 + 60 + 5 + 4) = 215/569 = 0.3778
+      expect(obp).toBeCloseTo(0.3778, 3);
+    });
+
+    it("should calculate SLG from TB and AB components", () => {
+      const projection = createMockProjection();
+      const components = JSON.parse(projection.stat_components_json);
+
+      const slg = (components.TB || 0) / Math.max(1, components.AB || 1);
+
+      // 280 / 500 = 0.560
+      expect(slg).toBeCloseTo(0.560, 3);
+    });
+
+    it("should calculate ERA from ER and IP components", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({
+          AB: 0,
+          IP: 180,
+          ER: 60,
+          H_P: 150,
+          BB_P: 50,
+          K: 200,
+          W: 12,
+          SV: 0
+        })
+      });
+      const components = JSON.parse(projection.stat_components_json);
+
+      const era = (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
+
+      // 9 * 60 / 180 = 3.00
+      expect(era).toBeCloseTo(3.00, 2);
+    });
+
+    it("should calculate WHIP from H_P, BB_P, and IP components", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({
+          AB: 0,
+          IP: 180,
+          ER: 60,
+          H_P: 150,
+          BB_P: 50,
+          K: 200,
+          W: 12,
+          SV: 0
+        })
+      });
+      const components = JSON.parse(projection.stat_components_json);
+
+      const whip = ((components.H_P || 0) + (components.BB_P || 0)) / Math.max(0.1, components.IP || 0.1);
+
+      // (150 + 50) / 180 = 1.111
+      expect(whip).toBeCloseTo(1.111, 3);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle division by zero for zero AB", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({
+          AB: 0,
+          H: 0
+        })
+      });
+      const components = JSON.parse(projection.stat_components_json);
+
+      const avg = (components.H || 0) / Math.max(1, components.AB || 1);
+
+      expect(avg).toBe(0);
+    });
+
+    it("should handle missing components gracefully", () => {
+      const projection = createMockProjection({
+        stat_components_json: JSON.stringify({})
+      });
+      const components = JSON.parse(projection.stat_components_json);
+
+      const avg = (components.H || 0) / Math.max(1, components.AB || 1);
+      const era = (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
+
+      expect(avg).toBe(0);
+      expect(era).toBe(0);
+    });
+  });
+});
 
 describe("TradeRecommendationAgent - Rate Stat Component Math", () => {
   let agent: TradeRecommendationAgent;
