@@ -23,8 +23,9 @@ const connection = new IORedis(
   },
 );
 
-// Create queue
+// Create queue and DLQ
 export const snapshotQueue = new Queue("snapshots", { connection: connection as any });
+export const snapshotDLQ = new Queue("snapshots-dlq", { connection: connection as any });
 
 interface SnapshotJobData {
   leagueId: number;
@@ -70,8 +71,31 @@ worker.on("completed", (job) => {
   logger.info({ jobId: job.id }, "Job completed");
 });
 
-worker.on("failed", (job, err) => {
-  logger.error({ jobId: job?.id, error: err }, "Job failed");
+worker.on("failed", async (job, err) => {
+  if (job && job.attemptsMade >= (job.opts.attempts || 3)) {
+    // Max retries exceeded - move to DLQ
+    logger.warn({ jobId: job.id }, "Max retries exceeded - moving to DLQ");
+
+    await snapshotDLQ.add(
+      "failed-snapshot",
+      {
+        originalJobId: job.id,
+        originalJobName: job.name,
+        originalData: job.data,
+        errorMessage: err.message,
+        errorStack: err.stack,
+        attemptsMade: job.attemptsMade,
+        failedAt: new Date().toISOString(),
+      },
+      {
+        removeOnComplete: { age: 86400 * 30 }, // Keep 30 days for analysis
+      },
+    );
+
+    logger.error({ jobId: job.id, error: err }, "Job moved to DLQ");
+  } else {
+    logger.error({ jobId: job?.id, error: err }, "Job failed");
+  }
 });
 
 // Schedule daily snapshots at 03:00 league timezone
@@ -120,6 +144,19 @@ export async function scheduleDailySnapshots() {
       );
     }
   }
+}
+
+/**
+ * Inspect DLQ for failed jobs (for admin debugging)
+ */
+export async function inspectDLQ(limit = 10) {
+  const failed = await snapshotDLQ.getJobs(["completed"], 0, limit);
+  return failed.map((job) => ({
+    jobId: job.data.originalJobId,
+    failedAt: job.data.failedAt,
+    error: job.data.errorMessage,
+    attempts: job.data.attemptsMade,
+  }));
 }
 
 // Graceful shutdown
