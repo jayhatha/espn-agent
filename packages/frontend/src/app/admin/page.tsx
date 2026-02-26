@@ -7,8 +7,6 @@ import { api } from "@/lib/api";
 import { StatCard } from "@/components/ui/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 function AdminPageContent() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -85,22 +83,16 @@ function AdminPageContent() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: { batter: File | null; pitcher: File | null }) => {
-      const formData = new FormData();
-      if (files.batter) formData.append("batter", files.batter);
-      if (files.pitcher) formData.append("pitcher", files.pitcher);
+      // Read file contents and convert to CSV strings
+      const battersCsv = files.batter ? await files.batter.text() : undefined;
+      const pitchersCsv = files.pitcher ? await files.pitcher.text() : undefined;
+      const asOfDate = new Date().toISOString().split('T')[0];
 
-      const response = await fetch(`${API_URL}/api/projections/upload-batch`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
+      return api.uploadProjections({
+        battersCsv,
+        pitchersCsv,
+        asOfDate,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || error.error || "Failed to upload projections");
-      }
-
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projections"] });

@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { api } from "@/lib/api";
 
 export default function ProjectionsUploadPage() {
   const params = useParams();
@@ -17,23 +16,18 @@ export default function ProjectionsUploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Read file content and convert to base64
+      const text = await file.text();
+      const asOfDate = new Date().toISOString().split('T')[0];
 
-      const response = await fetch(
-        `${API_URL}/api/projections/upload`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      // Determine if it's batters or pitchers based on file name or content
+      const isBatters = file.name.toLowerCase().includes('bat') ||
+                        file.name.toLowerCase().includes('hit');
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to upload projections");
-      }
-
-      return response.json();
+      return api.uploadProjections({
+        [isBatters ? 'battersCsv' : 'pitchersCsv']: text,
+        asOfDate,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
