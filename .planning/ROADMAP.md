@@ -178,3 +178,28 @@ Plans:
 - [ ] 11-03-PLAN.md — Extension league config detection and auto-refresh on pick
 - [ ] 11-04-PLAN.md — Extension value detection UI (red/yellow/green badges)
 - [ ] 11-05-PLAN.md — Backend projected standings endpoint (league-agnostic)
+
+### Phase 12: address codebase concerns
+
+**Goal:** Systematically fix known bugs, complete partial features, and improve code quality by addressing documented concerns in progressive depth order (bugs first, quick wins, deeper refactors)
+**Depends on:** Phase 11
+**Requirements:** CONCERN-BUG-01, CONCERN-BUG-02, CONCERN-BUG-04, CONCERN-DEBT-01, CONCERN-DEBT-02, CONCERN-DEBT-03, CONCERN-DEBT-05, CONCERN-DEBT-06, CONCERN-DEBT-08, CONCERN-FRAGILE-02, CONCERN-FRAGILE-03, CONCERN-PERF-01
+**Success Criteria** (what must be TRUE):
+  1. Injury data populated in morning reports with actual player positions
+  2. Draft recommendations return actual rankings instead of placeholder
+  3. Extension DOM selectors have validation and graceful degradation
+  4. Free agent pool populated during snapshot orchestration
+  5. Player name matching uses fuzzy resolution as primary path
+  6. Frontend pages use centralized API client (no hardcoded localhost URLs)
+  7. WHERE IN clauses have empty array guards to prevent SQL crashes
+  8. Transactions tracked during snapshot with deduplication
+  9. Snapshot orchestrator has error boundaries for partial failures
+  10. Trade recommendations include rate stat adjustments (AVG, ERA, WHIP)
+**Plans:** 5 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Fix critical bugs: injury data extraction, draft recommendations endpoint, DOM selector validation
+- [ ] 12-02-PLAN.md — Wire up free agent fetch and make fuzzy player matching primary path
+- [ ] 12-03-PLAN.md — Replace hardcoded API URLs and add empty array guards
+- [ ] 12-04-PLAN.md — Add transaction ingestion, error boundaries, and consistent retry wrapper
+- [ ] 12-05-PLAN.md — Implement rate stat adjustments in trade recommendations
