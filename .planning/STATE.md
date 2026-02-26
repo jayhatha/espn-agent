@@ -83,6 +83,7 @@ Progress: Phase 12: [██████████] 100% (5 of 5 plans complete
 | Phase 12 P03 | 27 | 2 tasks | 3 files |
 | Phase 12 P02 | 10 | 2 tasks | 5 files |
 | Phase 12 P04 | 7 | 3 tasks | 2 files |
+| Phase 13 P03 | 7 | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -155,6 +156,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 12 P04]: Don't overwrite successful prior snapshots with degraded new ones - protects good data during failures
 - [Phase 12 P04]: 429 rate limit handling with Retry-After header support for graceful ESPN throttling
 - [Phase 12]: Use calculateFinalRate instead of individual rate functions for consistency across all agents
+- [Phase 13]: DLQ keeps failed jobs for 30 days enabling post-mortem analysis
+- [Phase 13]: Morning report worker uses conditional initialization not process.exit
+- [Phase 13]: Player pool worker migrated to BullMQ for consistency and reliability
 
 ### Roadmap Evolution
 
