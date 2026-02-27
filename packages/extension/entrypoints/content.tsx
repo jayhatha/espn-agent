@@ -117,27 +117,26 @@ export default defineContentScript({
       draftFormat: detectedDraftFormat,
     });
 
-    // Expose diagnostic functions for debugging
-    // Usage: window.espnDraftAssistant.diagnose()
-    // Usage: window.espnDraftAssistant.testPick(element)
-    // Usage: window.espnDraftAssistant.diagnoseRosters()
-    (window as any).espnDraftAssistant = {
-      diagnose: diagnoseDOMStructure,
-      testPick: testParsePick,
-      diagnoseRosters: () => {
-        // Show stored state instead of parsing DOM
-        const { teamRosters } = useDraftStore.getState();
-        console.log("Stored Team Rosters:", Array.from(teamRosters.entries()));
+    // Expose diagnostic functions for debugging (development only)
+    if (import.meta.env.DEV) {
+      (window as any).espnDraftAssistant = {
+        diagnose: diagnoseDOMStructure,
+        testPick: testParsePick,
+        diagnoseRosters: () => {
+          // Show stored state instead of parsing DOM
+          const { teamRosters } = useDraftStore.getState();
+          console.log("Stored Team Rosters:", Array.from(teamRosters.entries()));
 
-        // Also parse DOM for comparison
-        const domRosters = parseTeamRostersFromDOM();
-        console.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
-      },
-      version: "1.0.0",
-    };
-    console.log(
-      "[ESPN Draft Assistant] Diagnostic tools available at window.espnDraftAssistant",
-    );
+          // Also parse DOM for comparison
+          const domRosters = parseTeamRostersFromDOM();
+          console.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
+        },
+        version: "1.0.0",
+      };
+      console.log(
+        "[ESPN Draft Assistant] Diagnostic tools available at window.espnDraftAssistant",
+      );
+    }
 
     const draftPageTitle =
       document.querySelector("h1.title")?.textContent?.trim() ||
