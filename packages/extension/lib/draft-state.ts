@@ -54,6 +54,14 @@ interface DraftState {
   // Team rosters accumulated during draft (teamId -> roster data)
   teamRosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>;
 
+  // Current auction player (session-only, not persisted)
+  currentAuctionPlayer: {
+    playerName: string;
+    currentBid?: number;
+    positions?: string[];
+    playerId?: number;
+  } | null;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -84,6 +92,7 @@ interface DraftState {
   updateTeamRoster: (teamId: string, teamName: string, playerId: number) => void;
   setAllTeamRosters: (rosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>) => void;
   clearTeamRosters: () => void;
+  setCurrentAuctionPlayer: (player: DraftState['currentAuctionPlayer']) => void;
   reset: () => void;
 }
 
@@ -105,6 +114,7 @@ export const useDraftStore = create<DraftState>()(
       projectedStandings: null,
       userRankingOverrides: {},
       teamRosters: new Map(),
+      currentAuctionPlayer: null,
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -220,6 +230,8 @@ export const useDraftStore = create<DraftState>()(
 
       clearTeamRosters: () => set({ teamRosters: new Map() }),
 
+      setCurrentAuctionPlayer: (player) => set({ currentAuctionPlayer: player }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -230,6 +242,7 @@ export const useDraftStore = create<DraftState>()(
           auctionValues: [],
           projectedStandings: null,
           teamRosters: new Map(),
+          currentAuctionPlayer: null,
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,
