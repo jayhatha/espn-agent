@@ -887,3 +887,216 @@ export function logRosterDiagnostics(): void {
     console.log(`    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`);
   }
 }
+
+/**
+ * Current auction player selector strategies
+ * ESPN displays the current player up for auction with bidding UI
+ */
+const CURRENT_AUCTION_PLAYER_SELECTORS = [
+  // Primary: ESPN's typical current player containers
+  ".currentPlayer",
+  '[class*="currentPlayer"]',
+  '[class*="CurrentPlayer"]',
+
+  // Secondary: Active player containers
+  ".activePlayer",
+  '[class*="activePlayer"]',
+  '[data-testid*="current-player"]',
+
+  // Fallback: Auction header often contains current player
+  ".auctionHeader",
+  '[class*="auctionHeader"]',
+  '[class*="auction-header"]',
+].join(", ");
+
+export interface CurrentAuctionPlayer {
+  playerName: string;
+  currentBid?: number;
+  positions?: string[];
+  playerId?: number;
+}
+
+/**
+ * Parse current auction player from ESPN DOM element
+ * Extracts player name, current bid, positions
+ */
+export function parseCurrentAuctionPlayer(
+  playerElement: Element,
+): CurrentAuctionPlayer | null {
+  try {
+    // Strategy 1: Extract player name
+    const playerNameSelectors = [
+      ".playerName",
+      '[class*="playerName"]',
+      '[class*="PlayerName"]',
+      ".player-name",
+      ".name",
+      '[class*="name"]',
+      '[data-testid*="player-name"]',
+    ];
+
+    let playerNameEl: Element | null = null;
+    for (const selector of playerNameSelectors) {
+      playerNameEl = playerElement.querySelector(selector);
+      if (playerNameEl?.textContent?.trim()) break;
+    }
+
+    const playerName = playerNameEl?.textContent?.trim();
+    if (!playerName) {
+      return null;
+    }
+
+    // Strategy 2: Extract current bid
+    const bidSelectors = [
+      ".currentBid",
+      ".bid",
+      ".winningPrice",
+      '[class*="currentBid"]',
+      '[class*="bid"]',
+      '[class*="price"]',
+      '[data-testid*="bid"]',
+      '[data-testid*="price"]',
+    ];
+
+    let bidEl: Element | null = null;
+    for (const selector of bidSelectors) {
+      bidEl = playerElement.querySelector(selector);
+      if (bidEl?.textContent?.trim()) break;
+    }
+
+    const bidText = bidEl?.textContent;
+    const currentBid = bidText
+      ? parseInt(bidText.replace(/\D/g, "") || "0", 10) || undefined
+      : undefined;
+
+    // Strategy 3: Extract positions
+    const positionSelectors = [
+      ".positionPill",
+      ".position",
+      '[class*="position"]',
+      '[class*="Position"]',
+      '[data-testid*="position"]',
+    ];
+
+    let positionEl: Element | null = null;
+    for (const selector of positionSelectors) {
+      positionEl = playerElement.querySelector(selector);
+      if (positionEl?.textContent?.trim()) break;
+    }
+
+    const positionText = positionEl?.textContent?.trim() || "";
+    const positions = positionText
+      .split("/")
+      .flatMap((part) => part.split(","))
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    // Strategy 4: Extract player ID if available
+    const playerId = parseInt(
+      playerElement.getAttribute("data-player-id") ||
+        playerElement.getAttribute("data-playerid") ||
+        "0",
+      10,
+    ) || undefined;
+
+    // Generate fallback ID if needed
+    const fallbackPlayerId = playerId || hashString(playerName.toLowerCase());
+
+    return {
+      playerName,
+      currentBid,
+      positions: positions.length > 0 ? positions : undefined,
+      playerId: fallbackPlayerId,
+    };
+  } catch (error) {
+    console.error(
+      "[ESPN Draft Assistant] Error parsing current auction player:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
+/**
+ * Observes ESPN auction draft page for current player up for bid
+ * Returns cleanup function to disconnect observer
+ *
+ * Debounces updates since ESPN may refresh DOM rapidly during bidding
+ */
+export function observeCurrentAuctionPlayer(
+  onPlayerChange: (player: CurrentAuctionPlayer | null) => void,
+): () => void {
+  let lastEmittedPlayer: string | null = null;
+  let debounceTimeout: number | null = null;
+
+  const emitPlayerChange = (player: CurrentAuctionPlayer | null) => {
+    const playerKey = player ? `${player.playerName}:${player.currentBid ?? ""}` : null;
+
+    if (playerKey === lastEmittedPlayer) {
+      return;
+    }
+
+    lastEmittedPlayer = playerKey;
+
+    if (player) {
+      console.log("[ESPN Draft Assistant] Current auction player:", player);
+    } else {
+      console.log("[ESPN Draft Assistant] No active auction player");
+    }
+
+    onPlayerChange(player);
+  };
+
+  const checkCurrentPlayer = () => {
+    // Clear pending debounce
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = null;
+    }
+
+    // Debounce: ESPN may refresh DOM rapidly during bidding
+    debounceTimeout = window.setTimeout(() => {
+      const playerContainer = document.querySelector(CURRENT_AUCTION_PLAYER_SELECTORS);
+
+      if (!playerContainer) {
+        emitPlayerChange(null);
+        return;
+      }
+
+      const player = parseCurrentAuctionPlayer(playerContainer);
+      emitPlayerChange(player);
+    }, 200); // 200ms debounce
+  };
+
+  // Initial check
+  checkCurrentPlayer();
+
+  // Watch for DOM changes
+  const observer = new MutationObserver(() => {
+    checkCurrentPlayer();
+  });
+
+  // Observe body for changes (auction UI updates frequently)
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'data-player-id', 'data-bid'],
+    });
+  }
+
+  // Periodic check as safety net (ESPN may update without DOM mutations)
+  const periodicCheck = setInterval(() => {
+    checkCurrentPlayer();
+  }, 2000);
+
+  // Return cleanup function
+  return () => {
+    observer.disconnect();
+    clearInterval(periodicCheck);
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+    }
+  };
+}
