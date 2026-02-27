@@ -416,6 +416,271 @@ export async function draftRoutes(app: FastifyInstance) {
     },
   );
 
+  // GET /api/leagues/:leagueId/draft/auction/validate - Compare ESPN vs VBD auction values
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: {
+      limit?: string;
+      projectionsRunId?: string;
+    };
+  }>(
+    "/api/leagues/:leagueId/draft/auction/validate",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const { limit, projectionsRunId } = request.query;
+      const maxPlayers = limit ? parseInt(limit, 10) : 100;
+
+      try {
+        // Get league info
+        const league = await db
+          .selectFrom("league")
+          .select(["id", "name", "espn_league_id", "season"])
+          .where("id", "=", leagueId)
+          .executeTakeFirst();
+
+        if (!league) {
+          return reply.code(404).send({ error: "League not found" });
+        }
+
+        // Get ESPN auth cookies (if available)
+        const authRow = await db
+          .selectFrom("league")
+          .select(["espn_swid", "espn_s2"])
+          .where("id", "=", leagueId)
+          .executeTakeFirst();
+
+        const espnAuth = authRow?.espn_swid && authRow?.espn_s2
+          ? { SWID: authRow.espn_swid, espn_s2: authRow.espn_s2 }
+          : undefined;
+
+        // Count teams in league
+        const teamsResult = await db
+          .selectFrom("team")
+          .select(({ fn }) => [fn.countAll<number>().as("count")])
+          .where("league_id", "=", leagueId)
+          .executeTakeFirst();
+
+        const totalTeams = teamsResult?.count || 0;
+
+        if (totalTeams === 0) {
+          return reply.code(404).send({
+            error: "No teams found in league. Please sync league data first.",
+          });
+        }
+
+        // Get league settings for budget
+        const latestSettings = await db
+          .selectFrom("league_settings_version")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .orderBy("effective_date", "desc")
+          .executeTakeFirst();
+
+        if (!latestSettings) {
+          return reply.code(404).send({
+            error: "League settings not found. Please sync league data first.",
+          });
+        }
+
+        const settings = latestSettings.settings_json as any;
+        const acquisitionRules = settings.acquisition_rules || {};
+        const budget = acquisitionRules.auction_budget || 260; // Default ESPN auction budget
+
+        // Fetch ESPN's pre-draft auction values
+        const { ESPNAdapter } = await import("../adapters/espn.js");
+        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnValues = await espnAdapter.fetchPreDraftAuctionValues({
+          leagueId: league.espn_league_id,
+          season: league.season,
+          auth: espnAuth,
+        });
+
+        if (espnValues.length === 0) {
+          return reply.code(400).send({
+            error: "ESPN pre-draft auction values not available for this league",
+            details:
+              "This may occur if the league is not configured for auction drafts, " +
+              "or if the draft has already started/completed.",
+          });
+        }
+
+        // Fetch our VBD auction values
+        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const auctionAgent = new AuctionValuationAgent(
+          db,
+          draftAgent,
+          request.log as any,
+        );
+
+        const ourValuations = await auctionAgent.getValuations(leagueId, {
+          projectionsRunId: projectionsRunId
+            ? parseInt(projectionsRunId, 10)
+            : undefined,
+          budget,
+          minBid: 1,
+          limit: 500, // Get enough to match ESPN's list
+        });
+
+        // Create a map of our valuations by player ID
+        const ourValueMap = new Map(
+          ourValuations.map((v) => [v.playerId, v.dollarValue]),
+        );
+
+        // Join on player ID and calculate deltas
+        interface Comparison {
+          playerId: number;
+          playerName: string;
+          positions: string[];
+          espnValue: number;
+          ourValue: number;
+          absoluteDelta: number;
+          percentDelta: number;
+          ratio: number;
+        }
+
+        const comparisons: Comparison[] = [];
+
+        for (const espnPlayer of espnValues) {
+          const ourValue = ourValueMap.get(espnPlayer.playerId);
+          if (ourValue === undefined) continue; // Skip players not in our valuations
+
+          const absoluteDelta = ourValue - espnPlayer.espnAuctionValue;
+          const percentDelta =
+            (absoluteDelta / espnPlayer.espnAuctionValue) * 100;
+          const ratio = ourValue / espnPlayer.espnAuctionValue;
+
+          comparisons.push({
+            playerId: espnPlayer.playerId,
+            playerName: espnPlayer.playerName,
+            positions: espnPlayer.positions,
+            espnValue: espnPlayer.espnAuctionValue,
+            ourValue,
+            absoluteDelta,
+            percentDelta,
+            ratio,
+          });
+        }
+
+        if (comparisons.length === 0) {
+          return reply.code(400).send({
+            error: "No common players found between ESPN and our valuations",
+            details:
+              "This may occur if projections are missing or player matching failed.",
+          });
+        }
+
+        // Calculate summary statistics
+        const deltas = comparisons.map((c) => c.absoluteDelta);
+        const sortedDeltas = [...deltas].sort((a, b) => a - b);
+        const meanDelta =
+          deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
+        const medianDelta =
+          sortedDeltas.length % 2 === 0
+            ? (sortedDeltas[sortedDeltas.length / 2 - 1] +
+                sortedDeltas[sortedDeltas.length / 2]) /
+              2
+            : sortedDeltas[Math.floor(sortedDeltas.length / 2)];
+
+        // RMSE: sqrt(sum((ourValue - espnValue)^2) / n)
+        const squaredErrors = comparisons.map(
+          (c) => Math.pow(c.absoluteDelta, 2),
+        );
+        const rmse = Math.sqrt(
+          squaredErrors.reduce((sum, e) => sum + e, 0) / comparisons.length,
+        );
+
+        // Pearson correlation coefficient
+        const espnValues_nums = comparisons.map((c) => c.espnValue);
+        const ourValues_nums = comparisons.map((c) => c.ourValue);
+        const meanEspn =
+          espnValues_nums.reduce((sum, v) => sum + v, 0) /
+          espnValues_nums.length;
+        const meanOur =
+          ourValues_nums.reduce((sum, v) => sum + v, 0) / ourValues_nums.length;
+
+        const covariance =
+          comparisons.reduce(
+            (sum, c) =>
+              sum + (c.espnValue - meanEspn) * (c.ourValue - meanOur),
+            0,
+          ) / comparisons.length;
+
+        const stdDevEspn = Math.sqrt(
+          espnValues_nums.reduce(
+            (sum, v) => sum + Math.pow(v - meanEspn, 2),
+            0,
+          ) / espnValues_nums.length,
+        );
+        const stdDevOur = Math.sqrt(
+          ourValues_nums.reduce((sum, v) => sum + Math.pow(v - meanOur, 2), 0) /
+            ourValues_nums.length,
+        );
+
+        const correlation =
+          stdDevEspn === 0 || stdDevOur === 0
+            ? 0
+            : covariance / (stdDevEspn * stdDevOur);
+
+        // Find top players in each system
+        const espnTop = [...comparisons].sort(
+          (a, b) => b.espnValue - a.espnValue,
+        )[0];
+        const ourTop = [...comparisons].sort(
+          (a, b) => b.ourValue - a.ourValue,
+        )[0];
+
+        // Apply limit to returned comparisons
+        const limitedComparisons = comparisons.slice(0, maxPlayers);
+
+        const result = {
+          comparisons: limitedComparisons,
+          summary: {
+            totalCompared: comparisons.length,
+            meanDelta: Math.round(meanDelta * 100) / 100,
+            medianDelta: Math.round(medianDelta * 100) / 100,
+            rmse: Math.round(rmse * 100) / 100,
+            correlation: Math.round(correlation * 1000) / 1000,
+            ourTopPlayer: {
+              name: ourTop.playerName,
+              value: ourTop.ourValue,
+            },
+            espnTopPlayer: {
+              name: espnTop.playerName,
+              value: espnTop.espnValue,
+            },
+          },
+          meta: {
+            leagueId,
+            totalTeams,
+            budget,
+            generatedAt: new Date().toISOString(),
+          },
+        };
+
+        // Add warning if small overlap
+        if (comparisons.length < 10) {
+          (result as any).warning =
+            "Small sample size - fewer than 10 overlapping players found. Results may not be statistically meaningful.";
+        }
+
+        return result;
+      } catch (error) {
+        request.log.error(
+          { error },
+          "Failed to validate auction values",
+        );
+        return reply.code(500).send({
+          error: "Failed to validate auction values",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
   // POST /api/draft/projected-standings - League-agnostic projected standings
   app.post<{
     Body: {
