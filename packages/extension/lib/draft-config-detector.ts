@@ -9,12 +9,41 @@ export interface DetectionResult {
 
 /**
  * Detect if this is a practice draft (no real league data)
+ * Practice drafts may have different DOM structure or limited data
  */
 export function isPracticeDraft(): boolean {
-  const h1 = document.querySelector('h1');
-  if (h1 && h1.textContent?.includes('Practice Draft')) {
+  // Strategy 1: Check page title/heading
+  const headingSelectors = ["h1", "h2", ".page-title", '[class*="title"]'];
+
+  for (const selector of headingSelectors) {
+    const heading = document.querySelector(selector);
+    if (heading?.textContent?.toLowerCase().includes("practice")) {
+      console.log(
+        "[ESPN Draft Assistant] Practice draft detected from heading",
+      );
+      return true;
+    }
+  }
+
+  // Strategy 2: Check URL for practice indicators
+  const url = window.location.href.toLowerCase();
+  if (url.includes("practice") || url.includes("mock")) {
+    console.log("[ESPN Draft Assistant] Practice draft detected from URL");
     return true;
   }
+
+  // Strategy 3: Check for practice draft indicators in page content
+  const bodyText = document.body?.textContent?.toLowerCase() || "";
+  if (
+    bodyText.includes("practice draft") ||
+    bodyText.includes("mock draft")
+  ) {
+    console.log(
+      "[ESPN Draft Assistant] Practice draft detected from page content",
+    );
+    return true;
+  }
+
   return false;
 }
 
@@ -68,90 +97,344 @@ export function detectLeagueConfig(): DetectionResult {
   };
 }
 
+/**
+ * Detect total team count from ESPN draft page
+ * Multiple strategies with validation to handle ESPN DOM variations
+ */
 function detectTeamCount(): number | null {
-  // Strategy 1: Count roster dropdown options (practice drafts)
-  const rosterDropdown = document.querySelector('select.dropdown__select');
-  if (rosterDropdown) {
-    const options = rosterDropdown.querySelectorAll('option');
-    // Filter out placeholder options (empty value or text like "Select team")
-    const teamOptions = Array.from(options).filter(opt => {
-      const value = opt.getAttribute('value') || '';
-      const text = (opt.textContent || '').trim();
-      return value && value !== '' && text && !text.toLowerCase().includes('select');
+  // Strategy 1: Count unique grid columns in completed picks (most reliable)
+  const pickElements = document.querySelectorAll('[style*="grid-area"]');
+  if (pickElements.length > 0) {
+    const columns = new Set<number>();
+    pickElements.forEach((el) => {
+      const styleValue = (el.getAttribute("style") || "").toLowerCase();
+      const match = styleValue.match(/grid-area\s*:\s*\d+\s*\/\s*(\d+)/);
+      if (match) {
+        columns.add(parseInt(match[1], 10));
+      }
     });
-    if (teamOptions.length > 0) {
-      return teamOptions.length;
+    if (columns.size >= 2) {
+      // Reasonable team count (2-20)
+      console.log(
+        `[ESPN Draft Assistant] Team count detected from grid columns: ${columns.size}`,
+      );
+      return columns.size;
     }
   }
 
-  // Strategy 2: Count draft board columns (excluding player name column)
-  const draftBoard = document.querySelector('[class*="draft-board"]');
-  if (draftBoard) {
-    const teamColumns = draftBoard.querySelectorAll('[class*="team-column"]');
-    if (teamColumns.length > 0) {
-      return teamColumns.length;
+  // Strategy 2: Count roster dropdown options (practice drafts and real drafts)
+  const dropdownSelectors = [
+    "select.dropdown__select",
+    'select[class*="dropdown"]',
+    'select[class*="team"]',
+    "select",
+  ];
+
+  for (const selector of dropdownSelectors) {
+    const rosterDropdown = document.querySelector(selector);
+    if (rosterDropdown) {
+      const options = rosterDropdown.querySelectorAll("option");
+      // Filter out placeholder options (empty value or text like "Select team")
+      const teamOptions = Array.from(options).filter((opt) => {
+        const value = opt.getAttribute("value") || "";
+        const text = (opt.textContent || "").trim();
+        // Valid if has value, non-empty text, doesn't say "select"
+        return (
+          value &&
+          value !== "" &&
+          text &&
+          !text.toLowerCase().includes("select") &&
+          text.length > 0
+        );
+      });
+      if (teamOptions.length >= 2) {
+        console.log(
+          `[ESPN Draft Assistant] Team count detected from dropdown: ${teamOptions.length}`,
+        );
+        return teamOptions.length;
+      }
     }
   }
 
-  // Strategy 3: Parse from league info header
-  const leagueInfo = document.querySelector('[class*="league-info"]');
-  if (leagueInfo) {
-    const text = leagueInfo.textContent || "";
-    const match = text.match(/(\d+)\s*teams?/i);
-    if (match) {
-      return parseInt(match[1], 10);
+  // Strategy 3: Count team header elements in draft board
+  const headerSelectors = [
+    '[class*="teamHeader"]',
+    '[class*="team"][class*="header"]',
+    '[class*="owner"][class*="header"]',
+    '[data-testid*="team-header"]',
+  ];
+
+  for (const selector of headerSelectors) {
+    const teamHeaders = document.querySelectorAll(selector);
+    if (teamHeaders.length >= 2) {
+      console.log(
+        `[ESPN Draft Assistant] Team count detected from headers: ${teamHeaders.length}`,
+      );
+      return teamHeaders.length;
     }
   }
 
-  // Strategy 4: Check URL parameters
+  // Strategy 4: Parse from league info text (e.g., "12 Team League")
+  const leagueInfoSelectors = [
+    '[class*="league"][class*="info"]',
+    '[class*="leagueInfo"]',
+    ".draft-header",
+    "header",
+    "h1",
+  ];
+
+  for (const selector of leagueInfoSelectors) {
+    const leagueInfo = document.querySelector(selector);
+    if (leagueInfo) {
+      const text = leagueInfo.textContent || "";
+      const match = text.match(/(\d+)\s*team/i);
+      if (match) {
+        const count = parseInt(match[1], 10);
+        if (count >= 2 && count <= 20) {
+          console.log(
+            `[ESPN Draft Assistant] Team count detected from text: ${count}`,
+          );
+          return count;
+        }
+      }
+    }
+  }
+
+  // Strategy 5: Check URL parameters
   const url = new URL(window.location.href);
-  const teams = url.searchParams.get("teams");
-  if (teams) {
-    return parseInt(teams, 10);
+  const urlTeams =
+    url.searchParams.get("teams") || url.searchParams.get("teamCount");
+  if (urlTeams) {
+    const count = parseInt(urlTeams, 10);
+    if (count >= 2 && count <= 20) {
+      console.log(
+        `[ESPN Draft Assistant] Team count detected from URL: ${count}`,
+      );
+      return count;
+    }
   }
 
+  console.warn(
+    "[ESPN Draft Assistant] Could not detect team count - tried grid columns, dropdowns, headers, text, and URL",
+  );
   return null;
 }
 
+/**
+ * Detect scoring categories from ESPN draft page
+ * Fallback to standard 5x5 if detection fails
+ */
 function detectCategories(): Category[] | null {
-  // Strategy 1: Parse from draft board stat columns
-  const statHeaders = document.querySelectorAll('[class*="stat-header"]');
-  if (statHeaders.length > 0) {
-    // Extract category names and map to Category objects
-    // This is ESPN-specific and may need updates if ESPN changes DOM
-    const categories: Category[] = [];
-    statHeaders.forEach((header) => {
-      const statName = header.textContent?.trim();
-      if (statName) {
-        categories.push(mapStatNameToCategory(statName));
-      }
-    });
-    return categories;
-  }
+  // Strategy 1: Parse from draft board stat column headers
+  const statHeaderSelectors = [
+    '[class*="statHeader"]',
+    '[class*="stat"][class*="header"]',
+    '[class*="category"][class*="header"]',
+    '[data-testid*="stat"]',
+    'th[class*="stat"]',
+  ];
 
-  // Strategy 2: Use standard 5x5 roto defaults as fallback
-  return getDefault5x5Categories();
-}
+  for (const selector of statHeaderSelectors) {
+    const statHeaders = document.querySelectorAll(selector);
+    if (statHeaders.length > 0) {
+      const categories: Category[] = [];
+      statHeaders.forEach((header) => {
+        const statName = header.textContent?.trim();
+        if (statName && statName.length <= 5) {
+          // ESPN uses short codes (R, HR, RBI, etc.)
+          categories.push(mapStatNameToCategory(statName));
+        }
+      });
 
-function detectRosterSlots(): Record<string, number> | null {
-  // Strategy 1: Parse from league settings sidebar
-  const settingsSidebar = document.querySelector('[class*="roster-settings"]');
-  if (settingsSidebar) {
-    const rosterLines = settingsSidebar.querySelectorAll('[class*="roster-slot"]');
-    const slots: Record<string, number> = {};
-    rosterLines.forEach((line) => {
-      const text = line.textContent || "";
-      const match = text.match(/^([A-Z0-9/]+):\s*(\d+)/);
-      if (match) {
-        slots[match[1]] = parseInt(match[2], 10);
+      if (categories.length >= 5) {
+        // Valid category set
+        console.log(
+          `[ESPN Draft Assistant] Categories detected from headers: ${categories.map((c) => c.stat_key).join(", ")}`,
+        );
+        return categories;
       }
-    });
-    if (Object.keys(slots).length > 0) {
-      return slots;
     }
   }
 
-  // Strategy 2: Use standard 5x5 roster defaults
+  // Strategy 2: Look for settings panel or league info
+  const settingsSelectors = [
+    '[class*="settings"]',
+    '[class*="leagueSettings"]',
+    '[class*="scoring"]',
+    ".sidebar",
+  ];
+
+  for (const selector of settingsSelectors) {
+    const settingsPanel = document.querySelector(selector);
+    if (settingsPanel) {
+      const text = settingsPanel.textContent || "";
+      // Look for category patterns like "R, HR, RBI, SB, AVG"
+      const categoryPattern = /\b([A-Z]{1,5})\b/g;
+      const matches = text.match(categoryPattern);
+
+      if (matches && matches.length >= 5) {
+        const categories = matches
+          .filter(
+            (stat) =>
+              stat.length <= 5 &&
+              !["ESPN", "MLB", "NBA", "NFL"].includes(stat),
+          )
+          .slice(0, 12) // Max reasonable categories
+          .map(mapStatNameToCategory);
+
+        if (categories.length >= 5) {
+          console.log(
+            `[ESPN Draft Assistant] Categories detected from settings: ${categories.map((c) => c.stat_key).join(", ")}`,
+          );
+          return categories;
+        }
+      }
+    }
+  }
+
+  // Strategy 3: Parse from URL parameters (some ESPN drafts include this)
+  const url = new URL(window.location.href);
+  const scoringParam = url.searchParams.get("scoring");
+  if (scoringParam) {
+    const categoryKeys = scoringParam.split(",");
+    if (categoryKeys.length >= 5) {
+      const categories = categoryKeys.map(mapStatNameToCategory);
+      console.log(
+        `[ESPN Draft Assistant] Categories detected from URL: ${categories.map((c) => c.stat_key).join(", ")}`,
+      );
+      return categories;
+    }
+  }
+
+  // Strategy 4: Use standard 5x5 roto defaults as fallback
+  console.warn(
+    "[ESPN Draft Assistant] Could not detect categories - using standard 5x5 defaults",
+  );
+  return getDefault5x5Categories();
+}
+
+/**
+ * Detect roster slots from ESPN draft page
+ * Fallback to standard 5x5 roster if detection fails
+ */
+function detectRosterSlots(): Record<string, number> | null {
+  // Strategy 1: Parse from roster settings sidebar or panel
+  const settingsSelectors = [
+    '[class*="rosterSettings"]',
+    '[class*="roster"][class*="settings"]',
+    '[class*="roster"][class*="config"]',
+    ".roster-limits",
+    '[data-testid*="roster"]',
+  ];
+
+  for (const selector of settingsSelectors) {
+    const settingsPanel = document.querySelector(selector);
+    if (settingsPanel) {
+      // Look for lines like "C: 1", "1B: 1", "OF: 3", etc.
+      const rosterLineSelectors = [
+        '[class*="rosterSlot"]',
+        '[class*="roster"][class*="line"]',
+        "li",
+        "div",
+      ];
+
+      for (const lineSelector of rosterLineSelectors) {
+        const rosterLines =
+          settingsPanel.querySelectorAll(lineSelector);
+        const slots: Record<string, number> = {};
+
+        rosterLines.forEach((line) => {
+          const text = line.textContent || "";
+          // Match patterns like "C: 1", "OF: 3", "SP/RP: 2"
+          const match = text.match(/^([A-Z0-9/]+):\s*(\d+)/);
+          if (match) {
+            const position = match[1];
+            const count = parseInt(match[2], 10);
+            if (count > 0 && count <= 10) {
+              // Reasonable slot count
+              slots[position] = count;
+            }
+          }
+        });
+
+        if (Object.keys(slots).length >= 5) {
+          console.log(
+            `[ESPN Draft Assistant] Roster slots detected: ${JSON.stringify(slots)}`,
+          );
+          return slots;
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Parse from roster limits display (often shown at bottom)
+  const limitsSelectors = [
+    ".roster-limits",
+    '[class*="limits"]',
+    '[class*="roster"][class*="summary"]',
+  ];
+
+  for (const selector of limitsSelectors) {
+    const limitsPanel = document.querySelector(selector);
+    if (limitsPanel) {
+      const text = limitsPanel.textContent || "";
+      const slots: Record<string, number> = {};
+
+      // Match all patterns in text
+      const matches = text.matchAll(/([A-Z0-9/]+):\s*(\d+)/g);
+      for (const match of matches) {
+        const position = match[1];
+        const count = parseInt(match[2], 10);
+        if (
+          count > 0 &&
+          count <= 10 &&
+          position.length <= 5 &&
+          /[A-Z]/.test(position)
+        ) {
+          slots[position] = count;
+        }
+      }
+
+      if (Object.keys(slots).length >= 5) {
+        console.log(
+          `[ESPN Draft Assistant] Roster slots detected from limits: ${JSON.stringify(slots)}`,
+        );
+        return slots;
+      }
+    }
+  }
+
+  // Strategy 3: Infer from position counts in completed picks
+  const pickElements = document.querySelectorAll('[style*="grid-area"]');
+  if (pickElements.length > 10) {
+    // Need reasonable sample size
+    const positionCounts: Record<string, number> = {};
+
+    pickElements.forEach((pick) => {
+      const positionEl = pick.querySelector(
+        '.position, [class*="position"], .positionPill',
+      );
+      const position = positionEl?.textContent?.trim();
+      if (position) {
+        positionCounts[position] = (positionCounts[position] || 0) + 1;
+      }
+    });
+
+    // This gives us a rough idea but not exact slots
+    // Only use if we have multiple positions
+    if (Object.keys(positionCounts).length >= 5) {
+      console.log(
+        `[ESPN Draft Assistant] Position distribution detected: ${JSON.stringify(positionCounts)} (using defaults for slots)`,
+      );
+      // We know positions exist but not exact slots - use defaults
+      return getDefault5x5Roster();
+    }
+  }
+
+  // Strategy 4: Use standard 5x5 roster defaults
+  console.warn(
+    "[ESPN Draft Assistant] Could not detect roster slots - using standard 5x5 defaults",
+  );
   return getDefault5x5Roster();
 }
 
