@@ -14,7 +14,7 @@ DROP CONSTRAINT IF EXISTS transaction_impact_unique_per_transaction_player;
 
 ALTER TABLE transaction_impact
 ADD CONSTRAINT transaction_impact_unique_per_transaction
-UNIQUE (league_id, transaction_date, transaction_type, player_gained_id, player_lost_id);
+UNIQUE (league_id, effective_date, move_type, player_gained_id, player_lost_id);
 
 -- Note: This composite constraint handles all transaction types:
 -- - Adds: player_gained_id set, player_lost_id NULL
