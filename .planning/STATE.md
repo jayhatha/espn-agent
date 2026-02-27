@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 13 (Clean Up Tech Debt)
 Plan: 6 of 6 in current phase
 Status: Complete
-Last activity: 2026-02-27 - Completed quick task 19: Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards using component-based formulas
+Last activity: 2026-02-27 - Completed quick task 19: Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards from stat components
 
 Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
 
@@ -244,7 +244,7 @@ None yet.
 | 16 | Fix security issues: encrypt API token storage and validate message handler sender | 2026-02-27 | fd272ce | Verified | [16-fix-security-issues-encrypt-api-token-st](./quick/16-fix-security-issues-encrypt-api-token-st/) |
 | 17 | Make auction budget and categories dynamic in extension based on detected league config | 2026-02-27 | dcfd535 | ✅ | [17-make-auction-budget-and-categories-dynam](./quick/17-make-auction-budget-and-categories-dynam/) |
 | 18 | Create DOM selector validation checklist for manual testing on live ESPN drafts | 2026-02-27 | d98c4fd | ✅ | [18-create-dom-selector-validation-checklist](./quick/18-create-dom-selector-validation-checklist/) |
-| 19 | Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards using component-based formulas | 2026-02-27 | 8401f3b | ✅ | [19-calculate-and-display-rate-stats-avg-era](./quick/19-calculate-and-display-rate-stats-avg-era/) |
+| 19 | Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards from stat components | 2026-02-27 | 421ecd2 | ✅ | [19-calculate-and-display-rate-stats-avg-era](./quick/19-calculate-and-display-rate-stats-avg-era/) |
 
 ## Session Continuity
 
