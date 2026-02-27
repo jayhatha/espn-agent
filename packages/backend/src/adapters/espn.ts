@@ -816,6 +816,154 @@ export class ESPNAdapter {
   }
 
   /**
+   * Fetch pre-draft auction values from ESPN's default player rankings
+   * Uses kona_player_info view to get ESPN's auctionValueAverage field
+   */
+  async fetchPreDraftAuctionValues(options: {
+    leagueId: number;
+    season: number;
+    auth?: ESPNAuthCookies;
+  }): Promise<Array<{
+    playerId: number;
+    playerName: string;
+    positions: string[];
+    espnAuctionValue: number;
+  }>> {
+    const { leagueId, season, auth } = options;
+
+    // Check cache first (1-hour TTL for pre-draft values)
+    const cacheKey = `auction-values:${leagueId}:${season}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger?.debug({ cacheKey }, "Using cached auction values");
+      return cached.data as Array<{
+        playerId: number;
+        playerName: string;
+        positions: string[];
+        espnAuctionValue: number;
+      }>;
+    }
+
+    try {
+      const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
+
+      // Use kona_player_info view with filter for rostered + free agent players
+      // We want all players with auction values, not just free agents
+      const xFantasyFilter = {
+        players: {
+          filterStatus: {
+            value: ["FREEAGENT", "WAIVERS", "ONTEAM"],
+          },
+          filterSlotIds: {
+            value: ALL_POSITION_SLOT_IDS,
+          },
+          sortPercOwned: {
+            sortPriority: 1,
+            sortAsc: false,
+          },
+          limit: 500, // Get top 500 players by ownership
+        },
+      };
+
+      const headers: Record<string, string> = {};
+      if (auth?.SWID && auth?.espn_s2) {
+        headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
+      }
+
+      const params: Record<string, unknown> = {
+        view: ["kona_player_info"],
+        "x-fantasy-filter": JSON.stringify(xFantasyFilter),
+      };
+
+      this.logger?.info(
+        { leagueId, season },
+        "Fetching ESPN pre-draft auction values",
+      );
+
+      await throttleEspnCall();
+
+      let response;
+      try {
+        response = await this.client.get(url, {
+          params,
+          headers,
+        });
+      } catch (error: any) {
+        if (error.response?.status === 429) {
+          const retryAfter = error.response.headers['retry-after'] || 60;
+          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+        }
+        throw error;
+      }
+
+      if (response.status !== 200) {
+        throw new Error(
+          `ESPN API returned status ${response.status}`,
+        );
+      }
+
+      // Validate response schema (reuse free agents schema)
+      const validatedData = validateEspnResponse(
+        ESPNFreeAgentsResponseSchema,
+        response.data,
+        `fetchPreDraftAuctionValues(${leagueId}, ${season})`,
+        this.logger
+      );
+
+      const players = (validatedData?.players as any[]) || [];
+      const auctionValues: Array<{
+        playerId: number;
+        playerName: string;
+        positions: string[];
+        espnAuctionValue: number;
+      }> = [];
+
+      for (const entry of players) {
+        const player = entry.player;
+        if (!player) continue;
+
+        // Only include players with positive auction values
+        const auctionValue = player.draftAuctionValue ?? player.auctionValueAverage ?? 0;
+        if (auctionValue <= 0) continue;
+
+        const eligibleSlots = (player.eligibleSlots || [])
+          .filter((s: number) => s <= 15 && s !== 12)
+          .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`);
+
+        auctionValues.push({
+          playerId: entry.id,
+          playerName: player.fullName || `Player ${entry.id}`,
+          positions: [...new Set(eligibleSlots)] as string[],
+          espnAuctionValue: auctionValue,
+        });
+      }
+
+      // Sort by auction value descending for easier comparison
+      auctionValues.sort((a, b) => b.espnAuctionValue - a.espnAuctionValue);
+
+      this.logger?.info(
+        { leagueId, valueCount: auctionValues.length },
+        "Pre-draft auction values fetched",
+      );
+
+      // Cache the result
+      this.cache.set(cacheKey, {
+        data: auctionValues,
+        expiresAt: Date.now() + 1000 * 60 * 60, // 1 hour
+      });
+
+      return auctionValues;
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId },
+        "Failed to fetch pre-draft auction values",
+      );
+      // Return empty array on error (graceful degradation)
+      return [];
+    }
+  }
+
+  /**
    * Normalize ESPN response to canonical league data
    */
   normalizeLeagueData(raw: Record<string, unknown>): ESPNLeagueData {
