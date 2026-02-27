@@ -150,28 +150,32 @@ export async function leaguesRoutes(app: FastifyInstance) {
           return { league, isNew: false, userTeamDetected: true };
         }
 
-        // Encrypt ESPN cookies if encryption key is configured
+        // Encrypt ESPN cookies (REQUIRED - no plaintext fallback)
         let espnSwidEncrypted: Buffer | null = null;
         let espnS2Encrypted: Buffer | null = null;
 
         if (auth?.SWID || auth?.espn_s2) {
+          if (!hasEncryptionKey()) {
+            return reply
+              .code(500)
+              .send({ error: "ENCRYPTION_KEY required for ESPN credential storage" });
+          }
           try {
-            if (hasEncryptionKey()) {
-              if (auth?.SWID) {
-                espnSwidEncrypted = encryptToken(auth.SWID);
-              }
-              if (auth?.espn_s2) {
-                espnS2Encrypted = encryptToken(auth.espn_s2);
-              }
-            } else {
-              request.log.warn("ENCRYPTION_KEY not configured - storing ESPN cookies in plaintext (dev mode)");
+            if (auth?.SWID) {
+              espnSwidEncrypted = encryptToken(auth.SWID);
+            }
+            if (auth?.espn_s2) {
+              espnS2Encrypted = encryptToken(auth.espn_s2);
             }
           } catch (error) {
-            request.log.error({ error }, "Failed to encrypt ESPN cookies - storing in plaintext");
+            request.log.error({ error }, "Failed to encrypt ESPN cookies");
+            return reply
+              .code(500)
+              .send({ error: "Failed to encrypt ESPN credentials" });
           }
         }
 
-        // Create league
+        // Create league (encrypted credentials only)
         league = await db
           .insertInto("league")
           .values({
@@ -180,8 +184,6 @@ export async function leaguesRoutes(app: FastifyInstance) {
             season,
             name: name || normalized.settings.name,
             timezone: timezone || "America/New_York",
-            espn_swid: auth?.SWID || null,
-            espn_s2: auth?.espn_s2 || null,
             espn_swid_encrypted: espnSwidEncrypted,
             espn_s2_encrypted: espnS2Encrypted,
             created_at: new Date(),
@@ -422,32 +424,34 @@ export async function leaguesRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Encrypt ESPN cookies if encryption key is configured
+        // Encrypt ESPN cookies (REQUIRED - no plaintext fallback)
         let espnSwidEncrypted: Buffer | null = null;
         let espnS2Encrypted: Buffer | null = null;
 
         if (SWID || espn_s2) {
+          if (!hasEncryptionKey()) {
+            return reply
+              .code(500)
+              .send({ error: "ENCRYPTION_KEY required for ESPN credential storage" });
+          }
           try {
-            if (hasEncryptionKey()) {
-              if (SWID) {
-                espnSwidEncrypted = encryptToken(SWID);
-              }
-              if (espn_s2) {
-                espnS2Encrypted = encryptToken(espn_s2);
-              }
-            } else {
-              request.log.warn("ENCRYPTION_KEY not configured - storing ESPN cookies in plaintext (dev mode)");
+            if (SWID) {
+              espnSwidEncrypted = encryptToken(SWID);
+            }
+            if (espn_s2) {
+              espnS2Encrypted = encryptToken(espn_s2);
             }
           } catch (error) {
-            request.log.error({ error }, "Failed to encrypt ESPN cookies - storing in plaintext");
+            request.log.error({ error }, "Failed to encrypt ESPN cookies");
+            return reply
+              .code(500)
+              .send({ error: "Failed to encrypt ESPN credentials" });
           }
         }
 
         const updatedLeague = await db
           .updateTable("league")
           .set({
-            espn_swid: SWID || null,
-            espn_s2: espn_s2 || null,
             espn_swid_encrypted: espnSwidEncrypted,
             espn_s2_encrypted: espnS2Encrypted,
           })
@@ -500,31 +504,25 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         const today = new Date().toISOString().split("T")[0];
 
-        // Build auth cookies from stored credentials - prefer encrypted, fallback to plaintext
+        // Build auth cookies from encrypted credentials (required)
         let auth: ESPNAuthCookies | undefined;
 
-        try {
-          if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
-            // Decrypt from encrypted columns
+        if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+          if (!hasEncryptionKey()) {
+            return reply
+              .code(500)
+              .send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+          }
+          try {
             auth = {
               SWID: decryptToken(league.espn_swid_encrypted),
               espn_s2: decryptToken(league.espn_s2_encrypted),
             };
-          } else if (league.espn_swid && league.espn_s2) {
-            // Fallback to plaintext columns
-            auth = {
-              SWID: league.espn_swid,
-              espn_s2: league.espn_s2,
-            };
-          }
-        } catch (error) {
-          request.log.error({ error }, "Failed to decrypt ESPN cookies - falling back to plaintext");
-          // Fallback to plaintext if decryption fails
-          if (league.espn_swid && league.espn_s2) {
-            auth = {
-              SWID: league.espn_swid,
-              espn_s2: league.espn_s2,
-            };
+          } catch (error) {
+            request.log.error({ error }, "Failed to decrypt ESPN cookies");
+            return reply
+              .code(500)
+              .send({ error: "Failed to decrypt ESPN credentials" });
           }
         }
 
