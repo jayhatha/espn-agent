@@ -671,3 +671,128 @@ export function detectDraftFormat(): "snake" | "auction" {
   // Default to snake
   return "snake";
 }
+
+/**
+ * Diagnostic function to check ESPN DOM structure health
+ * Useful for debugging selector issues on live ESPN pages
+ * Call from console: window.espnDraftAssistant?.diagnose()
+ */
+export function diagnoseDOMStructure(): {
+  draftBoardFound: boolean;
+  pickRowsCount: number;
+  completedPicksCount: number;
+  selectorHealth: Record<string, boolean>;
+  recommendations: string[];
+} {
+  const result = {
+    draftBoardFound: false,
+    pickRowsCount: 0,
+    completedPicksCount: 0,
+    selectorHealth: {} as Record<string, boolean>,
+    recommendations: [] as string[],
+  };
+
+  // Test draft board selectors
+  const draftBoard = findDraftBoardElement();
+  result.draftBoardFound = !!draftBoard;
+  result.selectorHealth["draftBoard"] = result.draftBoardFound;
+
+  if (!result.draftBoardFound) {
+    result.recommendations.push(
+      "Draft board not found - page may not be fully loaded or ESPN changed structure",
+    );
+  }
+
+  // Test pick row selectors
+  const pickRows = document.querySelectorAll(PICK_ROW_SELECTORS);
+  result.pickRowsCount = pickRows.length;
+  result.selectorHealth["pickRows"] = result.pickRowsCount > 0;
+
+  if (result.pickRowsCount === 0) {
+    result.recommendations.push(
+      "No pick rows found - check if draft has started or inspect element classes",
+    );
+  }
+
+  // Test completed pick selectors
+  const completedPicks = document.querySelectorAll(COMPLETED_PICK_SELECTORS);
+  result.completedPicksCount = completedPicks.length;
+  result.selectorHealth["completedPicks"] = result.completedPicksCount > 0;
+
+  if (result.pickRowsCount > 0 && result.completedPicksCount === 0) {
+    result.recommendations.push(
+      "Pick rows found but no completed picks - draft may not have started",
+    );
+  }
+
+  // Test for grid-based layout (ESPN's common pattern)
+  const gridElements = document.querySelectorAll('[style*="grid-area"]');
+  result.selectorHealth["gridLayout"] = gridElements.length > 0;
+
+  if (gridElements.length === 0 && result.pickRowsCount > 0) {
+    result.recommendations.push(
+      "Picks found but no grid layout detected - ESPN may have changed to different layout system",
+    );
+  }
+
+  // Log detailed diagnostics
+  console.log("[ESPN Draft Assistant] DOM Structure Diagnostic Report:");
+  console.log("  Draft Board Found:", result.draftBoardFound);
+  console.log("  Pick Rows Count:", result.pickRowsCount);
+  console.log("  Completed Picks Count:", result.completedPicksCount);
+  console.log("  Grid Elements:", gridElements.length);
+  console.log("  Selector Health:", result.selectorHealth);
+
+  if (result.recommendations.length > 0) {
+    console.warn(
+      "[ESPN Draft Assistant] Recommendations:",
+      result.recommendations,
+    );
+  } else {
+    console.log(
+      "[ESPN Draft Assistant] All selectors working - DOM structure healthy",
+    );
+  }
+
+  // Sample first few elements for manual inspection
+  if (pickRows.length > 0) {
+    console.log(
+      "[ESPN Draft Assistant] Sample pick row structure:",
+      {
+        tag: pickRows[0].tagName,
+        classes: pickRows[0].className,
+        id: pickRows[0].id,
+        attributes: Array.from(pickRows[0].attributes).map((attr) => ({
+          name: attr.name,
+          value: attr.value.slice(0, 50),
+        })),
+        childrenCount: pickRows[0].children.length,
+      },
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Test parsePickElement on a specific element from console
+ * Usage: testParsePick(document.querySelector('[style*="grid-area"]'))
+ */
+export function testParsePick(element: Element): void {
+  console.log("[ESPN Draft Assistant] Testing pick element parsing...");
+  console.log("Element:", {
+    tag: element.tagName,
+    classes: element.className,
+    id: element.id,
+  });
+
+  const result = parsePickElement(element);
+
+  if (result) {
+    console.log("[ESPN Draft Assistant] Parse successful:", result);
+  } else {
+    console.error(
+      "[ESPN Draft Assistant] Parse failed - check console warnings above for details",
+    );
+  }
+}

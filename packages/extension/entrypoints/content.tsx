@@ -5,6 +5,8 @@ import {
   parseLeagueIdFromUrl,
   detectDraftFormat,
   collectCompletedPicksSnapshot,
+  diagnoseDOMStructure,
+  testParsePick,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -106,6 +108,18 @@ export default defineContentScript({
       leagueId,
       draftFormat: detectedDraftFormat,
     });
+
+    // Expose diagnostic functions for debugging
+    // Usage: window.espnDraftAssistant.diagnose()
+    // Usage: window.espnDraftAssistant.testPick(element)
+    (window as any).espnDraftAssistant = {
+      diagnose: diagnoseDOMStructure,
+      testPick: testParsePick,
+      version: "1.0.0",
+    };
+    console.log(
+      "[ESPN Draft Assistant] Diagnostic tools available at window.espnDraftAssistant",
+    );
 
     const draftPageTitle =
       document.querySelector("h1.title")?.textContent?.trim() ||
