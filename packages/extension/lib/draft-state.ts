@@ -51,6 +51,9 @@ interface DraftState {
   // User ranking overrides (playerID -> adjusted rank)
   userRankingOverrides: Record<number, number>;
 
+  // Team rosters accumulated during draft (teamId -> roster data)
+  teamRosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -78,6 +81,9 @@ interface DraftState {
   clearPlayerOverride: (playerId: number) => void;
   clearAllOverrides: () => void;
   setConfigWarnings: (warnings: string[]) => void;
+  updateTeamRoster: (teamId: string, teamName: string, playerId: number) => void;
+  setAllTeamRosters: (rosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>) => void;
+  clearTeamRosters: () => void;
   reset: () => void;
 }
 
@@ -98,6 +104,7 @@ export const useDraftStore = create<DraftState>()(
       auctionValues: [],
       projectedStandings: null,
       userRankingOverrides: {},
+      teamRosters: new Map(),
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -186,6 +193,33 @@ export const useDraftStore = create<DraftState>()(
 
       setConfigWarnings: (warnings) => set({ configWarnings: warnings }),
 
+      updateTeamRoster: (teamId, teamName, playerId) => {
+        set((state) => {
+          const newRosters = new Map(state.teamRosters);
+          const existingRoster = newRosters.get(teamId);
+
+          if (existingRoster) {
+            // Check if player already on roster (dedupe)
+            if (!existingRoster.playerIds.includes(playerId)) {
+              existingRoster.playerIds.push(playerId);
+            }
+          } else {
+            // Create new roster entry
+            newRosters.set(teamId, {
+              teamId,
+              teamName,
+              playerIds: [playerId],
+            });
+          }
+
+          return { teamRosters: newRosters };
+        });
+      },
+
+      setAllTeamRosters: (rosters) => set({ teamRosters: rosters }),
+
+      clearTeamRosters: () => set({ teamRosters: new Map() }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -195,6 +229,7 @@ export const useDraftStore = create<DraftState>()(
           rankings: [],
           auctionValues: [],
           projectedStandings: null,
+          teamRosters: new Map(),
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,
@@ -205,6 +240,12 @@ export const useDraftStore = create<DraftState>()(
       version: 2,
       migrate: (persistedState) => {
         const state = (persistedState as Partial<DraftState>) ?? {};
+
+        // Deserialize teamRosters from array back to Map
+        const teamRostersArray = (state as any).teamRosters;
+        const teamRosters = teamRostersArray
+          ? new Map(teamRostersArray)
+          : new Map();
 
         return {
           ...state,
@@ -220,12 +261,14 @@ export const useDraftStore = create<DraftState>()(
           rankings: [],
           auctionValues: [],
           projectedStandings: null,
+          teamRosters,
         };
       },
       partialize: (state) => ({
         userRankingOverrides: state.userRankingOverrides,
         selectedPosition: state.selectedPosition,
         showOnlyNeeds: state.showOnlyNeeds,
+        teamRosters: Array.from(state.teamRosters.entries()), // Serialize Map to array
       }),
       storage: {
         getItem: async (name) => {
