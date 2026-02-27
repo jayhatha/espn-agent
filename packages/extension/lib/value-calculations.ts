@@ -4,6 +4,7 @@ import type {
   Category,
   DraftPick,
 } from "@espn-fantasy/shared";
+import type { ProjectedStandingsSnapshot } from "./draft-state";
 
 // Pick Value Tracking
 export interface PickValue {
@@ -265,4 +266,150 @@ export function calculateAuctionValueWithInflation(
   const adjustedValue = baseValue * safeInflationFactor;
 
   return Number.isFinite(adjustedValue) ? Math.floor(adjustedValue) : Math.floor(baseValue);
+}
+
+/**
+ * Calculate projected standings locally from roster data and rankings
+ * Used for practice drafts where backend API is not available
+ *
+ * Algorithm:
+ * 1. For each team, sum categorySGPs across all rostered players
+ * 2. Rank teams within each category by total SGP (descending)
+ * 3. Assign roto points: (numTeams - rank + 1)
+ * 4. Sum roto points across all categories for overall standings
+ * 5. Rank teams by overall points (descending)
+ *
+ * @param teamRosters - Map of teamId -> team roster data with playerIds
+ * @param rankings - Draft rankings with categorySGPs for each player
+ * @returns ProjectedStandingsSnapshot matching API response format
+ */
+export function calculateProjectedStandingsLocal(
+  teamRosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>,
+  rankings: DraftRanking[],
+): ProjectedStandingsSnapshot {
+  // Build lookup map for rankings by playerId
+  const rankingsMap = new Map<number, DraftRanking>();
+  for (const ranking of rankings) {
+    rankingsMap.set(ranking.playerId, ranking);
+  }
+
+  // Step 1: Compute category totals per team
+  // Structure: teamId -> categoryId -> total SGP
+  const teamCategoryTotals = new Map<string, Map<string, number>>();
+
+  for (const [teamId, roster] of teamRosters.entries()) {
+    const categoryTotals = new Map<string, number>();
+
+    for (const playerId of roster.playerIds) {
+      const ranking = rankingsMap.get(playerId);
+      if (!ranking || !ranking.categorySGPs) {
+        // Player not found in rankings - skip without affecting team total
+        continue;
+      }
+
+      // Sum SGPs across all categories
+      for (const [categoryId, sgp] of Object.entries(ranking.categorySGPs)) {
+        if (!Number.isFinite(sgp)) {
+          continue;
+        }
+
+        const currentTotal = categoryTotals.get(categoryId) || 0;
+        categoryTotals.set(categoryId, currentTotal + sgp);
+      }
+    }
+
+    teamCategoryTotals.set(teamId, categoryTotals);
+  }
+
+  // Step 2: Rank teams within each category and assign roto points
+  // Structure: teamId -> total roto points across all categories
+  const teamOverallPoints = new Map<string, number>();
+
+  // Get all unique category IDs
+  const allCategories = new Set<string>();
+  for (const categoryTotals of teamCategoryTotals.values()) {
+    for (const categoryId of categoryTotals.keys()) {
+      allCategories.add(categoryId);
+    }
+  }
+
+  // For each category, rank teams and assign points
+  for (const categoryId of allCategories) {
+    // Build array of [teamId, totalSGP] for this category
+    const teamsInCategory: Array<{ teamId: string; total: number }> = [];
+
+    for (const [teamId, categoryTotals] of teamCategoryTotals.entries()) {
+      const total = categoryTotals.get(categoryId) || 0;
+      teamsInCategory.push({ teamId, total });
+    }
+
+    // Sort by total SGP descending (higher SGP = better)
+    teamsInCategory.sort((a, b) => {
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+      // Deterministic tiebreaker: team_id ascending
+      return a.teamId.localeCompare(b.teamId);
+    });
+
+    // Assign roto points: (numTeams - rank + 1)
+    const numTeams = teamsInCategory.length;
+    teamsInCategory.forEach((team, index) => {
+      const rank = index + 1;
+      const rotoPoints = numTeams - rank + 1;
+
+      const currentPoints = teamOverallPoints.get(team.teamId) || 0;
+      teamOverallPoints.set(team.teamId, currentPoints + rotoPoints);
+    });
+  }
+
+  // Step 3: Build overall standings array
+  const overallStandings: Array<{
+    team_id: string;
+    teamName: string;
+    projected_overall_rank: number;
+    projected_overall_points: number;
+  }> = [];
+
+  for (const [teamId, roster] of teamRosters.entries()) {
+    const overallPoints = teamOverallPoints.get(teamId) || 0;
+
+    overallStandings.push({
+      team_id: teamId,
+      teamName: roster.teamName,
+      projected_overall_rank: 0, // Will be assigned in next step
+      projected_overall_points: overallPoints,
+    });
+  }
+
+  // Step 4: Sort by overall points descending and assign ranks
+  overallStandings.sort((a, b) => {
+    if (b.projected_overall_points !== a.projected_overall_points) {
+      return b.projected_overall_points - a.projected_overall_points;
+    }
+    // Deterministic tiebreaker: team_id ascending
+    return a.team_id.localeCompare(b.team_id);
+  });
+
+  overallStandings.forEach((standing, index) => {
+    standing.projected_overall_rank = index + 1;
+  });
+
+  // Step 5: Return ProjectedStandingsSnapshot
+  // Note: Practice drafts don't have historical data, so current = projected
+  return {
+    snapshotDate: new Date().toISOString(),
+    overallStandings: overallStandings.map((s) => ({
+      team_id: Number(s.team_id) || 0, // Try to parse as number for API compatibility
+      teamName: s.teamName,
+      projected_overall_rank: s.projected_overall_rank,
+      projected_overall_points: s.projected_overall_points,
+    })),
+    currentOverallStandings: overallStandings.map((s) => ({
+      team_id: Number(s.team_id) || 0,
+      teamName: s.teamName,
+      overall_rank: s.projected_overall_rank,
+      overall_points: s.projected_overall_points,
+    })),
+  };
 }
