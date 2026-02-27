@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 13 (Clean Up Tech Debt)
 Plan: 6 of 6 in current phase
 Status: Complete
-Last activity: 2026-02-27 - Completed quick task 19: Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards from stat components
+Last activity: 2026-02-27 - Completed quick task 20: Create auction value validation endpoint that compares our VBD-based values against ESPN's pre-draft auction values and reports differences
 
 Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
 
@@ -226,7 +226,8 @@ None yet.
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Status | Directory |
-|---|-------------|------|--------|--------|-----------|| 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | ✅ | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
+|---|-------------|------|--------|--------|-----------|
+| 1 | Fix cumulative counting stats magnitude (bench player exclusion) + debug endpoint | 2026-02-22 | c4c73f8 | ✅ | [1-fix-cumulative-counting-stats-magnitude-](./quick/1-fix-cumulative-counting-stats-magnitude-/) |
 | 2 | Add positional value to trade recommendations (roster gaps, scarcity scoring) | 2026-02-23 | 846736e | ✅ | [2-update-trade-recommendations-to-consider](./quick/2-update-trade-recommendations-to-consider/) |
 | 3 | Fix move impact metric - replace sum with single counterfactual (netRosterValue) | 2026-02-23 | 4bd284c | ✅ | [3-fix-move-impact-replace-sum-of-individua](./quick/3-fix-move-impact-replace-sum-of-individua/) |
 | 4 | Season selector and historical trade analysis (moves page) | 2026-02-23 | 79ecc41 | ✅ | [4-season-selector-and-historical-trade-ana](./quick/4-season-selector-and-historical-trade-ana/) |
@@ -245,6 +246,7 @@ None yet.
 | 17 | Make auction budget and categories dynamic in extension based on detected league config | 2026-02-27 | dcfd535 | ✅ | [17-make-auction-budget-and-categories-dynam](./quick/17-make-auction-budget-and-categories-dynam/) |
 | 18 | Create DOM selector validation checklist for manual testing on live ESPN drafts | 2026-02-27 | d98c4fd | ✅ | [18-create-dom-selector-validation-checklist](./quick/18-create-dom-selector-validation-checklist/) |
 | 19 | Calculate and display rate stats (AVG, ERA, WHIP, OPS) in extension player cards from stat components | 2026-02-27 | 421ecd2 | ✅ | [19-calculate-and-display-rate-stats-avg-era](./quick/19-calculate-and-display-rate-stats-avg-era/) |
+| 20 | Create auction value validation endpoint that compares our VBD-based values against ESPN's pre-draft auction values and reports differences | 2026-02-27 | 9375da1 | ✅ | [20-create-auction-value-validation-endpoint](./quick/20-create-auction-value-validation-endpoint/) |
 
 ## Session Continuity
 
