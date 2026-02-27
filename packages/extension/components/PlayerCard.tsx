@@ -1,5 +1,11 @@
 import React, { useMemo } from "react";
 import type { DraftRanking } from "@espn-fantasy/shared";
+import {
+  calculateAVG,
+  calculateERA,
+  calculateWHIP,
+  calculateOPS,
+} from "@espn-fantasy/shared";
 import { useDraftStore } from "../lib/draft-state";
 import {
   calculateSnakeDraftValue,
@@ -120,6 +126,7 @@ export default function PlayerCard({
 
       {/* Projected stats (abbreviated) */}
       <div className="text-xs text-gray-600 mt-2 flex gap-3">
+        {/* Counting stats - read directly */}
         {player.projectedStats.HR && (
           <span>HR: {player.projectedStats.HR}</span>
         )}
@@ -129,15 +136,31 @@ export default function PlayerCard({
         {player.projectedStats.SB && (
           <span>SB: {player.projectedStats.SB}</span>
         )}
-        {player.projectedStats.AVG && (
-          <span>AVG: {formatNumber(player.projectedStats.AVG, 3)}</span>
-        )}
         {player.projectedStats.W && <span>W: {player.projectedStats.W}</span>}
         {player.projectedStats.SV && (
           <span>SV: {player.projectedStats.SV}</span>
         )}
-        {player.projectedStats.ERA && (
-          <span>ERA: {formatNumber(player.projectedStats.ERA, 2)}</span>
+
+        {/* Rate stats - calculated from components */}
+        {player.projectedStats.AB > 0 && (
+          <>
+            <span>
+              AVG: {formatNumber(calculateAVG(player.projectedStats), 3)}
+            </span>
+            <span>
+              OPS: {formatNumber(calculateOPS(player.projectedStats), 3)}
+            </span>
+          </>
+        )}
+        {player.projectedStats.IP > 0 && (
+          <>
+            <span>
+              ERA: {formatNumber(calculateERA(player.projectedStats), 2)}
+            </span>
+            <span>
+              WHIP: {formatNumber(calculateWHIP(player.projectedStats), 2)}
+            </span>
+          </>
         )}
       </div>
     </div>
