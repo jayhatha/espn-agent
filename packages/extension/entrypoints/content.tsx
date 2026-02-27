@@ -212,6 +212,7 @@ export default defineContentScript({
           "P": 2,
           "BN": 3,
         },
+        budget: 260,
       };
       console.warn("[ESPN Draft Assistant] Config detection failed, using 5x5 defaults");
     }
@@ -234,7 +235,7 @@ export default defineContentScript({
       totalTeams: cachedLeagueConfig?.totalTeams || 12,
       rosterSize: totalRosterSize,
       myTeamId: teamId ?? "user",
-      budget: 260, // Auction only
+      budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
     useDraftStore.setState({ sidebarVisible: true });
 
@@ -350,7 +351,7 @@ export default defineContentScript({
         if (currentState.draftFormat === "auction") {
           try {
             const values = await getAuctionValues(leagueId.toString(), {
-              budget: 260,
+              budget: cachedLeagueConfig?.budget || 260,
               rosterSize: currentState.rosterSize,
               backendLeagueId: latestBackendLeagueId || undefined,
             });
@@ -586,7 +587,7 @@ export default defineContentScript({
         totalTeams: latestState.totalTeams,
         rosterSize: latestState.rosterSize,
         myTeamId: latestState.myTeamId || teamId || "user",
-        budget: latestState.remainingBudget || 260,
+        budget: latestState.remainingBudget || cachedLeagueConfig?.budget || 260,
       });
 
       refreshAssistantData(); // Throttled, will respect 3s minimum

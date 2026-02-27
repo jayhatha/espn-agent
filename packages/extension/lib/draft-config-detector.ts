@@ -1,7 +1,7 @@
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 
 export interface DetectionResult {
-  config: DraftConfiguration | null;
+  config: (DraftConfiguration & { budget?: number }) | null;
   confidence: "high" | "low" | "failed";
   warnings: string[];
   isPracticeDraft: boolean;
@@ -48,6 +48,80 @@ export function isPracticeDraft(): boolean {
 }
 
 /**
+ * Detect auction budget from ESPN draft page DOM
+ * Multi-strategy detection with 100-500 validation range
+ */
+function detectAuctionBudget(): number {
+  // Strategy 1: Look for budget display in draft settings panel
+  const settingsSelectors = [
+    '[class*="budget"]',
+    '[class*="auction"][class*="settings"]',
+    '.draft-settings',
+    '[class*="settings"]',
+  ];
+
+  for (const selector of settingsSelectors) {
+    const settingsPanel = document.querySelector(selector);
+    if (settingsPanel) {
+      const text = settingsPanel.textContent || "";
+      // Pattern: "Budget: $260" or "$260 Budget" or "260" near "budget" text
+      const budgetMatch = text.match(/(?:budget[:\s]*\$?\s*(\d+)|\$?(\d+)\s*budget)/i);
+      if (budgetMatch) {
+        const budgetValue = parseInt(budgetMatch[1] || budgetMatch[2], 10);
+        if (budgetValue >= 100 && budgetValue <= 500) {
+          console.log(`[ESPN Draft Assistant] Auction budget detected from settings: $${budgetValue}`);
+          return budgetValue;
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Parse from roster display showing remaining budget
+  // Pattern: "$243 remaining of $260" or "$243/$260"
+  const budgetDisplaySelectors = [
+    '[class*="budget"]',
+    '[class*="remaining"]',
+    '[class*="auction"]',
+  ];
+
+  for (const selector of budgetDisplaySelectors) {
+    const budgetDisplay = document.querySelector(selector);
+    if (budgetDisplay) {
+      const text = budgetDisplay.textContent || "";
+      // Match patterns like "243 remaining of 260" or "243/260"
+      const remainingMatch = text.match(/(\d+)\s*(?:remaining|left).*?of.*?\$?(\d+)/i);
+      const slashMatch = text.match(/\$?(\d+)\s*\/\s*\$?(\d+)/);
+
+      const totalBudget = remainingMatch
+        ? parseInt(remainingMatch[2], 10)
+        : slashMatch
+        ? parseInt(slashMatch[2], 10)
+        : null;
+
+      if (totalBudget && totalBudget >= 100 && totalBudget <= 500) {
+        console.log(`[ESPN Draft Assistant] Auction budget detected from remaining display: $${totalBudget}`);
+        return totalBudget;
+      }
+    }
+  }
+
+  // Strategy 3: URL parameter (some ESPN drafts include ?budget=260)
+  const url = new URL(window.location.href);
+  const urlBudget = url.searchParams.get("budget");
+  if (urlBudget) {
+    const budgetValue = parseInt(urlBudget, 10);
+    if (budgetValue >= 100 && budgetValue <= 500) {
+      console.log(`[ESPN Draft Assistant] Auction budget detected from URL: $${budgetValue}`);
+      return budgetValue;
+    }
+  }
+
+  // Strategy 4: Default to 260 if all strategies fail
+  console.warn("[ESPN Draft Assistant] Could not detect auction budget - using default $260");
+  return 260;
+}
+
+/**
  * Detect league configuration from ESPN draft page DOM
  * User constraint: Auto-detect from DOM, fallback to 5x5 defaults on failure
  */
@@ -77,11 +151,14 @@ export function detectLeagueConfig(): DetectionResult {
     warnings.push("Could not detect roster slots from league settings");
   }
 
+  // 4. Detect auction budget
+  const budget = detectAuctionBudget();
+
   // If any detection failed, return low confidence or failed
   if (!totalTeams || !categories || !rosterSlots) {
     return {
       config: totalTeams && categories && rosterSlots
-        ? { totalTeams, categories, rosterSlots }
+        ? { totalTeams, categories, rosterSlots, budget }
         : null,
       confidence: totalTeams || categories || rosterSlots ? "low" : "failed",
       warnings,
@@ -90,7 +167,7 @@ export function detectLeagueConfig(): DetectionResult {
   }
 
   return {
-    config: { totalTeams, categories, rosterSlots },
+    config: { totalTeams, categories, rosterSlots, budget },
     confidence: "high",
     warnings,
     isPracticeDraft: isPractice,
