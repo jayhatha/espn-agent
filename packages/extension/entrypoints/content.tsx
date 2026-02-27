@@ -9,6 +9,7 @@ import {
   testParsePick,
   parseTeamRostersFromDOM,
   logRosterDiagnostics,
+  observeCurrentAuctionPlayer,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -508,6 +509,14 @@ export default defineContentScript({
 
     mountSidebar();
 
+    // Observe current auction player (auction only)
+    let auctionPlayerCleanup: (() => void) | null = null;
+    if (resolvedDraftFormat === "auction") {
+      auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
+        useDraftStore.getState().setCurrentAuctionPlayer(player);
+      });
+    }
+
     const sidebarMountObserver = new MutationObserver(() => {
       if (!document.getElementById(SIDEBAR_ROOT_ID)) {
         mountSidebar();
@@ -624,6 +633,7 @@ export default defineContentScript({
     // Cleanup on page unload
     window.addEventListener("beforeunload", () => {
       cleanup();
+      auctionPlayerCleanup?.();
       window.clearInterval(sidebarHeartbeat);
       window.clearInterval(popoutHeartbeat);
       sidebarMountObserver.disconnect();
