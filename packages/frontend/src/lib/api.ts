@@ -225,6 +225,7 @@ export const api = {
   async triggerSnapshot(leagueId: number) {
     return fetchAPI(`/api/leagues/${leagueId}/snapshot`, {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 
@@ -414,6 +415,7 @@ export const api = {
   async computeTransactionImpacts(leagueId: number, season: number) {
     return fetchAPI(`/api/leagues/${leagueId}/transaction-impacts/compute?season=${season}`, {
       method: 'POST',
+      body: JSON.stringify({}),
     });
   },
 
