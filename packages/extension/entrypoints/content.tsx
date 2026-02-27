@@ -7,6 +7,8 @@ import {
   collectCompletedPicksSnapshot,
   diagnoseDOMStructure,
   testParsePick,
+  parseTeamRostersFromDOM,
+  logRosterDiagnostics,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -22,6 +24,7 @@ import { detectLeagueConfig } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
+import { calculateProjectedStandingsLocal } from "../lib/value-calculations";
 
 const SIDEBAR_ROOT_ID = "espn-draft-assistant-root";
 const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
@@ -117,9 +120,11 @@ export default defineContentScript({
     // Expose diagnostic functions for debugging
     // Usage: window.espnDraftAssistant.diagnose()
     // Usage: window.espnDraftAssistant.testPick(element)
+    // Usage: window.espnDraftAssistant.diagnoseRosters()
     (window as any).espnDraftAssistant = {
       diagnose: diagnoseDOMStructure,
       testPick: testParsePick,
+      diagnoseRosters: logRosterDiagnostics,
       version: "1.0.0",
     };
     console.log(
@@ -342,8 +347,37 @@ export default defineContentScript({
             backendLeagueId: latestBackendLeagueId || undefined,
           });
           useDraftStore.getState().setProjectedStandings(standings);
-        } catch {
-          useDraftStore.getState().setProjectedStandings(null);
+        } catch (apiError) {
+          console.log(
+            "[ESPN Draft Assistant] API standings failed, falling back to DOM parsing",
+          );
+
+          try {
+            // Fallback: parse rosters from DOM and compute locally
+            const teamRosters = parseTeamRostersFromDOM();
+            const { rankings } = useDraftStore.getState();
+
+            if (teamRosters.size > 0 && rankings.length > 0) {
+              const localStandings = calculateProjectedStandingsLocal(
+                teamRosters,
+                rankings,
+              );
+              useDraftStore.getState().setProjectedStandings(localStandings);
+              console.log(
+                "[ESPN Draft Assistant] Local standings computed for",
+                teamRosters.size,
+                "teams",
+              );
+            } else {
+              useDraftStore.getState().setProjectedStandings(null);
+            }
+          } catch (domError) {
+            console.error(
+              "[ESPN Draft Assistant] DOM fallback failed:",
+              domError,
+            );
+            useDraftStore.getState().setProjectedStandings(null);
+          }
         }
 
         const completedPicks = collectCompletedPicksSnapshot();
