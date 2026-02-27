@@ -1,41 +1,71 @@
 import type { DraftPick } from "@espn-fantasy/shared";
 
+/**
+ * ESPN Draft Board Selectors - ordered by specificity
+ *
+ * ESPN's draft board structure (as of 2026):
+ * - Main container: typically has "draft" or "board" in class/id
+ * - Pick cells: Grid-based layout with style="grid-area: row / column"
+ * - Completed picks: Marked with specific classes or contain player data
+ * - ESPN uses JSX-generated class names (e.g., .jsx-XXXXX) that may vary
+ *
+ * Strategy: Primary selectors target stable ESPN patterns, fallbacks use
+ * broader matches for resilience against ESPN DOM changes.
+ */
 const DRAFT_BOARD_SELECTORS = [
-  ".draftBoardGrid",
-  '[class*="draftBoardGrid"]',
-  ".draft-board",
-  ".draftboard-container",
+  // Primary: ESPN's typical draft board containers
+  ".draftBoardContainer",
   '[class*="draftBoard"]',
   '[class*="DraftBoard"]',
-  '[data-testid*="draft-board"]',
-  '[data-testid*="draftboard"]',
   '[id*="draftBoard"]',
-  '[id*="draft-board"]',
-  '[class*="draft-room"]',
-  '[class*="draftRoom"]',
-  '[class*="DraftRoom"]',
-  '[data-testid*="draft-room"]',
+
+  // Fallback: Broader draft-related containers
+  '[class*="draft"][class*="board"]',
+  '[class*="draft"][class*="container"]',
+  ".draft-content-wrapper",
+  '[class*="draft-columns"]',
+
+  // Last resort: Look for grid-styled containers with pick cells
+  '[style*="grid-template"]',
+  '[data-testid*="draft"]',
 ].join(", ");
 
 const PICK_ROW_SELECTORS = [
-  ".draft-board-grid-pick-cell",
-  ".draft-board-grid-pick-cell.completedPick",
-  ".draft-board-grid-pick-cell.myTeam",
-  ".pick-row",
-  ".draft-pick",
-  '[class*="pickRow"]',
-  '[class*="PickRow"]',
-  '[class*="draftPick"]',
-  '[class*="DraftPick"]',
-  '[data-testid*="pick-row"]',
-  '[data-testid*="draft-pick"]',
+  // Primary: Cells with grid positioning (ESPN uses inline grid-area styles)
+  '[style*="grid-area"]',
+
+  // Secondary: Pick cells by class
+  ".draftBoardCell",
+  ".pickCell",
+  '[class*="pickCell"]',
+  '[class*="PickCell"]',
+  '[class*="draftCell"]',
+
+  // Tertiary: Data attributes (ESPN sometimes uses these)
   "[data-player-id]",
+  "[data-pick-number]",
+  '[data-testid*="pick"]',
+
+  // Fallback: Broader pick-related patterns
+  '[class*="pick"][class*="row"]',
+  '[class*="draft"][class*="pick"]',
 ].join(", ");
 
 const COMPLETED_PICK_SELECTORS = [
-  ".draft-board-grid-pick-cell.completedPick",
+  // Primary: ESPN marks completed picks with specific classes or data
   ".completedPick",
-  ".pick-row.completed",
+  '[class*="completed"]',
+  '[data-completed="true"]',
+  '[data-status="completed"]',
+
+  // Secondary: Picks that contain player data are likely completed
+  '[data-player-id]:not([data-player-id=""])',
+  '[style*="grid-area"]:has(.playerCard)',
+  '[style*="grid-area"]:has([class*="player"])',
+
+  // Fallback: Any cell with player name elements (defensive)
+  ':has(.playerName)',
+  ':has([class*="playerName"])',
 ].join(", ");
 
 function parseGridArea(
@@ -328,25 +358,41 @@ export function observeDraftBoard(
 
 /**
  * Extract pick data from ESPN DOM element
- * NOTE: Selectors are placeholders - must be verified against real ESPN draft page
+ *
+ * ESPN DOM patterns (as of 2026):
+ * - Player name: May be split (first/last) or combined in single element
+ * - Team abbrev: MLB team (e.g., "LAD", "NYY") - usually in separate element
+ * - Position: Often in "pill" elements, may be comma or slash separated
+ * - Fantasy team: The team making the pick - may be in parent or sibling
+ * - Grid position: Inferred from style="grid-area: row / column"
+ *
+ * Fallback strategy: Try multiple selector patterns, log specific failures
  */
 export function parsePickElement(pickElement: Element): DraftPick | null {
   try {
-    const playerNameEl = pickElement.querySelector(
-      '.player-name, [class*="playerName"], [class*="PlayerName"], [data-testid*="player-name"]',
-    );
-    const teamEl = pickElement.querySelector(
-      '.team-abbrev, [class*="teamAbbrev"], [class*="TeamAbbrev"], [data-testid*="team"]',
-    );
-    const positionEl = pickElement.querySelector(
-      '.player-position, [class*="position"], [class*="Position"], [data-testid*="position"]',
-    );
+    // Strategy 1: Look for player name in various ESPN patterns
+    const playerNameSelectors = [
+      ".playerName",
+      '[class*="playerName"]',
+      '[class*="PlayerName"]',
+      ".player-name",
+      ".name",
+      '[class*="name"]',
+      '[data-testid*="player-name"]',
+    ];
 
+    let playerNameEl: Element | null = null;
+    for (const selector of playerNameSelectors) {
+      playerNameEl = pickElement.querySelector(selector);
+      if (playerNameEl?.textContent?.trim()) break;
+    }
+
+    // Strategy 2: Try first/last name split pattern
     const firstName = pickElement
-      .querySelector(".playerFirstName")
+      .querySelector(".playerFirstName, .firstName, [class*='firstName']")
       ?.textContent?.trim();
     const lastName = pickElement
-      .querySelector(".playerLastName")
+      .querySelector(".playerLastName, .lastName, [class*='lastName']")
       ?.textContent?.trim();
 
     const playerName = [
@@ -354,95 +400,168 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
       [firstName, lastName].filter(Boolean).join(" ").trim(),
     ].find((value) => Boolean(value));
 
-    // Fantasy team name (NOT player's MLB team)
-    // Look for team owner/name in various possible locations
-    const fantasyTeamEl = pickElement.querySelector(
-      '.team-name, .owner-name, .teamName, .ownerName, [class*="teamName"], [class*="ownerName"], [data-testid*="team-name"]',
+    // Strategy 3: Extract MLB team abbreviation (NOT fantasy team)
+    const teamEl = pickElement.querySelector(
+      '.teamAbbrev, .team-abbrev, [class*="teamAbbrev"], [class*="team"][class*="abbrev"], [data-testid*="team"]',
     );
 
-    // Try to get fantasy team name from parent containers
-    const parentTeamEl = pickElement.closest('[data-team-name], [data-owner-name]');
+    // Strategy 4: Extract position(s) with multiple fallbacks
+    const positionSelectors = [
+      ".positionPill",
+      ".position",
+      '[class*="position"]',
+      '[class*="Position"]',
+      '[data-testid*="position"]',
+    ];
 
-    const teamName =
-      fantasyTeamEl?.textContent?.trim() ||
-      parentTeamEl?.getAttribute('data-team-name') ||
-      parentTeamEl?.getAttribute('data-owner-name') ||
-      undefined;
+    let positionEl: Element | null = null;
+    for (const selector of positionSelectors) {
+      positionEl = pickElement.querySelector(selector);
+      if (positionEl?.textContent?.trim()) break;
+    }
 
-    const positionText =
-      positionEl?.textContent?.trim() ||
-      pickElement.querySelector(".positionPill")?.textContent?.trim() ||
-      "";
+    const positionText = positionEl?.textContent?.trim() || "";
+    // ESPN may use "/" or "," to separate positions (e.g., "1B/OF" or "OF, 1B")
     const positions = positionText
       .split("/")
       .flatMap((part) => part.split(","))
       .map((part) => part.trim())
       .filter(Boolean);
 
+    // Strategy 5: Fantasy team name (NOT player's MLB team)
+    // ESPN displays the team making the pick - could be in cell, header, or parent
+    const fantasyTeamSelectors = [
+      ".teamName",
+      ".ownerName",
+      ".owner",
+      '[class*="teamName"]',
+      '[class*="ownerName"]',
+      '[class*="owner"]',
+      '[data-testid*="team-name"]',
+    ];
+
+    let fantasyTeamEl: Element | null = null;
+    for (const selector of fantasyTeamSelectors) {
+      fantasyTeamEl = pickElement.querySelector(selector);
+      if (fantasyTeamEl?.textContent?.trim()) break;
+    }
+
+    // Try parent containers for team data attributes
+    const parentTeamEl = pickElement.closest(
+      '[data-team-name], [data-owner-name], [data-team-id]',
+    );
+
+    const teamName =
+      fantasyTeamEl?.textContent?.trim() ||
+      parentTeamEl?.getAttribute("data-team-name") ||
+      parentTeamEl?.getAttribute("data-owner-name") ||
+      undefined;
+
+    // Early exit for incomplete picks
     if (!playerName) {
-      if (pickElement.classList.contains("upcomingPick")) {
+      // Don't log warnings for upcoming picks (these are expected to be incomplete)
+      if (
+        pickElement.classList.contains("upcomingPick") ||
+        pickElement.classList.contains("upcoming") ||
+        pickElement.hasAttribute("data-upcoming")
+      ) {
         return null;
       }
 
-      console.warn("[ESPN Draft Assistant] Incomplete pick data:", {
-        playerName,
-        teamName,
-      });
+      console.warn(
+        "[ESPN Draft Assistant] Failed to parse player name from pick element",
+        {
+          element: pickElement.tagName,
+          classes: pickElement.className,
+          hasPlayerNameEl: !!playerNameEl,
+          hasFirstName: !!firstName,
+          hasLastName: !!lastName,
+        },
+      );
       return null;
     }
 
-    // Extract IDs and pick number from data attributes (if available)
+    // Strategy 6: Extract IDs and pick numbers from various sources
     const playerId = parseInt(
-      pickElement.getAttribute("data-player-id") || "0",
+      pickElement.getAttribute("data-player-id") ||
+        pickElement.getAttribute("data-playerid") ||
+        "0",
       10,
     );
+
     const pickNumber = parseInt(
-      pickElement.getAttribute("data-pick-number") || "0",
+      pickElement.getAttribute("data-pick-number") ||
+        pickElement.getAttribute("data-pick") ||
+        pickElement.querySelector(".pickNumber, [class*='pickNumber']")
+          ?.textContent?.replace(/\D/g, "") ||
+        "0",
       10,
     );
-    const rowNumber = parseInt(
-      pickElement
-        .querySelector(".rowNumber")
-        ?.textContent?.replace(/\D/g, "") || "0",
-      10,
-    );
+
+    // ESPN uses grid-area for positioning in CSS Grid layout
     const gridArea = parseGridArea(pickElement);
 
+    // Strategy 7: Determine team ID with multiple fallbacks
     const teamId =
       pickElement.getAttribute("data-team-id") ||
-      (pickElement.classList.contains("myTeam")
+      parentTeamEl?.getAttribute("data-team-id") ||
+      (pickElement.classList.contains("myTeam") ||
+      pickElement.classList.contains("my-team")
         ? "myTeam"
         : gridArea
           ? String(gridArea.column)
           : teamName || "unknown-team");
 
-    // Auction cost (if present)
-    const costEl = pickElement.querySelector(
-      '.pick-cost, [class*="cost"], [class*="Cost"], [data-testid*="cost"], [data-testid*="bid"]',
-    );
-    const winningPriceEl = pickElement.querySelector(".winningPrice");
-    const parsedCostText = costEl?.textContent || winningPriceEl?.textContent;
+    // Strategy 8: Auction cost (if auction draft)
+    const costSelectors = [
+      ".winningPrice",
+      ".cost",
+      ".bid",
+      '[class*="winningPrice"]',
+      '[class*="cost"]',
+      '[class*="Cost"]',
+      '[class*="bid"]',
+      '[data-testid*="cost"]',
+      '[data-testid*="price"]',
+    ];
+
+    let costEl: Element | null = null;
+    for (const selector of costSelectors) {
+      costEl = pickElement.querySelector(selector);
+      if (costEl?.textContent?.trim()) break;
+    }
+
+    const parsedCostText = costEl?.textContent;
     const cost = parsedCostText
-      ? parseInt(parsedCostText.replace(/\D/g, "") || "0", 10)
+      ? parseInt(parsedCostText.replace(/\D/g, "") || "0", 10) || undefined
       : undefined;
 
+    // Strategy 9: Roster slot (if displayed)
     const rosterSlot = pickElement
-      .querySelector(".rosterSlot")
+      .querySelector(".rosterSlot, [class*='rosterSlot'], [class*='slot']")
       ?.textContent?.trim();
+
+    // Generate deterministic fallback player ID if ESPN doesn't provide one
     const fallbackPlayerId = hashString(
       `${playerName.toLowerCase()}|${teamId}|${cost ?? ""}|${rosterSlot ?? ""}|${gridArea?.row ?? ""}|${gridArea?.column ?? ""}`,
     );
 
+    // Compute pick number from multiple sources (priority order)
     const computedPickNumber =
-      pickNumber || rowNumber || (gridArea ? gridArea.row : 0);
+      pickNumber || (gridArea ? gridArea.row : 0);
 
-    // Generate better fallback team names based on position/column
+    // Strategy 10: Generate intelligent team name fallbacks
     let finalTeamName = teamName;
     if (!finalTeamName) {
-      if (pickElement.classList.contains("myTeam")) {
+      if (
+        pickElement.classList.contains("myTeam") ||
+        pickElement.classList.contains("my-team") ||
+        teamId === "myTeam"
+      ) {
         finalTeamName = "My Team";
       } else if (gridArea && gridArea.column) {
         // Use column number to generate team name (e.g., "Team 1", "Team 2")
+        // This works because ESPN's grid layout uses columns for teams
         finalTeamName = `Team ${gridArea.column}`;
       } else if (teamId && teamId !== "unknown-team" && teamId !== "myTeam") {
         // Use teamId as fallback if it looks like a number or identifier
@@ -463,7 +582,17 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
       positions,
     };
   } catch (error) {
-    console.error("[ESPN Draft Assistant] Error parsing pick element:", error);
+    console.error(
+      "[ESPN Draft Assistant] Error parsing pick element:",
+      error instanceof Error ? error.message : error,
+    );
+    console.error("[ESPN Draft Assistant] Pick element details:", {
+      tag: pickElement.tagName,
+      classes: pickElement.className,
+      id: pickElement.id,
+      childrenCount: pickElement.children.length,
+      textContent: pickElement.textContent?.slice(0, 100),
+    });
     return null;
   }
 }
