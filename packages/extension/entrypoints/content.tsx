@@ -16,6 +16,7 @@ import {
   resolveBackendLeagueId,
   getRankingsWithRetry,
   getAuctionValuesWithRetry,
+  throttle,
 } from "../lib/api-client";
 import { detectLeagueConfig } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
@@ -42,49 +43,53 @@ function normalizePlayerName(name: string): string {
 /**
  * Refresh rankings and projections with cached config
  * User constraint: auto-refresh after each pick, keep stale data on failure
+ * Throttled to 3s minimum between calls to prevent 429 errors
  */
-async function refreshRankingsAndProjections(espnLeagueId: string) {
-  const state = useDraftStore.getState();
+const refreshRankingsAndProjections = throttle(
+  async (espnLeagueId: string) => {
+    const state = useDraftStore.getState();
 
-  // Use cached config (don't re-detect per user constraint)
-  if (!cachedLeagueConfig) {
-    console.warn("[ESPN Draft Assistant] No league config available for refresh");
-    return;
-  }
-
-  try {
-    // Fetch with retry logic
-    const [rankings, auctionValues] = await Promise.all([
-      getRankingsWithRetry(espnLeagueId, {
-        draftFormat: state.draftFormat,
-      }),
-      state.draftFormat === "auction"
-        ? getAuctionValuesWithRetry(espnLeagueId, {
-            budget: state.remainingBudget,
-            rosterSize: state.rosterSize,
-          })
-        : Promise.resolve([]),
-    ]);
-
-    // Update state
-    state.setRankings(rankings);
-    if (state.draftFormat === "auction") {
-      state.setAuctionValues(auctionValues);
+    // Use cached config (don't re-detect per user constraint)
+    if (!cachedLeagueConfig) {
+      console.warn("[ESPN Draft Assistant] No league config available for refresh");
+      return;
     }
 
-    console.log("[ESPN Draft Assistant] Rankings refreshed successfully", {
-      rankingsCount: rankings.length,
-      auctionValuesCount: auctionValues.length,
-    });
-  } catch (error) {
-    // User constraint: keep stale data on failure after retries
-    console.error(
-      "[ESPN Draft Assistant] Failed to refresh rankings after retries, keeping stale data",
-      error
-    );
-    // Don't throw - UI keeps showing stale rankings
-  }
-}
+    try {
+      // Fetch with retry logic
+      const [rankings, auctionValues] = await Promise.all([
+        getRankingsWithRetry(espnLeagueId, {
+          draftFormat: state.draftFormat,
+        }),
+        state.draftFormat === "auction"
+          ? getAuctionValuesWithRetry(espnLeagueId, {
+              budget: state.remainingBudget,
+              rosterSize: state.rosterSize,
+            })
+          : Promise.resolve([]),
+      ]);
+
+      // Update state
+      state.setRankings(rankings);
+      if (state.draftFormat === "auction") {
+        state.setAuctionValues(auctionValues);
+      }
+
+      console.log("[ESPN Draft Assistant] Rankings refreshed successfully", {
+        rankingsCount: rankings.length,
+        auctionValuesCount: auctionValues.length,
+      });
+    } catch (error) {
+      // User constraint: keep stale data on failure after retries
+      console.error(
+        "[ESPN Draft Assistant] Failed to refresh rankings after retries, keeping stale data",
+        error
+      );
+      // Don't throw - UI keeps showing stale rankings
+    }
+  },
+  3000 // 3 seconds minimum between refreshes (backend limit: 50/min = 1.2s per request, use 3s for safety)
+);
 
 export default defineContentScript({
   matches: ["https://fantasy.espn.com/baseball/draft*"],
@@ -301,48 +306,51 @@ export default defineContentScript({
       await refreshRankingsAndProjections(leagueId.toString());
     };
 
-    const refreshAssistantData = async () => {
-      const latestBackendLeagueId = await resolveBackendLeagueMapping();
-      const currentState = useDraftStore.getState();
+    const refreshAssistantData = throttle(
+      async () => {
+        const latestBackendLeagueId = await resolveBackendLeagueMapping();
+        const currentState = useDraftStore.getState();
 
-      try {
-        const rankings = await getRankings(leagueId.toString(), {
-          draftFormat: currentState.draftFormat,
-          backendLeagueId: latestBackendLeagueId || undefined,
-        });
-        useDraftStore.getState().setRankings(rankings);
-      } catch (error) {
-        console.error("[ESPN Draft Assistant] Refresh rankings failed:", error);
-      }
-
-      if (currentState.draftFormat === "auction") {
         try {
-          const values = await getAuctionValues(leagueId.toString(), {
-            budget: 260,
-            rosterSize: currentState.rosterSize,
+          const rankings = await getRankings(leagueId.toString(), {
+            draftFormat: currentState.draftFormat,
             backendLeagueId: latestBackendLeagueId || undefined,
           });
-          useDraftStore.getState().setAuctionValues(values);
+          useDraftStore.getState().setRankings(rankings);
         } catch (error) {
-          console.error(
-            "[ESPN Draft Assistant] Refresh auction values failed:",
-            error,
-          );
+          console.error("[ESPN Draft Assistant] Refresh rankings failed:", error);
         }
-      }
 
-      try {
-        const standings = await getProjectedStandings(leagueId.toString(), {
-          backendLeagueId: latestBackendLeagueId || undefined,
-        });
-        useDraftStore.getState().setProjectedStandings(standings);
-      } catch {
-        useDraftStore.getState().setProjectedStandings(null);
-      }
+        if (currentState.draftFormat === "auction") {
+          try {
+            const values = await getAuctionValues(leagueId.toString(), {
+              budget: 260,
+              rosterSize: currentState.rosterSize,
+              backendLeagueId: latestBackendLeagueId || undefined,
+            });
+            useDraftStore.getState().setAuctionValues(values);
+          } catch (error) {
+            console.error(
+              "[ESPN Draft Assistant] Refresh auction values failed:",
+              error,
+            );
+          }
+        }
 
-      const completedPicks = collectCompletedPicksSnapshot();
-      completedPicks.forEach((pick) => processDetectedPick(pick));
-    };
+        try {
+          const standings = await getProjectedStandings(leagueId.toString(), {
+            backendLeagueId: latestBackendLeagueId || undefined,
+          });
+          useDraftStore.getState().setProjectedStandings(standings);
+        } catch {
+          useDraftStore.getState().setProjectedStandings(null);
+        }
+
+        const completedPicks = collectCompletedPicksSnapshot();
+        completedPicks.forEach((pick) => processDetectedPick(pick));
+      },
+      3000 // 3 seconds minimum between refreshes
+    );
 
     const mountSidebar = () => {
       if (isPopoutOpen) {
@@ -506,16 +514,13 @@ export default defineContentScript({
 
     refreshAssistantData();
 
-    const formatStabilizer = window.setInterval(() => {
+    // Check format once after page stabilizes (not every 1.5s)
+    setTimeout(() => {
       const latestDetection = detectDraftFormat();
-      if (latestDetection !== "auction") {
-        return;
-      }
+      if (latestDetection !== "auction") return;
 
       const latestState = useDraftStore.getState();
-      if (latestState.draftFormat === "auction") {
-        return;
-      }
+      if (latestState.draftFormat === "auction") return;
 
       latestState.initializeDraft({
         leagueId,
@@ -526,21 +531,8 @@ export default defineContentScript({
         budget: latestState.remainingBudget || 260,
       });
 
-      getAuctionValues(leagueId.toString(), {
-        budget: 260,
-        rosterSize: latestState.rosterSize,
-        backendLeagueId: resolvedBackendLeagueId || undefined,
-      })
-        .then((values) => {
-          useDraftStore.getState().setAuctionValues(values);
-        })
-        .catch((error) => {
-          console.error(
-            "[ESPN Draft Assistant] Failed to load auction values after format stabilization:",
-            error,
-          );
-        });
-    }, 1500);
+      refreshAssistantData(); // Throttled, will respect 3s minimum
+    }, 2000);
 
     // Start observing draft board for picks
     const cleanup = observeDraftBoard((pick) => processDetectedPick(pick));
@@ -589,7 +581,6 @@ export default defineContentScript({
     // Cleanup on page unload
     window.addEventListener("beforeunload", () => {
       cleanup();
-      window.clearInterval(formatStabilizer);
       window.clearInterval(sidebarHeartbeat);
       window.clearInterval(popoutHeartbeat);
       sidebarMountObserver.disconnect();
