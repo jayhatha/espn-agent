@@ -243,6 +243,7 @@ export default defineContentScript({
     let popoutWindow: Window | null = null;
     let popoutRootInstance: ReturnType<typeof createRoot> | null = null;
     let isPopoutOpen = false;
+    let isMounting = false;
     const { [SIDEBAR_DOCK_STORAGE_KEY]: storedDockSide } =
       await chrome.storage.local.get(SIDEBAR_DOCK_STORAGE_KEY);
     let currentDockSide: "left" | "right" =
@@ -382,31 +383,34 @@ export default defineContentScript({
     );
 
     const mountSidebar = () => {
-      if (isPopoutOpen) {
+      if (isPopoutOpen || isMounting) {
         return;
       }
 
-      if (!document.body) {
-        return;
-      }
+      isMounting = true;
 
-      const existingRoot = document.getElementById(SIDEBAR_ROOT_ID);
-      if (existingRoot) {
-        const existingShadowRoot = existingRoot.shadowRoot;
-        const existingMountPoint = existingShadowRoot?.querySelector(
-          '[data-espn-assistant-mount="true"]',
-        );
-
-        if (existingMountPoint && existingMountPoint.childElementCount > 0) {
+      try {
+        if (!document.body) {
           return;
         }
 
-        existingRoot.remove();
-      }
+        const existingRoot = document.getElementById(SIDEBAR_ROOT_ID);
+        if (existingRoot) {
+          const existingShadowRoot = existingRoot.shadowRoot;
+          const existingMountPoint = existingShadowRoot?.querySelector(
+            '[data-espn-assistant-mount="true"]',
+          );
 
-      const sidebarRoot = document.createElement("div");
-      sidebarRoot.id = SIDEBAR_ROOT_ID;
-      sidebarRoot.style.cssText = `
+          if (existingMountPoint && existingMountPoint.childElementCount > 0) {
+            return;
+          }
+
+          existingRoot.remove();
+        }
+
+        const sidebarRoot = document.createElement("div");
+        sidebarRoot.id = SIDEBAR_ROOT_ID;
+        sidebarRoot.style.cssText = `
         position: fixed;
         top: 0;
         width: 400px;
@@ -415,36 +419,39 @@ export default defineContentScript({
         box-shadow: -2px 0 8px rgba(0,0,0,0.1);
       `;
 
-      const shadowRoot = sidebarRoot.attachShadow({ mode: "open" });
+        const shadowRoot = sidebarRoot.attachShadow({ mode: "open" });
 
-      const styleSheet = document.createElement("style");
-      styleSheet.textContent = contentStyles;
-      shadowRoot.appendChild(styleSheet);
+        const styleSheet = document.createElement("style");
+        styleSheet.textContent = contentStyles;
+        shadowRoot.appendChild(styleSheet);
 
-      const reactRoot = document.createElement("div");
-      reactRoot.setAttribute("data-espn-assistant-mount", "true");
-      shadowRoot.appendChild(reactRoot);
+        const reactRoot = document.createElement("div");
+        reactRoot.setAttribute("data-espn-assistant-mount", "true");
+        shadowRoot.appendChild(reactRoot);
 
-      document.body.appendChild(sidebarRoot);
+        document.body.appendChild(sidebarRoot);
 
-      reactRootInstance = createRoot(reactRoot);
-      reactRootInstance.render(
-        <div
-          style={{
-            height: "100%",
-            background: "#ffffff",
-            color: "#111827",
-            fontFamily:
-              'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          }}
-        >
-          <DraftSidebar />
-        </div>,
-      );
+        reactRootInstance = createRoot(reactRoot);
+        reactRootInstance.render(
+          <div
+            style={{
+              height: "100%",
+              background: "#ffffff",
+              color: "#111827",
+              fontFamily:
+                'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            }}
+          >
+            <DraftSidebar />
+          </div>,
+        );
 
-      applySidebarPosition(currentDockSide);
+        applySidebarPosition(currentDockSide);
 
-      console.log("[ESPN Draft Assistant] Sidebar rendered");
+        console.log("[ESPN Draft Assistant] Sidebar rendered");
+      } finally {
+        isMounting = false;
+      }
     };
 
     const openPopout = () => {
