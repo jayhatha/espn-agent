@@ -10,7 +10,8 @@
     "test": "vitest",
     "migrate": "tsx src/db/migrate.ts",
     "lint": "eslint src --ext .ts",
-    "worker:player-pool": "tsx src/workers/player-pool-worker.ts"
+    "worker:player-pool": "tsx src/workers/player-pool-worker.ts",
+    "sync-player-pool": "tsx scripts/sync-player-pool.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^9.4.0",
