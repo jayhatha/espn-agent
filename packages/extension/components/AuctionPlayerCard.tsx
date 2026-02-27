@@ -1,5 +1,11 @@
 import React from "react";
 import type { AuctionValue } from "@espn-fantasy/shared";
+import {
+  calculateAVG,
+  calculateERA,
+  calculateWHIP,
+  calculateOPS,
+} from "@espn-fantasy/shared";
 import { useDraftStore } from "../lib/draft-state";
 import { calculateBudgetPacing } from "../lib/value-calculations";
 import {
@@ -116,11 +122,34 @@ export default function AuctionPlayerCard({
 
       {/* Projected stats (abbreviated) */}
       <div className="text-xs text-gray-600 mt-2 flex gap-3">
+        {/* Counting stats - read directly */}
         {projectedStats.HR && <span>HR: {projectedStats.HR}</span>}
         {projectedStats.RBI && <span>RBI: {projectedStats.RBI}</span>}
         {projectedStats.SB && <span>SB: {projectedStats.SB}</span>}
         {projectedStats.W && <span>W: {projectedStats.W}</span>}
         {projectedStats.SV && <span>SV: {projectedStats.SV}</span>}
+
+        {/* Rate stats - calculated from components */}
+        {projectedStats.AB && projectedStats.AB > 0 && (
+          <>
+            <span>
+              AVG: {formatNumber(calculateAVG(projectedStats), 3)}
+            </span>
+            <span>
+              OPS: {formatNumber(calculateOPS(projectedStats), 3)}
+            </span>
+          </>
+        )}
+        {projectedStats.IP && projectedStats.IP > 0 && (
+          <>
+            <span>
+              ERA: {formatNumber(calculateERA(projectedStats), 2)}
+            </span>
+            <span>
+              WHIP: {formatNumber(calculateWHIP(projectedStats), 2)}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );
