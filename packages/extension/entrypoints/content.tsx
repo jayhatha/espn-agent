@@ -14,7 +14,6 @@ import { useDraftStore } from "../lib/draft-state";
 import {
   getRankings,
   getAuctionValues,
-  getProjectedStandings,
   resolveBackendLeagueId,
   getRankingsWithRetry,
   getAuctionValuesWithRetry,
@@ -24,7 +23,7 @@ import { detectLeagueConfig } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
-import { calculateProjectedStandingsLocal } from "../lib/value-calculations";
+import { calculateProjectedStandingsFromState } from "../lib/value-calculations";
 
 const SIDEBAR_ROOT_ID = "espn-draft-assistant-root";
 const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
@@ -124,7 +123,15 @@ export default defineContentScript({
     (window as any).espnDraftAssistant = {
       diagnose: diagnoseDOMStructure,
       testPick: testParsePick,
-      diagnoseRosters: logRosterDiagnostics,
+      diagnoseRosters: () => {
+        // Show stored state instead of parsing DOM
+        const { teamRosters } = useDraftStore.getState();
+        console.log("Stored Team Rosters:", Array.from(teamRosters.entries()));
+
+        // Also parse DOM for comparison
+        const domRosters = parseTeamRostersFromDOM();
+        console.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
+      },
       version: "1.0.0",
     };
     console.log(
@@ -307,6 +314,19 @@ export default defineContentScript({
         }
       }
 
+      // Update team roster state
+      if (pick.teamId && pick.playerId) {
+        useDraftStore.getState().updateTeamRoster(
+          pick.teamId,
+          pick.teamName || `Team ${pick.teamId}`,
+          pick.playerId
+        );
+
+        // Recompute standings from updated state
+        const standings = calculateProjectedStandingsFromState();
+        useDraftStore.getState().setProjectedStandings(standings);
+      }
+
       // Auto-refresh rankings after each pick (user constraint)
       await refreshRankingsAndProjections(leagueId.toString());
     };
@@ -342,42 +362,16 @@ export default defineContentScript({
           }
         }
 
-        try {
-          const standings = await getProjectedStandings(leagueId.toString(), {
-            backendLeagueId: latestBackendLeagueId || undefined,
-          });
-          useDraftStore.getState().setProjectedStandings(standings);
-        } catch (apiError) {
+        // Update projected standings from stored roster state (no API call, no DOM parsing)
+        const standings = calculateProjectedStandingsFromState();
+        useDraftStore.getState().setProjectedStandings(standings);
+
+        if (standings) {
           console.log(
-            "[ESPN Draft Assistant] API standings failed, falling back to DOM parsing",
+            "[ESPN Draft Assistant] Projected standings computed from stored state for",
+            standings.overallStandings.length,
+            "teams"
           );
-
-          try {
-            // Fallback: parse rosters from DOM and compute locally
-            const teamRosters = parseTeamRostersFromDOM();
-            const { rankings } = useDraftStore.getState();
-
-            if (teamRosters.size > 0 && rankings.length > 0) {
-              const localStandings = calculateProjectedStandingsLocal(
-                teamRosters,
-                rankings,
-              );
-              useDraftStore.getState().setProjectedStandings(localStandings);
-              console.log(
-                "[ESPN Draft Assistant] Local standings computed for",
-                teamRosters.size,
-                "teams",
-              );
-            } else {
-              useDraftStore.getState().setProjectedStandings(null);
-            }
-          } catch (domError) {
-            console.error(
-              "[ESPN Draft Assistant] DOM fallback failed:",
-              domError,
-            );
-            useDraftStore.getState().setProjectedStandings(null);
-          }
         }
 
         const completedPicks = collectCompletedPicksSnapshot();
@@ -545,6 +539,21 @@ export default defineContentScript({
         mountSidebar();
       }
     }, 1000);
+
+    // Initialize team rosters from DOM on page load
+    try {
+      const initialRosters = parseTeamRostersFromDOM();
+      if (initialRosters.size > 0) {
+        useDraftStore.getState().setAllTeamRosters(initialRosters);
+        console.log(
+          "[ESPN Draft Assistant] Initialized rosters for",
+          initialRosters.size,
+          "teams from DOM"
+        );
+      }
+    } catch (error) {
+      console.error("[ESPN Draft Assistant] Failed to initialize rosters:", error);
+    }
 
     refreshAssistantData();
 
