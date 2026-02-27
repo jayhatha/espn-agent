@@ -98,6 +98,7 @@ Progress: Phase 13: [██████████] 100% (6 of 6 plans complete
 | Phase 13 P04 | 5 | 2 tasks | 7 files |
 | Phase 13 P06 | 11 | 3 tasks | 4 files |
 | Phase quick-10 P01 | 5 | 3 tasks | 3 files |
+| Phase quick-16 P01 | 4 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 13]: Graceful degradation on schema mismatch (log warning, continue) alerts devs without breaking app
 - [Phase 13]: Interface definitions at file level for clear visibility and reusability
 - [Phase 13]: Shared constants in lib/constants.ts to eliminate duplication (COLORS, API_URL)
+- [Phase quick-16]: Require ENCRYPTION_KEY at startup (fail if missing) to prevent plaintext credential storage
+- [Phase quick-16]: Return 500 on decryption errors (no silent fallback) to force operators to fix encryption issues
+- [Phase quick-16]: Validate sender.url AND sender.id in extension message handler to prevent webpage attacks and extension spoofing
 
 ### Roadmap Evolution
 
