@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 13 (Clean Up Tech Debt)
 Plan: 6 of 6 in current phase
 Status: Complete
-Last activity: 2026-02-27 - Completed quick task 11: Fix excessive API calls causing 429 errors
+Last activity: 2026-02-27 - Completed quick task 15: Fix critical extension bugs (async forEach, race conditions, debug globals)
 
 Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
 
@@ -89,6 +89,7 @@ Progress: Phase 13: [██████████] 100% (6 of 6 plans complete
 | quick-12 | 8min | 3 | 3 |
 | quick-13 | 3min | 3 | 3 |
 | quick-14 | 2min | 3 | 4 |
+| quick-15 | 2min | 3 | 2 |
 
 *Updated: 2026-02-26 after Phase 13 completion*
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
@@ -231,9 +232,10 @@ None yet.
 | 12 | Parse practice draft rosters from DOM to enable projected standings without backend API | 2026-02-27 | 143f732 | ✅ | [12-parse-practice-draft-rosters-from-dom-in](./quick/12-parse-practice-draft-rosters-from-dom-in/) |
 | 13 | Refactor draft projections to use DOM + Reactive Observers with persistent storage | 2026-02-27 | 72a90c9 | ✅ | [13-refactor-draft-projections-to-use-dom-ro](./quick/13-refactor-draft-projections-to-use-dom-ro/) |
 | 14 | Show current auction player at top of sidebar during auction drafts | 2026-02-27 | 962bbce | ✅ | [14-show-the-current-player-at-the-top-of-th](./quick/14-show-the-current-player-at-the-top-of-th/) |
+| 15 | Fix critical extension bugs: async forEach promise rejections, sidebar race conditions, production debug globals | 2026-02-27 | 74fb264 | ✅ | [15-fix-critical-extension-bugs-async-foreac](./quick/15-fix-critical-extension-bugs-async-foreac/) |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed quick-14 - show current auction player at top of sidebar
+Stopped at: Completed quick-15 - fix critical extension bugs (async forEach, race conditions, debug globals)
 Resume file: None
