@@ -13,6 +13,44 @@ export default defineBackground(() => {
 
   // Message handler for content script communication
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // SECURITY: Validate sender origin before processing messages
+    // Prevents malicious webpages from sending fake messages to extension
+
+    if (sender.url) {
+      // Message from content script - validate it's from ESPN domain
+      try {
+        const senderUrl = new URL(sender.url);
+
+        // Whitelist of allowed ESPN domains
+        const allowedDomains = [
+          'fantasy.espn.com',
+          'lm-api-reads.fantasy.espn.com'
+        ];
+
+        const isAllowedDomain = allowedDomains.some(domain =>
+          senderUrl.hostname === domain || senderUrl.hostname.endsWith('.' + domain)
+        );
+
+        if (!isAllowedDomain) {
+          console.warn('[ESPN Draft Assistant] SECURITY: Rejected message from unauthorized origin:', senderUrl.hostname);
+          sendResponse({ error: 'Unauthorized sender origin' });
+          return false;
+        }
+
+        // Additional validation: verify sender is from this extension (prevents extension spoofing)
+        if (sender.id && sender.id !== chrome.runtime.id) {
+          console.warn('[ESPN Draft Assistant] SECURITY: Rejected message from different extension:', sender.id);
+          sendResponse({ error: 'Invalid sender extension' });
+          return false;
+        }
+      } catch (error) {
+        console.error('[ESPN Draft Assistant] Invalid sender URL:', sender.url, error);
+        sendResponse({ error: 'Invalid sender URL' });
+        return false;
+      }
+    }
+    // If sender.url is undefined, message is from extension page (popup, options) - allow it
+
     console.log('[ESPN Draft Assistant] Message received:', message.type);
 
     if (message.type === 'GET_RANKINGS') {
