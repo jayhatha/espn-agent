@@ -38,7 +38,7 @@ interface DraftState {
   // User's team
   myTeamId: string | null;
   myRoster: DraftedPlayer[];
-  remainingBudget: number; // Auction only
+  remainingBudget: number; // Auction only (detected from ESPN or default 260)
 
   // All picks (across all teams)
   allPicks: DraftPick[];
@@ -75,7 +75,7 @@ interface DraftState {
     totalTeams: number;
     rosterSize: number;
     myTeamId: string;
-    budget?: number;
+    budget?: number; // Detected from ESPN DOM (default: 260)
   }) => void;
   addPick: (pick: DraftPick) => void;
   updateRoster: (player: DraftedPlayer) => void;
@@ -107,7 +107,7 @@ export const useDraftStore = create<DraftState>()(
       rosterSize: 25,
       myTeamId: null,
       myRoster: [],
-      remainingBudget: 260,
+      remainingBudget: 260, // Default value, overridden by config on initialization
       allPicks: [],
       rankings: [],
       auctionValues: [],
@@ -128,7 +128,7 @@ export const useDraftStore = create<DraftState>()(
           totalTeams: config.totalTeams,
           rosterSize: config.rosterSize,
           myTeamId: config.myTeamId,
-          remainingBudget: config.budget || 260,
+          remainingBudget: config.budget || 260, // Use detected budget or fallback to 260
         });
       },
 
