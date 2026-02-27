@@ -3,6 +3,59 @@ import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 import { backOff } from "exponential-backoff";
 import { isPracticeDraft, detectLeagueConfig } from "./draft-config-detector";
 
+/**
+ * Throttle helper - limits function execution to once per wait period
+ */
+function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  let timeout: NodeJS.Timeout | null = null;
+  let lastRun = 0;
+
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    const remaining = wait - (now - lastRun);
+
+    if (remaining <= 0) {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      lastRun = now;
+      return func(...args);
+    }
+
+    return undefined;
+  };
+}
+
+/**
+ * Request deduplication cache - prevents duplicate in-flight requests
+ */
+const inflightRequests = new Map<string, Promise<any>>();
+
+function dedupedRequest<T>(
+  key: string,
+  requestFn: () => Promise<T>
+): Promise<T> {
+  const existing = inflightRequests.get(key);
+  if (existing) {
+    console.log(`[API Client] Deduping request: ${key}`);
+    return existing as Promise<T>;
+  }
+
+  const promise = requestFn().finally(() => {
+    inflightRequests.delete(key);
+  });
+
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
+// Export throttle for use in content script
+export { throttle };
+
 // ESPN stat ID to our stat key mapping
 // Reference: packages/backend/src/adapters/espn.ts
 const ESPN_STAT_MAP: Record<number, {
@@ -787,72 +840,76 @@ export async function getRankings(
   espnLeagueId: string,
   options: GetRankingsOptions = {}
 ): Promise<PlayerRanking[]> {
-  try {
-    const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
-    const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
+  const cacheKey = `rankings:${espnLeagueId}:${JSON.stringify(options)}`;
 
-    // Fetch ESPN settings for league-agnostic draft
-    console.log("[API Client] Fetching ESPN settings for league:", espnLeagueId);
-    let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
+  return dedupedRequest(cacheKey, async () => {
+    try {
+      const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
+      const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
 
-    // If ESPN settings failed (e.g., practice draft), try DOM detection
-    if (!espnConfig) {
-      console.log("[API Client] ESPN settings not available, attempting DOM detection");
-      const domDetection = detectLeagueConfig();
+      // Fetch ESPN settings for league-agnostic draft
+      console.log("[API Client] Fetching ESPN settings for league:", espnLeagueId);
+      let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
 
-      if (domDetection.config && domDetection.confidence !== "failed") {
-        console.log("[API Client] Using DOM-detected config:", {
-          confidence: domDetection.confidence,
-          isPracticeDraft: domDetection.isPracticeDraft,
-          warnings: domDetection.warnings
-        });
-        espnConfig = domDetection.config;
-      } else {
-        console.warn("[API Client] DOM detection failed, using baseline rankings");
-        return baselineRankings as PlayerRanking[];
+      // If ESPN settings failed (e.g., practice draft), try DOM detection
+      if (!espnConfig) {
+        console.log("[API Client] ESPN settings not available, attempting DOM detection");
+        const domDetection = detectLeagueConfig();
+
+        if (domDetection.config && domDetection.confidence !== "failed") {
+          console.log("[API Client] Using DOM-detected config:", {
+            confidence: domDetection.confidence,
+            isPracticeDraft: domDetection.isPracticeDraft,
+            warnings: domDetection.warnings
+          });
+          espnConfig = domDetection.config;
+        } else {
+          console.warn("[API Client] DOM detection failed, using baseline rankings");
+          return baselineRankings as PlayerRanking[];
+        }
       }
+
+      // Build query params with JSON-encoded config
+      const params = new URLSearchParams({
+        numTeams: espnConfig.totalTeams.toString(),
+        categories: JSON.stringify(espnConfig.categories),
+        rosterSlots: JSON.stringify(espnConfig.rosterSlots),
+        limit: "300",
+      });
+
+      if (options.position) params.set("position", options.position);
+
+      const url = `${normalizedBackendUrl}/api/draft/rankings?${params}`;
+
+      console.log("[API Client] Fetching generic draft rankings");
+
+      // Fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        mode: "cors",
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await parseJsonSafely(response);
+      const rankings = data?.rankings || [];
+
+      console.log("[API Client] Received", rankings.length, "rankings");
+
+      return rankings.length > 0 ? rankings : (baselineRankings as PlayerRanking[]);
+
+    } catch (error) {
+      console.warn("[API Client] Failed to fetch live rankings, using baseline:", error);
+      return baselineRankings as PlayerRanking[];
     }
-
-    // Build query params with JSON-encoded config
-    const params = new URLSearchParams({
-      numTeams: espnConfig.totalTeams.toString(),
-      categories: JSON.stringify(espnConfig.categories),
-      rosterSlots: JSON.stringify(espnConfig.rosterSlots),
-      limit: "300",
-    });
-
-    if (options.position) params.set("position", options.position);
-
-    const url = `${normalizedBackendUrl}/api/draft/rankings?${params}`;
-
-    console.log("[API Client] Fetching generic draft rankings");
-
-    // Fetch with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const response = await fetch(url, {
-      signal: controller.signal,
-      mode: "cors",
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await parseJsonSafely(response);
-    const rankings = data?.rankings || [];
-
-    console.log("[API Client] Received", rankings.length, "rankings");
-
-    return rankings.length > 0 ? rankings : (baselineRankings as PlayerRanking[]);
-
-  } catch (error) {
-    console.warn("[API Client] Failed to fetch live rankings, using baseline:", error);
-    return baselineRankings as PlayerRanking[];
-  }
+  });
 }
 
 /**
@@ -862,69 +919,73 @@ export async function getAuctionValues(
   espnLeagueId: string,
   options: GetAuctionValuesOptions = {}
 ): Promise<AuctionValue[]> {
-  try {
-    const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
-    const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
+  const cacheKey = `auction:${espnLeagueId}:${JSON.stringify(options)}`;
 
-    // Fetch ESPN settings
-    console.log("[API Client] Fetching ESPN settings for auction values");
-    let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
+  return dedupedRequest(cacheKey, async () => {
+    try {
+      const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
+      const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
 
-    // If ESPN settings failed (e.g., practice draft), try DOM detection
-    if (!espnConfig) {
-      console.log("[API Client] ESPN settings not available, attempting DOM detection");
-      const domDetection = detectLeagueConfig();
+      // Fetch ESPN settings
+      console.log("[API Client] Fetching ESPN settings for auction values");
+      let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
 
-      if (domDetection.config && domDetection.confidence !== "failed") {
-        console.log("[API Client] Using DOM-detected config for auction values");
-        espnConfig = domDetection.config;
-      } else {
-        console.warn("[API Client] DOM detection failed, no auction values available");
-        return [];
+      // If ESPN settings failed (e.g., practice draft), try DOM detection
+      if (!espnConfig) {
+        console.log("[API Client] ESPN settings not available, attempting DOM detection");
+        const domDetection = detectLeagueConfig();
+
+        if (domDetection.config && domDetection.confidence !== "failed") {
+          console.log("[API Client] Using DOM-detected config for auction values");
+          espnConfig = domDetection.config;
+        } else {
+          console.warn("[API Client] DOM detection failed, no auction values available");
+          return [];
+        }
       }
+
+      // Build query params
+      const params = new URLSearchParams({
+        numTeams: espnConfig.totalTeams.toString(),
+        categories: JSON.stringify(espnConfig.categories),
+        rosterSlots: JSON.stringify(espnConfig.rosterSlots),
+        budget: (options.budget || espnConfig.budget || 260).toString(),
+        minBid: "1",
+        limit: "300",
+      });
+
+      if (options.position) params.set("position", options.position);
+
+      const url = `${normalizedBackendUrl}/api/draft/auction?${params}`;
+
+      console.log("[API Client] Fetching generic auction values");
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        mode: "cors",
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await parseJsonSafely(response);
+      const valuations = data?.valuations || [];
+
+      console.log("[API Client] Received", valuations.length, "auction values");
+
+      return valuations;
+
+    } catch (error) {
+      console.warn("[API Client] Failed to fetch auction values:", error);
+      return [];
     }
-
-    // Build query params
-    const params = new URLSearchParams({
-      numTeams: espnConfig.totalTeams.toString(),
-      categories: JSON.stringify(espnConfig.categories),
-      rosterSlots: JSON.stringify(espnConfig.rosterSlots),
-      budget: (options.budget || espnConfig.budget || 260).toString(),
-      minBid: "1",
-      limit: "300",
-    });
-
-    if (options.position) params.set("position", options.position);
-
-    const url = `${normalizedBackendUrl}/api/draft/auction?${params}`;
-
-    console.log("[API Client] Fetching generic auction values");
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const response = await fetch(url, {
-      signal: controller.signal,
-      mode: "cors",
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await parseJsonSafely(response);
-    const valuations = data?.valuations || [];
-
-    console.log("[API Client] Received", valuations.length, "auction values");
-
-    return valuations;
-
-  } catch (error) {
-    console.warn("[API Client] Failed to fetch auction values:", error);
-    return [];
-  }
+  });
 }
 
 export async function getProjectedStandings(
@@ -1007,48 +1068,25 @@ function generateBaselineAuctionValues(): AuctionValue[] {
 }
 
 /**
- * Fetch rankings with retry logic (exponential backoff)
- * User constraint: 2-3 retries with exponential backoff
+ * Fetch rankings with single attempt - backend handles retries with circuit breaker
+ * (Phase 12 P04: Backend circuit breaker opens after 5 failures for 60s)
+ * Client retries fight the circuit breaker and create thundering herd on recovery
  */
 export async function getRankingsWithRetry(
   espnLeagueId: string,
   options: GetRankingsOptions = {}
 ): Promise<PlayerRanking[]> {
-  return backOff(
-    () => getRankings(espnLeagueId, options),
-    {
-      numOfAttempts: 3,          // User constraint: 2-3 retries
-      startingDelay: 1000,       // 1 second
-      timeMultiple: 2,           // Exponential: 1s, 2s, 4s
-      maxDelay: 5000,            // Cap at 5 seconds
-      jitter: "full",            // Randomize to prevent thundering herd
-      retry: (error: any, attemptNumber: number) => {
-        console.warn(`[API Client] Retry attempt ${attemptNumber} after error:`, error);
-        return true; // Always retry within attempt limit
-      },
-    }
-  );
+  // Just call getRankings directly - backend handles retries
+  return getRankings(espnLeagueId, options);
 }
 
 /**
- * Fetch auction values with retry logic (exponential backoff)
+ * Fetch auction values with single attempt - backend handles retries with circuit breaker
  */
 export async function getAuctionValuesWithRetry(
   espnLeagueId: string,
   options: GetAuctionValuesOptions = {}
 ): Promise<AuctionValue[]> {
-  return backOff(
-    () => getAuctionValues(espnLeagueId, options),
-    {
-      numOfAttempts: 3,
-      startingDelay: 1000,
-      timeMultiple: 2,
-      maxDelay: 5000,
-      jitter: "full",
-      retry: (error: any, attemptNumber: number) => {
-        console.warn(`[API Client] Retry attempt ${attemptNumber} after error:`, error);
-        return true;
-      },
-    }
-  );
+  // Just call getAuctionValues directly - backend handles retries
+  return getAuctionValues(espnLeagueId, options);
 }
