@@ -111,12 +111,46 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
 
-    return fetchAPI('/api/projections/upload', {
+    // Use fetch directly to avoid Content-Type override
+    // Browser will automatically set multipart/form-data with boundary
+    const res = await fetch(`${API_URL}/api/projections/upload`, {
       method: 'POST',
+      credentials: 'include',
       body: formData,
-      // Don't set Content-Type - browser will set it with boundary for multipart
-      headers: {},
     });
+
+    if (res.status === 401) {
+      // Attempt silent refresh before giving up
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        // Retry upload with fresh tokens
+        const retryRes = await fetch(`${API_URL}/api/projections/upload`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+
+        if (retryRes.ok) {
+          return retryRes.json();
+        }
+      }
+
+      // Refresh failed - redirect to login
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        if (path !== '/login' && path !== '/signup' && path !== '/') {
+          window.location.href = '/login';
+        }
+      }
+      throw new Error('Unauthorized');
+    }
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || error.message || 'Upload failed');
+    }
+
+    return res.json();
   },
 
   async getProjections(limit = 20) {
