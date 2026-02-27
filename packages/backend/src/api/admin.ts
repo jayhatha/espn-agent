@@ -4,7 +4,12 @@ import { getDb } from "../db/connection.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { backfillQueue } from "../workers/backfill-worker.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
-import { ESPNAdapter, type ESPNAuthCookies, ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP } from "../adapters/espn.js";
+import {
+  ESPNAdapter,
+  type ESPNAuthCookies,
+  ESPN_STAT_MAP,
+  ESPN_LINEUP_SLOT_MAP,
+} from "../adapters/espn.js";
 
 /**
  * Admin API Routes
@@ -170,8 +175,12 @@ export async function adminRoutes(app: FastifyInstance) {
         .selectFrom("league_daily_snapshot")
         .select([
           db.fn.countAll().as("total"),
-          sql<number>`COUNT(*) FILTER (WHERE is_degraded = false)`.as("healthy"),
-          sql<number>`COUNT(*) FILTER (WHERE is_degraded = true)`.as("degraded"),
+          sql<number>`COUNT(*) FILTER (WHERE is_degraded = false)`.as(
+            "healthy",
+          ),
+          sql<number>`COUNT(*) FILTER (WHERE is_degraded = true)`.as(
+            "degraded",
+          ),
         ])
         .where("snapshot_date", ">=", sevenDaysAgo)
         .executeTakeFirst();
@@ -221,16 +230,14 @@ export async function adminRoutes(app: FastifyInstance) {
         )
         .selectFrom("league")
         .leftJoin("latest_snapshots", "league.id", "latest_snapshots.league_id")
-        .leftJoin(
-          "league_daily_snapshot",
-          (join) =>
-            join
-              .onRef("league.id", "=", "league_daily_snapshot.league_id")
-              .onRef(
-                "latest_snapshots.max_snapshot_date",
-                "=",
-                "league_daily_snapshot.snapshot_date",
-              ),
+        .leftJoin("league_daily_snapshot", (join) =>
+          join
+            .onRef("league.id", "=", "league_daily_snapshot.league_id")
+            .onRef(
+              "latest_snapshots.max_snapshot_date",
+              "=",
+              "league_daily_snapshot.snapshot_date",
+            ),
         )
         .select([
           "league.id",
@@ -308,7 +315,8 @@ export async function adminRoutes(app: FastifyInstance) {
       if (start < 1 || end > 30 || start > end) {
         return reply.code(400).send({
           error: "Invalid week range",
-          message: "startWeek must be >= 1, endWeek must be <= 30, and startWeek <= endWeek",
+          message:
+            "startWeek must be >= 1, endWeek must be <= 30, and startWeek <= endWeek",
         });
       }
 
@@ -318,8 +326,6 @@ export async function adminRoutes(app: FastifyInstance) {
         .select([
           "id",
           "espn_league_id",
-          "espn_swid",
-          "espn_s2",
           "espn_swid_encrypted",
           "espn_s2_encrypted",
           "name",
@@ -333,36 +339,34 @@ export async function adminRoutes(app: FastifyInstance) {
         });
       }
 
-      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      // Get ESPN auth credentials (encrypted only)
       let espnAuth: { SWID?: string; espn_s2?: string } | undefined;
-      const swidSource = league.espn_swid_encrypted || league.espn_swid;
-      const s2Source = league.espn_s2_encrypted || league.espn_s2;
-
-      if (swidSource || s2Source) {
-        const SWID = swidSource
-          ? Buffer.isBuffer(swidSource) && hasEncryptionKey()
-            ? decryptToken(swidSource)
-            : Buffer.isBuffer(swidSource)
-              ? swidSource.toString()
-              : swidSource
-          : undefined;
-        const espn_s2 = s2Source
-          ? Buffer.isBuffer(s2Source) && hasEncryptionKey()
-            ? decryptToken(s2Source)
-            : Buffer.isBuffer(s2Source)
-              ? s2Source.toString()
-              : s2Source
-          : undefined;
-        espnAuth = { SWID, espn_s2 };
+      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        if (!hasEncryptionKey()) {
+          return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+        }
+        try {
+          espnAuth = {
+            SWID: decryptToken(league.espn_swid_encrypted),
+            espn_s2: decryptToken(league.espn_s2_encrypted),
+          };
+        } catch (error) {
+          request.log.error({ error }, "Failed to decrypt ESPN cookies");
+          return reply.code(500).send({ error: "Failed to decrypt ESPN credentials" });
+        }
       }
 
       // Clear existing data if requested
       if (clearExisting) {
         const baseDate = new Date(season, 3, 1);
-        const startDate = new Date(baseDate.getTime() + (start - 1) * 7 * 24 * 60 * 60 * 1000)
+        const startDate = new Date(
+          baseDate.getTime() + (start - 1) * 7 * 24 * 60 * 60 * 1000,
+        )
           .toISOString()
           .split("T")[0];
-        const endDate = new Date(baseDate.getTime() + (end - 1) * 7 * 24 * 60 * 60 * 1000)
+        const endDate = new Date(
+          baseDate.getTime() + (end - 1) * 7 * 24 * 60 * 60 * 1000,
+        )
           .toISOString()
           .split("T")[0];
 
@@ -452,7 +456,10 @@ export async function adminRoutes(app: FastifyInstance) {
           message: `Backfill started: ${end - start + 1} weeks`,
         };
       } catch (error) {
-        request.log.error({ error, leagueId, season }, "Failed to start backfill");
+        request.log.error(
+          { error, leagueId, season },
+          "Failed to start backfill",
+        );
         return reply.code(500).send({
           success: false,
           error: "Failed to start backfill job",
@@ -488,10 +495,14 @@ export async function adminRoutes(app: FastifyInstance) {
 
       // Compute snapshot date range using same formula as historical-backfill.ts
       const baseDate = new Date(season, 3, 1); // April 1 of season year
-      const startDate = new Date(baseDate.getTime() + (startWeek - 1) * 7 * 24 * 60 * 60 * 1000)
+      const startDate = new Date(
+        baseDate.getTime() + (startWeek - 1) * 7 * 24 * 60 * 60 * 1000,
+      )
         .toISOString()
         .split("T")[0];
-      const endDate = new Date(baseDate.getTime() + (endWeek - 1) * 7 * 24 * 60 * 60 * 1000)
+      const endDate = new Date(
+        baseDate.getTime() + (endWeek - 1) * 7 * 24 * 60 * 60 * 1000,
+      )
         .toISOString()
         .split("T")[0];
 
@@ -534,7 +545,13 @@ export async function adminRoutes(app: FastifyInstance) {
         const transactionsDeleted = Number(txnResult.numDeletedRows);
 
         request.log.info(
-          { leagueId, season, snapshotsDeleted, rawPayloadsDeleted, transactionsDeleted },
+          {
+            leagueId,
+            season,
+            snapshotsDeleted,
+            rawPayloadsDeleted,
+            transactionsDeleted,
+          },
           "Backfill data cleared",
         );
 
@@ -548,7 +565,10 @@ export async function adminRoutes(app: FastifyInstance) {
           dateRange: { startDate, endDate },
         };
       } catch (error) {
-        request.log.error({ error, leagueId, season }, "Failed to clear backfill data");
+        request.log.error(
+          { error, leagueId, season },
+          "Failed to clear backfill data",
+        );
         return reply.code(500).send({
           success: false,
           error: "Failed to clear backfill data",
@@ -670,7 +690,10 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     },
     async (request: any, reply: any) => {
-      const season = parseInt(request.body.season || new Date().getFullYear(), 10);
+      const season = parseInt(
+        request.body.season || new Date().getFullYear(),
+        10,
+      );
 
       if (season < 2017 || season > new Date().getFullYear() + 1) {
         return reply.code(400).send({
@@ -681,11 +704,12 @@ export async function adminRoutes(app: FastifyInstance) {
 
       try {
         // Import player pool queue dynamically
-        const { playerPoolQueue } = await import("../workers/player-pool-worker.js");
+        const { playerPoolQueue } =
+          await import("../workers/player-pool-worker.js");
 
         // Add job to queue
         const jobId = `manual-sync-${season}-${Date.now()}`;
-        const job = await playerPoolQueue.add(
+        await playerPoolQueue.add(
           jobId,
           { season },
           {
@@ -708,7 +732,10 @@ export async function adminRoutes(app: FastifyInstance) {
           message: "Player pool sync started",
         };
       } catch (error) {
-        request.log.error({ error, season }, "Failed to trigger player pool sync");
+        request.log.error(
+          { error, season },
+          "Failed to trigger player pool sync",
+        );
         return reply.code(500).send({
           success: false,
           error: "Failed to trigger player pool sync",
@@ -755,8 +782,6 @@ export async function adminRoutes(app: FastifyInstance) {
         .select([
           "id",
           "espn_league_id",
-          "espn_swid",
-          "espn_s2",
           "espn_swid_encrypted",
           "espn_s2_encrypted",
           "name",
@@ -770,27 +795,21 @@ export async function adminRoutes(app: FastifyInstance) {
         });
       }
 
-      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      // Get ESPN auth credentials (encrypted only)
       let espnAuth: ESPNAuthCookies | undefined;
-      const swidSource = league.espn_swid_encrypted || league.espn_swid;
-      const s2Source = league.espn_s2_encrypted || league.espn_s2;
-
-      if (swidSource || s2Source) {
-        const SWID = swidSource
-          ? Buffer.isBuffer(swidSource) && hasEncryptionKey()
-            ? decryptToken(swidSource)
-            : Buffer.isBuffer(swidSource)
-              ? swidSource.toString()
-              : swidSource
-          : undefined;
-        const espn_s2 = s2Source
-          ? Buffer.isBuffer(s2Source) && hasEncryptionKey()
-            ? decryptToken(s2Source)
-            : Buffer.isBuffer(s2Source)
-              ? s2Source.toString()
-              : s2Source
-          : undefined;
-        espnAuth = { SWID, espn_s2 };
+      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        if (!hasEncryptionKey()) {
+          return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+        }
+        try {
+          espnAuth = {
+            SWID: decryptToken(league.espn_swid_encrypted),
+            espn_s2: decryptToken(league.espn_s2_encrypted),
+          };
+        } catch (error) {
+          request.log.error({ error }, "Failed to decrypt ESPN cookies");
+          return reply.code(500).send({ error: "Failed to decrypt ESPN credentials" });
+        }
       }
 
       try {
@@ -815,9 +834,11 @@ export async function adminRoutes(app: FastifyInstance) {
 
           for (const entry of rosterEntries) {
             const playerId = entry.playerId;
-            const playerName = entry.playerPoolEntry?.player?.fullName || "Unknown";
+            const playerName =
+              entry.playerPoolEntry?.player?.fullName || "Unknown";
             const lineupSlotId = entry.lineupSlotId;
-            const slotLabel = ESPN_LINEUP_SLOT_MAP[lineupSlotId] || `Slot ${lineupSlotId}`;
+            const slotLabel =
+              ESPN_LINEUP_SLOT_MAP[lineupSlotId] || `Slot ${lineupSlotId}`;
 
             // Check if player would be included by the fixed filter
             const included = lineupSlotId !== undefined && lineupSlotId <= 16;
@@ -825,13 +846,17 @@ export async function adminRoutes(app: FastifyInstance) {
             // Find per-period stats (statSplitTypeId=5)
             const playerStats = entry.playerPoolEntry?.player?.stats || [];
             const periodStats = playerStats.find(
-              (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
+              (s: any) =>
+                s.scoringPeriodId === scoringPeriodId &&
+                s.statSplitTypeId === 5,
             );
 
             const periodStatsObj: Record<string, number> = {};
 
             if (periodStats && periodStats.stats) {
-              for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
+              for (const [espnStatIdStr, value] of Object.entries(
+                periodStats.stats,
+              )) {
                 const espnStatId = parseInt(espnStatIdStr, 10);
                 const statInfo = ESPN_STAT_MAP[espnStatId];
 
@@ -844,7 +869,8 @@ export async function adminRoutes(app: FastifyInstance) {
                       const ip = value / 3;
                       teamPeriodTotals.IP = (teamPeriodTotals.IP || 0) + ip;
                     } else {
-                      teamPeriodTotals[statInfo.key] = (teamPeriodTotals[statInfo.key] || 0) + value;
+                      teamPeriodTotals[statInfo.key] =
+                        (teamPeriodTotals[statInfo.key] || 0) + value;
                     }
                   }
                 }
@@ -864,7 +890,9 @@ export async function adminRoutes(app: FastifyInstance) {
           // Get ESPN's team-level valuesByStat for comparison
           const valuesByStat: Record<string, number> = {};
           if (team.valuesByStat) {
-            for (const [espnStatIdStr, value] of Object.entries(team.valuesByStat)) {
+            for (const [espnStatIdStr, value] of Object.entries(
+              team.valuesByStat,
+            )) {
               const espnStatId = parseInt(espnStatIdStr, 10);
               const statInfo = ESPN_STAT_MAP[espnStatId];
               if (statInfo && typeof value === "number") {
@@ -878,7 +906,9 @@ export async function adminRoutes(app: FastifyInstance) {
             teamName: team.name || `Team ${team.id}`,
             valuesByStat,
             rosterPlayerCount: rosterEntries.length,
-            playersWithPeriodStats: players.filter(p => Object.keys(p.periodStats).length > 0).length,
+            playersWithPeriodStats: players.filter(
+              (p) => Object.keys(p.periodStats).length > 0,
+            ).length,
             players,
             teamPeriodTotals,
           });
@@ -890,7 +920,10 @@ export async function adminRoutes(app: FastifyInstance) {
           teams,
         };
       } catch (error) {
-        request.log.error({ error, leagueId, season, scoringPeriodId }, "Failed to fetch period stats");
+        request.log.error(
+          { error, leagueId, season, scoringPeriodId },
+          "Failed to fetch period stats",
+        );
         return reply.code(500).send({
           success: false,
           error: "Failed to fetch period stats from ESPN",

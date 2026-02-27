@@ -6,6 +6,7 @@ import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-re
 import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
+import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Recommendations API Routes
@@ -53,7 +54,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         // Fetch league auth info
         const league = await db
           .selectFrom("league")
-          .select(["espn_league_id", "season", "espn_swid", "espn_s2"])
+          .select(["espn_league_id", "season", "espn_swid_encrypted", "espn_s2_encrypted"])
           .where("id", "=", leagueId)
           .executeTakeFirst();
 
@@ -61,9 +62,22 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           return reply.code(404).send({ error: "League not found" });
         }
 
-        const auth = league.espn_swid && league.espn_s2
-          ? { SWID: league.espn_swid, espn_s2: league.espn_s2 }
-          : undefined;
+        // Decrypt ESPN cookies (encrypted only)
+        let auth: { SWID: string; espn_s2: string } | undefined;
+        if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+          if (!hasEncryptionKey()) {
+            return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+          }
+          try {
+            auth = {
+              SWID: decryptToken(league.espn_swid_encrypted),
+              espn_s2: decryptToken(league.espn_s2_encrypted),
+            };
+          } catch (error) {
+            request.log.error({ error }, "Failed to decrypt ESPN cookies");
+            return reply.code(500).send({ error: "Failed to decrypt ESPN credentials" });
+          }
+        }
 
         // Fetch free agents live from ESPN with ownership data
         const espnAdapter = new ESPNAdapter(request.log as any);

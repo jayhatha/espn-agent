@@ -23,8 +23,6 @@ async function triggerDegradedLeagueResnapshots(
     .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
     .select([
       "league.id",
-      "league.espn_swid",
-      "league.espn_s2",
       "league.espn_swid_encrypted",
       "league.espn_s2_encrypted",
     ])
@@ -34,8 +32,6 @@ async function triggerDegradedLeagueResnapshots(
     )
     .groupBy([
       "league.id",
-      "league.espn_swid",
-      "league.espn_s2",
       "league.espn_swid_encrypted",
       "league.espn_s2_encrypted",
     ])
@@ -58,21 +54,21 @@ async function triggerDegradedLeagueResnapshots(
         try {
           const orchestrator = new SnapshotOrchestratorAgent(db, log);
 
-          // Decrypt ESPN cookies - prefer encrypted, fallback to plaintext
+          // Decrypt ESPN cookies (encrypted only - no plaintext fallback)
           let auth: { SWID: string; espn_s2: string } | undefined;
-          try {
-            if (league.espn_swid_encrypted && league.espn_s2_encrypted && hasEncryptionKey()) {
+          if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+            if (!hasEncryptionKey()) {
+              log.error({ leagueId: league.id }, "ENCRYPTION_KEY not configured - cannot decrypt credentials");
+              return;
+            }
+            try {
               auth = {
                 SWID: decryptToken(league.espn_swid_encrypted),
                 espn_s2: decryptToken(league.espn_s2_encrypted),
               };
-            } else if (league.espn_swid && league.espn_s2) {
-              auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
-            }
-          } catch (error) {
-            log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
-            if (league.espn_swid && league.espn_s2) {
-              auth = { SWID: league.espn_swid, espn_s2: league.espn_s2 };
+            } catch (error) {
+              log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
+              return;
             }
           }
 

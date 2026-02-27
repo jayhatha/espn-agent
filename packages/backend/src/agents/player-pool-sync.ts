@@ -51,8 +51,6 @@ export class PlayerPoolSyncAgent {
         .selectFrom("league")
         .select([
           "espn_league_id",
-          "espn_swid",
-          "espn_s2",
           "espn_swid_encrypted",
           "espn_s2_encrypted",
         ])
@@ -76,29 +74,40 @@ export class PlayerPoolSyncAgent {
         "Using connected league for player pool sync",
       );
 
-      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      // Get ESPN auth credentials (encrypted only)
       let espnAuth: { SWID: string; espn_s2: string } | undefined;
-      const swidSource =
-        league.espn_swid_encrypted || league.espn_swid;
-      const s2Source = league.espn_s2_encrypted || league.espn_s2;
-
-      if (swidSource && s2Source) {
+      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
         // Import decryption utilities
         const { decryptToken, hasEncryptionKey } = await import(
           "../utils/encryption.js"
         );
 
-        const SWID = Buffer.isBuffer(swidSource) && hasEncryptionKey()
-          ? decryptToken(swidSource)
-          : Buffer.isBuffer(swidSource)
-            ? swidSource.toString()
-            : swidSource;
-        const espn_s2 = Buffer.isBuffer(s2Source) && hasEncryptionKey()
-          ? decryptToken(s2Source)
-          : Buffer.isBuffer(s2Source)
-            ? s2Source.toString()
-            : s2Source;
-        espnAuth = { SWID, espn_s2 };
+        if (!hasEncryptionKey()) {
+          const msg = "ENCRYPTION_KEY not configured - cannot decrypt credentials";
+          this.logger?.error(msg);
+          return {
+            success: false,
+            playersUpdated: 0,
+            playersInserted: 0,
+            error: msg,
+          };
+        }
+
+        try {
+          espnAuth = {
+            SWID: decryptToken(league.espn_swid_encrypted),
+            espn_s2: decryptToken(league.espn_s2_encrypted),
+          };
+        } catch (error) {
+          const msg = "Failed to decrypt ESPN credentials";
+          this.logger?.error({ error }, msg);
+          return {
+            success: false,
+            playersUpdated: 0,
+            playersInserted: 0,
+            error: msg,
+          };
+        }
       }
 
       const players = await this.espnAdapter.fetchLeague({
