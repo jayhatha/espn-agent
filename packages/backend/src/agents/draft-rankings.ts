@@ -11,6 +11,7 @@ import {
   calculateTotalSGP,
   getReplacementLevel,
   calculateVBD,
+  calculateFinalRate,
 } from "../../../shared/dist/index.js";
 
 /**
@@ -157,7 +158,6 @@ export class DraftRankingsAgent {
       if (category.type === "COUNTING") {
         allValues = allProjections.map((p) => p[category.stat_key] || 0);
       } else if (category.type === "RATE" && category.formula_id) {
-        const { calculateFinalRate } = require("../../../shared/dist/index.js");
         allValues = allProjections.map((p) => {
           try {
             return calculateFinalRate(category.formula_id!, {}, p);
@@ -376,8 +376,6 @@ export class DraftRankingsAgent {
       allValues = allProjections.map((p) => p[category.stat_key] || 0);
     } else if (category.type === "RATE" && category.formula_id) {
       try {
-        // Import calculateFinalRate if needed
-        const { calculateFinalRate } = require("../../../shared/dist/index.js");
         statValue = calculateFinalRate(category.formula_id, {}, projection);
         allValues = allProjections.map((p) => {
           try {
@@ -576,7 +574,6 @@ export class DraftRankingsAgent {
   private getCategoryValue(stats: StatComponents, category: Category): number {
     if (category.type === "RATE" && category.formula_id) {
       // Calculate rate from components
-      const { calculateFinalRate } = require("../../../shared/dist/index.js");
       try {
         return calculateFinalRate(category.formula_id, {}, stats);
       } catch {
