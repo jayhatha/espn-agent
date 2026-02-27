@@ -796,3 +796,94 @@ export function testParsePick(element: Element): void {
     );
   }
 }
+
+/**
+ * Parse team rosters from ESPN draft DOM
+ * Returns map of teamId -> team roster data with playerIds
+ *
+ * Strategy:
+ * 1. Collect all completed picks using existing snapshot function
+ * 2. Group picks by teamId field (already parsed by parsePickElement)
+ * 3. Return Map with entry per team containing teamId/teamName/playerIds
+ *
+ * Use cases:
+ * - Practice drafts: compute projected standings locally without backend API
+ * - Fallback when API fails: use DOM state to maintain UI functionality
+ */
+export function parseTeamRostersFromDOM(): Map<
+  string,
+  { teamId: string; teamName: string; playerIds: number[] }
+> {
+  const picks = collectCompletedPicksSnapshot();
+  const teamRosters = new Map<
+    string,
+    { teamId: string; teamName: string; playerIds: number[] }
+  >();
+
+  // Group picks by teamId
+  for (const pick of picks) {
+    // Skip picks with missing teamId (should be rare with fallback logic in parsePickElement)
+    if (!pick.teamId) {
+      console.warn(
+        "[ESPN Draft Assistant] Skipping pick with missing teamId:",
+        pick.playerName,
+      );
+      continue;
+    }
+
+    // Get or create team roster entry
+    let roster = teamRosters.get(pick.teamId);
+    if (!roster) {
+      roster = {
+        teamId: pick.teamId,
+        teamName: pick.teamName || `Team ${pick.teamId}`,
+        playerIds: [],
+      };
+      teamRosters.set(pick.teamId, roster);
+    }
+
+    // Add player to roster (dedupe by playerId)
+    if (!roster.playerIds.includes(pick.playerId)) {
+      roster.playerIds.push(pick.playerId);
+    }
+  }
+
+  console.log(
+    `[ESPN Draft Assistant] Parsed ${teamRosters.size} team rosters from DOM (${picks.length} total picks)`,
+  );
+
+  return teamRosters;
+}
+
+/**
+ * Diagnostic function to log roster parsing results
+ * Useful for debugging roster detection on live ESPN pages
+ * Call from console: window.espnDraftAssistant?.diagnoseRosters()
+ */
+export function logRosterDiagnostics(): void {
+  const rosters = parseTeamRostersFromDOM();
+
+  console.log("[ESPN Draft Assistant] Roster Diagnostic Report:");
+  console.log(`  Total teams: ${rosters.size}`);
+
+  if (rosters.size === 0) {
+    console.warn("  No teams found - draft may not have started");
+    return;
+  }
+
+  // Log each team
+  rosters.forEach((roster, teamId) => {
+    console.log(
+      `  Team "${roster.teamName}" (ID: ${teamId}): ${roster.playerIds.length} players`,
+    );
+  });
+
+  // Show sample roster (first team)
+  const firstTeam = Array.from(rosters.values())[0];
+  if (firstTeam) {
+    console.log("\n  Sample roster (first team):");
+    console.log(`    Team: ${firstTeam.teamName}`);
+    console.log(`    Players: ${firstTeam.playerIds.length}`);
+    console.log(`    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`);
+  }
+}
