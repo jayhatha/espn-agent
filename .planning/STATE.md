@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 13 (Clean Up Tech Debt)
 Plan: 6 of 6 in current phase
 Status: Complete
-Last activity: 2026-02-27 - Completed quick task 16: Fix security issues: encrypt API token storage and validate message handler sender
+Last activity: 2026-02-27 - Completed quick task 17: Make auction budget and categories dynamic
 
 Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
 
@@ -90,8 +90,10 @@ Progress: Phase 13: [██████████] 100% (6 of 6 plans complete
 | quick-13 | 3min | 3 | 3 |
 | quick-14 | 2min | 3 | 4 |
 | quick-15 | 2min | 3 | 2 |
+| quick-16 | 4min | 2 | 7 |
+| quick-17 | 3min | 3 | 3 |
 
-*Updated: 2026-02-26 after Phase 13 completion*
+*Updated: 2026-02-27 after quick task 17 completion*
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
 | Phase 13 P02 | 10 | 3 tasks | 6 files |
 | Phase 13 P05 | 3 | 3 tasks | 3 files |
@@ -237,10 +239,11 @@ None yet.
 | 13 | Refactor draft projections to use DOM + Reactive Observers with persistent storage | 2026-02-27 | 72a90c9 | ✅ | [13-refactor-draft-projections-to-use-dom-ro](./quick/13-refactor-draft-projections-to-use-dom-ro/) |
 | 14 | Show current auction player at top of sidebar during auction drafts | 2026-02-27 | 962bbce | ✅ | [14-show-the-current-player-at-the-top-of-th](./quick/14-show-the-current-player-at-the-top-of-th/) |
 | 15 | Fix critical extension bugs: async forEach promise rejections, sidebar race conditions, production debug globals | 2026-02-27 | 74fb264 | ✅ | [15-fix-critical-extension-bugs-async-foreac](./quick/15-fix-critical-extension-bugs-async-foreac/) |
-| 16 | Fix security issues: encrypt API token storage and validate message handler sender | 2026-02-27 | fd272ce | Verified | [16-fix-security-issues-encrypt-api-token-st](./quick/16-fix-security-issues-encrypt-api-token-st/) |
+| 16 | Fix security issues: encrypt API token storage and validate message handler sender | 2026-02-27 | fd272ce | ✅ | [16-fix-security-issues-encrypt-api-token-st](./quick/16-fix-security-issues-encrypt-api-token-st/) |
+| 17 | Make auction budget and categories dynamic in Chrome extension | 2026-02-27 | fc9983a | ✅ | [17-make-auction-budget-and-categories-dynam](./quick/17-make-auction-budget-and-categories-dynam/) |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed quick-15 - fix critical extension bugs (async forEach, race conditions, debug globals)
+Stopped at: Completed quick-17 - make auction budget and categories dynamic
 Resume file: None
