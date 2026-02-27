@@ -46,13 +46,65 @@ export class PlayerPoolSyncAgent {
     const startTime = Date.now();
 
     try {
-      // Fetch top 500 players by ownership from ESPN
-      // Use a generic public league for free agent data (no auth needed for top players)
-      const GENERIC_LEAGUE_ID = 1; // ESPN's generic league ID for public data
+      // Look up an actual connected league for this season to use for player data
+      const league = await this.db
+        .selectFrom("league")
+        .select([
+          "espn_league_id",
+          "espn_swid",
+          "espn_s2",
+          "espn_swid_encrypted",
+          "espn_s2_encrypted",
+        ])
+        .where("season", "=", season)
+        .orderBy("created_at", "asc")
+        .executeTakeFirst();
+
+      if (!league) {
+        const msg = `No connected league found for season ${season}`;
+        this.logger?.warn(msg);
+        return {
+          success: false,
+          playersUpdated: 0,
+          playersInserted: 0,
+          error: msg,
+        };
+      }
+
+      this.logger?.info(
+        { espnLeagueId: league.espn_league_id, season },
+        "Using connected league for player pool sync",
+      );
+
+      // Get ESPN auth credentials (prefer encrypted, fall back to plaintext)
+      let espnAuth: { SWID: string; espn_s2: string } | undefined;
+      const swidSource =
+        league.espn_swid_encrypted || league.espn_swid;
+      const s2Source = league.espn_s2_encrypted || league.espn_s2;
+
+      if (swidSource && s2Source) {
+        // Import decryption utilities
+        const { decryptToken, hasEncryptionKey } = await import(
+          "../utils/encryption.js"
+        );
+
+        const SWID = Buffer.isBuffer(swidSource) && hasEncryptionKey()
+          ? decryptToken(swidSource)
+          : Buffer.isBuffer(swidSource)
+            ? swidSource.toString()
+            : swidSource;
+        const espn_s2 = Buffer.isBuffer(s2Source) && hasEncryptionKey()
+          ? decryptToken(s2Source)
+          : Buffer.isBuffer(s2Source)
+            ? s2Source.toString()
+            : s2Source;
+        espnAuth = { SWID, espn_s2 };
+      }
 
       const players = await this.espnAdapter.fetchLeague({
-        leagueId: GENERIC_LEAGUE_ID,
+        leagueId: league.espn_league_id,
         season,
+        auth: espnAuth,
         views: ["kona_player_info"],
         xFantasyFilter: {
           players: {
@@ -80,7 +132,10 @@ export class PlayerPoolSyncAgent {
         };
       }
 
-      this.logger?.info({ playerCount: rawPlayers.length }, "Fetched players from ESPN");
+      this.logger?.info(
+        { playerCount: rawPlayers.length },
+        "Fetched players from ESPN",
+      );
 
       // Parse player data
       const playerDataList: PlayerData[] = [];
@@ -104,17 +159,20 @@ export class PlayerPoolSyncAgent {
         // Extract current season stats (statSplitTypeId=0 for full season)
         const statsArray = player.stats || [];
         const seasonStats = statsArray.find(
-          (s: any) => s.statSplitTypeId === 0 && s.seasonId === season
+          (s: any) => s.statSplitTypeId === 0 && s.seasonId === season,
         );
 
         const currentSeasonStats: Record<string, number> = {};
         if (seasonStats && seasonStats.stats) {
-          for (const [espnStatIdStr, value] of Object.entries(seasonStats.stats)) {
+          for (const [espnStatIdStr, value] of Object.entries(
+            seasonStats.stats,
+          )) {
             const espnStatId = parseInt(espnStatIdStr, 10);
             const statInfo = ESPN_STAT_MAP[espnStatId];
 
             if (statInfo && statInfo.type === "COUNTING") {
-              currentSeasonStats[statInfo.key] = typeof value === "number" ? value : 0;
+              currentSeasonStats[statInfo.key] =
+                typeof value === "number" ? value : 0;
             }
           }
         }
@@ -135,27 +193,30 @@ export class PlayerPoolSyncAgent {
 
       this.logger?.info(
         { playerCount: playerDataList.length },
-        "Parsed player data, starting upsert"
+        "Parsed player data, starting upsert",
       );
 
       // Batch check which players already exist
       const espnPlayerIds = playerDataList.map((p) => p.espnPlayerId);
-      const existingPlayers = espnPlayerIds.length > 0
-        ? await this.db
-            .selectFrom("player")
-            .select(["id", "espn_player_id"])
-            .where("espn_player_id", "in", espnPlayerIds)
-            .execute()
-        : [];
+      const existingPlayers =
+        espnPlayerIds.length > 0
+          ? await this.db
+              .selectFrom("player")
+              .select(["id", "espn_player_id"])
+              .where("espn_player_id", "in", espnPlayerIds)
+              .execute()
+          : [];
 
-      const existingIdSet = new Set(existingPlayers.map((p) => p.espn_player_id));
+      const existingIdSet = new Set(
+        existingPlayers.map((p) => p.espn_player_id),
+      );
 
       // Separate into inserts and updates
       const playersToInsert = playerDataList.filter(
-        (p) => !existingIdSet.has(p.espnPlayerId)
+        (p) => !existingIdSet.has(p.espnPlayerId),
       );
       const playersToUpdate = playerDataList.filter((p) =>
-        existingIdSet.has(p.espnPlayerId)
+        existingIdSet.has(p.espnPlayerId),
       );
 
       // Batch insert new players
@@ -174,7 +235,7 @@ export class PlayerPoolSyncAgent {
                 pct_owned: p.pctOwned,
                 current_season_stats_json: p.currentSeasonStats,
                 last_synced_at: new Date(),
-              }))
+              })),
             )
             .execute();
           playersInserted = playersToInsert.length;
@@ -200,7 +261,7 @@ export class PlayerPoolSyncAgent {
         } catch (error) {
           this.logger?.error(
             { error, playerId: playerData.espnPlayerId },
-            "Failed to update player"
+            "Failed to update player",
           );
         }
       }
@@ -208,7 +269,7 @@ export class PlayerPoolSyncAgent {
       const duration = Date.now() - startTime;
       this.logger?.info(
         { playersUpdated, playersInserted, durationMs: duration },
-        "Player pool sync completed successfully"
+        "Player pool sync completed successfully",
       );
 
       return {
@@ -258,12 +319,36 @@ export class PlayerPoolSyncAgent {
    */
   private mapProTeamId(proTeamId: number): string {
     const map: Record<number, string> = {
-      1: "BAL", 2: "BOS", 3: "LAA", 4: "CWS", 5: "CLE",
-      6: "DET", 7: "KC", 8: "MIL", 9: "MIN", 10: "NYY",
-      11: "OAK", 12: "SEA", 13: "TEX", 14: "TOR", 15: "ATL",
-      16: "CHC", 17: "CIN", 18: "HOU", 19: "LAD", 20: "WSH",
-      21: "NYM", 22: "PHI", 23: "PIT", 24: "STL", 25: "SD",
-      26: "SF", 27: "COL", 28: "MIA", 29: "ARI", 30: "TB",
+      1: "BAL",
+      2: "BOS",
+      3: "LAA",
+      4: "CWS",
+      5: "CLE",
+      6: "DET",
+      7: "KC",
+      8: "MIL",
+      9: "MIN",
+      10: "NYY",
+      11: "OAK",
+      12: "SEA",
+      13: "TEX",
+      14: "TOR",
+      15: "ATL",
+      16: "CHC",
+      17: "CIN",
+      18: "HOU",
+      19: "LAD",
+      20: "WSH",
+      21: "NYM",
+      22: "PHI",
+      23: "PIT",
+      24: "STL",
+      25: "SD",
+      26: "SF",
+      27: "COL",
+      28: "MIA",
+      29: "ARI",
+      30: "TB",
     };
 
     return map[proTeamId] || `TEAM_${proTeamId}`;
