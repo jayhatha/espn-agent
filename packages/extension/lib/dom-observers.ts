@@ -250,14 +250,14 @@ export function observeDraftBoard(
     scanCompletedPicks(document);
   };
 
-  const observer = new MutationObserver((mutations) => {
+  const observer = new MutationObserver(async (mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
         // Check for new pick rows
-        mutation.addedNodes.forEach((node) => {
+        for (const node of mutation.addedNodes) {
           const pickElements = getPickCandidatesFromNode(node);
 
-          pickElements.forEach(async (pickElement) => {
+          const pickPromises = pickElements.map(async (pickElement) => {
             try {
               const pick = parsePickElement(pickElement);
               if (pick) {
@@ -267,19 +267,20 @@ export function observeDraftBoard(
               console.error(
                 "[ESPN Draft Assistant] Error parsing pick from mutation:",
                 error,
+                { element: pickElement },
               );
-              console.error(
-                "[ESPN Draft Assistant] Pick element context:",
-                {
-                  tag: pickElement.tagName,
-                  classes: pickElement.className,
-                  parentTag: pickElement.parentElement?.tagName,
-                },
-              );
-              // Continue observing despite extraction failure
             }
           });
-        });
+
+          try {
+            await Promise.all(pickPromises);
+          } catch (error) {
+            console.error(
+              "[ESPN Draft Assistant] Error processing pick batch:",
+              error,
+            );
+          }
+        }
       }
     }
   });
