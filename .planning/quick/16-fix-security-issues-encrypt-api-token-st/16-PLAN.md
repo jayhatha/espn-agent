@@ -6,7 +6,7 @@ wave: 1
 depends_on: []
 files_modified:
   - packages/backend/src/api/leagues.ts
-  - packages/backend/src/db/migrations/012_remove_plaintext_espn_cookies.sql
+  - packages/backend/src/db/migrations/015_remove_plaintext_espn_cookies.sql
   - packages/extension/entrypoints/background.ts
 autonomous: true
 requirements: [SEC-01, SEC-02]
@@ -18,7 +18,7 @@ must_haves:
     - "Extension message handler rejects messages from arbitrary web pages"
     - "Backend requires ENCRYPTION_KEY at startup (fails if missing)"
   artifacts:
-    - path: "packages/backend/src/db/migrations/012_remove_plaintext_espn_cookies.sql"
+    - path: "packages/backend/src/db/migrations/015_remove_plaintext_espn_cookies.sql"
       provides: "Migration to drop plaintext ESPN cookie columns"
       min_lines: 10
     - path: "packages/backend/src/api/leagues.ts"
@@ -71,15 +71,15 @@ Output: Encrypted-only credential storage, sender-validated message handlers, mi
   <name>Task 1: Remove plaintext ESPN credential storage and migrate to encrypted-only</name>
   <files>
     packages/backend/src/api/leagues.ts
-    packages/backend/src/db/migrations/012_remove_plaintext_espn_cookies.sql
+    packages/backend/src/db/migrations/015_remove_plaintext_espn_cookies.sql
   </files>
   <action>
-**Create migration 012_remove_plaintext_espn_cookies.sql:**
+**Create migration 015_remove_plaintext_espn_cookies.sql:**
 
 Drop plaintext columns `espn_swid` and `espn_s2` from league table. These were kept during Phase 1 for backward compatibility but are now fully migrated to encrypted storage.
 
 ```sql
--- Migration 012: Remove plaintext ESPN cookie columns
+-- Migration 015: Remove plaintext ESPN cookie columns
 -- All credentials now stored only in encrypted form
 
 ALTER TABLE league
@@ -173,7 +173,7 @@ COMMENT ON COLUMN league.espn_s2_encrypted IS 'AES-256-GCM encrypted ESPN espn_s
 5. Test encryption requirement: Attempt POST /api/leagues/connect without ENCRYPTION_KEY → should return 500 "ENCRYPTION_KEY required"
   </verify>
   <done>
-- Migration 012 applied successfully dropping plaintext columns espn_swid and espn_s2
+- Migration 015 applied successfully dropping plaintext columns espn_swid and espn_s2
 - `leagues.ts` writes ONLY to encrypted columns (espn_swid_encrypted, espn_s2_encrypted) in both POST /connect and PATCH /auth
 - `leagues.ts` reads ONLY from encrypted columns (no plaintext fallback) in snapshot endpoints
 - ENCRYPTION_KEY is required at credential storage time (throws error if missing)
@@ -323,7 +323,7 @@ Run after both tasks complete:
 </verification>
 
 <success_criteria>
-- [ ] Migration 012 removes espn_swid and espn_s2 columns from league table
+- [ ] Migration 015 removes espn_swid and espn_s2 columns from league table
 - [ ] leagues.ts stores ESPN credentials ONLY in encrypted columns (no plaintext fallback)
 - [ ] ESPN adapter calls decrypt credentials just-in-time for API requests
 - [ ] Backend requires ENCRYPTION_KEY env var (fails at startup if missing)

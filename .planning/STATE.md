@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 13 (Clean Up Tech Debt)
 Plan: 6 of 6 in current phase
 Status: Complete
-Last activity: 2026-02-27 - Completed quick task 15: Fix critical extension bugs (async forEach, race conditions, debug globals)
+Last activity: 2026-02-27 - Completed quick task 16: Fix security issues: encrypt API token storage and validate message handler sender
 
 Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
 
@@ -237,6 +237,7 @@ None yet.
 | 13 | Refactor draft projections to use DOM + Reactive Observers with persistent storage | 2026-02-27 | 72a90c9 | ✅ | [13-refactor-draft-projections-to-use-dom-ro](./quick/13-refactor-draft-projections-to-use-dom-ro/) |
 | 14 | Show current auction player at top of sidebar during auction drafts | 2026-02-27 | 962bbce | ✅ | [14-show-the-current-player-at-the-top-of-th](./quick/14-show-the-current-player-at-the-top-of-th/) |
 | 15 | Fix critical extension bugs: async forEach promise rejections, sidebar race conditions, production debug globals | 2026-02-27 | 74fb264 | ✅ | [15-fix-critical-extension-bugs-async-foreac](./quick/15-fix-critical-extension-bugs-async-foreac/) |
+| 16 | Fix security issues: encrypt API token storage and validate message handler sender | 2026-02-27 | fd272ce | Verified | [16-fix-security-issues-encrypt-api-token-st](./quick/16-fix-security-issues-encrypt-api-token-st/) |
 
 ## Session Continuity
 
