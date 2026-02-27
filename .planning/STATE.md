@@ -88,6 +88,7 @@ Progress: Phase 13: [██████████] 100% (6 of 6 plans complete
 | quick-11 | 4min | 2 | 2 |
 | quick-12 | 8min | 3 | 3 |
 | quick-13 | 3min | 3 | 3 |
+| quick-14 | 2min | 3 | 4 |
 
 *Updated: 2026-02-26 after Phase 13 completion*
 | Phase 13 P03 | 7 | 3 tasks | 6 files |
@@ -229,9 +230,10 @@ None yet.
 | 11 | Fix excessive API calls causing 429 rate limit errors in Chrome extension | 2026-02-27 | f3203c4 | ✅ | [11-fix-excessive-api-calls-causing-429-erro](./quick/11-fix-excessive-api-calls-causing-429-erro/) |
 | 12 | Parse practice draft rosters from DOM to enable projected standings without backend API | 2026-02-27 | 143f732 | ✅ | [12-parse-practice-draft-rosters-from-dom-in](./quick/12-parse-practice-draft-rosters-from-dom-in/) |
 | 13 | Refactor draft projections to use DOM + Reactive Observers with persistent storage | 2026-02-27 | 72a90c9 | ✅ | [13-refactor-draft-projections-to-use-dom-ro](./quick/13-refactor-draft-projections-to-use-dom-ro/) |
+| 14 | Show current auction player at top of sidebar during auction drafts | 2026-02-27 | 962bbce | ✅ | [14-show-the-current-player-at-the-top-of-th](./quick/14-show-the-current-player-at-the-top-of-th/) |
 
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed quick task 13 - refactor draft projections to use stored state with incremental updates
+Stopped at: Completed quick-14 - show current auction player at top of sidebar
 Resume file: None
