@@ -657,6 +657,66 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
+  // POST /api/admin/player-pool/sync - Manually trigger player pool sync
+  app.post(
+    "/api/admin/player-pool/sync",
+    {
+      onRequest: [requireAdmin],
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 hour",
+        },
+      },
+    },
+    async (request: any, reply: any) => {
+      const season = parseInt(request.body.season || new Date().getFullYear(), 10);
+
+      if (season < 2017 || season > new Date().getFullYear() + 1) {
+        return reply.code(400).send({
+          error: "Invalid season",
+          message: `season must be between 2017 and ${new Date().getFullYear() + 1}`,
+        });
+      }
+
+      try {
+        // Import player pool queue dynamically
+        const { playerPoolQueue } = await import("../workers/player-pool-worker.js");
+
+        // Add job to queue
+        const jobId = `manual-sync-${season}-${Date.now()}`;
+        const job = await playerPoolQueue.add(
+          jobId,
+          { season },
+          {
+            jobId,
+            removeOnComplete: {
+              age: 86400, // Keep for 24 hours
+            },
+            removeOnFail: {
+              age: 86400 * 7, // Keep failures for 7 days
+            },
+          },
+        );
+
+        request.log.info({ season, jobId }, "Player pool sync job enqueued");
+
+        return {
+          success: true,
+          jobId,
+          season,
+          message: "Player pool sync started",
+        };
+      } catch (error) {
+        request.log.error({ error, season }, "Failed to trigger player pool sync");
+        return reply.code(500).send({
+          success: false,
+          error: "Failed to trigger player pool sync",
+        });
+      }
+    },
+  );
+
   // GET /api/admin/leagues/:leagueId/debug/period-stats - Debug endpoint for scoring period roster stats
   app.get(
     "/api/admin/leagues/:leagueId/debug/period-stats",

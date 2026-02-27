@@ -436,4 +436,12 @@ export const api = {
     const qs = season ? `?season=${season}` : '';
     return fetchAPI(`/api/leagues/${leagueId}/transaction-impacts/league-summary${qs}`);
   },
+
+  // Player pool sync
+  async triggerPlayerPoolSync(season?: number) {
+    return fetchAPI('/api/admin/player-pool/sync', {
+      method: 'POST',
+      body: JSON.stringify({ season: season || new Date().getFullYear() }),
+    });
+  },
 };
