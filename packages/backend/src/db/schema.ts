@@ -35,7 +35,7 @@ export interface Database {
   league: WithGeneratedId<League>;
   league_settings_version: LeagueSettingsVersion;
   team: WithGeneratedId<Team>;
-  player: WithGeneratedId<Player>;
+  player: Player;
   player_identity_map: PlayerIdentityMap;
   league_raw_payload: WithGeneratedId<LeagueRawPayload>;
   league_daily_snapshot: LeagueDailySnapshot;

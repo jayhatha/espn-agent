@@ -82,8 +82,7 @@ export interface StatComponents {
 
 // Player
 export interface Player {
-  id: number;
-  espn_player_id: number;
+  id: number; // ESPN player ID (primary key)
   name: string;
   mlb_team: string | null;
   positions: string[];
