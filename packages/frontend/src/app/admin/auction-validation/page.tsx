@@ -22,8 +22,8 @@ interface ValidationResponse {
     medianDelta: number;
     rmse: number;
     correlation: number;
-    ourTopPlayer: string;
-    espnTopPlayer: string;
+    ourTopPlayer: { name: string; value: number };
+    espnTopPlayer: { name: string; value: number };
   };
   comparisons: PlayerComparison[];
 }
@@ -587,14 +587,20 @@ function AuctionValidationPageContent() {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">Our Top Player</div>
                   <div className="text-lg font-semibold text-gray-900">
-                    {results.summary.ourTopPlayer}
+                    {results.summary.ourTopPlayer.name}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    ${results.summary.ourTopPlayer.value}
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4">
                   <div className="text-sm text-gray-600 mb-1">ESPN Top Player</div>
                   <div className="text-lg font-semibold text-gray-900">
-                    {results.summary.espnTopPlayer}
+                    {results.summary.espnTopPlayer.name}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    ${results.summary.espnTopPlayer.value}
                   </div>
                 </div>
               </div>
