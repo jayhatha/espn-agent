@@ -243,4 +243,82 @@ describe("ESPNAdapter", () => {
       expect(mockClient).toHaveBeenCalledTimes(2); // Initial + 1 retry
     }, 10000);
   });
+
+  describe("fetchPreDraftAuctionValues", () => {
+    it("should fetch auction values for 100+ players", async () => {
+      // This is an integration test - requires real ESPN league
+      // Skip in CI if ESPN credentials not available
+      const espnLeagueId = parseInt(process.env.TEST_ESPN_LEAGUE_ID || "0");
+      const season = 2026;
+
+      if (espnLeagueId === 0) {
+        console.log("Skipping fetchPreDraftAuctionValues test - set TEST_ESPN_LEAGUE_ID to run");
+        return;
+      }
+
+      const adapter = new ESPNAdapter(mockLogger);
+      const auth = {
+        SWID: process.env.ESPN_SWID || "",
+        espn_s2: process.env.ESPN_S2 || "",
+      };
+
+      const result = await adapter.fetchPreDraftAuctionValues({
+        leagueId: espnLeagueId,
+        season,
+        auth: auth.SWID && auth.espn_s2 ? auth : undefined,
+      });
+
+      // Should return significantly more than 6 players
+      expect(result.length).toBeGreaterThan(100);
+
+      // Should have players across multiple positions
+      const positions = new Set(result.flatMap(p => p.positions));
+      expect(positions.size).toBeGreaterThan(5); // At least 6 different positions
+
+      // Should have variation in auction values (not all the same)
+      const values = result.map(p => p.espnAuctionValue);
+      const uniqueValues = new Set(values);
+      expect(uniqueValues.size).toBeGreaterThan(10); // At least 10 different values
+
+      // Top player should have reasonable auction value
+      const topPlayer = result[0]; // Result is sorted by value descending
+      expect(topPlayer.espnAuctionValue).toBeGreaterThan(20); // Top player > $20
+      expect(topPlayer.espnAuctionValue).toBeLessThan(100); // Top player < $100 (sanity check)
+    });
+
+    it("should handle missing auction values gracefully", async () => {
+      // Unit test with mocked response containing no auction values
+      const mockResponse = {
+        status: 200,
+        data: {
+          players: [
+            {
+              id: 12345,
+              player: {
+                fullName: "Test Player",
+                eligibleSlots: [0, 1],
+                draftRanksByRankType: {
+                  STANDARD: {
+                    // No auctionValue field
+                  },
+                },
+              },
+            },
+          ],
+        },
+      };
+
+      const adapter = new ESPNAdapter(mockLogger);
+      // Mock axios to return empty auction values
+      vi.spyOn(adapter["client"], "get").mockResolvedValue(mockResponse);
+
+      const result = await adapter.fetchPreDraftAuctionValues({
+        leagueId: 123,
+        season: 2026,
+      });
+
+      // Should return empty array, not throw
+      expect(result).toEqual([]);
+    });
+  });
 });
