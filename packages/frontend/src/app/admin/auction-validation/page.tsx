@@ -5,13 +5,14 @@ import { AdminRoute } from "@/components/ProtectedRoute";
 import { api } from "@/lib/api";
 
 interface PlayerComparison {
-  name: string;
+  playerId: number;
+  playerName: string;
   positions: string[];
   espnValue: number;
   ourValue: number;
-  delta: number;
-  deltaPercent: number;
   absoluteDelta: number;
+  percentDelta: number;
+  ratio: number;
 }
 
 interface ValidationResponse {
@@ -633,7 +634,7 @@ function AuctionValidationPageContent() {
                     {results.comparisons.map((comp, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {comp.name}
+                          {comp.playerName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {comp.positions.join(", ")}
