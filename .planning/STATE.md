@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 14 (ESPN Auction Values Fix)
+Phase: 15 (Fix Empty Categories in SGP Calculation)
 Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-02-28 - Completed 14-01-PLAN.md: ESPN auction values endpoint fix with increased limit and diagnostic logging
+Last activity: 2026-02-28 - Completed 15-01-PLAN.md: Fixed SGP category enum mismatch causing all auction values to collapse to $1
 
-Progress: Phase 14: [██████████] 100% (1 of 1 plans complete)
+Progress: Phase 15: [██████████] 100% (1 of 1 plans complete)
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: Phase 14: [██████████] 100% (1 of 1 plans complete
 | 13 | P05 | 3min | 3 | 3 |
 | 13 | P06 | 11min | 3 | 4 |
 | 14 | P01 | 2min | 2 | 2 |
+| 15 | P01 | 48min | 3 | 6 |
 
 **Quick Tasks:**
 
@@ -199,6 +200,8 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-16]: Require ENCRYPTION_KEY at startup (fail if missing) to prevent plaintext credential storage
 - [Phase quick-16]: Return 500 on decryption errors (no silent fallback) to force operators to fix encryption issues
 - [Phase quick-16]: Validate sender.url AND sender.id in extension message handler to prevent webpage attacks and extension spoofing
+- [Phase 15]: Export pure utility functions from extension modules for unit testing when they don't require DOM APIs
+- [Phase 15]: Category enum values sent to backend must use uppercase COUNTING/RATE and HIGHER_BETTER/LOWER_BETTER (not lowercase) — backend filter uses exact enum match
 
 ### Roadmap Evolution
 
@@ -262,5 +265,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 14-01-PLAN.md - ESPN auction values endpoint fix
+Stopped at: Completed 15-01-PLAN.md - SGP category enum mismatch fix restoring auction values
 Resume file: None

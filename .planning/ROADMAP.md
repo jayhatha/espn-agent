@@ -250,7 +250,7 @@ Plans:
 
 **Goal:** Fix categories data flow bug causing all auction values to collapse to $1 by ensuring formula_id is included for RATE stats in both extension DOM detection and admin page
 **Depends on:** Phase 14
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 15-01-PLAN.md — Fix DOM detector to include formula_id/required_components for RATE stats, fix admin page enum values, add unit tests
