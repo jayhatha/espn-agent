@@ -171,7 +171,7 @@ importers:
         version: 18.3.7(@types/react@18.3.28)
       '@wxt-dev/module-react':
         specifier: ^1.1.5
-        version: 1.1.5(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0))(wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@2.6.1)(rollup@4.57.1)(tsx@4.21.0))
+        version: 1.1.5(vite@7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0))(wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@1.21.7)(rollup@4.57.1)(tsx@4.21.0))
       autoprefixer:
         specifier: ^10.4.17
         version: 10.4.24(postcss@8.5.6)
@@ -184,9 +184,12 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
+      vitest:
+        specifier: ^1.6.1
+        version: 1.6.1(@types/node@25.3.0)
       wxt:
         specifier: ^0.20.18
-        version: 0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@2.6.1)(rollup@4.57.1)(tsx@4.21.0)
+        version: 0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@1.21.7)(rollup@4.57.1)(tsx@4.21.0)
 
   packages/frontend:
     dependencies:
@@ -5638,7 +5641,7 @@ snapshots:
   '@unrs/resolver-binding-win32-x64-msvc@1.11.1':
     optional: true
 
-  '@vitejs/plugin-react@5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0))':
+  '@vitejs/plugin-react@5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.0)
@@ -5646,7 +5649,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-rc.3
       '@types/babel__core': 7.20.5
       react-refresh: 0.18.0
-      vite: 7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0)
+      vite: 7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -5694,10 +5697,10 @@ snapshots:
       '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
 
-  '@wxt-dev/module-react@1.1.5(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0))(wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@2.6.1)(rollup@4.57.1)(tsx@4.21.0))':
+  '@wxt-dev/module-react@1.1.5(vite@7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0))(wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@1.21.7)(rollup@4.57.1)(tsx@4.21.0))':
     dependencies:
-      '@vitejs/plugin-react': 5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0))
-      wxt: 0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@2.6.1)(rollup@4.57.1)(tsx@4.21.0)
+      '@vitejs/plugin-react': 5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0))
+      wxt: 0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@1.21.7)(rollup@4.57.1)(tsx@4.21.0)
     transitivePeerDependencies:
       - supports-color
       - vite
@@ -9098,13 +9101,31 @@ snapshots:
       - supports-color
       - terser
 
-  vite-node@5.3.0(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0):
+  vite-node@1.6.1(@types/node@25.3.0):
+    dependencies:
+      cac: 6.7.14
+      debug: 4.4.3
+      pathe: 1.1.2
+      picocolors: 1.1.1
+      vite: 5.4.21(@types/node@25.3.0)
+    transitivePeerDependencies:
+      - '@types/node'
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
+  vite-node@5.3.0(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0):
     dependencies:
       cac: 6.7.14
       es-module-lexer: 2.0.0
       obug: 2.1.1
       pathe: 2.0.3
-      vite: 7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0)
+      vite: 7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -9136,7 +9157,7 @@ snapshots:
       '@types/node': 25.3.0
       fsevents: 2.3.3
 
-  vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0):
+  vite@7.3.1(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0):
     dependencies:
       esbuild: 0.27.3
       fdir: 6.5.0(picomatch@4.0.3)
@@ -9147,7 +9168,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 25.3.0
       fsevents: 2.3.3
-      jiti: 2.6.1
+      jiti: 1.21.7
       tsx: 4.21.0
 
   vitest@1.6.1(@types/node@20.19.33):
@@ -9174,6 +9195,40 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.19.33
+    transitivePeerDependencies:
+      - less
+      - lightningcss
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+
+  vitest@1.6.1(@types/node@25.3.0):
+    dependencies:
+      '@vitest/expect': 1.6.1
+      '@vitest/runner': 1.6.1
+      '@vitest/snapshot': 1.6.1
+      '@vitest/spy': 1.6.1
+      '@vitest/utils': 1.6.1
+      acorn-walk: 8.3.4
+      chai: 4.5.0
+      debug: 4.4.3
+      execa: 8.0.1
+      local-pkg: 0.5.1
+      magic-string: 0.30.21
+      pathe: 1.1.2
+      picocolors: 1.1.1
+      std-env: 3.10.0
+      strip-literal: 2.1.1
+      tinybench: 2.9.0
+      tinypool: 0.8.4
+      vite: 5.4.21(@types/node@25.3.0)
+      vite-node: 1.6.1(@types/node@25.3.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 25.3.0
     transitivePeerDependencies:
       - less
       - lightningcss
@@ -9324,7 +9379,7 @@ snapshots:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
 
-  wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@2.6.1)(rollup@4.57.1)(tsx@4.21.0):
+  wxt@0.20.18(@types/node@25.3.0)(eslint@8.57.1)(jiti@1.21.7)(rollup@4.57.1)(tsx@4.21.0):
     dependencies:
       '@1natsu/wait-element': 4.1.2
       '@aklinker1/rollup-plugin-visualizer': 5.12.0(rollup@4.57.1)
@@ -9369,7 +9424,7 @@ snapshots:
       scule: 1.3.0
       unimport: 5.6.0
       vite: 5.4.21(@types/node@25.3.0)
-      vite-node: 5.3.0(@types/node@25.3.0)(jiti@2.6.1)(tsx@4.21.0)
+      vite-node: 5.3.0(@types/node@25.3.0)(jiti@1.21.7)(tsx@4.21.0)
       web-ext-run: 0.2.4
     optionalDependencies:
       eslint: 8.57.1

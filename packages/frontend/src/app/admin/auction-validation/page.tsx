@@ -32,8 +32,8 @@ interface Category {
   category_id: number;
   stat_key: string;
   name: string;
-  type: "counting" | "rate";
-  direction: "high" | "low";
+  type: "COUNTING" | "RATE";
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
   formula_id?: string;
 }
 
@@ -46,21 +46,21 @@ interface RosterSlot {
 
 // Available categories
 const AVAILABLE_CATEGORIES: Category[] = [
-  { category_id: 1, stat_key: "R", name: "R", type: "counting", direction: "high" },
-  { category_id: 2, stat_key: "HR", name: "HR", type: "counting", direction: "high" },
-  { category_id: 3, stat_key: "RBI", name: "RBI", type: "counting", direction: "high" },
-  { category_id: 4, stat_key: "SB", name: "SB", type: "counting", direction: "high" },
-  { category_id: 5, stat_key: "AVG", name: "AVG", type: "rate", direction: "high", formula_id: "avg" },
-  { category_id: 6, stat_key: "OBP", name: "OBP", type: "rate", direction: "high", formula_id: "obp" },
-  { category_id: 7, stat_key: "SLG", name: "SLG", type: "rate", direction: "high", formula_id: "slg" },
-  { category_id: 8, stat_key: "OPS", name: "OPS", type: "rate", direction: "high", formula_id: "ops" },
-  { category_id: 16, stat_key: "K", name: "K", type: "counting", direction: "high" },
-  { category_id: 17, stat_key: "W", name: "W", type: "counting", direction: "high" },
-  { category_id: 18, stat_key: "SV", name: "SV", type: "counting", direction: "high" },
-  { category_id: 19, stat_key: "ERA", name: "ERA", type: "rate", direction: "low", formula_id: "era" },
-  { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "rate", direction: "low", formula_id: "whip" },
-  { category_id: 21, stat_key: "QS", name: "QS", type: "counting", direction: "high" },
-  { category_id: 22, stat_key: "HLD", name: "HLD", type: "counting", direction: "high" },
+  { category_id: 1, stat_key: "R", name: "R", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 2, stat_key: "HR", name: "HR", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 3, stat_key: "RBI", name: "RBI", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 4, stat_key: "SB", name: "SB", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 5, stat_key: "AVG", name: "AVG", type: "RATE", direction: "HIGHER_BETTER", formula_id: "avg" },
+  { category_id: 6, stat_key: "OBP", name: "OBP", type: "RATE", direction: "HIGHER_BETTER", formula_id: "obp" },
+  { category_id: 7, stat_key: "SLG", name: "SLG", type: "RATE", direction: "HIGHER_BETTER", formula_id: "slg" },
+  { category_id: 8, stat_key: "OPS", name: "OPS", type: "RATE", direction: "HIGHER_BETTER", formula_id: "ops" },
+  { category_id: 16, stat_key: "K", name: "K", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 17, stat_key: "W", name: "W", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 18, stat_key: "SV", name: "SV", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 19, stat_key: "ERA", name: "ERA", type: "RATE", direction: "LOWER_BETTER", formula_id: "era" },
+  { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "RATE", direction: "LOWER_BETTER", formula_id: "whip" },
+  { category_id: 21, stat_key: "QS", name: "QS", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 22, stat_key: "HLD", name: "HLD", type: "COUNTING", direction: "HIGHER_BETTER" },
 ];
 
 // Available roster slots

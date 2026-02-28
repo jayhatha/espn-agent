@@ -515,7 +515,7 @@ function detectRosterSlots(): Record<string, number> | null {
   return getDefault5x5Roster();
 }
 
-function mapStatNameToCategory(statName: string): Category {
+export function mapStatNameToCategory(statName: string): Category {
   // Map ESPN stat display names to Category objects
   // This mapping must align with backend category definitions
   const categoryMap: Record<string, Category> = {
@@ -542,7 +542,7 @@ function mapStatNameToCategory(statName: string): Category {
   };
 }
 
-function getDefault5x5Categories(): Category[] {
+export function getDefault5x5Categories(): Category[] {
   return [
     { category_id: "R", stat_key: "R", type: "COUNTING", direction: "HIGHER_BETTER", name: "Runs" },
     { category_id: "HR", stat_key: "HR", type: "COUNTING", direction: "HIGHER_BETTER", name: "Home Runs" },
