@@ -861,7 +861,7 @@ export class ESPNAdapter {
             sortPriority: 1,
             sortAsc: false,
           },
-          limit: 500, // Get top 500 players by ownership
+          limit: 2000, // Get top 2000 players by ownership
         },
       };
 
@@ -914,6 +914,45 @@ export class ESPNAdapter {
       );
 
       const players = (validatedData?.players as any[]) || [];
+
+      // Diagnostic logging to identify pagination issues
+      this.logger?.info({
+        leagueId,
+        season,
+        totalPlayers: players.length,
+        requestedLimit: xFantasyFilter.players.limit,
+        playersWithRankings: players.filter(p => p.player?.draftRanksByRankType).length,
+        playersWithStandardAuction: players.filter(p =>
+          p.player?.draftRanksByRankType?.STANDARD?.auctionValue > 0
+        ).length,
+        playersWithRotoAuction: players.filter(p =>
+          p.player?.draftRanksByRankType?.ROTO?.auctionValue > 0
+        ).length,
+      }, "ESPN auction values response diagnostic");
+
+      // Log sample player structure for debugging
+      if (players.length > 0 && players[0].player?.draftRanksByRankType) {
+        this.logger?.debug({
+          samplePlayer: {
+            id: players[0].id,
+            name: players[0].player?.fullName,
+            hasRankings: !!players[0].player?.draftRanksByRankType,
+            rankingTypes: Object.keys(players[0].player?.draftRanksByRankType || {}),
+            standardAuctionValue: players[0].player?.draftRanksByRankType?.STANDARD?.auctionValue,
+            rotoAuctionValue: players[0].player?.draftRanksByRankType?.ROTO?.auctionValue,
+          },
+        }, "Sample player structure");
+      }
+
+      // Warn if ESPN returned fewer players than requested
+      if (players.length < xFantasyFilter.players.limit && players.length > 0) {
+        this.logger?.warn({
+          leagueId,
+          returned: players.length,
+          requested: xFantasyFilter.players.limit,
+        }, "ESPN returned fewer players than requested - may need pagination");
+      }
+
       const auctionValues: Array<{
         playerId: number;
         playerName: string;
