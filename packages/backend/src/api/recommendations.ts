@@ -111,14 +111,14 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           await db
             .insertInto("player")
             .values({
-              espn_player_id: fa.playerId,
+              id: fa.playerId,
               name: fa.name,
               mlb_team: fa.mlbTeam,
               positions: fa.positions,
               created_at: new Date(),
             })
             .onConflict((oc) =>
-              oc.column("espn_player_id").doUpdateSet({
+              oc.column("id").doUpdateSet({
                 name: fa.name,
                 mlb_team: fa.mlbTeam,
                 positions: fa.positions,
@@ -133,12 +133,12 @@ export async function recommendationsRoutes(app: FastifyInstance) {
               .selectFrom("player as p")
               .select([
                 "p.id as player_id",
-                "p.espn_player_id",
+                "p.id as espn_player_id",
                 "p.name as player_name",
                 "p.mlb_team",
                 "p.positions",
               ])
-              .where("p.espn_player_id", "in", espnPlayerIds)
+              .where("p.id", "in", espnPlayerIds)
               .execute()
           : [];
 
@@ -239,7 +239,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .select([
             "roster.player_id",
             "player.name as player_name",
-            "player.espn_player_id",
+            "player.id as espn_player_id",
             "player.mlb_team",
             "player.positions",
             "roster.roster_status",
@@ -832,7 +832,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .select([
               "roster.player_id",
               "player.name as player_name",
-              "player.espn_player_id",
+              "player.id as espn_player_id",
               "player.mlb_team",
               "player.positions",
               "roster.roster_status",
@@ -850,7 +850,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .select([
               "roster.player_id",
               "player.name as player_name",
-              "player.espn_player_id",
+              "player.id as espn_player_id",
               "player.mlb_team",
               "player.positions",
               "roster.roster_status",

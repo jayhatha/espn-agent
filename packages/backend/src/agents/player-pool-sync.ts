@@ -211,13 +211,13 @@ export class PlayerPoolSyncAgent {
         espnPlayerIds.length > 0
           ? await this.db
               .selectFrom("player")
-              .select(["id", "espn_player_id"])
-              .where("espn_player_id", "in", espnPlayerIds)
+              .select(["id"])
+              .where("id", "in", espnPlayerIds)
               .execute()
           : [];
 
       const existingIdSet = new Set(
-        existingPlayers.map((p) => p.espn_player_id),
+        existingPlayers.map((p) => p.id),
       );
 
       // Separate into inserts and updates
@@ -236,7 +236,7 @@ export class PlayerPoolSyncAgent {
             .insertInto("player")
             .values(
               playersToInsert.map((p) => ({
-                espn_player_id: p.espnPlayerId,
+                id: p.espnPlayerId,
                 name: p.name,
                 mlb_team: p.mlbTeam,
                 positions: p.positions,
@@ -264,7 +264,7 @@ export class PlayerPoolSyncAgent {
               current_season_stats_json: playerData.currentSeasonStats,
               last_synced_at: new Date(),
             })
-            .where("espn_player_id", "=", playerData.espnPlayerId)
+            .where("id", "=", playerData.espnPlayerId)
             .execute();
           playersUpdated++;
         } catch (error) {

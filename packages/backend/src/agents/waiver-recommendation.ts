@@ -119,7 +119,7 @@ export class WaiverRecommendationAgent {
             const freeAgentPlayers = await this.db
               .selectFrom("player")
               .select("id")
-              .where("espn_player_id", "in", espnPlayerIds)
+              .where("id", "in", espnPlayerIds)
               .execute();
 
             freeAgents = freeAgentPlayers.map((p) => p.id);

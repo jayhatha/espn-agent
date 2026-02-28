@@ -384,7 +384,7 @@ export class TradeRecommendationAgent {
         "roster.team_id",
         "roster.player_id",
         "player.name as player_name",
-        "player.espn_player_id",
+        "player.id as espn_player_id",
         "player.mlb_team",
         "player.positions",
         "roster.roster_status",

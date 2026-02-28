@@ -38,7 +38,7 @@ export class PlayerIdentityResolutionAgent {
     const player = await this.db
       .selectFrom("player")
       .selectAll()
-      .where("espn_player_id", "=", espnPlayerId)
+      .where("id", "=", espnPlayerId)
       .executeTakeFirst();
 
     if (!player) {

@@ -442,14 +442,14 @@ export class SnapshotOrchestratorAgent {
         const existingPlayer = await trx
           .selectFrom("player")
           .select(["id", "injury_status"])
-          .where("espn_player_id", "=", entry.espnPlayerId)
+          .where("id", "=", entry.espnPlayerId)
           .executeTakeFirst();
 
         // Upsert player with injury status
         const playerResult = await trx
           .insertInto("player")
           .values({
-            espn_player_id: entry.espnPlayerId,
+            id: entry.espnPlayerId,
             name: entry.name,
             mlb_team: entry.mlbTeam,
             positions: entry.positions,
@@ -458,7 +458,7 @@ export class SnapshotOrchestratorAgent {
             created_at: new Date(),
           })
           .onConflict((oc) =>
-            oc.column("espn_player_id").doUpdateSet({
+            oc.column("id").doUpdateSet({
               name: entry.name,
               mlb_team: entry.mlbTeam,
               positions: entry.positions,
@@ -849,11 +849,11 @@ export class SnapshotOrchestratorAgent {
       if (allEspnPlayerIds.length > 0) {
         const playerRows = await trx
           .selectFrom("player")
-          .select(["id", "espn_player_id"])
-          .where("espn_player_id", "in", allEspnPlayerIds)
+          .select(["id"])
+          .where("id", "in", allEspnPlayerIds)
           .execute();
         for (const row of playerRows) {
-          espnPlayerIdToDbId.set(row.espn_player_id, row.id);
+          espnPlayerIdToDbId.set(row.id, row.id);
         }
       }
 
@@ -1144,14 +1144,14 @@ export class SnapshotOrchestratorAgent {
       await trx
         .insertInto("player")
         .values({
-          espn_player_id: fa.playerId,
+          id: fa.playerId,
           name: fa.name,
           mlb_team: null,
           positions: fa.positions, // Use parsed positions instead of empty array
           created_at: new Date(),
         })
         .onConflict((oc) =>
-          oc.column("espn_player_id").doUpdateSet({
+          oc.column("id").doUpdateSet({
             name: fa.name,
             positions: fa.positions, // Update positions on conflict
           }),
@@ -1186,14 +1186,14 @@ export class SnapshotOrchestratorAgent {
       const playerResult = await this.db
         .insertInto("player")
         .values({
-          espn_player_id: fa.playerId,
+          id: fa.playerId,
           name: fa.name,
           mlb_team: fa.mlbTeam,
           positions: fa.positions,
           created_at: new Date(),
         })
         .onConflict((oc) =>
-          oc.column("espn_player_id").doUpdateSet({
+          oc.column("id").doUpdateSet({
             name: fa.name,
             mlb_team: fa.mlbTeam,
             positions: fa.positions,
