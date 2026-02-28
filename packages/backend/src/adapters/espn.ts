@@ -875,6 +875,9 @@ export class ESPNAdapter {
         "x-fantasy-filter": JSON.stringify(xFantasyFilter),
       };
 
+      // Add scoringPeriodId to get auction values from draftRanksByRankType
+      params.scoringPeriodId = 1;
+
       this.logger?.info(
         { leagueId, season },
         "Fetching ESPN pre-draft auction values",
@@ -922,8 +925,10 @@ export class ESPNAdapter {
         const player = entry.player;
         if (!player) continue;
 
-        // Only include players with positive auction values
-        const auctionValue = player.draftAuctionValue ?? player.auctionValueAverage ?? 0;
+        // Read auction value from draftRanksByRankType (requires scoringPeriodId=1)
+        const auctionValue = player.draftRanksByRankType?.STANDARD?.auctionValue ??
+                            player.draftRanksByRankType?.ROTO?.auctionValue ??
+                            0;
         if (auctionValue <= 0) continue;
 
         const eligibleSlots = (player.eligibleSlots || [])
