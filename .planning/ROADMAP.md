@@ -138,7 +138,7 @@ Plans:
 | 11. Draft Assistant Enhancements | v1.2 | 5/5 | Complete | 2026-02-25 |
 | 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
 | 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
-| 14. ESPN Auction Values Bug Fix | v1.2 | 1/1 | Planning | - |
+| 14. ESPN Auction Values Bug Fix | v1.2 | Complete    | 2026-02-28 | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -241,7 +241,7 @@ Plans:
   2. Players span multiple positions (C, 1B, 2B, 3B, SS, OF, SP, RP)
   3. Response includes high-ownership (>50%) and low-ownership (<10%) players
   4. Diagnostic logging shows actual ESPN response metrics
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [x] 14-01-PLAN.md — Increase x-fantasy-filter limit to 2000, add diagnostic logging, add integration test
