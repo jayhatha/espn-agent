@@ -34,6 +34,7 @@ interface Category {
   name: string;
   type: "counting" | "rate";
   direction: "high" | "low";
+  formula_id?: string;
 }
 
 interface RosterSlot {
@@ -49,15 +50,15 @@ const AVAILABLE_CATEGORIES: Category[] = [
   { category_id: 2, stat_key: "HR", name: "HR", type: "counting", direction: "high" },
   { category_id: 3, stat_key: "RBI", name: "RBI", type: "counting", direction: "high" },
   { category_id: 4, stat_key: "SB", name: "SB", type: "counting", direction: "high" },
-  { category_id: 5, stat_key: "AVG", name: "AVG", type: "rate", direction: "high" },
-  { category_id: 6, stat_key: "OBP", name: "OBP", type: "rate", direction: "high" },
-  { category_id: 7, stat_key: "SLG", name: "SLG", type: "rate", direction: "high" },
-  { category_id: 8, stat_key: "OPS", name: "OPS", type: "rate", direction: "high" },
+  { category_id: 5, stat_key: "AVG", name: "AVG", type: "rate", direction: "high", formula_id: "avg" },
+  { category_id: 6, stat_key: "OBP", name: "OBP", type: "rate", direction: "high", formula_id: "obp" },
+  { category_id: 7, stat_key: "SLG", name: "SLG", type: "rate", direction: "high", formula_id: "slg" },
+  { category_id: 8, stat_key: "OPS", name: "OPS", type: "rate", direction: "high", formula_id: "ops" },
   { category_id: 16, stat_key: "K", name: "K", type: "counting", direction: "high" },
   { category_id: 17, stat_key: "W", name: "W", type: "counting", direction: "high" },
   { category_id: 18, stat_key: "SV", name: "SV", type: "counting", direction: "high" },
-  { category_id: 19, stat_key: "ERA", name: "ERA", type: "rate", direction: "low" },
-  { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "rate", direction: "low" },
+  { category_id: 19, stat_key: "ERA", name: "ERA", type: "rate", direction: "low", formula_id: "era" },
+  { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "rate", direction: "low", formula_id: "whip" },
   { category_id: 21, stat_key: "QS", name: "QS", type: "counting", direction: "high" },
   { category_id: 22, stat_key: "HLD", name: "HLD", type: "counting", direction: "high" },
 ];
@@ -160,6 +161,7 @@ function AuctionValidationPageContent() {
           name: cat.name,
           type: cat.type,
           direction: cat.direction,
+          ...(cat.formula_id && { formula_id: cat.formula_id }),
         }));
 
       // Build roster slots JSON from selections

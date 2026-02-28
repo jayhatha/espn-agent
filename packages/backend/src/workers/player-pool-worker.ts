@@ -10,7 +10,11 @@ const logger = pino({
   name: "player-pool-worker",
 });
 
-const CURRENT_SEASON = 2025; // Update annually or read from env var
+function getCurrentSeason(): number {
+  const now = new Date();
+  // MLB season spans the calendar year; use current year
+  return now.getFullYear();
+}
 
 const connection = new IORedis(
   process.env.REDIS_URL || "redis://localhost:6379",
@@ -28,7 +32,7 @@ export const playerPoolQueue = new Queue("player-pool-sync", {
 playerPoolQueue
   .add(
     "daily-sync",
-    { season: CURRENT_SEASON },
+    { season: getCurrentSeason() },
     {
       repeat: {
         pattern: "0 4 * * *", // 4 AM daily
@@ -83,7 +87,10 @@ const worker = new Worker<PlayerPoolJobData>(
           duration,
         };
       } else {
-        logger.error({ error: result.error, jobId: job.id }, "Player pool sync failed");
+        logger.error(
+          { error: result.error, jobId: job.id },
+          "Player pool sync failed",
+        );
         throw new Error(result.error || "Unknown sync error");
       }
     } catch (error) {
