@@ -138,6 +138,7 @@ Plans:
 | 11. Draft Assistant Enhancements | v1.2 | 5/5 | Complete | 2026-02-25 |
 | 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
 | 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
+| 14. ESPN Auction Values Bug Fix | v1.2 | 1/1 | Planning | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -229,3 +230,18 @@ Plans:
 - [x] 13-04-PLAN.md — Replace frontend any types and extract shared components — completed 2026-02-26
 - [x] 13-05-PLAN.md — ESPNAdapter improvements: LRU cache, rate limiting, schema validation — completed 2026-02-26
 - [x] 13-06-PLAN.md — Add tests for critical paths — completed 2026-02-26
+
+### Phase 14: ESPN Auction Values Bug Fix
+
+**Goal:** Fix ESPN auction values endpoint returning only 6 players instead of full player pool by increasing pagination limit and adding diagnostic logging
+**Depends on:** Phase 13
+**Requirements:** BUGFIX-ESPN-AUCTION-VALUES
+**Success Criteria** (what must be TRUE):
+  1. Auction validation endpoint returns 500+ players with ESPN auction values
+  2. Players span multiple positions (C, 1B, 2B, 3B, SS, OF, SP, RP)
+  3. Response includes high-ownership (>50%) and low-ownership (<10%) players
+  4. Diagnostic logging shows actual ESPN response metrics
+**Plans:** 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — Increase x-fantasy-filter limit to 2000, add diagnostic logging, add integration test
