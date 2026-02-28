@@ -27,28 +27,75 @@ interface ValidationResponse {
   comparisons: PlayerComparison[];
 }
 
+interface Category {
+  category_id: number;
+  stat_key: string;
+  name: string;
+  type: "counting" | "rate";
+  direction: "high" | "low";
+}
+
+interface RosterSlot {
+  key: string;
+  label: string;
+  defaultCount: number;
+  group: "batting" | "pitching";
+}
+
+// Available categories
+const AVAILABLE_CATEGORIES: Category[] = [
+  { category_id: 1, stat_key: "R", name: "R", type: "counting", direction: "high" },
+  { category_id: 2, stat_key: "HR", name: "HR", type: "counting", direction: "high" },
+  { category_id: 3, stat_key: "RBI", name: "RBI", type: "counting", direction: "high" },
+  { category_id: 4, stat_key: "SB", name: "SB", type: "counting", direction: "high" },
+  { category_id: 5, stat_key: "AVG", name: "AVG", type: "rate", direction: "high" },
+  { category_id: 6, stat_key: "OBP", name: "OBP", type: "rate", direction: "high" },
+  { category_id: 7, stat_key: "SLG", name: "SLG", type: "rate", direction: "high" },
+  { category_id: 8, stat_key: "OPS", name: "OPS", type: "rate", direction: "high" },
+  { category_id: 16, stat_key: "K", name: "K", type: "counting", direction: "high" },
+  { category_id: 17, stat_key: "W", name: "W", type: "counting", direction: "high" },
+  { category_id: 18, stat_key: "SV", name: "SV", type: "counting", direction: "high" },
+  { category_id: 19, stat_key: "ERA", name: "ERA", type: "rate", direction: "low" },
+  { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "rate", direction: "low" },
+  { category_id: 21, stat_key: "QS", name: "QS", type: "counting", direction: "high" },
+  { category_id: 22, stat_key: "HLD", name: "HLD", type: "counting", direction: "high" },
+];
+
+// Available roster slots
+const AVAILABLE_SLOTS: RosterSlot[] = [
+  { key: "C", label: "Catcher", defaultCount: 1, group: "batting" },
+  { key: "1B", label: "First Base", defaultCount: 1, group: "batting" },
+  { key: "2B", label: "Second Base", defaultCount: 1, group: "batting" },
+  { key: "3B", label: "Third Base", defaultCount: 1, group: "batting" },
+  { key: "SS", label: "Shortstop", defaultCount: 1, group: "batting" },
+  { key: "OF", label: "Outfield", defaultCount: 3, group: "batting" },
+  { key: "UTIL", label: "Utility", defaultCount: 1, group: "batting" },
+  { key: "SP", label: "Starting Pitcher", defaultCount: 3, group: "pitching" },
+  { key: "RP", label: "Relief Pitcher", defaultCount: 2, group: "pitching" },
+  { key: "P", label: "Pitcher", defaultCount: 2, group: "pitching" },
+  { key: "Bench", label: "Bench", defaultCount: 5, group: "pitching" },
+];
+
+// Standard 5x5 categories (pre-selected by default)
+const STANDARD_5X5_STAT_KEYS = ["R", "HR", "RBI", "SB", "AVG", "K", "W", "SV", "ERA", "WHIP"];
+
 function AuctionValidationPageContent() {
   // Form state
   const [numTeams, setNumTeams] = useState<number>(12);
-  const [categories, setCategories] = useState<string>(
-    JSON.stringify([
-      {"category_id":1,"stat_key":"R","name":"R","type":"counting","direction":"high"},
-      {"category_id":2,"stat_key":"HR","name":"HR","type":"counting","direction":"high"},
-      {"category_id":3,"stat_key":"RBI","name":"RBI","type":"counting","direction":"high"},
-      {"category_id":4,"stat_key":"SB","name":"SB","type":"counting","direction":"high"},
-      {"category_id":5,"stat_key":"AVG","name":"AVG","type":"rate","direction":"high"},
-      {"category_id":16,"stat_key":"K","name":"K","type":"counting","direction":"high"},
-      {"category_id":17,"stat_key":"W","name":"W","type":"counting","direction":"high"},
-      {"category_id":18,"stat_key":"SV","name":"SV","type":"counting","direction":"high"},
-      {"category_id":19,"stat_key":"ERA","name":"ERA","type":"rate","direction":"low"},
-      {"category_id":20,"stat_key":"WHIP","name":"WHIP","type":"rate","direction":"low"}
-    ], null, 2)
+
+  // Categories state (checkboxes)
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    new Set(STANDARD_5X5_STAT_KEYS)
   );
-  const [rosterSlots, setRosterSlots] = useState<string>(
-    JSON.stringify({
-      "C":1,"1B":1,"2B":1,"3B":1,"SS":1,"OF":3,"UTIL":1,"SP":3,"RP":2,"P":2,"Bench":5
-    }, null, 2)
+
+  // Roster slots state (checkboxes with counts)
+  const [selectedSlots, setSelectedSlots] = useState<Map<string, number>>(
+    new Map([
+      ["C", 1], ["1B", 1], ["2B", 1], ["3B", 1], ["SS", 1],
+      ["OF", 3], ["UTIL", 1], ["SP", 3], ["RP", 2], ["P", 2], ["Bench", 5]
+    ])
   );
+
   const [budget, setBudget] = useState<number>(260);
   const [minBid, setMinBid] = useState<number>(1);
   const [limit, setLimit] = useState<number>(100);
@@ -62,6 +109,35 @@ function AuctionValidationPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Category checkbox handler
+  const handleCategoryToggle = (statKey: string) => {
+    const newSelected = new Set(selectedCategories);
+    if (newSelected.has(statKey)) {
+      newSelected.delete(statKey);
+    } else {
+      newSelected.add(statKey);
+    }
+    setSelectedCategories(newSelected);
+  };
+
+  // Roster slot checkbox handler
+  const handleSlotToggle = (key: string, defaultCount: number) => {
+    const newSlots = new Map(selectedSlots);
+    if (newSlots.has(key)) {
+      newSlots.delete(key);
+    } else {
+      newSlots.set(key, defaultCount);
+    }
+    setSelectedSlots(newSlots);
+  };
+
+  // Roster slot count handler
+  const handleSlotCountChange = (key: string, count: number) => {
+    const newSlots = new Map(selectedSlots);
+    newSlots.set(key, count);
+    setSelectedSlots(newSlots);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -74,10 +150,24 @@ function AuctionValidationPageContent() {
         throw new Error("ESPN League ID is required");
       }
 
+      // Build categories JSON from selections
+      const categoriesArray = AVAILABLE_CATEGORIES
+        .filter(cat => selectedCategories.has(cat.stat_key))
+        .map(cat => ({
+          category_id: cat.category_id,
+          stat_key: cat.stat_key,
+          name: cat.name,
+          type: cat.type,
+          direction: cat.direction,
+        }));
+
+      // Build roster slots JSON from selections
+      const rosterSlotsObj = Object.fromEntries(selectedSlots);
+
       const params = {
         numTeams,
-        categories,
-        rosterSlots,
+        categories: JSON.stringify(categoriesArray),
+        rosterSlots: JSON.stringify(rosterSlotsObj),
         budget,
         minBid,
         limit,
@@ -235,32 +325,154 @@ function AuctionValidationPageContent() {
               />
             </div>
 
-            {/* Categories JSON */}
+            {/* Categories Selection */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Categories (JSON)
-              </label>
-              <textarea
-                value={categories}
-                onChange={(e) => setCategories(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                rows={8}
-                required
-              />
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Scoring Categories
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Batting Categories */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    Batting Categories
+                  </h4>
+                  <div className="space-y-2">
+                    {AVAILABLE_CATEGORIES
+                      .filter(cat => ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"].includes(cat.stat_key))
+                      .map(cat => (
+                        <label key={cat.stat_key} className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategories.has(cat.stat_key)}
+                            onChange={() => handleCategoryToggle(cat.stat_key)}
+                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">
+                            {cat.name} ({cat.type})
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Pitching Categories */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    Pitching Categories
+                  </h4>
+                  <div className="space-y-2">
+                    {AVAILABLE_CATEGORIES
+                      .filter(cat => ["K", "W", "SV", "HLD", "QS", "ERA", "WHIP"].includes(cat.stat_key))
+                      .map(cat => (
+                        <label key={cat.stat_key} className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategories.has(cat.stat_key)}
+                            onChange={() => handleCategoryToggle(cat.stat_key)}
+                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">
+                            {cat.name} ({cat.type})
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {selectedCategories.size === 0 && (
+                <p className="mt-2 text-sm text-red-600">
+                  Please select at least one category
+                </p>
+              )}
             </div>
 
-            {/* Roster Slots JSON */}
+            {/* Roster Slots Selection */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Roster Slots (JSON)
-              </label>
-              <textarea
-                value={rosterSlots}
-                onChange={(e) => setRosterSlots(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm"
-                rows={4}
-                required
-              />
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Roster Slots
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Position Players */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    Position Players
+                  </h4>
+                  <div className="space-y-2">
+                    {AVAILABLE_SLOTS
+                      .filter(slot => slot.group === "batting")
+                      .map(slot => (
+                        <div key={slot.key} className="flex items-center justify-between">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSlots.has(slot.key)}
+                              onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {slot.label}
+                            </span>
+                          </label>
+                          {selectedSlots.has(slot.key) && (
+                            <input
+                              type="number"
+                              value={selectedSlots.get(slot.key)}
+                              onChange={(e) => handleSlotCountChange(slot.key, parseInt(e.target.value, 10))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              min="1"
+                              max="10"
+                            />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Pitchers */}
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    Pitchers & Bench
+                  </h4>
+                  <div className="space-y-2">
+                    {AVAILABLE_SLOTS
+                      .filter(slot => slot.group === "pitching")
+                      .map(slot => (
+                        <div key={slot.key} className="flex items-center justify-between">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedSlots.has(slot.key)}
+                              onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              {slot.label}
+                            </span>
+                          </label>
+                          {selectedSlots.has(slot.key) && (
+                            <input
+                              type="number"
+                              value={selectedSlots.get(slot.key)}
+                              onChange={(e) => handleSlotCountChange(slot.key, parseInt(e.target.value, 10))}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              min="1"
+                              max="10"
+                            />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {selectedSlots.size === 0 && (
+                <p className="mt-2 text-sm text-red-600">
+                  Please select at least one roster slot
+                </p>
+              )}
             </div>
 
             {/* Submit Button */}
