@@ -253,9 +253,10 @@ None yet.
 | 20 | Create auction value validation endpoint that compares our VBD-based values against ESPN's pre-draft auction values and reports differences | 2026-02-27 | 9375da1 | ✅ | [20-create-auction-value-validation-endpoint](./quick/20-create-auction-value-validation-endpoint/) |
 | 21 | Create admin UI page for auction validation with form inputs and results display comparing VBD values vs ESPN baseline | 2026-02-28 | 58b7522 | ✅ | [21-create-admin-ui-page-for-auction-validat](./quick/21-create-admin-ui-page-for-auction-validat/) |
 | 22 | Replace JSON inputs with checkboxes for category and roster selection in auction validation page | 2026-02-28 | 2f84614 | ✅ | [22-replace-json-inputs-with-checkboxes-for-](./quick/22-replace-json-inputs-with-checkboxes-for-/) |
+| 23 | Migrate player table to use ESPN player IDs as primary keys instead of auto-increment IDs | 2026-02-28 | 88aa469 | ✅ | [23-migrate-player-table-to-use-espn-player-](./quick/23-migrate-player-table-to-use-espn-player-/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-22 - Replace JSON inputs with checkboxes for category and roster selection
+Stopped at: Completed quick-23 - Migrate player table to use ESPN player IDs as primary keys
 Resume file: None
