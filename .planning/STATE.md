@@ -206,6 +206,8 @@ Recent decisions affecting v1.1 work:
 - Phase 07.2 inserted after Phase 7: Research and fix standings over time (URGENT) — counting stat values are an order of magnitude smaller than expected in backfill snapshots despite cumulative accumulation fix in 07.1.
 - Phase 10 added: ESPN Live Draft Assistant
 - Phase 11 added: Draft Assistant Enhancements - player pool sync, value detection, and league-agnostic projections
+- Phase 15 added: Fix empty categories in SGP calculation - categories not passing through to DraftRankingsAgent causing all auction values to be $1
+- Phase 16 added: ESPN auction values pagination - ESPN caps responses at 50 players regardless of limit, implement offset-based pagination to fetch full 500+ player pool
 - Phase 12 added: address codebase concerns
 - Phase 14 added: Fix ESPN auction values endpoint - only returning 6 players instead of full player pool
 
