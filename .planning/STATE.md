@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 13 (Clean Up Tech Debt)
-Plan: 6 of 6 in current phase
+Phase: 14 (ESPN Auction Values Fix)
+Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-02-28 - Completed quick task 22: Replace JSON inputs with checkboxes for category and roster selection in auction validation page
+Last activity: 2026-02-28 - Completed 14-01-PLAN.md: ESPN auction values endpoint fix with increased limit and diagnostic logging
 
-Progress: Phase 13: [██████████] 100% (6 of 6 plans complete)
+Progress: Phase 14: [██████████] 100% (1 of 1 plans complete)
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: Phase 13: [██████████] 100% (6 of 6 plans complete
 | 13 | P04 | 5min | 2 | 7 |
 | 13 | P05 | 3min | 3 | 3 |
 | 13 | P06 | 11min | 3 | 4 |
+| 14 | P01 | 2min | 2 | 2 |
 
 **Quick Tasks:**
 
@@ -206,6 +207,7 @@ Recent decisions affecting v1.1 work:
 - Phase 10 added: ESPN Live Draft Assistant
 - Phase 11 added: Draft Assistant Enhancements - player pool sync, value detection, and league-agnostic projections
 - Phase 12 added: address codebase concerns
+- Phase 14 added: Fix ESPN auction values endpoint - only returning 6 players instead of full player pool
 
 ### Pending Todos
 
@@ -258,5 +260,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-23 - Migrate player table to use ESPN player IDs as primary keys
+Stopped at: Completed 14-01-PLAN.md - ESPN auction values endpoint fix
 Resume file: None

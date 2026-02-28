@@ -244,4 +244,4 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 14-01-PLAN.md — Increase x-fantasy-filter limit to 2000, add diagnostic logging, add integration test
+- [x] 14-01-PLAN.md — Increase x-fantasy-filter limit to 2000, add diagnostic logging, add integration test
