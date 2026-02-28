@@ -74,6 +74,11 @@ function AdminPageContent() {
   const [backfillError, setBackfillError] = useState<string | null>(null);
   const [backfillSuccess, setBackfillSuccess] = useState<string | null>(null);
 
+  // Player pool sync state
+  const [playerPoolSeason, setPlayerPoolSeason] = useState<number>(new Date().getFullYear());
+  const [playerPoolError, setPlayerPoolError] = useState<string | null>(null);
+  const [playerPoolSuccess, setPlayerPoolSuccess] = useState<string | null>(null);
+
   // System stats query
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["admin", "stats"],
@@ -173,6 +178,22 @@ function AdminPageContent() {
     onError: (error: Error) => {
       setBackfillError(error.message);
       setBackfillSuccess(null);
+    },
+  });
+
+  // Player pool sync mutation
+  const playerPoolSyncMutation = useMutation({
+    mutationFn: async (season: number) => {
+      return api.triggerPlayerPoolSync(season);
+    },
+    onSuccess: (data: any) => {
+      setPlayerPoolSuccess(`Player pool sync started: ${data.message || data.jobId}`);
+      setPlayerPoolError(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+    },
+    onError: (error: Error) => {
+      setPlayerPoolError(error.message);
+      setPlayerPoolSuccess(null);
     },
   });
 
@@ -652,6 +673,85 @@ function AdminPageContent() {
         <p className="mt-3 text-xs text-blue-600">
           Note: You need a FanGraphs subscription to access Depth Charts projections.
         </p>
+      </div>
+
+      {/* Player Pool Sync */}
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          Player Pool Sync
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Sync top ~500 rostered players from ESPN to populate the player pool for draft recommendations.
+          This runs automatically at 4 AM ET daily, but you can trigger it manually here.
+        </p>
+
+        {playerPoolSuccess && (
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
+            {playerPoolSuccess}
+          </div>
+        )}
+
+        {playerPoolError && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+            {playerPoolError}
+          </div>
+        )}
+
+        <div className="flex items-end gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Season
+            </label>
+            <input
+              type="number"
+              value={playerPoolSeason}
+              onChange={(e) => setPlayerPoolSeason(parseInt(e.target.value, 10))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              min="2020"
+              max={new Date().getFullYear() + 1}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => playerPoolSyncMutation.mutate(playerPoolSeason)}
+            disabled={playerPoolSyncMutation.isPending}
+            className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {playerPoolSyncMutation.isPending ? "Syncing..." : "Sync Player Pool"}
+          </button>
+        </div>
+
+        <div className="mt-4 text-sm text-gray-600">
+          <p><strong>Note:</strong> This requires at least one connected league for the season. The sync uses that league's auth credentials to fetch player data from ESPN.</p>
+        </div>
+      </div>
+
+      {/* Auction Value Validation */}
+      <div className="bg-white shadow rounded-lg p-6 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          Auction Value Validation
+        </h2>
+        <p className="text-gray-600 mb-4">
+          Compare our VBD-based auction values against ESPN's pre-draft baseline values to validate calculation accuracy.
+        </p>
+        <a
+          href="/admin/auction-validation"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+        >
+          <svg
+            className="mr-2 h-5 w-5"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Validate Auction Values
+        </a>
       </div>
 
       {/* Upload History */}
