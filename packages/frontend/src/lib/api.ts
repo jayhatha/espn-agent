@@ -444,4 +444,41 @@ export const api = {
       body: JSON.stringify({ season: season || new Date().getFullYear() }),
     });
   },
+
+  // Auction value validation
+  async validateAuctionValues(params: {
+    numTeams: number;
+    categories: string; // JSON stringified array
+    rosterSlots: string; // JSON stringified object
+    budget?: number;
+    minBid?: number;
+    limit?: number;
+    espnLeagueId: number;
+    espnSeason: number;
+    espnSwid?: string;
+    espnS2?: string;
+    projectionsRunId?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    // Add all params to query string
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await fetch(`${API_URL}/api/draft/auction/validate?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.details || 'Failed to validate auction values');
+    }
+
+    return response.json();
+  },
 };
