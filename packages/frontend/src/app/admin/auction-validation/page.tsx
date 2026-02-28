@@ -645,14 +645,14 @@ function AuctionValidationPageContent() {
                           ${comp.ourValue}
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${
-                          comp.delta > 0 ? 'text-green-600' : comp.delta < 0 ? 'text-red-600' : 'text-gray-600'
+                          comp.absoluteDelta > 0 ? 'text-green-600' : comp.absoluteDelta < 0 ? 'text-red-600' : 'text-gray-600'
                         }`}>
-                          {comp.delta > 0 ? '+' : ''}${comp.delta.toFixed(2)}
+                          {comp.absoluteDelta > 0 ? '+' : ''}${comp.absoluteDelta.toFixed(2)}
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${
-                          comp.deltaPercent > 0 ? 'text-green-600' : comp.deltaPercent < 0 ? 'text-red-600' : 'text-gray-600'
+                          comp.percentDelta > 0 ? 'text-green-600' : comp.percentDelta < 0 ? 'text-red-600' : 'text-gray-600'
                         }`}>
-                          {comp.deltaPercent > 0 ? '+' : ''}{comp.deltaPercent.toFixed(1)}%
+                          {comp.percentDelta > 0 ? '+' : ''}{comp.percentDelta.toFixed(1)}%
                         </td>
                       </tr>
                     ))}
