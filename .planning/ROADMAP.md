@@ -248,12 +248,12 @@ Plans:
 
 ### Phase 15: Fix empty categories in SGP calculation - categories not passing through to DraftRankingsAgent causing all auction values to be $1
 
-**Goal:** [To be planned]
+**Goal:** Fix categories data flow bug causing all auction values to collapse to $1 by ensuring formula_id is included for RATE stats in both extension DOM detection and admin page
 **Depends on:** Phase 14
-**Plans:** 0 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 15 to break down)
+- [ ] 15-01-PLAN.md — Fix DOM detector to include formula_id/required_components for RATE stats, fix admin page enum values, add unit tests
 
 ### Phase 16: ESPN auction values pagination - ESPN caps responses at 50 players regardless of limit, implement offset-based pagination to fetch full 500+ player pool
 
