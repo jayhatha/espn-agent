@@ -180,6 +180,10 @@ export class DraftRankingsAgent {
       categoryStats[category.category_id] = { mean, stdDev, min, max };
     }
 
+    // DIAGNOSTIC: This log helps diagnose SGP calculation issues by showing
+    // whether categories are being received with valid formula_id fields.
+    // Empty categories array indicates upstream bug in category construction
+    // (e.g., incorrect enum values like "counting" instead of "COUNTING").
     this.logger?.info(
       {
         categories: Object.entries(categoryStats).map(([catId, stats]) => ({
