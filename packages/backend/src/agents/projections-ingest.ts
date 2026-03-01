@@ -280,9 +280,9 @@ export class ProjectionsIngestAgent {
     }) as ProjectionCSVRow[];
 
     // Required columns for hitters (per DESIGN_DOC.md §5.2)
+    // H and TB can be derived from 1B/2B/3B/HR, so they're not strictly required
     const required = [
       "AB",
-      "H",
       "R",
       "HR",
       "RBI",
@@ -290,9 +290,18 @@ export class ProjectionsIngestAgent {
       "BB",
       "HBP",
       "SF",
-      "TB",
     ];
     const missing = required.filter((col) => !(col in rows[0]));
+    // Need either H directly or components to derive it
+    const hasH = "H" in rows[0];
+    const hasHitComponents = "1B" in rows[0] && "2B" in rows[0] && "3B" in rows[0];
+    if (!hasH && !hasHitComponents) {
+      missing.push("H (or 1B+2B+3B)");
+    }
+    // Need either TB directly or components to derive it
+    if (!("TB" in rows[0]) && !hasHitComponents) {
+      missing.push("TB (or 1B+2B+3B)");
+    }
 
     const unmatchedPlayers: string[] = [];
     let exactMatches = 0;
@@ -313,19 +322,30 @@ export class ProjectionsIngestAgent {
         .map(p => p.trim())
         .filter(p => p.length > 0 && p !== "IL" && p !== "NA" && p !== "BE"); // Filter out roster slots, not positions
 
+      const singles = parseFloat(row["1B"] as string) || 0;
+      const doubles = parseFloat(row["2B"] as string) || 0;
+      const triples = parseFloat(row["3B"] as string) || 0;
+      const homeRuns = parseFloat(row.HR as string) || 0;
+
+      // Derive H from components if not in CSV (H = 1B + 2B + 3B + HR)
+      const hits = parseFloat(row.H as string) || (singles + doubles + triples + homeRuns);
+      // Derive TB from components — FanGraphs exports don't include TB
+      const totalBases = parseFloat(row.TB as string) || (singles + 2 * doubles + 3 * triples + 4 * homeRuns);
+
       const components: StatComponents = {
         AB: parseFloat(row.AB as string) || 0,
-        H: parseFloat(row.H as string) || 0,
+        H: hits,
         R: parseFloat(row.R as string) || 0,
-        HR: parseFloat(row.HR as string) || 0,
+        HR: homeRuns,
         RBI: parseFloat(row.RBI as string) || 0,
         SB: parseFloat(row.SB as string) || 0,
         BB: parseFloat(row.BB as string) || 0,
         HBP: parseFloat(row.HBP as string) || 0,
         SF: parseFloat(row.SF as string) || 0,
-        TB: parseFloat(row.TB as string) || 0,
-        "2B": parseFloat(row["2B"] as string) || 0,
-        "3B": parseFloat(row["3B"] as string) || 0,
+        TB: totalBases,
+        "1B": singles,
+        "2B": doubles,
+        "3B": triples,
         CS: parseFloat(row.CS as string) || 0,
       };
 
