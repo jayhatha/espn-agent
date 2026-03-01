@@ -845,113 +845,114 @@ export class ESPNAdapter {
       }>;
     }
 
+    // Pagination constants: ESPN caps at 50 per request regardless of limit in params,
+    // so we use offset-based pagination with a smaller batch size and loop until done.
+    const batchSize = 500;
+    const MAX_ITERATIONS = 20; // Safety cap: 20 x 500 = 10,000 players max
+
     try {
       const url = `/seasons/${season}/segments/0/leagues/${leagueId}`;
 
-      // Use kona_player_info view with filter for rostered + free agent players
-      // We want all players with auction values, not just free agents
-      const xFantasyFilter = {
-        players: {
-          filterStatus: {
-            value: ["FREEAGENT", "WAIVERS", "ONTEAM"],
-          },
-          filterSlotIds: {
-            value: ALL_POSITION_SLOT_IDS,
-          },
-          sortPercOwned: {
-            sortPriority: 1,
-            sortAsc: false,
-          },
-          limit: 2000, // Get top 2000 players by ownership
-        },
-      };
+      let offset = 0;
+      const allPlayers: any[] = [];
 
-      const headers: Record<string, string> = {};
-      if (auth?.SWID && auth?.espn_s2) {
-        headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
-      }
-
-      const params: Record<string, unknown> = {
-        view: ["kona_player_info"],
-        "x-fantasy-filter": JSON.stringify(xFantasyFilter),
-      };
-
-      // Add scoringPeriodId to get auction values from draftRanksByRankType
-      params.scoringPeriodId = 1;
-
-      this.logger?.info(
-        { leagueId, season },
-        "Fetching ESPN pre-draft auction values",
-      );
-
-      await throttleEspnCall();
-
-      let response;
-      try {
-        response = await this.client.get(url, {
-          params,
-          headers,
-        });
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after'] || 60;
-          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+      for (let i = 0; i < MAX_ITERATIONS; i++) {
+        const headers: Record<string, string> = {};
+        if (auth?.SWID && auth?.espn_s2) {
+          headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
         }
-        throw error;
-      }
 
-      if (response.status !== 200) {
-        throw new Error(
-          `ESPN API returned status ${response.status}`,
+        // KEY FIX: x-fantasy-filter sent as HTTP header (ESPN ignores it as URL param)
+        // Add sortDraftRanks to surface players with auction values first
+        headers["x-fantasy-filter"] = JSON.stringify({
+          players: {
+            filterStatus: { value: ["FREEAGENT", "WAIVERS", "ONTEAM"] },
+            filterSlotIds: { value: ALL_POSITION_SLOT_IDS },
+            sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
+            limit: batchSize,
+            offset,
+          },
+        });
+
+        const params: Record<string, unknown> = {
+          view: ["kona_player_info"],
+          scoringPeriodId: 1,
+        };
+
+        this.logger?.info(
+          { leagueId, season, offset, batchSize },
+          "Fetching ESPN pre-draft auction values batch",
         );
+
+        await throttleEspnCall();
+
+        let response;
+        try {
+          response = await this.client.get(url, { params, headers });
+        } catch (error: any) {
+          if (error.response?.status === 429) {
+            const retryAfter = error.response.headers['retry-after'] || 60;
+            this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
+          }
+          throw error;
+        }
+
+        if (response.status !== 200) {
+          throw new Error(`ESPN API returned status ${response.status}`);
+        }
+
+        const validatedData = validateEspnResponse(
+          ESPNFreeAgentsResponseSchema,
+          response.data,
+          `fetchPreDraftAuctionValues(${leagueId}, ${season}, offset=${offset})`,
+          this.logger
+        );
+
+        const batch = (validatedData?.players as any[]) || [];
+
+        this.logger?.info({
+          leagueId,
+          season,
+          offset,
+          batchSize,
+          received: batch.length,
+          totalSoFar: allPlayers.length + batch.length,
+        }, "ESPN auction values batch fetched");
+
+        allPlayers.push(...batch);
+
+        // Partial page signals end of results
+        if (batch.length < batchSize) break;
+
+        offset += batchSize;
       }
 
-      // Validate response schema (reuse free agents schema)
-      const validatedData = validateEspnResponse(
-        ESPNFreeAgentsResponseSchema,
-        response.data,
-        `fetchPreDraftAuctionValues(${leagueId}, ${season})`,
-        this.logger
-      );
-
-      const players = (validatedData?.players as any[]) || [];
-
-      // Diagnostic logging to identify pagination issues
+      // Diagnostic logging after all pages collected
       this.logger?.info({
         leagueId,
         season,
-        totalPlayers: players.length,
-        requestedLimit: xFantasyFilter.players.limit,
-        playersWithRankings: players.filter(p => p.player?.draftRanksByRankType).length,
-        playersWithStandardAuction: players.filter(p =>
+        totalFetched: allPlayers.length,
+        playersWithRankings: allPlayers.filter(p => p.player?.draftRanksByRankType).length,
+        playersWithStandardAuction: allPlayers.filter(p =>
           p.player?.draftRanksByRankType?.STANDARD?.auctionValue > 0
         ).length,
-        playersWithRotoAuction: players.filter(p =>
+        playersWithRotoAuction: allPlayers.filter(p =>
           p.player?.draftRanksByRankType?.ROTO?.auctionValue > 0
         ).length,
       }, "ESPN auction values response diagnostic");
 
       // Log sample player structure for debugging
-      if (players.length > 0 && players[0].player?.draftRanksByRankType) {
+      if (allPlayers.length > 0 && allPlayers[0].player?.draftRanksByRankType) {
         this.logger?.debug({
           samplePlayer: {
-            id: players[0].id,
-            name: players[0].player?.fullName,
-            hasRankings: !!players[0].player?.draftRanksByRankType,
-            rankingTypes: Object.keys(players[0].player?.draftRanksByRankType || {}),
-            standardAuctionValue: players[0].player?.draftRanksByRankType?.STANDARD?.auctionValue,
-            rotoAuctionValue: players[0].player?.draftRanksByRankType?.ROTO?.auctionValue,
+            id: allPlayers[0].id,
+            name: allPlayers[0].player?.fullName,
+            hasRankings: !!allPlayers[0].player?.draftRanksByRankType,
+            rankingTypes: Object.keys(allPlayers[0].player?.draftRanksByRankType || {}),
+            standardAuctionValue: allPlayers[0].player?.draftRanksByRankType?.STANDARD?.auctionValue,
+            rotoAuctionValue: allPlayers[0].player?.draftRanksByRankType?.ROTO?.auctionValue,
           },
         }, "Sample player structure");
-      }
-
-      // Warn if ESPN returned fewer players than requested
-      if (players.length < xFantasyFilter.players.limit && players.length > 0) {
-        this.logger?.warn({
-          leagueId,
-          returned: players.length,
-          requested: xFantasyFilter.players.limit,
-        }, "ESPN returned fewer players than requested - may need pagination");
       }
 
       const auctionValues: Array<{
@@ -961,7 +962,7 @@ export class ESPNAdapter {
         espnAuctionValue: number;
       }> = [];
 
-      for (const entry of players) {
+      for (const entry of allPlayers) {
         const player = entry.player;
         if (!player) continue;
 
