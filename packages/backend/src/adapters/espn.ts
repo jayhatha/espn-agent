@@ -608,10 +608,11 @@ export class ESPNAdapter {
         headers.Cookie = `SWID=${auth.SWID}; espn_s2=${auth.espn_s2}`;
       }
 
-      // Pass filter as x-fantasy-filter URL parameter (JSON stringified)
+      // Pass filter as x-fantasy-filter HTTP header (ESPN ignores it as URL param)
+      headers["x-fantasy-filter"] = JSON.stringify(xFantasyFilter);
+
       const params: Record<string, unknown> = {
         view: ["kona_player_info"],
-        "x-fantasy-filter": JSON.stringify(xFantasyFilter),
       };
 
       this.logger?.info(
