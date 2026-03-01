@@ -257,9 +257,10 @@ Plans:
 
 ### Phase 16: ESPN auction values pagination - ESPN caps responses at 50 players regardless of limit, implement offset-based pagination to fetch full 500+ player pool
 
-**Goal:** [To be planned]
+**Goal:** Fix ESPN returning only 50 players in auction value and free agent fetches by moving x-fantasy-filter from URL params to HTTP headers, and add offset-based pagination to fetchPreDraftAuctionValues to retrieve the full 500+ player pool
 **Depends on:** Phase 15
-**Plans:** 0 plans
+**Requirements:** BUGFIX-ESPN-PAGINATION
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 16 to break down)
+- [ ] 16-01-PLAN.md — Fix x-fantasy-filter transport (params → headers) in fetchFreeAgents and fetchPreDraftAuctionValues, add sortDraftRanks to auction filter, implement offset-based pagination loop in fetchPreDraftAuctionValues
