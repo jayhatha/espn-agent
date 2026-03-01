@@ -260,7 +260,7 @@ Plans:
 **Goal:** Fix ESPN returning only 50 players in auction value and free agent fetches by moving x-fantasy-filter from URL params to HTTP headers, and add offset-based pagination to fetchPreDraftAuctionValues to retrieve the full 500+ player pool
 **Depends on:** Phase 15
 **Requirements:** BUGFIX-ESPN-PAGINATION
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 16-01-PLAN.md — Fix x-fantasy-filter transport (params → headers) in fetchFreeAgents and fetchPreDraftAuctionValues, add sortDraftRanks to auction filter, implement offset-based pagination loop in fetchPreDraftAuctionValues

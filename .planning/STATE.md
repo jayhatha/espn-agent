@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 15 (Fix Empty Categories in SGP Calculation)
+Phase: 16 (ESPN Auction Values Pagination)
 Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-02-28 - Completed 15-01-PLAN.md: Fixed SGP category enum mismatch causing all auction values to collapse to $1
+Last activity: 2026-03-01 - Completed 16-01-PLAN.md: Fixed ESPN returning only 50 players by moving x-fantasy-filter to HTTP headers and adding offset-based pagination to fetchPreDraftAuctionValues
 
-Progress: Phase 15: [██████████] 100% (1 of 1 plans complete)
+Progress: Phase 16: [██████████] 100% (1 of 1 plans complete)
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Progress: Phase 15: [██████████] 100% (1 of 1 plans complete
 | 13 | P06 | 11min | 3 | 4 |
 | 14 | P01 | 2min | 2 | 2 |
 | 15 | P01 | 48min | 3 | 6 |
+| 16 | P01 | 2min | 2 | 1 |
 
 **Quick Tasks:**
 
@@ -202,6 +203,10 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-16]: Validate sender.url AND sender.id in extension message handler to prevent webpage attacks and extension spoofing
 - [Phase 15]: Export pure utility functions from extension modules for unit testing when they don't require DOM APIs
 - [Phase 15]: Category enum values sent to backend must use uppercase COUNTING/RATE and HIGHER_BETTER/LOWER_BETTER (not lowercase) — backend filter uses exact enum match
+- [Phase 16]: x-fantasy-filter must be sent as HTTP header (not URL query param) — ESPN silently ignores it as a URL param, causing the 50-player default cap regardless of limit field value
+- [Phase 16]: batchSize=500 with MAX_ITERATIONS=20 safety cap (10,000 players max) for fetchPreDraftAuctionValues pagination
+- [Phase 16]: sortDraftRanks (STANDARD, sortAsc=true, sortPriority=100) in auction filter ensures players with auction values surface in early pages
+- [Phase 16]: Pagination terminates on partial batch (batch.length < batchSize) — no explicit total count needed from ESPN
 
 ### Roadmap Evolution
 
@@ -264,6 +269,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed 15-01-PLAN.md - SGP category enum mismatch fix restoring auction values
+Last session: 2026-03-01
+Stopped at: Completed 16-01-PLAN.md - ESPN pagination fix (x-fantasy-filter as HTTP header + offset-based pagination in fetchPreDraftAuctionValues)
 Resume file: None
