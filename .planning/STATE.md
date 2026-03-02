@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 3 of 5 in current phase
+Plan: 4 of 9 in current phase
 Status: In Progress
-Last activity: 2026-03-02 - Completed 17-03-PLAN.md: Navigation redesign + 5 shared UI component refactoring (PageHeader, StatCard, LoadingSpinner, ErrorAlert, StatsTable)
+Last activity: 2026-03-02 - Completed 17-04-PLAN.md: Entry pages (landing, login, signup, onboarding) redesigned with design system components, lucide icons, FadeIn scroll animations
 
-Progress: Phase 17: [██████░░░░] 60% (3 of 5 plans complete)
+Progress: Phase 17: [████░░░░░░] 44% (4 of 9 plans complete)
 
 ## Performance Metrics
 
@@ -112,6 +112,7 @@ Progress: Phase 17: [██████░░░░] 60% (3 of 5 plans complete)
 | Phase quick-23 P01 | 4 | 3 tasks | 9 files |
 | Phase 17 P02 | 27 | 2 tasks | 9 files |
 | Phase 17 P03 | 3 | 2 tasks | 6 files |
+| Phase 17 P04 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -217,6 +218,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: aria-expanded={mobileMenuOpen} dynamic binding (not hardcoded false) is required for correct accessibility tree in screen readers
 - [Phase 17]: StatsTable highlightClassName default changed from bg-blue-50 to bg-accent-light to align with design tokens
 - [Phase 17]: All inline SVGs in navigation and shared UI components replaced with lucide-react equivalents for consistency and maintainability
+- [Phase 17]: buttonVariants helper used for Link elements that need Button styling (landing page CTA) — avoids wrapping Link inside Button which creates invalid DOM nesting
 
 ### Roadmap Evolution
 
@@ -281,5 +283,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 17-03-PLAN.md - Navigation redesign and shared UI component refactoring (navigation, PageHeader, StatCard, LoadingSpinner, ErrorAlert, StatsTable)
+Stopped at: Completed 17-04-PLAN.md - Entry pages (landing, login, signup, onboarding) redesigned with design system components, lucide-react icons, and FadeIn scroll animations
 Resume file: None
