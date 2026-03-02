@@ -1,6 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Heading } from "@/components/ui/Heading";
+import { Text } from "@/components/ui/Text";
 
 interface PageHeaderProps {
   title: string;
@@ -21,34 +25,23 @@ export function PageHeader({
         <div className="mb-4">
           <Link
             href={backLink.href}
-            className="inline-flex items-center text-blue-600 hover:text-blue-700 text-sm font-medium"
+            className={cn(
+              "inline-flex items-center text-sm font-medium transition-colors",
+              "text-content-secondary hover:text-content"
+            )}
           >
-            <svg
-              className="w-4 h-4 mr-1"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <ChevronLeft className="w-4 h-4 mr-1" />
             {backLink.label}
           </Link>
         </div>
       )}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            {title}
-          </h1>
+          <Heading level={1}>{title}</Heading>
           {subtitle && (
-            <p className="mt-2 text-sm sm:text-base text-gray-600">
+            <Text size="sm" color="secondary" className="mt-2">
               {subtitle}
-            </p>
+            </Text>
           )}
         </div>
         {actions && <div className="flex-shrink-0 ml-4">{actions}</div>}

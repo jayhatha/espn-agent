@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/cn";
+
 interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg";
   message?: string;
@@ -20,15 +22,20 @@ export function LoadingSpinner({
   const spinner = (
     <div className="text-center">
       <div
-        className={`animate-spin rounded-full border-blue-600 mx-auto ${sizeClasses[size]}`}
+        className={cn(
+          "animate-spin rounded-full border-accent mx-auto",
+          sizeClasses[size]
+        )}
       />
-      {message && <p className="mt-4 text-gray-600 text-sm">{message}</p>}
+      {message && (
+        <p className="mt-4 text-content-secondary text-body-sm">{message}</p>
+      )}
     </div>
   );
 
   if (fullPage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface-secondary">
         {spinner}
       </div>
     );
@@ -47,9 +54,9 @@ export function LoadingSkeleton({
   className?: string;
 }) {
   return (
-    <div className={`animate-pulse space-y-4 ${className}`}>
+    <div className={cn("animate-pulse space-y-4", className)}>
       {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-32 bg-gray-200 rounded" />
+        <div key={i} className="h-32 bg-neutral-200 rounded" />
       ))}
     </div>
   );

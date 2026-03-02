@@ -1,5 +1,8 @@
 "use client";
 
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/cn";
+
 interface StatCardProps {
   label: string;
   value: string | number;
@@ -10,42 +13,14 @@ interface StatCardProps {
 }
 
 const trendColors = {
-  up: "text-green-600",
-  down: "text-red-600",
-  neutral: "text-gray-500",
+  up: "text-positive",
+  down: "text-negative",
+  neutral: "text-content-secondary",
 };
 
-const trendArrows = {
-  up: (
-    <svg
-      className="h-4 w-4 text-green-500"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5 10l7-7m0 0l7 7m-7-7v18"
-      />
-    </svg>
-  ),
-  down: (
-    <svg
-      className="h-4 w-4 text-red-500"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M19 14l-7 7m0 0l-7-7m7 7V3"
-      />
-    </svg>
-  ),
+const trendIcons = {
+  up: <TrendingUp className="h-4 w-4 text-positive" />,
+  down: <TrendingDown className="h-4 w-4 text-negative" />,
   neutral: null,
 };
 
@@ -58,23 +33,35 @@ export function StatCard({
   className = "",
 }: StatCardProps) {
   return (
-    <div className={`bg-white shadow rounded-lg p-6 ${className}`}>
+    <div
+      className={cn(
+        "bg-white rounded-card border border-neutral-200 shadow-card p-6",
+        className
+      )}
+    >
       <div className="flex items-center">
         {icon && <div className="flex-shrink-0">{icon}</div>}
         <div className={icon ? "ml-4" : ""}>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
+          <p className="text-body-sm font-medium text-content-secondary">
+            {label}
+          </p>
           <div className="flex items-center mt-1">
             <p
-              className={`text-2xl font-semibold ${trend ? trendColors[trend] : "text-gray-900"}`}
+              className={cn(
+                "text-h3 font-semibold",
+                trend ? trendColors[trend] : "text-content"
+              )}
             >
               {value}
             </p>
-            {trend && trendArrows[trend] && (
-              <span className="ml-2">{trendArrows[trend]}</span>
+            {trend && trendIcons[trend] && (
+              <span className="ml-2">{trendIcons[trend]}</span>
             )}
           </div>
           {subtitle && (
-            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+            <p className="text-caption text-content-secondary mt-1">
+              {subtitle}
+            </p>
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { cn } from "@/lib/cn";
 
 export interface StatsTableColumn {
   key: string;
@@ -41,7 +42,7 @@ export function StatsTable({
   defaultSortDir = "asc",
   rowKey = "id",
   highlightRow,
-  highlightClassName = "bg-blue-50",
+  highlightClassName = "bg-accent-light",
   emptyMessage = "No data available",
   compact = false,
   stickyHeader = false,
@@ -88,24 +89,35 @@ export function StatsTable({
   if (data.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-gray-500">{emptyMessage}</p>
+        <p className="text-body-sm text-content-secondary">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className={`bg-gray-50 ${stickyHeader ? "sticky top-0 z-10" : ""}`}>
+      <table className="min-w-full divide-y divide-neutral-200">
+        <thead
+          className={cn(
+            "bg-surface-secondary",
+            stickyHeader ? "sticky top-0 z-10" : ""
+          )}
+        >
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`${px} ${py} text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                  alignClasses[col.align || "left"]
-                } ${col.headerClassName || ""} ${
-                  col.sticky ? "sticky left-0 bg-gray-50 z-10" : ""
-                } ${sortable && col.sortable !== false ? "cursor-pointer hover:bg-gray-100 select-none" : ""}`}
+                className={cn(
+                  px,
+                  py,
+                  "text-body-sm font-medium text-content-secondary uppercase tracking-wider",
+                  alignClasses[col.align || "left"],
+                  col.headerClassName || "",
+                  col.sticky ? "sticky left-0 bg-surface-secondary z-10" : "",
+                  sortable && col.sortable !== false
+                    ? "cursor-pointer hover:bg-surface-tertiary select-none"
+                    : ""
+                )}
                 onClick={() =>
                   sortable && col.sortable !== false && handleSort(col.key)
                 }
@@ -113,7 +125,7 @@ export function StatsTable({
                 <span className="inline-flex items-center gap-1">
                   {col.label}
                   {sortable && sortKey === col.key && (
-                    <span className="text-blue-600">
+                    <span className="text-accent">
                       {sortDir === "asc" ? "\u2191" : "\u2193"}
                     </span>
                   )}
@@ -122,22 +134,28 @@ export function StatsTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-neutral-100">
           {sortedData.map((row, rowIdx) => {
             const isHighlighted = highlightRow?.(row);
             return (
               <tr
                 key={getRowKey(row, rowIdx)}
-                className={isHighlighted ? highlightClassName : ""}
+                className={cn(
+                  "hover:bg-surface-secondary transition-colors",
+                  isHighlighted ? highlightClassName : ""
+                )}
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={`${px} ${py} whitespace-nowrap text-sm ${
-                      alignClasses[col.align || "left"]
-                    } ${col.className || ""} ${
+                    className={cn(
+                      px,
+                      py,
+                      "whitespace-nowrap text-body-sm text-content",
+                      alignClasses[col.align || "left"],
+                      col.className || "",
                       col.sticky ? "sticky left-0 bg-inherit z-10" : ""
-                    }`}
+                    )}
                   >
                     {col.format
                       ? col.format(row[col.key], row)
