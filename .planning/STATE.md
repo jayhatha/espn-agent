@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: 16 (ESPN Auction Values Pagination)
-Plan: 1 of 1 in current phase
-Status: Complete
-Last activity: 2026-03-01 - Completed 16-01-PLAN.md: Fixed ESPN returning only 50 players by moving x-fantasy-filter to HTTP headers and adding offset-based pagination to fetchPreDraftAuctionValues
+Phase: 17 (Site Redesign - Typography-Driven Design System)
+Plan: 1 of 5 in current phase
+Status: In Progress
+Last activity: 2026-03-02 - Completed 17-01-PLAN.md: Design system foundation - installed tailwind-merge/cva/lucide-react, defined token system, cn() utility, CHART_THEME, accessible root layout
 
-Progress: Phase 16: [██████████] 100% (1 of 1 plans complete)
+Progress: Phase 17: [██░░░░░░░░] 20% (1 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -207,6 +207,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 16]: batchSize=500 with MAX_ITERATIONS=20 safety cap (10,000 players max) for fetchPreDraftAuctionValues pagination
 - [Phase 16]: sortDraftRanks (STANDARD, sortAsc=true, sortPriority=100) in auction filter ensures players with auction values surface in early pages
 - [Phase 16]: Pagination terminates on partial batch (batch.length < batchSize) — no explicit total count needed from ESPN
+- [Phase 17]: Keep existing primary colors in tailwind.config.js so existing pages don't break during incremental migration
+- [Phase 17]: Accent token uses near-black (#111827) as primary action color for editorial aesthetic instead of blue-600
+- [Phase 17]: Inter variable font with --font-inter CSS variable enables font-sans Tailwind class to consume custom token
+- [Phase 17]: globals.css uses @layer base to avoid specificity issues with Tailwind utilities
 
 ### Roadmap Evolution
 
@@ -218,6 +222,7 @@ Recent decisions affecting v1.1 work:
 - Phase 16 added: ESPN auction values pagination - ESPN caps responses at 50 players regardless of limit, implement offset-based pagination to fetch full 500+ player pool
 - Phase 12 added: address codebase concerns
 - Phase 14 added: Fix ESPN auction values endpoint - only returning 6 players instead of full player pool
+- Phase 17 added: Site redesign — typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
 
 ### Pending Todos
 
@@ -269,6 +274,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Completed 16-01-PLAN.md - ESPN pagination fix (x-fantasy-filter as HTTP header + offset-based pagination in fetchPreDraftAuctionValues)
+Last session: 2026-03-02
+Stopped at: Completed 17-01-PLAN.md - Design system foundation (tokens, cn utility, accessible layout)
 Resume file: None
