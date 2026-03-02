@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 1 of 5 in current phase
+Plan: 2 of 5 in current phase
 Status: In Progress
-Last activity: 2026-03-02 - Completed 17-01-PLAN.md: Design system foundation - installed tailwind-merge/cva/lucide-react, defined token system, cn() utility, CHART_THEME, accessible root layout
+Last activity: 2026-03-02 - Completed 17-02-PLAN.md: Component library - Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn (9 primitives)
 
-Progress: Phase 17: [██░░░░░░░░] 20% (1 of 5 plans complete)
+Progress: Phase 17: [████░░░░░░] 40% (2 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ Progress: Phase 17: [██░░░░░░░░] 20% (1 of 5 plans complete)
 | Phase quick-10 P01 | 5 | 3 tasks | 3 files |
 | Phase quick-16 P01 | 4 | 2 tasks | 7 files |
 | Phase quick-23 P01 | 4 | 3 tasks | 9 files |
+| Phase 17 P02 | 27 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: Accent token uses near-black (#111827) as primary action color for editorial aesthetic instead of blue-600
 - [Phase 17]: Inter variable font with --font-inter CSS variable enables font-sans Tailwind class to consume custom token
 - [Phase 17]: globals.css uses @layer base to avoid specificity issues with Tailwind utilities
+- [Phase 17]: Omit<React.HTMLAttributes<T>, 'color'> in Text component avoids TypeScript TS2320 conflict between HTML color attribute and CVA color variant
 
 ### Roadmap Evolution
 
@@ -275,5 +277,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 17-01-PLAN.md - Design system foundation (tokens, cn utility, accessible layout)
+Stopped at: Completed 17-02-PLAN.md - Component library (9 design system primitives: Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn)
 Resume file: None
