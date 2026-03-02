@@ -264,3 +264,29 @@ Plans:
 
 Plans:
 - [ ] 16-01-PLAN.md — Fix x-fantasy-filter transport (params → headers) in fetchFreeAgents and fetchPreDraftAuctionValues, add sortDraftRanks to auction filter, implement offset-based pagination loop in fetchPreDraftAuctionValues
+
+### Phase 17: Site redesign -- typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
+
+**Goal:** Refactor the frontend to follow a restrained, typography-driven, high-end creative design system with increased whitespace, simplified navigation, stronger hierarchy, reduced visual clutter, subtle motion, and WCAG AA accessibility
+**Depends on:** Phase 16
+**Requirements:** DS-01, DS-02, DS-03, DS-04, DS-05, DS-06, DS-07
+**Success Criteria** (what must be TRUE):
+  1. Design token system defined (typography scale, color palette, spacing, shadows) in tailwind.config.js
+  2. Shared component library created (Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn)
+  3. Navigation redesigned with lucide-react icons, design tokens, and WCAG AA accessibility
+  4. All 18 routes migrated to use design system components
+  5. No gradient backgrounds, heavy shadows, or dangerouslySetInnerHTML for emojis
+  6. Scroll-reveal animations on landing page respecting prefers-reduced-motion
+  7. Skip-to-content link, focus-visible states, and proper aria attributes throughout
+**Plans:** 9 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — Install dependencies (tailwind-merge, cva, lucide-react), define design tokens in Tailwind config, create cn() utility, clean globals.css, update root layout
+- [ ] 17-02-PLAN.md — Create component library: Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn
+- [ ] 17-03-PLAN.md — Redesign navigation and refactor shared UI components (PageHeader, StatCard, LoadingSpinner, ErrorAlert, StatsTable)
+- [ ] 17-04-PLAN.md — Redesign landing page, login, signup, and onboarding pages
+- [ ] 17-05-PLAN.md — Migrate league list, connect, and dashboard pages with league components
+- [ ] 17-06-PLAN.md — Migrate trades, waivers, standings pages with player/impact components
+- [ ] 17-07-PLAN.md — Migrate trends, moves, projections pages with chart theming
+- [ ] 17-08-PLAN.md — Migrate draft rankings, auction, lineup, streaming, and admin pages
+- [ ] 17-09-PLAN.md — Remove legacy config, verify no anti-patterns, visual verification checkpoint
