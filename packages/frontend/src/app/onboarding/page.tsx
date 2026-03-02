@@ -2,7 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CheckIcon } from "lucide-react";
 import { api } from "@/lib/api";
+import { Container } from "@/components/ui/Container";
+import { Heading } from "@/components/ui/Heading";
+import { Text } from "@/components/ui/Text";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { cn } from "@/lib/cn";
 
 interface League {
   id: number;
@@ -36,95 +44,96 @@ export default function OnboardingPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            {STEPS.map((step, index) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    index < currentStep
-                      ? "bg-blue-600 text-white"
-                      : index === currentStep
-                        ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                        : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  {index < currentStep ? (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    index + 1
+    <div className="min-h-screen py-8 sm:py-12">
+      <Container>
+        <div className="max-w-2xl mx-auto">
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              {STEPS.map((step, index) => (
+                <div key={step} className="flex items-center">
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors",
+                      index < currentStep
+                        ? "bg-accent text-content-inverse"
+                        : index === currentStep
+                          ? "bg-accent text-content-inverse ring-4 ring-accent/20"
+                          : "bg-neutral-200 text-content-secondary"
+                    )}
+                  >
+                    {index < currentStep ? (
+                      <CheckIcon className="w-4 h-4" />
+                    ) : (
+                      index + 1
+                    )}
+                  </div>
+                  {index < STEPS.length - 1 && (
+                    <div
+                      className={cn(
+                        "hidden sm:block w-12 md:w-20 h-0.5 mx-1 transition-colors",
+                        index < currentStep ? "bg-accent" : "bg-neutral-200"
+                      )}
+                    />
                   )}
                 </div>
-                {index < STEPS.length - 1 && (
-                  <div
-                    className={`hidden sm:block w-12 md:w-20 h-0.5 mx-1 ${
-                      index < currentStep ? "bg-blue-600" : "bg-gray-200"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="flex justify-between">
+              {STEPS.map((step, index) => (
+                <Text
+                  key={step}
+                  size="caption"
+                  className={cn(
+                    index === currentStep
+                      ? "text-content font-medium"
+                      : "text-content-tertiary"
+                  )}
+                >
+                  {step}
+                </Text>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-between">
-            {STEPS.map((step, index) => (
-              <span
-                key={step}
-                className={`text-xs sm:text-sm ${
-                  index === currentStep
-                    ? "text-blue-600 font-medium"
-                    : "text-gray-400"
-                }`}
-              >
-                {step}
-              </span>
-            ))}
-          </div>
-        </div>
 
-        {/* Step Content */}
-        <div className="bg-white rounded-xl shadow-md p-6 sm:p-8">
-          {currentStep === 0 && (
-            <WelcomeStep onNext={() => setCurrentStep(1)} />
-          )}
-          {currentStep === 1 && (
-            <ConnectLeagueStep
-              onNext={(league: League) => {
-                setWizardContext((prev) => ({ ...prev, league }));
-                setCurrentStep(2);
-              }}
-            />
-          )}
-          {currentStep === 2 && wizardContext.league && (
-            <SelectTeamStep
-              league={wizardContext.league}
-              onNext={(teamId: number, teamName: string) => {
-                setWizardContext((prev) => ({
-                  ...prev,
-                  selectedTeamId: teamId,
-                  selectedTeamName: teamName,
-                }));
-                setCurrentStep(3);
-              }}
-            />
-          )}
-          {currentStep === 3 && wizardContext.league && (
-            <CompleteStep
-              leagueName={wizardContext.league.name}
-              teamName={wizardContext.selectedTeamName || "your team"}
-              leagueId={wizardContext.league.id}
-            />
-          )}
+          {/* Step Content */}
+          <Card>
+            <CardContent className="p-6 sm:p-8">
+              {currentStep === 0 && (
+                <WelcomeStep onNext={() => setCurrentStep(1)} />
+              )}
+              {currentStep === 1 && (
+                <ConnectLeagueStep
+                  onNext={(league: League) => {
+                    setWizardContext((prev) => ({ ...prev, league }));
+                    setCurrentStep(2);
+                  }}
+                />
+              )}
+              {currentStep === 2 && wizardContext.league && (
+                <SelectTeamStep
+                  league={wizardContext.league}
+                  onNext={(teamId: number, teamName: string) => {
+                    setWizardContext((prev) => ({
+                      ...prev,
+                      selectedTeamId: teamId,
+                      selectedTeamName: teamName,
+                    }));
+                    setCurrentStep(3);
+                  }}
+                />
+              )}
+              {currentStep === 3 && wizardContext.league && (
+                <CompleteStep
+                  leagueName={wizardContext.league.name}
+                  teamName={wizardContext.selectedTeamName || "your team"}
+                  leagueId={wizardContext.league.id}
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }
@@ -134,13 +143,13 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="text-center">
       <div className="text-5xl mb-4">&#9918;</div>
-      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+      <Heading level={2} className="mb-3">
         Welcome to Fantasy Baseball Command Center
-      </h2>
-      <p className="text-gray-600 mb-8 max-w-lg mx-auto">
+      </Heading>
+      <Text color="secondary" className="mb-8 max-w-lg mx-auto">
         Get AI-powered recommendations for waivers, trades, and projected
         standings
-      </p>
+      </Text>
 
       <div className="text-left max-w-md mx-auto mb-8 space-y-4">
         <BulletPoint text="Connect your ESPN league" />
@@ -148,16 +157,13 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         <BulletPoint text="Get daily waiver and trade suggestions" />
       </div>
 
-      <button
-        onClick={onNext}
-        className="w-full sm:w-auto px-8 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
-      >
+      <Button onClick={onNext} variant="primary" size="lg" className="w-full sm:w-auto px-8">
         Get Started
-      </button>
+      </Button>
       <div className="mt-3">
         <button
           onClick={onNext}
-          className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-body-sm text-content-tertiary hover:text-content-secondary transition-colors"
         >
           Skip
         </button>
@@ -170,7 +176,7 @@ function BulletPoint({ text }: { text: string }) {
   return (
     <div className="flex items-center space-x-3">
       <svg
-        className="w-5 h-5 text-blue-600 flex-shrink-0"
+        className="w-5 h-5 text-accent flex-shrink-0"
         fill="currentColor"
         viewBox="0 0 20 20"
       >
@@ -180,7 +186,7 @@ function BulletPoint({ text }: { text: string }) {
           clipRule="evenodd"
         />
       </svg>
-      <span className="text-gray-700">{text}</span>
+      <Text color="default">{text}</Text>
     </div>
   );
 }
@@ -228,51 +234,49 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
 
   return (
     <div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+      <Heading level={2} className="mb-2">
         Connect Your ESPN League
-      </h2>
-      <p className="text-gray-600 mb-6">
+      </Heading>
+      <Text color="secondary" className="mb-6">
         Enter your ESPN Fantasy Baseball league details to get started.
-      </p>
+      </Text>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* ESPN League ID */}
         <div>
           <label
             htmlFor="espnLeagueId"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-body-sm font-medium text-content mb-1"
           >
             ESPN League ID *
           </label>
-          <input
+          <Input
             type="number"
             id="espnLeagueId"
             required
             value={espnLeagueId}
             onChange={(e) => setEspnLeagueId(e.target.value)}
-            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2"
             placeholder="123456"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <Text size="caption" color="tertiary" className="mt-1">
             Find this in your ESPN league URL: fantasy.espn.com/baseball/league?leagueId=<strong>123456</strong>
-          </p>
+          </Text>
         </div>
 
         {/* Season */}
         <div>
           <label
             htmlFor="season"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-body-sm font-medium text-content mb-1"
           >
             Season *
           </label>
-          <input
+          <Input
             type="number"
             id="season"
             required
             value={season}
             onChange={(e) => setSeason(e.target.value)}
-            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2"
             placeholder="2026"
             min="2020"
             max={new Date().getFullYear() + 1}
@@ -283,61 +287,60 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         <div>
           <label
             htmlFor="leagueName"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-body-sm font-medium text-content mb-1"
           >
             League Name (Optional)
           </label>
-          <input
+          <Input
             type="text"
             id="leagueName"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2"
             placeholder="Will be fetched from ESPN if not provided"
           />
         </div>
 
         {/* Private League Toggle */}
-        <div className="border-t border-gray-200 pt-4">
+        <div className="border-t border-neutral-100 pt-4">
           <label className="flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
             />
-            <span className="ml-2 text-sm font-medium text-gray-700">
+            <Text size="sm" className="ml-2 font-medium">
               Private league (requires ESPN cookies)
-            </span>
+            </Text>
           </label>
 
           {isPrivate && (
-            <div className="mt-4 space-y-4 bg-gray-50 p-4 rounded-md">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 space-y-4 bg-surface-secondary p-4 rounded-lg">
+              <Text size="sm" color="secondary">
                 Private leagues require your ESPN authentication cookies.{" "}
                 <a
                   href="https://github.com/cwendt94/espn-api/wiki/ESPN-Fantasy-Football-Cookies"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 underline"
+                  className="text-accent hover:underline"
                 >
                   How to find these cookies
                 </a>
-              </p>
+              </Text>
 
               <div>
                 <label
                   htmlFor="swid"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-body-sm font-medium text-content mb-1"
                 >
                   SWID Cookie
                 </label>
-                <input
+                <Input
                   type="text"
                   id="swid"
                   value={swid}
                   onChange={(e) => setSwid(e.target.value)}
-                  className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 font-mono text-xs"
+                  className="font-mono text-caption"
                   placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
                 />
               </div>
@@ -345,16 +348,16 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
               <div>
                 <label
                   htmlFor="espnS2"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-body-sm font-medium text-content mb-1"
                 >
                   espn_s2 Cookie
                 </label>
-                <input
+                <Input
                   type="text"
                   id="espnS2"
                   value={espnS2}
                   onChange={(e) => setEspnS2(e.target.value)}
-                  className="block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 font-mono text-xs"
+                  className="font-mono text-caption"
                   placeholder="AEB..."
                 />
               </div>
@@ -365,11 +368,11 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         {/* Error */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-700 text-sm">{error}</p>
+            <Text size="sm" className="text-red-700">{error}</Text>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+              className="mt-2 text-body-sm text-red-600 hover:text-red-800 underline"
             >
               Dismiss
             </button>
@@ -377,15 +380,17 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         )}
 
         {/* Submit */}
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="lg"
           disabled={loading || !espnLeagueId || !season}
-          className="w-full py-3 px-4 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+          className="w-full"
         >
           {loading ? (
             <>
               <svg
-                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                className="animate-spin -ml-1 mr-3 h-5 w-5"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -409,7 +414,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
           ) : (
             "Connect League"
           )}
-        </button>
+        </Button>
       </form>
     </div>
   );
@@ -470,27 +475,8 @@ function SelectTeamStep({
   if (loading) {
     return (
       <div className="text-center py-12">
-        <svg
-          className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          />
-        </svg>
-        <p className="text-gray-600">Loading teams...</p>
+        <div className="animate-spin rounded-full border-b-2 border-accent h-8 w-8 mx-auto mb-4" />
+        <Text color="secondary">Loading teams...</Text>
       </div>
     );
   }
@@ -499,9 +485,10 @@ function SelectTeamStep({
     return (
       <div className="text-center py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-          <p className="text-red-700 text-sm">{error}</p>
+          <Text size="sm" className="text-red-700">{error}</Text>
         </div>
-        <button
+        <Button
+          variant="secondary"
           onClick={() => {
             setError(null);
             setLoading(true);
@@ -520,31 +507,30 @@ function SelectTeamStep({
                 setLoading(false);
               });
           }}
-          className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
         >
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div>
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+      <Heading level={2} className="mb-2">
         Select Your Team
-      </h2>
-      <p className="text-gray-600 mb-6">
+      </Heading>
+      <Text color="secondary" className="mb-6">
         Choose the team you manage in {league.name || "your league"}.
-      </p>
+      </Text>
 
       {teams.length === 1 ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-center">
-          <p className="text-blue-800 font-medium">
+        <div className="bg-surface-secondary border border-neutral-200 rounded-lg p-4 mb-6 text-center">
+          <Text className="font-medium">
             Auto-selected: {teams[0].name}
-          </p>
-          <p className="text-blue-600 text-sm mt-1">
+          </Text>
+          <Text size="sm" color="secondary" className="mt-1">
             Only one team found in this league.
-          </p>
+          </Text>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -552,30 +538,33 @@ function SelectTeamStep({
             <button
               key={team.id}
               onClick={() => setSelectedTeamId(team.id)}
-              className={`text-left p-4 rounded-lg border-2 transition-all ${
+              className={cn(
+                "text-left p-4 rounded-lg border-2 transition-all",
                 selectedTeamId === team.id
-                  ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600"
-                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              }`}
+                  ? "border-accent bg-accent/5 ring-1 ring-accent"
+                  : "border-neutral-200 hover:border-neutral-300 hover:bg-surface-secondary"
+              )}
             >
-              <div className="font-semibold text-gray-900">{team.name}</div>
+              <Text className="font-semibold">{team.name}</Text>
               {team.abbreviation && (
-                <div className="text-sm text-gray-500 mt-0.5">
+                <Text size="sm" color="secondary" className="mt-0.5">
                   {team.abbreviation}
-                </div>
+                </Text>
               )}
             </button>
           ))}
         </div>
       )}
 
-      <button
+      <Button
         onClick={handleContinue}
+        variant="primary"
+        size="lg"
         disabled={selectedTeamId === null}
-        className="w-full py-3 px-4 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed"
+        className="w-full"
       >
         Continue
-      </button>
+      </Button>
     </div>
   );
 }
@@ -594,9 +583,9 @@ function CompleteStep({
 
   return (
     <div className="text-center">
-      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="w-16 h-16 bg-surface-secondary rounded-full flex items-center justify-center mx-auto mb-4">
         <svg
-          className="w-8 h-8 text-green-600"
+          className="w-8 h-8 text-accent"
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -608,26 +597,28 @@ function CompleteStep({
         </svg>
       </div>
 
-      <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-        You're all set!
-      </h2>
+      <Heading level={2} className="mb-3">
+        You&apos;re all set!
+      </Heading>
 
-      <p className="text-gray-600 mb-2">
-        Connected to <span className="font-semibold">{leagueName}</span> as{" "}
-        <span className="font-semibold">{teamName}</span>
-      </p>
+      <Text color="secondary" className="mb-2">
+        Connected to <span className="font-semibold text-content">{leagueName}</span> as{" "}
+        <span className="font-semibold text-content">{teamName}</span>
+      </Text>
 
-      <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">
+      <Text size="sm" color="tertiary" className="mb-8 max-w-md mx-auto">
         Upload FanGraphs projections from your league dashboard for even better
         recommendations.
-      </p>
+      </Text>
 
-      <button
+      <Button
         onClick={() => router.push(`/leagues/${leagueId}`)}
-        className="w-full sm:w-auto px-8 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+        variant="primary"
+        size="lg"
+        className="w-full sm:w-auto px-8"
       >
         Go to Dashboard
-      </button>
+      </Button>
     </div>
   );
 }
