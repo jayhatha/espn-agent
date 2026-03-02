@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 2 of 5 in current phase
+Plan: 3 of 5 in current phase
 Status: In Progress
-Last activity: 2026-03-02 - Completed 17-02-PLAN.md: Component library - Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn (9 primitives)
+Last activity: 2026-03-02 - Completed 17-03-PLAN.md: Navigation redesign + 5 shared UI component refactoring (PageHeader, StatCard, LoadingSpinner, ErrorAlert, StatsTable)
 
-Progress: Phase 17: [████░░░░░░] 40% (2 of 5 plans complete)
+Progress: Phase 17: [██████░░░░] 60% (3 of 5 plans complete)
 
 ## Performance Metrics
 
@@ -111,6 +111,7 @@ Progress: Phase 17: [████░░░░░░] 40% (2 of 5 plans complete)
 | Phase quick-16 P01 | 4 | 2 tasks | 7 files |
 | Phase quick-23 P01 | 4 | 3 tasks | 9 files |
 | Phase 17 P02 | 27 | 2 tasks | 9 files |
+| Phase 17 P03 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -213,6 +214,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: Inter variable font with --font-inter CSS variable enables font-sans Tailwind class to consume custom token
 - [Phase 17]: globals.css uses @layer base to avoid specificity issues with Tailwind utilities
 - [Phase 17]: Omit<React.HTMLAttributes<T>, 'color'> in Text component avoids TypeScript TS2320 conflict between HTML color attribute and CVA color variant
+- [Phase 17]: aria-expanded={mobileMenuOpen} dynamic binding (not hardcoded false) is required for correct accessibility tree in screen readers
+- [Phase 17]: StatsTable highlightClassName default changed from bg-blue-50 to bg-accent-light to align with design tokens
+- [Phase 17]: All inline SVGs in navigation and shared UI components replaced with lucide-react equivalents for consistency and maintainability
 
 ### Roadmap Evolution
 
@@ -277,5 +281,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 17-02-PLAN.md - Component library (9 design system primitives: Container, Heading, Text, Button, Card, Badge, Input, Select, FadeIn)
+Stopped at: Completed 17-03-PLAN.md - Navigation redesign and shared UI component refactoring (navigation, PageHeader, StatCard, LoadingSpinner, ErrorAlert, StatsTable)
 Resume file: None
