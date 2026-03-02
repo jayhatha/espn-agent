@@ -4,7 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Navigation } from "./navigation";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "ESPN Fantasy Baseball Assistant",
@@ -18,13 +18,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className={inter.variable}>
+      <body className="font-sans">
+        <a href="#main-content" className="skip-to-content">
+          Skip to content
+        </a>
         <Providers>
-          <div className="min-h-screen bg-gray-50">
-            <Navigation />
-            <main>{children}</main>
-          </div>
+          <Navigation />
+          <main id="main-content">{children}</main>
         </Providers>
       </body>
     </html>
