@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/cn";
+
 interface PlayerRowProps {
   player: {
     id: number;
@@ -18,16 +20,16 @@ interface PlayerRowProps {
 
 const variantStyles = {
   default: {
-    hover: "hover:bg-gray-50",
-    selectedBg: "bg-blue-100 border-l-4 border-blue-600",
+    hover: "hover:bg-surface-secondary",
+    selectedBg: "bg-accent-light border-l-4 border-accent",
   },
   add: {
-    hover: "hover:bg-green-50",
-    selectedBg: "bg-green-100 border-l-4 border-green-600",
+    hover: "hover:bg-positive-light",
+    selectedBg: "bg-positive-light border-l-4 border-positive",
   },
   drop: {
-    hover: "hover:bg-red-50",
-    selectedBg: "bg-red-100 border-l-4 border-red-600",
+    hover: "hover:bg-negative-light",
+    selectedBg: "bg-negative-light border-l-4 border-negative",
   },
 };
 
@@ -43,22 +45,24 @@ export function PlayerRow({
 
   return (
     <div
-      className={`flex items-center ${py} px-3 transition-colors ${
-        selected ? styles.selectedBg : styles.hover
-      }`}
+      className={cn(
+        "flex items-center px-3 transition-colors",
+        py,
+        selected ? styles.selectedBg : styles.hover,
+      )}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-gray-900 truncate">
+          <div className="text-body-sm font-medium text-content truncate">
             {player.name}
           </div>
           {player.rosterSlot && (
-            <span className="text-xs font-medium text-gray-400 ml-2">
+            <span className="text-data text-content-tertiary ml-2">
               {player.rosterSlot}
             </span>
           )}
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-data text-content-secondary">
           {player.position}
           {player.team && ` \u2022 ${player.team}`}
         </div>

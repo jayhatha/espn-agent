@@ -4,12 +4,19 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowRight, ArrowRightLeft, ExternalLink, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { Container } from "@/components/ui/Container";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Heading } from "@/components/ui/Heading";
+import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PlayerRow } from "@/components/league/PlayerRow";
 import { getESPNTradeUrl } from "@/lib/espn-links";
+import { cn } from "@/lib/cn";
 
 interface ProposedTrade {
   givePlayers: Array<{ playerId: number; playerName: string }>;
@@ -241,31 +248,30 @@ export default function TradesPage() {
     analyzeTradeM.mutate({ givePlayers, receivePlayers });
   };
 
-  const getRecommendationColor = (
+  const getRecommendationVariant = (
     rec: "accept" | "decline" | "consider",
-  ) => {
-    if (rec === "accept")
-      return "bg-green-100 text-green-800 border-green-300";
-    if (rec === "decline") return "bg-red-100 text-red-800 border-red-300";
-    return "bg-yellow-100 text-yellow-800 border-yellow-300";
+  ): "positive" | "negative" | "warning" => {
+    if (rec === "accept") return "positive";
+    if (rec === "decline") return "negative";
+    return "warning";
   };
 
   const getLikelihoodColor = (likelihood: "high" | "medium" | "low") => {
-    if (likelihood === "high") return "text-green-600";
-    if (likelihood === "medium") return "text-yellow-600";
-    return "text-red-600";
+    if (likelihood === "high") return "text-positive";
+    if (likelihood === "medium") return "text-warning";
+    return "text-negative";
   };
 
   const renderDeltaColor = (value: number) =>
     value > 0
-      ? "text-green-600"
+      ? "text-positive"
       : value < 0
-        ? "text-red-600"
-        : "text-gray-600";
+        ? "text-negative"
+        : "text-content-secondary";
 
   if (!selectedTeamId) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Container size="wide" className="py-8">
         <ErrorAlert
           variant="warning"
           message="Please select your team on the league page to access trade analysis."
@@ -274,12 +280,12 @@ export default function TradesPage() {
             label: "Go to League Page",
           }}
         />
-      </div>
+      </Container>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <Container size="wide" className="py-6 sm:py-8">
       <PageHeader
         title="Trade Analyzer"
         subtitle="Analyze trade impacts and discover beneficial trade opportunities"
@@ -287,573 +293,327 @@ export default function TradesPage() {
       />
 
       {/* Mode Toggle */}
-      <div className="mb-6 bg-white shadow rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => {
-              setShowAnalyzer(true);
-              setTradeAnalysis(null);
-              setGivePlayerIds([]);
-              setReceivePlayerIds([]);
-            }}
-            className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-              showAnalyzer
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Build & Analyze Trade
-          </button>
-          <button
-            onClick={() => setShowAnalyzer(false)}
-            className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-              !showAnalyzer
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            Browse AI Suggestions
-          </button>
-        </div>
+      <div className="mb-6">
+        <Card>
+          <CardContent className="py-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                variant={showAnalyzer ? "primary" : "secondary"}
+                className="flex-1"
+                onClick={() => {
+                  setShowAnalyzer(true);
+                  setTradeAnalysis(null);
+                  setGivePlayerIds([]);
+                  setReceivePlayerIds([]);
+                }}
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Build & Analyze Trade
+              </Button>
+              <Button
+                variant={!showAnalyzer ? "primary" : "secondary"}
+                className="flex-1"
+                onClick={() => setShowAnalyzer(false)}
+              >
+                Browse AI Suggestions
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Build & Analyze Trade */}
       {showAnalyzer && (
         <div className="space-y-6">
           {/* Partner Selection */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Select Trade Partner
-            </label>
-            <select
-              value={selectedPartnerId || ""}
-              onChange={(e) => {
-                setSelectedPartnerId(
-                  e.target.value ? parseInt(e.target.value, 10) : null,
-                );
-                setGivePlayerIds([]);
-                setReceivePlayerIds([]);
-                setTradeAnalysis(null);
-                setValidationResult(null);
-              }}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
-            >
-              <option value="">-- Choose a team --</option>
-              {partnersData?.partners.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Card>
+            <CardContent>
+              <label className="block text-body-sm font-medium text-content mb-3">
+                Select Trade Partner
+              </label>
+              <select
+                value={selectedPartnerId || ""}
+                onChange={(e) => {
+                  setSelectedPartnerId(
+                    e.target.value ? parseInt(e.target.value, 10) : null,
+                  );
+                  setGivePlayerIds([]);
+                  setReceivePlayerIds([]);
+                  setTradeAnalysis(null);
+                  setValidationResult(null);
+                }}
+                className="block w-full rounded-lg border border-neutral-200 bg-white text-content focus:border-accent focus:ring-accent px-4 py-2"
+              >
+                <option value="">-- Choose a team --</option>
+                {partnersData?.partners.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </CardContent>
+          </Card>
 
           {/* Trade Builder */}
           {selectedPartnerId && (
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Build Trade
-              </h2>
-
-              {rostersLoading || !rostersData ? (
-                <LoadingSkeleton lines={1} />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Your Team */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
-                    </label>
-                    <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                      {rostersData.userTeam.roster.map((player) => (
-                        <label
-                          key={player.playerId}
-                          className="flex items-center border border-gray-200 rounded-lg cursor-pointer"
-                        >
-                          <div className="pl-3">
-                            <input
-                              type="checkbox"
-                              checked={givePlayerIds.includes(player.playerId)}
-                              disabled={givePlayerIds.length >= 3 && !givePlayerIds.includes(player.playerId)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setGivePlayerIds([
-                                    ...givePlayerIds,
-                                    player.playerId,
-                                  ]);
-                                } else {
-                                  setGivePlayerIds(
-                                    givePlayerIds.filter(
-                                      (id) => id !== player.playerId,
-                                    ),
-                                  );
-                                }
-                                setTradeAnalysis(null);
-                              }}
-                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <PlayerRow
-                              player={{
-                                id: player.playerId,
-                                name: player.playerName,
-                                position: player.positions.join(", "),
-                                team: player.mlbTeam,
-                              }}
-                              selected={givePlayerIds.includes(
-                                player.playerId,
-                              )}
-                              variant="drop"
-                            />
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                    {givePlayerIds.length >= 3 && (
-                      <div className="mt-2 text-xs text-amber-600 font-medium">
-                        Maximum 3 players
+            <Card>
+              <CardHeader>
+                <Heading level={3}>Build Trade</Heading>
+              </CardHeader>
+              <CardContent>
+                {rostersLoading || !rostersData ? (
+                  <LoadingSkeleton lines={1} />
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Your Team */}
+                    <div>
+                      <label className="block text-body-sm font-medium text-content mb-3">
+                        You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
+                      </label>
+                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 rounded-lg p-3">
+                        {rostersData.userTeam.roster.map((player) => (
+                          <label
+                            key={player.playerId}
+                            className="flex items-center border border-neutral-200 rounded-lg cursor-pointer"
+                          >
+                            <div className="pl-3">
+                              <input
+                                type="checkbox"
+                                checked={givePlayerIds.includes(player.playerId)}
+                                disabled={givePlayerIds.length >= 3 && !givePlayerIds.includes(player.playerId)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setGivePlayerIds([
+                                      ...givePlayerIds,
+                                      player.playerId,
+                                    ]);
+                                  } else {
+                                    setGivePlayerIds(
+                                      givePlayerIds.filter(
+                                        (id) => id !== player.playerId,
+                                      ),
+                                    );
+                                  }
+                                  setTradeAnalysis(null);
+                                }}
+                                className="h-4 w-4 text-accent border-neutral-300 rounded focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <PlayerRow
+                                player={{
+                                  id: player.playerId,
+                                  name: player.playerName,
+                                  position: player.positions.join(", "),
+                                  team: player.mlbTeam,
+                                }}
+                                selected={givePlayerIds.includes(
+                                  player.playerId,
+                                )}
+                                variant="drop"
+                              />
+                            </div>
+                          </label>
+                        ))}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Partner Team */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
-                    </label>
-                    <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                      {rostersData.partnerTeam.roster.map((player) => (
-                        <label
-                          key={player.playerId}
-                          className="flex items-center border border-gray-200 rounded-lg cursor-pointer"
-                        >
-                          <div className="pl-3">
-                            <input
-                              type="checkbox"
-                              checked={receivePlayerIds.includes(
-                                player.playerId,
-                              )}
-                              disabled={receivePlayerIds.length >= 3 && !receivePlayerIds.includes(player.playerId)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setReceivePlayerIds([
-                                    ...receivePlayerIds,
-                                    player.playerId,
-                                  ]);
-                                } else {
-                                  setReceivePlayerIds(
-                                    receivePlayerIds.filter(
-                                      (id) => id !== player.playerId,
-                                    ),
-                                  );
-                                }
-                                setTradeAnalysis(null);
-                              }}
-                              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <PlayerRow
-                              player={{
-                                id: player.playerId,
-                                name: player.playerName,
-                                position: player.positions.join(", "),
-                                team: player.mlbTeam,
-                              }}
-                              selected={receivePlayerIds.includes(
-                                player.playerId,
-                              )}
-                              variant="add"
-                            />
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                    {receivePlayerIds.length >= 3 && (
-                      <div className="mt-2 text-xs text-amber-600 font-medium">
-                        Maximum 3 players
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Validation Status */}
-              {givePlayerIds.length > 0 && receivePlayerIds.length > 0 && (
-                <div className="mt-4">
-                  {isValidating ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Checking roster validity...
-                    </div>
-                  ) : validationResult ? (
-                    validationResult.isLegal ? (
-                      <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Trade is roster-legal
-                      </div>
-                    ) : (
-                      <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                        <div className="flex items-center gap-2 text-sm font-medium text-red-700 mb-1">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                          </svg>
-                          Roster issues detected
+                      {givePlayerIds.length >= 3 && (
+                        <div className="mt-2 text-data text-warning font-medium">
+                          Maximum 3 players
                         </div>
-                        <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
-                          {validationResult.issues.map((issue, i) => (
-                            <li key={i}>{issue}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )
-                  ) : null}
-                </div>
-              )}
-
-              <div className="mt-6">
-                <button
-                  onClick={handleAnalyzeTrade}
-                  disabled={
-                    analyzeTradeM.isPending ||
-                    givePlayerIds.length === 0 ||
-                    receivePlayerIds.length === 0 ||
-                    (validationResult !== null && !validationResult.isLegal) ||
-                    isValidating
-                  }
-                  className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {analyzeTradeM.isPending
-                    ? "Analyzing..."
-                    : isValidating
-                      ? "Validating..."
-                      : validationResult && !validationResult.isLegal
-                        ? "Fix Roster Issues First"
-                        : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
-                </button>
-              </div>
-
-              {analyzeTradeM.isError && (
-                <div className="mt-4">
-                  <ErrorAlert
-                    message={(analyzeTradeM.error as Error).message}
-                  />
-                  {(analyzeTradeM.error as Error).message.includes(
-                    "projected standings",
-                  ) && (
-                    <div className="mt-3">
-                      <p className="text-sm text-red-700 mb-3">
-                        Trade analysis requires projections. Please contact your
-                        administrator to upload projections.
-                      </p>
-                      <Link
-                        href={`/leagues/${leagueId}`}
-                        className="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        Go to League Page
-                      </Link>
+                      )}
                     </div>
-                  )}
+
+                    {/* Partner Team */}
+                    <div>
+                      <label className="block text-body-sm font-medium text-content mb-3">
+                        You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
+                      </label>
+                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 rounded-lg p-3">
+                        {rostersData.partnerTeam.roster.map((player) => (
+                          <label
+                            key={player.playerId}
+                            className="flex items-center border border-neutral-200 rounded-lg cursor-pointer"
+                          >
+                            <div className="pl-3">
+                              <input
+                                type="checkbox"
+                                checked={receivePlayerIds.includes(
+                                  player.playerId,
+                                )}
+                                disabled={receivePlayerIds.length >= 3 && !receivePlayerIds.includes(player.playerId)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setReceivePlayerIds([
+                                      ...receivePlayerIds,
+                                      player.playerId,
+                                    ]);
+                                  } else {
+                                    setReceivePlayerIds(
+                                      receivePlayerIds.filter(
+                                        (id) => id !== player.playerId,
+                                      ),
+                                    );
+                                  }
+                                  setTradeAnalysis(null);
+                                }}
+                                className="h-4 w-4 text-positive border-neutral-300 rounded focus:ring-positive disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <PlayerRow
+                                player={{
+                                  id: player.playerId,
+                                  name: player.playerName,
+                                  position: player.positions.join(", "),
+                                  team: player.mlbTeam,
+                                }}
+                                selected={receivePlayerIds.includes(
+                                  player.playerId,
+                                )}
+                                variant="add"
+                              />
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      {receivePlayerIds.length >= 3 && (
+                        <div className="mt-2 text-data text-warning font-medium">
+                          Maximum 3 players
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Validation Status */}
+                {givePlayerIds.length > 0 && receivePlayerIds.length > 0 && (
+                  <div className="mt-4">
+                    {isValidating ? (
+                      <div className="flex items-center gap-2 text-body-sm text-content-secondary">
+                        <Loader2 className="animate-spin h-4 w-4" />
+                        Checking roster validity...
+                      </div>
+                    ) : validationResult ? (
+                      validationResult.isLegal ? (
+                        <div className="flex items-center gap-2 text-body-sm text-positive bg-positive-light border border-positive-border rounded-lg px-3 py-2">
+                          <CheckCircle className="h-4 w-4" />
+                          Trade is roster-legal
+                        </div>
+                      ) : (
+                        <div className="bg-negative-light border border-negative-border rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 text-body-sm font-medium text-negative mb-1">
+                            <AlertTriangle className="h-4 w-4" />
+                            Roster issues detected
+                          </div>
+                          <ul className="list-disc list-inside text-body-sm text-negative space-y-1">
+                            {validationResult.issues.map((issue, i) => (
+                              <li key={i}>{issue}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    ) : null}
+                  </div>
+                )}
+
+                <div className="mt-6">
+                  <Button
+                    variant="primary"
+                    onClick={handleAnalyzeTrade}
+                    disabled={
+                      analyzeTradeM.isPending ||
+                      givePlayerIds.length === 0 ||
+                      receivePlayerIds.length === 0 ||
+                      (validationResult !== null && !validationResult.isLegal) ||
+                      isValidating
+                    }
+                  >
+                    {analyzeTradeM.isPending
+                      ? "Analyzing..."
+                      : isValidating
+                        ? "Validating..."
+                        : validationResult && !validationResult.isLegal
+                          ? "Fix Roster Issues First"
+                          : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
+                  </Button>
                 </div>
-              )}
-            </div>
+
+                {analyzeTradeM.isError && (
+                  <div className="mt-4">
+                    <ErrorAlert
+                      message={(analyzeTradeM.error as Error).message}
+                    />
+                    {(analyzeTradeM.error as Error).message.includes(
+                      "projected standings",
+                    ) && (
+                      <div className="mt-3">
+                        <p className="text-body-sm text-negative mb-3">
+                          Trade analysis requires projections. Please contact your
+                          administrator to upload projections.
+                        </p>
+                        <Link
+                          href={`/leagues/${leagueId}`}
+                          className="inline-flex items-center px-3 py-2 bg-negative text-white text-body-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                        >
+                          Go to League Page
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           )}
 
           {/* Trade Analysis Result */}
           {tradeAnalysis && (
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Trade Analysis
-              </h2>
-
-              {/* Overall Impact */}
-              <div className="mb-6 p-4 border-2 rounded-lg bg-gradient-to-br from-blue-50 to-white">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <div className="text-sm text-gray-500 mb-1">
-                      Overall Point Change
-                    </div>
-                    <div
-                      className={`text-3xl font-bold ${renderDeltaColor(tradeAnalysis.deltaOverallPoints)}`}
-                    >
-                      {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
-                      {tradeAnalysis.deltaOverallPoints.toFixed(1)} pts
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {tradeAnalysis.currentOverallPoints.toFixed(1)} &rarr;{" "}
-                      {tradeAnalysis.projectedOverallPoints.toFixed(1)}
-                    </div>
-                  </div>
-
-                  <div
-                    className={`px-4 py-2 border-2 rounded-lg font-medium uppercase text-sm ${getRecommendationColor(tradeAnalysis.recommendation)}`}
-                  >
-                    {tradeAnalysis.recommendation}
-                  </div>
-                </div>
-
-                <div className="mt-4 p-3 bg-white rounded-lg border border-gray-200">
-                  <div className="text-sm font-medium text-gray-700 mb-1">
-                    Analysis
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {tradeAnalysis.explanation}
-                  </p>
-                </div>
-
-                <div className="mt-3 text-xs text-gray-500">
-                  Fairness Score:{" "}
-                  <span className="font-semibold">
-                    {tradeAnalysis.fairnessScore.toFixed(2)}
-                  </span>{" "}
-                  (Range: -1 to 1, closer to 0 is more balanced)
-                </div>
-
-                {/* ESPN Link */}
-                {espnLeagueId && season && (
-                  <div className="mt-3">
-                    <a
-                      href={getESPNTradeUrl(espnLeagueId, season)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm gap-2"
-                    >
-                      Propose on ESPN
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Category Breakdown */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">
-                  Category Impact
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Category
-                        </th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                          Rank Change
-                        </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                          Point Change
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {tradeAnalysis.categoryImpacts.map((cat) => (
-                        <tr key={cat.categoryName}>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                            {cat.categoryName}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-center">
-                            <span
-                              className={`font-semibold ${renderDeltaColor(cat.deltaRank * -1)}`}
-                            >
-                              {cat.currentRank} &rarr; {cat.projectedRank}
-                              {cat.deltaRank !== 0 &&
-                                ` (${cat.deltaRank > 0 ? "+" : ""}${cat.deltaRank})`}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right">
-                            <span
-                              className={`font-semibold ${renderDeltaColor(cat.deltaPoints)}`}
-                            >
-                              {cat.deltaPoints > 0 ? "+" : ""}
-                              {cat.deltaPoints.toFixed(1)} pts
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* AI Trade Suggestions */}
-      {!showAnalyzer && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
-            AI-Generated Trade Suggestions
-          </h2>
-          <p className="text-sm text-gray-600 mb-6">
-            These are trades that would improve your projected standings
-          </p>
-
-          {candidatesData &&
-            candidatesData.candidates.length > 0 &&
-            candidatesData.candidates[0]?.positionalContext?.needPositions &&
-            candidatesData.candidates[0].positionalContext.needPositions.length >
-              0 && (
-              <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm font-medium text-blue-800">
-                  Positions of need:{" "}
-                  {candidatesData.candidates[0].positionalContext.needPositions.join(
-                    ", ",
-                  )}
-                </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  Trades filling these positions are ranked higher
-                </div>
-              </div>
-            )}
-
-          {candidatesLoading ? (
-            <LoadingSkeleton lines={3} />
-          ) : candidatesError ? (
-            <div>
-              <ErrorAlert message={(candidatesError as Error).message} />
-              {(candidatesError as Error).message.includes(
-                "projected standings",
-              ) && (
-                <div className="mt-4">
-                  <p className="text-sm text-red-700 mb-3">
-                    Trade suggestions require projections. Please contact your
-                    administrator to upload projections.
-                  </p>
-                  <Link
-                    href={`/leagues/${leagueId}`}
-                    className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Go to League Page
-                  </Link>
-                </div>
-              )}
-            </div>
-          ) : candidatesData && candidatesData.candidates.length > 0 ? (
-            <div className="space-y-4">
-              {candidatesData.candidates.map((candidate, idx) => (
-                <div
-                  key={idx}
-                  className="border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-lg transition-shadow"
-                >
-                  {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+            <Card>
+              <CardHeader>
+                <Heading level={3}>Trade Analysis</Heading>
+              </CardHeader>
+              <CardContent>
+                {/* Overall Impact */}
+                <div className="mb-6 p-4 border border-neutral-200 rounded-lg bg-surface-secondary">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                      <div className="text-sm text-gray-500">
-                        Trade Partner
+                      <div className="text-body-sm text-content-secondary mb-1">
+                        Overall Point Change
                       </div>
-                      <div className="text-lg font-bold text-gray-900">
-                        {candidate.partnerTeamName}
-                      </div>
-                    </div>
-                    <div className="text-left sm:text-right">
-                      <div className="text-sm text-gray-500">
-                        Projected Gain
-                      </div>
-                      <div className="text-xl font-bold text-green-600">
-                        +{candidate.deltaOverallPoints.toFixed(1)} pts
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trade Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <div className="text-xs font-semibold text-red-600 uppercase mb-1">
-                        You Give
-                      </div>
-                      {candidate.trade.givePlayers.map((p, i) => (
-                        <div
-                          key={i}
-                          className="text-sm font-medium text-gray-900 truncate"
-                        >
-                          {p.playerName}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-center">
-                      <svg
-                        className="w-6 h-6 text-gray-400 rotate-90 sm:rotate-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <div
+                        className={cn("text-3xl font-bold", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 8l4 4m0 0l-4 4m4-4H3"
-                        />
-                      </svg>
-                    </div>
-
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="text-xs font-semibold text-green-600 uppercase mb-1">
-                        You Get
+                        {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
+                        {tradeAnalysis.deltaOverallPoints.toFixed(1)} pts
                       </div>
-                      {candidate.trade.receivePlayers.map((p, i) => (
-                        <div
-                          key={i}
-                          className="text-sm font-medium text-gray-900 truncate"
-                        >
-                          {p.playerName}
-                        </div>
-                      ))}
+                      <div className="text-body-sm text-content-secondary mt-1">
+                        {tradeAnalysis.currentOverallPoints.toFixed(1)} &rarr;{" "}
+                        {tradeAnalysis.projectedOverallPoints.toFixed(1)}
+                      </div>
                     </div>
+
+                    <Badge
+                      variant={getRecommendationVariant(tradeAnalysis.recommendation)}
+                      className="uppercase text-sm px-4 py-2 rounded-lg"
+                    >
+                      {tradeAnalysis.recommendation}
+                    </Badge>
                   </div>
 
-                  {/* Positional Context Badges */}
-                  {candidate.positionalContext?.fillsNeed && (
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                        Fills need:{" "}
-                        {candidate.positionalContext.needPositions
-                          .filter((pos) =>
-                            candidate.positionalContext!.positionGained.includes(
-                              pos,
-                            ),
-                          )
-                          .join(", ")}
-                      </span>
-                      {candidate.positionalContext.positionalBonus >= 1.0 && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                          High positional value
-                        </span>
-                      )}
+                  <div className="mt-4 p-3 bg-white rounded-lg border border-neutral-200">
+                    <div className="text-body-sm font-medium text-content mb-1">
+                      Analysis
                     </div>
-                  )}
-
-                  {/* Metadata */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">
-                        Acceptance Likelihood:{" "}
-                      </span>
-                      <span
-                        className={`font-semibold ${getLikelihoodColor(candidate.likelihood)}`}
-                      >
-                        {candidate.likelihood.charAt(0).toUpperCase() +
-                          candidate.likelihood.slice(1)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Fairness: </span>
-                      <span className="font-semibold text-gray-700">
-                        {candidate.fairnessScore.toFixed(2)}
-                      </span>
-                    </div>
+                    <p className="text-body-sm text-content-secondary">
+                      {tradeAnalysis.explanation}
+                    </p>
                   </div>
 
-                  <div className="mt-3 text-xs text-gray-600">
-                    {candidate.explanation}
+                  <div className="mt-3 text-data text-content-secondary">
+                    Fairness Score:{" "}
+                    <span className="font-semibold text-content">
+                      {tradeAnalysis.fairnessScore.toFixed(2)}
+                    </span>{" "}
+                    (Range: -1 to 1, closer to 0 is more balanced)
                   </div>
 
                   {/* ESPN Link */}
@@ -863,28 +623,256 @@ export default function TradesPage() {
                         href={getESPNTradeUrl(espnLeagueId, season)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm gap-2"
+                        className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
                       >
                         Propose on ESPN
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
+                        <ExternalLink className="h-4 w-4" />
                       </a>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <p>No beneficial trade opportunities found at this time.</p>
-              <p className="text-sm mt-2">
-                Try the manual trade builder to evaluate specific proposals.
-              </p>
-            </div>
+
+                {/* Category Breakdown */}
+                <div>
+                  <Heading level={4} className="uppercase tracking-wider mb-3 text-body-sm text-content-secondary font-semibold">
+                    Category Impact
+                  </Heading>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-neutral-200">
+                      <thead className="bg-surface-secondary">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-data font-medium text-content-secondary uppercase">
+                            Category
+                          </th>
+                          <th className="px-4 py-3 text-center text-data font-medium text-content-secondary uppercase">
+                            Rank Change
+                          </th>
+                          <th className="px-4 py-3 text-right text-data font-medium text-content-secondary uppercase">
+                            Point Change
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {tradeAnalysis.categoryImpacts.map((cat) => (
+                          <tr key={cat.categoryName} className="hover:bg-surface-secondary">
+                            <td className="px-4 py-3 text-body-sm font-medium text-content">
+                              {cat.categoryName}
+                            </td>
+                            <td className="px-4 py-3 text-body-sm text-center">
+                              <span
+                                className={cn("font-semibold text-data", renderDeltaColor(cat.deltaRank * -1))}
+                              >
+                                {cat.currentRank} &rarr; {cat.projectedRank}
+                                {cat.deltaRank !== 0 &&
+                                  ` (${cat.deltaRank > 0 ? "+" : ""}${cat.deltaRank})`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-body-sm text-right">
+                              <span
+                                className={cn("font-semibold text-data", renderDeltaColor(cat.deltaPoints))}
+                              >
+                                {cat.deltaPoints > 0 ? "+" : ""}
+                                {cat.deltaPoints.toFixed(1)} pts
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}
-    </div>
+
+      {/* AI Trade Suggestions */}
+      {!showAnalyzer && (
+        <Card>
+          <CardHeader>
+            <Heading level={3}>AI-Generated Trade Suggestions</Heading>
+            <p className="text-body-sm text-content-secondary mt-1">
+              These are trades that would improve your projected standings
+            </p>
+          </CardHeader>
+          <CardContent>
+            {candidatesData &&
+              candidatesData.candidates.length > 0 &&
+              candidatesData.candidates[0]?.positionalContext?.needPositions &&
+              candidatesData.candidates[0].positionalContext.needPositions.length >
+                0 && (
+                <div className="mb-4 px-4 py-3 bg-info-light border border-info-border rounded-lg">
+                  <div className="text-body-sm font-medium text-info">
+                    Positions of need:{" "}
+                    {candidatesData.candidates[0].positionalContext.needPositions.join(
+                      ", ",
+                    )}
+                  </div>
+                  <div className="text-data text-info mt-1">
+                    Trades filling these positions are ranked higher
+                  </div>
+                </div>
+              )}
+
+            {candidatesLoading ? (
+              <LoadingSkeleton lines={3} />
+            ) : candidatesError ? (
+              <div>
+                <ErrorAlert message={(candidatesError as Error).message} />
+                {(candidatesError as Error).message.includes(
+                  "projected standings",
+                ) && (
+                  <div className="mt-4">
+                    <p className="text-body-sm text-negative mb-3">
+                      Trade suggestions require projections. Please contact your
+                      administrator to upload projections.
+                    </p>
+                    <Link
+                      href={`/leagues/${leagueId}`}
+                      className="inline-flex items-center px-4 py-2 bg-negative text-white text-body-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Go to League Page
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ) : candidatesData && candidatesData.candidates.length > 0 ? (
+              <div className="space-y-4">
+                {candidatesData.candidates.map((candidate, idx) => (
+                  <div
+                    key={idx}
+                    className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-shadow"
+                  >
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                      <div>
+                        <div className="text-data text-content-secondary">
+                          Trade Partner
+                        </div>
+                        <div className="text-h4 font-bold text-content">
+                          {candidate.partnerTeamName}
+                        </div>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <div className="text-data text-content-secondary">
+                          Projected Gain
+                        </div>
+                        <div className="text-h4 font-bold text-positive">
+                          +{candidate.deltaOverallPoints.toFixed(1)} pts
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trade Details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
+                      <div className="bg-negative-light border border-negative-border rounded-lg p-3">
+                        <div className="text-data font-semibold text-negative uppercase mb-1">
+                          You Give
+                        </div>
+                        {candidate.trade.givePlayers.map((p, i) => (
+                          <div
+                            key={i}
+                            className="text-body-sm font-medium text-content truncate"
+                          >
+                            {p.playerName}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-center">
+                        <ArrowRight className="w-6 h-6 text-content-tertiary rotate-90 sm:rotate-0" />
+                      </div>
+
+                      <div className="bg-positive-light border border-positive-border rounded-lg p-3">
+                        <div className="text-data font-semibold text-positive uppercase mb-1">
+                          You Get
+                        </div>
+                        {candidate.trade.receivePlayers.map((p, i) => (
+                          <div
+                            key={i}
+                            className="text-body-sm font-medium text-content truncate"
+                          >
+                            {p.playerName}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Positional Context Badges */}
+                    {candidate.positionalContext?.fillsNeed && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <Badge variant="info">
+                          Fills need:{" "}
+                          {candidate.positionalContext.needPositions
+                            .filter((pos) =>
+                              candidate.positionalContext!.positionGained.includes(
+                                pos,
+                              ),
+                            )
+                            .join(", ")}
+                        </Badge>
+                        {candidate.positionalContext.positionalBonus >= 1.0 && (
+                          <Badge variant="default">
+                            High positional value
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Metadata */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-body-sm">
+                      <div>
+                        <span className="text-content-secondary">
+                          Acceptance Likelihood:{" "}
+                        </span>
+                        <span
+                          className={cn("font-semibold", getLikelihoodColor(candidate.likelihood))}
+                        >
+                          {candidate.likelihood.charAt(0).toUpperCase() +
+                            candidate.likelihood.slice(1)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-content-secondary">Fairness: </span>
+                        <span className="font-semibold text-content">
+                          {candidate.fairnessScore.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 text-data text-content-secondary">
+                      {candidate.explanation}
+                    </div>
+
+                    {/* ESPN Link */}
+                    {espnLeagueId && season && (
+                      <div className="mt-3">
+                        <a
+                          href={getESPNTradeUrl(espnLeagueId, season)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
+                        >
+                          Propose on ESPN
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-content-secondary">
+                <p>No beneficial trade opportunities found at this time.</p>
+                <p className="text-body-sm mt-2">
+                  Try the manual trade builder to evaluate specific proposals.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </Container>
   );
 }

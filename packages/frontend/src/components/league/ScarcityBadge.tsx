@@ -1,72 +1,38 @@
 "use client";
 
+import { Check, ArrowDown, Minus } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/cn";
+
 interface ScarcityBadgeProps {
   level: "surplus" | "neutral" | "deficit";
   className?: string;
 }
 
-const badgeConfig = {
-  surplus: {
-    label: "Strength",
-    bgColor: "bg-green-100",
-    textColor: "text-green-800",
-    borderColor: "border-green-300",
-    icon: (
-      <svg
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 13l4 4L19 7"
-        />
-      </svg>
-    ),
-  },
-  neutral: {
-    label: "Average",
-    bgColor: "bg-gray-100",
-    textColor: "text-gray-800",
-    borderColor: "border-gray-300",
-    icon: null,
-  },
-  deficit: {
-    label: "Weakness",
-    bgColor: "bg-red-100",
-    textColor: "text-red-800",
-    borderColor: "border-red-300",
-    icon: (
-      <svg
-        className="h-4 w-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M19 14l-7 7m0 0l-7-7m7 7V3"
-        />
-      </svg>
-    ),
-  },
-};
-
 export function ScarcityBadge({ level, className = "" }: ScarcityBadgeProps) {
-  const config = badgeConfig[level];
+  if (level === "surplus") {
+    return (
+      <Badge variant="positive" className={cn("gap-1", className)}>
+        <Check className="h-3 w-3" />
+        <span>Strength</span>
+      </Badge>
+    );
+  }
+
+  if (level === "deficit") {
+    return (
+      <Badge variant="negative" className={cn("gap-1", className)}>
+        <ArrowDown className="h-3 w-3" />
+        <span>Weakness</span>
+      </Badge>
+    );
+  }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded border ${config.borderColor} ${config.bgColor} ${config.textColor} text-xs font-medium ${className}`}
-    >
-      {config.icon}
-      <span>{config.label}</span>
-    </span>
+    <Badge variant="default" className={cn("gap-1", className)}>
+      <Minus className="h-3 w-3" />
+      <span>Average</span>
+    </Badge>
   );
 }
 
