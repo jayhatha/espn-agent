@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-03 - Completed quick task 25: Audit trade recommendation agent - fix stat_key mismatch and dynamic category logic
+Last activity: 2026-03-03 - Completed quick task 26: Clean up auction validation frontend - remove ESPN auth fields, add BB/K9/WPCT/L categories
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
@@ -119,6 +119,7 @@ Progress: Phase 18: [██████████] 100% (2 of 2 plans complete
 | Phase 17 P07 | 4 | 2 tasks | 7 files |
 | Phase 17 P08 | 12 | 2 tasks | 6 files |
 | Phase 18 P02 | 3 | 2 tasks | 4 files |
+| Phase quick-26 P01 | 1 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -313,6 +314,7 @@ None yet.
 | 23 | Migrate player table to use ESPN player IDs as primary keys instead of auto-increment IDs | 2026-02-28 | 88aa469 | ✅ | [23-migrate-player-table-to-use-espn-player-](./quick/23-migrate-player-table-to-use-espn-player-/) |
 | 24 | Apply Phase 18 editorial composition design to Chrome extension | 2026-03-03 | dcdc219 | ✅ | [24-apply-phase-18-editorial-composition-des](./quick/24-apply-phase-18-editorial-composition-des/) |
 | 25 | Audit trade recommendation agent: fix stat_key mismatch, dynamic category logic, add WPCT formula | 2026-03-03 | 77a74fd | ✅ | [25-audit-waiver-and-trade-recommendation-ma](./quick/25-audit-waiver-and-trade-recommendation-ma/) |
+| 26 | Clean up auction validation frontend: remove ESPN auth fields (League ID, SWID, S2), add BB/K9/WPCT/L categories | 2026-03-03 | ec6a7e2 | ✅ | [26-clean-up-auction-validation-frontend-rem](./quick/26-clean-up-auction-validation-frontend-rem/) |
 
 ## Session Continuity
 
