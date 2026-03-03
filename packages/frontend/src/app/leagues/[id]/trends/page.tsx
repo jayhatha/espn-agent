@@ -15,7 +15,6 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "@/lib/api";
-import { COLORS } from "@/lib/constants";
 import { CHART_THEME } from "@/lib/chart-theme";
 import { cn } from "@/lib/cn";
 import { Container } from "@/components/ui/Container";
