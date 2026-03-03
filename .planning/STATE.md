@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 10 - ESPN Live Draft Assistant (COMPLETE)
+**Current focus:** Phase 18 - Dashboard Compositional Layout
 
 ## Current Position
 
-Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 9 of 9 in current phase
+Phase: 18 (Dashboard Compositional Layout)
+Plan: 1 of 1 in current phase
 Status: Complete
-Last activity: 2026-03-03 - Completed 17-09-PLAN.md: Legacy primary colors removed from Tailwind config, all anti-patterns eliminated (shadow-lg, max-w-7xl, purple classes), build verified passing
+Last activity: 2026-03-03 - Completed 18-01-PLAN.md: DM Serif Display installed, dashboard decomposed into 6 section components, KPI StatCards removed, section-based alternating backgrounds implemented
 
-Progress: Phase 17: [██████████] 100% (9 of 9 plans complete)
+Progress: Phase 18: [██████████] 100% (1 of 1 plans complete)
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: Phase 17: [██████████] 100% (9 of 9 plans complete
 | 14 | P01 | 2min | 2 | 2 |
 | 15 | P01 | 48min | 3 | 6 |
 | 16 | P01 | 2min | 2 | 1 |
+| 18 | P01 | 4min | 2 | 10 |
 
 **Quick Tasks:**
 
@@ -236,6 +237,11 @@ Recent decisions affecting v1.1 work:
 - [Phase 17 P09]: Legacy primary color block (50/100/500/600/700) removed from tailwind.config.js after confirming zero references across all page/component files
 - [Phase 17 P09]: SVG foreignObject tooltip shadow-lg classes removed as redundant — CHART_THEME inline styles handle tooltip appearance in SVG context where Tailwind shadow may not apply
 - [Phase 17 P09]: max-w-content-wide replaces max-w-7xl in navigation.tsx to use design token instead of hardcoded Tailwind class
+- [Phase 18 P01]: DM Serif Display weight 400 only — bold appearance comes from the serif design itself, forcing semibold breaks editorial aesthetic
+- [Phase 18 P01]: Heading CVA base removes top-level font-semibold; levels 1-2 use font-display serif, levels 3-4 use font-semibold sans — explicit per-level control
+- [Phase 18 P01]: Sections own their Container internally, page.tsx has no outer Container — enables full-width section background alternation (white / surface-secondary / surface-tertiary)
+- [Phase 18 P01]: Card kept only for CategoryMiniChart — charts need a contained surface; all other dashboard sections use section background alone for grouping
+- [Phase 18 P01]: Quick access rendered as compact link strip (not bordered card grid) — hover:bg-accent-light text links in 5-column grid on desktop
 
 ### Roadmap Evolution
 
@@ -248,6 +254,7 @@ Recent decisions affecting v1.1 work:
 - Phase 12 added: address codebase concerns
 - Phase 14 added: Fix ESPN auction values endpoint - only returning 6 players instead of full player pool
 - Phase 17 added: Site redesign — typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
+- Phase 18 added: Refactor dashboard from card-based SaaS layout into composition-driven layout inspired by high-end creative web design
 
 ### Pending Todos
 
@@ -300,5 +307,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 17-09-PLAN.md - Final cleanup: legacy primary colors removed, all anti-patterns eliminated, build verified, design system migration complete. Visual verification checkpoint pending manual review.
+Stopped at: Completed 18-01-PLAN.md: DM Serif Display installed, dashboard decomposed into 6 named section components, KPI StatCards removed, section-based alternating backgrounds implemented, build verified passing.
 Resume file: None
