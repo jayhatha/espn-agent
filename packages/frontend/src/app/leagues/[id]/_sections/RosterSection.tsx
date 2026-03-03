@@ -39,18 +39,18 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-neutral-200">
-                    <thead className="bg-surface-secondary">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase w-16">
+                    <thead>
+                      <tr className="border-b-2 border-neutral-200">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left w-12">
                           Slot
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Player
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Team
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Positions
                         </th>
                       </tr>
@@ -58,16 +58,16 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                     <tbody className="divide-y divide-neutral-100">
                       {groupedRoster.active.map((p) => (
                         <tr key={p.player_id}>
-                          <td className="px-4 py-2 text-body-sm font-medium text-content-secondary w-16">
+                          <td className="py-2 pr-4 text-data font-medium text-content-secondary w-12">
                             {p.roster_slot}
                           </td>
-                          <td className="px-4 py-2 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
                             {p.player_name}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>
@@ -86,18 +86,18 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-neutral-200">
-                    <thead className="bg-surface-secondary">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase w-16">
+                    <thead>
+                      <tr className="border-b-2 border-neutral-200">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left w-12">
                           Slot
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Player
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Team
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                           Positions
                         </th>
                       </tr>
@@ -105,16 +105,16 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                     <tbody className="divide-y divide-neutral-100">
                       {groupedRoster.bench.map((p) => (
                         <tr key={p.player_id}>
-                          <td className="px-4 py-2 text-body-sm font-medium text-content-tertiary w-16">
+                          <td className="py-2 pr-4 text-data font-medium text-content-tertiary w-12">
                             BE
                           </td>
-                          <td className="px-4 py-2 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
                             {p.player_name}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>
@@ -134,17 +134,17 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-neutral-200">
                     <thead className="bg-negative-light">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase w-16">
+                      <tr className="border-b-2 border-negative-border">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-negative text-left w-12">
                           Slot
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-negative text-left">
                           Player
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-negative text-left">
                           Team
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                        <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-negative text-left">
                           Positions
                         </th>
                       </tr>
@@ -152,16 +152,16 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                     <tbody className="divide-y divide-neutral-100">
                       {groupedRoster.il.map((p) => (
                         <tr key={p.player_id} className="bg-negative-light/30">
-                          <td className="px-4 py-2 text-body-sm font-medium text-negative w-16">
+                          <td className="py-2 pr-4 text-data font-medium text-negative w-12">
                             IL
                           </td>
-                          <td className="px-4 py-2 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
                             {p.player_name}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="px-4 py-2 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>

@@ -64,46 +64,46 @@ export function CategoryStatsTable({
   return (
     <div>
       {title && (
-        <h2 className="text-body-lg font-medium text-content mb-4">{title}</h2>
+        <h2 className="text-h4 font-semibold text-content mb-4">{title}</h2>
       )}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-neutral-200">
-          <thead className="bg-surface-secondary">
-            <tr>
-              <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+          <thead>
+            <tr className="border-b-2 border-neutral-200">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                 Category
               </th>
-              <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
                 Value
               </th>
-              <th className="px-4 py-3 text-center text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-center">
                 Rank
               </th>
-              <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
                 Roto Pts
               </th>
               {showProjected && (
                 <>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
                     Proj. Value
                   </th>
-                  <th className="px-4 py-3 text-center text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-center">
                     Proj. Rank
                   </th>
                 </>
               )}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-neutral-100">
+          <tbody className="divide-y divide-neutral-100">
             {categories.map((cat) => (
-              <tr key={cat.category_id || cat.name} className="border-b border-neutral-100">
-                <td className="px-4 py-3 whitespace-nowrap text-body-sm font-medium text-content">
+              <tr key={cat.category_id || cat.name}>
+                <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm font-medium text-content">
                   {cat.name}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right text-content">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content">
                   {formatStatValue(cat.value, cat.type, cat.stat_key)}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-center">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm text-center">
                   <span
                     className={cn(
                       "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
@@ -113,12 +113,12 @@ export function CategoryStatsTable({
                     #{cat.rank}
                   </span>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right font-semibold text-content">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-data font-semibold text-right text-content">
                   {Number(cat.roto_points)}
                 </td>
                 {showProjected && (
                   <>
-                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right text-content-secondary">
+                    <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content-secondary">
                       {cat.projected_value != null
                         ? formatStatValue(
                             cat.projected_value,
@@ -127,7 +127,7 @@ export function CategoryStatsTable({
                           )
                         : "-"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-center">
+                    <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm text-center">
                       {cat.projected_rank != null ? (
                         <span
                           className={cn(
