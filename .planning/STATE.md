@@ -115,6 +115,7 @@ Progress: Phase 17: [██████░░░░] 66% (6 of 9 plans complete)
 | Phase 17 P04 | 4 | 2 tasks | 4 files |
 | Phase 17 P05 | 14 | 2 tasks | 8 files |
 | Phase 17 P06 | 15 | 2 tasks | 7 files |
+| Phase 17 P08 | 12 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -226,6 +227,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: CHART_THEME.colors[0] as default teamColor in CategoryMiniChart aligns chart colors with design tokens
 - [Phase 17]: ScarcityBadge delegates entirely to Badge component variants (positive/negative/default) using lucide-react Check/ArrowDown/Minus icons
 - [Phase 17]: Trades/waivers mode toggles: Button variant=primary for active state, variant=secondary for inactive - eliminates conditional color class string
+- [Phase 17]: getTierVariant() maps tier numbers to Badge semantic variants instead of ad-hoc Tailwind color classes
+- [Phase 17]: Semantic status helpers (getJobStatusVariant, getStalenessVariant, getLeagueStatusVariant) centralize status-to-Badge-variant mapping in admin page
 
 ### Roadmap Evolution
 
