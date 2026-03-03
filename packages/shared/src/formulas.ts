@@ -35,9 +35,13 @@ export function calculateERA(components: StatComponents): number {
 }
 
 export function calculateWHIP(components: StatComponents): number {
-  const { IP = 0, H = 0, BB = 0 } = components;
+  const { IP = 0 } = components;
+  // Prefer pitcher-specific keys (HA, BBA) to avoid collision with batter H/BB
+  // Falls back to H/BB for backward compat with team daily data
+  const hitsAllowed = components.HA ?? components.H ?? 0;
+  const walksAllowed = components.BBA ?? components.BB ?? 0;
   if (IP === 0) return 0;
-  return (H + BB) / IP;
+  return (hitsAllowed + walksAllowed) / IP;
 }
 
 export function calculateK9(components: StatComponents): number {
@@ -118,7 +122,7 @@ export function getRequiredComponents(formulaId: string): string[] {
     case "era":
       return ["IP", "ER"];
     case "whip":
-      return ["IP", "H", "BB"];
+      return ["IP", "HA", "BBA"];
     case "k9":
       return ["IP", "K"];
     case "wpct":

@@ -1,7 +1,7 @@
 import { parse } from "csv-parse/sync";
 import type { StatComponents } from "../../../shared/dist/index.js";
 import type { Logger } from "pino";
-import type { Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
 import type { Database } from "../db/schema.js";
 import { PlayerIdentityResolutionAgent } from "./player-identity.js";
 
@@ -41,8 +41,11 @@ export interface ValidationReport {
   matchStats: MatchStatistics;
 }
 
-/** Minimum confidence threshold for fuzzy matches during projections ingest */
-const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.8;
+/** Minimum confidence threshold for fuzzy matches during projections ingest.
+ * Set high (0.95) because the char-set overlap algorithm is too generous —
+ * it matched completely different names (e.g., "Jared Young" → Aaron Judge)
+ * at 0.80+. Only accept very close matches (typos, accents, suffixes). */
+const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.95;
 
 export class ProjectionsIngestAgent {
   private identityAgent: PlayerIdentityResolutionAgent;
@@ -243,23 +246,42 @@ export class ProjectionsIngestAgent {
       unmatchedPlayers: allUnmatched,
     };
 
-    if (hasCompleteBatters && hasCompletePitchers) {
-      await this.db
-        .updateTable("projections_run")
-        .set({
-          staleness: "fresh",
-          artifacts_json: artifacts as any,
-        })
-        .where("id", "=", projectionsRun.id)
-        .execute();
-    } else {
-      await this.db
-        .updateTable("projections_run")
-        .set({
-          artifacts_json: artifacts as any,
-        })
-        .where("id", "=", projectionsRun.id)
-        .execute();
+    // Check if both batters and pitchers exist for this run
+    // (they may have been uploaded in separate requests)
+    let hasBatters = hasCompleteBatters;
+    let hasPitchers = hasCompletePitchers;
+
+    if (!hasBatters || !hasPitchers) {
+      // Check DB for existing projections with batter vs pitcher indicators
+      const existingProjections = await this.db
+        .selectFrom("player_projection as pp")
+        .select([
+          sql<string>`COUNT(pp.player_id)`.as("count"),
+          sql<string>`SUM(CASE WHEN (pp.stat_components_json->>'IP')::float > 0 AND COALESCE((pp.stat_components_json->>'AB')::float, 0) = 0 THEN 1 ELSE 0 END)`.as("pitcher_count"),
+          sql<string>`SUM(CASE WHEN (pp.stat_components_json->>'AB')::float > 0 THEN 1 ELSE 0 END)`.as("batter_count"),
+        ])
+        .where("pp.projections_run_id", "=", projectionsRun.id)
+        .executeTakeFirst();
+
+      if (existingProjections) {
+        hasBatters = hasBatters || Number(existingProjections.batter_count) > 0;
+        hasPitchers = hasPitchers || Number(existingProjections.pitcher_count) > 0;
+      }
+    }
+
+    const staleness = hasBatters && hasPitchers ? "fresh" : "stale";
+
+    await this.db
+      .updateTable("projections_run")
+      .set({
+        staleness,
+        artifacts_json: artifacts as any,
+      })
+      .where("id", "=", projectionsRun.id)
+      .execute();
+
+    if (staleness === "fresh") {
+      this.logger?.info({ projectionsRunId: projectionsRun.id }, "Projections run marked as fresh (both batters and pitchers present)");
     }
 
     return {
@@ -373,7 +395,7 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
-      // Upsert projection
+      // Upsert projection — merge JSONB on conflict to preserve pitcher data for two-way players
       await this.db
         .insertInto("player_projection")
         .values({
@@ -383,7 +405,7 @@ export class ProjectionsIngestAgent {
         })
         .onConflict((oc) =>
           oc.columns(["projections_run_id", "player_id"]).doUpdateSet({
-            stat_components_json: components,
+            stat_components_json: sql`player_projection.stat_components_json || excluded.stat_components_json`,
           }),
         )
         .execute();
@@ -459,8 +481,8 @@ export class ProjectionsIngestAgent {
       const components: StatComponents = {
         IP: parseFloat(row.IP as string) || 0,
         ER: parseFloat(row.ER as string) || 0,
-        H: parseFloat(row.H as string) || 0,
-        BB: parseFloat(row.BB as string) || 0,
+        HA: parseFloat(row.H as string) || 0,  // Hits allowed — use HA to avoid collision with batter H
+        BBA: parseFloat(row.BB as string) || 0, // Walks allowed — use BBA to avoid collision with batter BB
         K: strikeouts,
         SO: strikeouts, // ESPN stat 60 uses "SO" as stat_key
         W: parseFloat(row.W as string) || 0,
@@ -493,6 +515,7 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
+      // Upsert projection — merge JSONB on conflict to preserve batter data for two-way players
       await this.db
         .insertInto("player_projection")
         .values({
@@ -502,7 +525,7 @@ export class ProjectionsIngestAgent {
         })
         .onConflict((oc) =>
           oc.columns(["projections_run_id", "player_id"]).doUpdateSet({
-            stat_components_json: components,
+            stat_components_json: sql`player_projection.stat_components_json || excluded.stat_components_json`,
           }),
         )
         .execute();
