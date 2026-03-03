@@ -46,6 +46,13 @@ export function calculateK9(components: StatComponents): number {
   return (9 * K) / IP;
 }
 
+export function calculateWPCT(components: StatComponents): number {
+  const { W = 0, L = 0 } = components;
+  const total = W + L;
+  if (total === 0) return 0;
+  return W / total;
+}
+
 /**
  * Combine current-to-date and projected components
  */
@@ -88,6 +95,8 @@ export function calculateFinalRate(
       return calculateWHIP(combined);
     case "k9":
       return calculateK9(combined);
+    case "wpct":
+      return calculateWPCT(combined);
     default:
       throw new Error(`Unknown formula: ${formulaId}`);
   }
@@ -112,6 +121,8 @@ export function getRequiredComponents(formulaId: string): string[] {
       return ["IP", "H", "BB"];
     case "k9":
       return ["IP", "K"];
+    case "wpct":
+      return ["W", "L"];
     default:
       return [];
   }
@@ -218,12 +229,14 @@ export function getReplacementLevel(
   // Get slot count for this position
   let slotCount = rosterSlots[position] || 0;
 
-  // For shared/utility slots, prorate by typical usage
+  // Prorate shared/utility slots by typical usage to avoid double-counting
+  // players who fill both a dedicated slot and a flex slot.
+  // OF is NOT prorated — it has dedicated slots, not shared with other positions.
   if (position === "UTIL") {
     slotCount = (rosterSlots["UTIL"] || 0) * 0.2;
   } else if (position === "IF" || position === "MI") {
     slotCount = (rosterSlots[position] || 0) * 0.25;
-  } else if (position === "OF" || position === "CI") {
+  } else if (position === "CI") {
     slotCount = (rosterSlots[position] || 0) * 0.33;
   }
 
