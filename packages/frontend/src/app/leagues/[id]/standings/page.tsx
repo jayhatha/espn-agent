@@ -4,6 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { Container } from "@/components/ui/Container";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Heading } from "@/components/ui/Heading";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -12,6 +15,7 @@ import {
   formatStatValue,
   getRankColor,
 } from "@/components/league/CategoryStatsTable";
+import { cn } from "@/lib/cn";
 
 interface Category {
   category_id: string;
@@ -149,7 +153,7 @@ export default function StandingsPage() {
       label: "Rank",
       align: "left",
       format: (val) => (
-        <span className="font-medium text-gray-900">{val}</span>
+        <span className="font-medium text-content">{val}</span>
       ),
     },
     {
@@ -159,9 +163,9 @@ export default function StandingsPage() {
       format: (val, row) => (
         <div className="flex items-center">
           {selectedTeamId === row.team_id && (
-            <span className="inline-block w-2 h-2 rounded-full bg-blue-600 mr-2" />
+            <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
           )}
-          <span className="font-medium text-gray-900">{val}</span>
+          <span className="font-medium text-content">{val}</span>
         </div>
       ),
     },
@@ -170,7 +174,7 @@ export default function StandingsPage() {
       label: "Total Roto Points",
       align: "right",
       format: (val) => (
-        <span className="font-semibold text-gray-900">{Number(val)}</span>
+        <span className="font-semibold text-data text-content">{Number(val)}</span>
       ),
     },
   ];
@@ -193,94 +197,101 @@ export default function StandingsPage() {
     const numTeams = overallStandings.length;
 
     return (
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">{title}</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">
-                  Team
-                </th>
-                {categories.map((cat) => (
-                  <th
-                    key={cat.category_id}
-                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]"
-                  >
-                    {cat.name || cat.stat_key}
+      <Card>
+        <CardHeader>
+          <Heading level={3}>{title}</Heading>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-neutral-200">
+              <thead className="bg-surface-secondary">
+                <tr>
+                  <th className="px-3 py-3 text-left text-data font-medium text-content-secondary uppercase tracking-wider sticky left-0 bg-surface-secondary z-10">
+                    Team
                   </th>
-                ))}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider font-bold">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {overallStandings.map((team) => {
-                const isSelected = selectedTeamId === team.team_id;
-                const teamCats = teamCategoryMap.get(team.team_id);
+                  {categories.map((cat) => (
+                    <th
+                      key={cat.category_id}
+                      className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider min-w-[80px]"
+                    >
+                      {cat.name || cat.stat_key}
+                    </th>
+                  ))}
+                  <th className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider font-bold">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-neutral-100">
+                {overallStandings.map((team) => {
+                  const isSelected = selectedTeamId === team.team_id;
+                  const teamCats = teamCategoryMap.get(team.team_id);
 
-                return (
-                  <tr
-                    key={team.team_id}
-                    className={isSelected ? "bg-blue-50" : ""}
-                  >
-                    <td className="px-3 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-inherit z-10">
-                      <div className="flex items-center">
-                        {isSelected && (
-                          <span className="inline-block w-2 h-2 rounded-full bg-blue-600 mr-2 flex-shrink-0" />
-                        )}
-                        <span className="truncate max-w-[150px]">
-                          {team.teamName}
-                        </span>
-                      </div>
-                    </td>
-                    {categories.map((cat) => {
-                      const catData = teamCats?.get(cat.category_id);
-                      if (!catData) {
+                  return (
+                    <tr
+                      key={team.team_id}
+                      className={cn(
+                        "hover:bg-surface-secondary transition-colors",
+                        isSelected ? "bg-accent-light" : "",
+                      )}
+                    >
+                      <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content sticky left-0 bg-inherit z-10">
+                        <div className="flex items-center">
+                          {isSelected && (
+                            <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
+                          )}
+                          <span className="truncate max-w-[150px]">
+                            {team.teamName}
+                          </span>
+                        </div>
+                      </td>
+                      {categories.map((cat) => {
+                        const catData = teamCats?.get(cat.category_id);
+                        if (!catData) {
+                          return (
+                            <td
+                              key={cat.category_id}
+                              className="px-3 py-3 text-center text-data text-content-tertiary"
+                            >
+                              -
+                            </td>
+                          );
+                        }
                         return (
                           <td
                             key={cat.category_id}
-                            className="px-3 py-3 text-center text-sm text-gray-400"
+                            className="px-3 py-3 text-center"
                           >
-                            -
+                            <div className="flex flex-col items-center">
+                              <span className="text-data text-content font-medium">
+                                {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
+                              </span>
+                              <span
+                                className={`text-data rounded px-1 mt-0.5 ${getRankColor(catData[rankKey], numTeams)}`}
+                              >
+                                #{catData[rankKey]} ({Number(catData[pointsKey])}
+                                pts)
+                              </span>
+                            </div>
                           </td>
                         );
-                      }
-                      return (
-                        <td
-                          key={cat.category_id}
-                          className="px-3 py-3 text-center text-sm"
-                        >
-                          <div className="flex flex-col items-center">
-                            <span className="text-gray-900 font-medium text-xs">
-                              {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
-                            </span>
-                            <span
-                              className={`text-xs rounded px-1 mt-0.5 ${getRankColor(catData[rankKey], numTeams)}`}
-                            >
-                              #{catData[rankKey]} ({Number(catData[pointsKey])}
-                              pts)
-                            </span>
-                          </div>
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-3 text-center text-sm font-bold text-gray-900">
-                      {Number(team[overallPointsKey])}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      })}
+                      <td className="px-3 py-3 text-center text-data font-bold text-content">
+                        {Number(team[overallPointsKey])}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     );
   };
 
   return (
-    <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Container size="wide" className="py-8">
       <PageHeader
         title="Standings"
         subtitle="Current and projected end-of-season standings by category."
@@ -288,7 +299,7 @@ export default function StandingsPage() {
       />
 
       {data?.snapshotDate && (
-        <p className="mt-1 mb-6 text-sm text-gray-500">
+        <p className="mt-1 mb-6 text-body-sm text-content-secondary">
           As of snapshot: {data.snapshotDate}
         </p>
       )}
@@ -301,25 +312,27 @@ export default function StandingsPage() {
         <>
           {/* View Mode Tabs */}
           <div className="mb-6">
-            <div className="border-b border-gray-200">
+            <div className="border-b border-neutral-200">
               <nav className="-mb-px flex space-x-8">
                 <button
                   onClick={() => setViewMode("current")}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  className={cn(
+                    "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
                     viewMode === "current"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                      ? "border-accent text-content"
+                      : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300",
+                  )}
                 >
                   Current Standings
                 </button>
                 <button
                   onClick={() => setViewMode("projected")}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  className={cn(
+                    "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
                     viewMode === "projected"
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                      ? "border-accent text-content"
+                      : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300",
+                  )}
                 >
                   Projected Standings
                 </button>
@@ -330,21 +343,23 @@ export default function StandingsPage() {
           {viewMode === "current" && currentMatrix ? (
             <>
               {/* Current Overall Standings */}
-              <div className="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Current Overall Standings
-                </h2>
-                <StatsTable
-                  columns={overallColumns}
-                  data={currentMatrix.overallStandings.map((t) => ({
-                    ...t,
-                    rank: t.overall_rank,
-                    points: t.overall_points,
-                  }))}
-                  rowKey="team_id"
-                  highlightRow={(row) => selectedTeamId === row.team_id}
-                />
-              </div>
+              <Card className="mb-8">
+                <CardHeader>
+                  <Heading level={3}>Current Overall Standings</Heading>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <StatsTable
+                    columns={overallColumns}
+                    data={currentMatrix.overallStandings.map((t) => ({
+                      ...t,
+                      rank: t.overall_rank,
+                      points: t.overall_points,
+                    }))}
+                    rowKey="team_id"
+                    highlightRow={(row) => selectedTeamId === row.team_id}
+                  />
+                </CardContent>
+              </Card>
 
               {/* Current Category Breakdown */}
               {renderCategoryBreakdown(
@@ -359,36 +374,40 @@ export default function StandingsPage() {
               )}
             </>
           ) : viewMode === "current" && !currentMatrix ? (
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="text-center py-12">
-                <h3 className="text-sm font-medium text-gray-900">
-                  No current standings available
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Current standings will appear after you create a snapshot.
-                </p>
-              </div>
-            </div>
+            <Card>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Heading level={4} className="text-body-sm font-medium text-content mb-1">
+                    No current standings available
+                  </Heading>
+                  <p className="text-body-sm text-content-secondary">
+                    Current standings will appear after you create a snapshot.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           ) : null}
 
           {viewMode === "projected" && projectedMatrix ? (
             <>
               {/* Projected Overall Standings */}
-              <div className="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Overall Projected Standings
-                </h2>
-                <StatsTable
-                  columns={overallColumns}
-                  data={projectedMatrix.overallStandings.map((t) => ({
-                    ...t,
-                    rank: t.projected_overall_rank,
-                    points: t.projected_overall_points,
-                  }))}
-                  rowKey="team_id"
-                  highlightRow={(row) => selectedTeamId === row.team_id}
-                />
-              </div>
+              <Card className="mb-8">
+                <CardHeader>
+                  <Heading level={3}>Overall Projected Standings</Heading>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <StatsTable
+                    columns={overallColumns}
+                    data={projectedMatrix.overallStandings.map((t) => ({
+                      ...t,
+                      rank: t.projected_overall_rank,
+                      points: t.projected_overall_points,
+                    }))}
+                    rowKey="team_id"
+                    highlightRow={(row) => selectedTeamId === row.team_id}
+                  />
+                </CardContent>
+              </Card>
 
               {/* Projected Category Breakdown */}
               {renderCategoryBreakdown(
@@ -403,46 +422,50 @@ export default function StandingsPage() {
               )}
             </>
           ) : viewMode === "projected" && !projectedMatrix ? (
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="text-center py-12">
-                <h3 className="text-sm font-medium text-gray-900">
-                  No projected standings available
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Projected standings will appear after projections are uploaded
-                  and a snapshot is created. Contact your administrator if
-                  projections are needed.
-                </p>
-              </div>
-            </div>
+            <Card>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Heading level={4} className="text-body-sm font-medium text-content mb-1">
+                    No projected standings available
+                  </Heading>
+                  <p className="text-body-sm text-content-secondary">
+                    Projected standings will appear after projections are uploaded
+                    and a snapshot is created. Contact your administrator if
+                    projections are needed.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           ) : null}
         </>
       ) : (
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
-              No standings available
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Standings will appear after you create a snapshot.
-            </p>
-          </div>
-        </div>
+        <Card>
+          <CardContent>
+            <div className="text-center py-12">
+              <svg
+                className="mx-auto h-12 w-12 text-content-tertiary"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+              <Heading level={4} className="mt-2 text-body-sm font-medium text-content mb-1">
+                No standings available
+              </Heading>
+              <p className="text-body-sm text-content-secondary">
+                Standings will appear after you create a snapshot.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </Container>
   );
 }
