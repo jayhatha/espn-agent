@@ -8,7 +8,6 @@ import type {
   DraftConfiguration,
 } from "../../../shared/dist/index.js";
 import {
-  calculateTotalSGP,
   getReplacementLevel,
   calculateVBD,
   calculateFinalRate,
@@ -20,6 +19,13 @@ import {
  *
  * Produces VBD-ranked player list with position-specific replacement levels
  */
+
+/** Stat keys that belong to pitching categories */
+const PITCHING_STAT_KEYS = new Set([
+  "K", "W", "L", "SV", "HLD", "QS", "CG", "BLSV", "SVO",
+  "ER", "OUTS", "HA", "BBA", "HRA",
+  "ERA", "WHIP", "K9", "WPCT",
+]);
 
 interface PlayerWithProjection {
   playerId: number;
@@ -107,16 +113,24 @@ export class DraftRankingsAgent {
     // Determine projections run ID
     let projectionsRunId = options?.projectionsRunId;
     if (!projectionsRunId) {
+      // Prefer fresh, fall back to most recent stale run
       const latestRun = await this.db
         .selectFrom("projections_run")
-        .select("id")
-        .where("staleness", "=", "fresh")
+        .select(["id", "staleness"])
+        .orderBy("staleness", "asc") // 'fresh' < 'stale' alphabetically
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 
       if (!latestRun) {
-        this.logger?.warn("No fresh projections run found");
+        this.logger?.warn("No projections run found");
         return [];
+      }
+
+      if (latestRun.staleness !== "fresh") {
+        this.logger?.warn(
+          { runId: latestRun.id, staleness: latestRun.staleness },
+          "Using stale projections run (no fresh run available)",
+        );
       }
 
       projectionsRunId = latestRun.id;
@@ -145,20 +159,34 @@ export class DraftRankingsAgent {
       "Loaded player projections",
     );
 
-    // Calculate SGP for all players
+    // Split projections into batter and pitcher pools for SGP calculation
+    // This prevents cross-type dilution (batters with 0 ERA dragging pitcher means down)
     const allProjections = projections.map(
       (p) => p.stat_components_json as StatComponents,
     );
+    const batterProjections = allProjections.filter((p) => (p.AB ?? 0) > 0);
+    const pitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
+
+    this.logger?.info(
+      {
+        totalPlayers: allProjections.length,
+        batters: batterProjections.length,
+        pitchers: pitcherProjections.length,
+      },
+      "Split player pools for SGP calculation",
+    );
 
     // DIAGNOSTIC: Log category-level statistics to validate SGP spread
-    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number }> = {};
+    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number; poolSize: number }> = {};
     for (const category of categories) {
+      const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
+      const pool = isPitchingCat ? pitcherProjections : batterProjections;
       let allValues: number[];
 
       if (category.type === "COUNTING") {
-        allValues = allProjections.map((p) => p[category.stat_key] || 0);
+        allValues = pool.map((p) => p[category.stat_key] || 0);
       } else if (category.type === "RATE" && category.formula_id) {
-        allValues = allProjections.map((p) => {
+        allValues = pool.map((p) => {
           try {
             return calculateFinalRate(category.formula_id!, {}, p);
           } catch {
@@ -177,13 +205,9 @@ export class DraftRankingsAgent {
       const min = Math.min(...allValues);
       const max = Math.max(...allValues);
 
-      categoryStats[category.category_id] = { mean, stdDev, min, max };
+      categoryStats[category.category_id] = { mean, stdDev, min, max, poolSize: pool.length };
     }
 
-    // DIAGNOSTIC: This log helps diagnose SGP calculation issues by showing
-    // whether categories are being received with valid formula_id fields.
-    // Empty categories array indicates upstream bug in category construction
-    // (e.g., incorrect enum values like "counting" instead of "COUNTING").
     this.logger?.info(
       {
         categories: Object.entries(categoryStats).map(([catId, stats]) => ({
@@ -193,30 +217,47 @@ export class DraftRankingsAgent {
           min: stats.min.toFixed(2),
           max: stats.max.toFixed(2),
           range: (stats.max - stats.min).toFixed(2),
+          poolSize: stats.poolSize,
         })),
       },
-      "Category statistics for SGP calculation",
+      "Category statistics for SGP calculation (type-split pools)",
     );
 
     const playersWithSGP: PlayerWithProjection[] = projections.map((p) => {
       const projectedStats = p.stat_components_json as StatComponents;
       const categorySGPs: Record<string, number> = {};
+      let sgpTotal = 0;
 
-      // Calculate SGP per category for detailed tracking
+      const isBatter = (projectedStats.AB ?? 0) > 0;
+      const isPitcher = (projectedStats.IP ?? 0) > 0;
+
+      // Calculate SGP per category using type-appropriate pool
+      // Only evaluate categories the player can contribute to
       for (const category of categories) {
+        const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
+
+        // Skip categories the player can't contribute to
+        // (batters skip pitching cats, pitchers skip batting cats)
+        // Two-way players (Ohtani) get both
+        if (isPitchingCat && !isPitcher) {
+          categorySGPs[category.category_id] = 0;
+          continue;
+        }
+        if (!isPitchingCat && !isBatter) {
+          categorySGPs[category.category_id] = 0;
+          continue;
+        }
+
+        const pool = isPitchingCat ? pitcherProjections : batterProjections;
+
         const sgp = this.calculateCategorySGPForPlayer(
           projectedStats,
-          allProjections,
+          pool,
           category,
         );
         categorySGPs[category.category_id] = sgp;
+        sgpTotal += sgp;
       }
-
-      const sgpTotal = calculateTotalSGP(
-        projectedStats,
-        allProjections,
-        categories,
-      );
 
       return {
         playerId: p.player_id,
@@ -261,9 +302,10 @@ export class DraftRankingsAgent {
       if (replacementIndex <= eligiblePlayers.length) {
         replacementSGPs[pos] = eligiblePlayers[replacementIndex - 1].sgpTotal;
       } else {
-        // AUDIT FIX: Not enough players at this position - set very negative replacement
-        // This makes all players at sparse positions valuable (no true replacement available)
-        replacementSGPs[pos] = -10; // Highly negative = all players valuable
+        // Sparse position: not enough projected players to fill all rosters.
+        // Use the worst available player as the replacement level — don't artificially inflate
+        // values by using a hardcoded floor (that would overvalue all catchers, etc.)
+        replacementSGPs[pos] = eligiblePlayers[eligiblePlayers.length - 1].sgpTotal;
       }
 
       // DIAGNOSTIC: Always log replacement level details

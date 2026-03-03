@@ -446,17 +446,6 @@ export async function draftRoutes(app: FastifyInstance) {
           return reply.code(404).send({ error: "League not found" });
         }
 
-        // Get ESPN auth cookies (if available)
-        const authRow = await db
-          .selectFrom("league")
-          .select(["espn_swid", "espn_s2"])
-          .where("id", "=", leagueId)
-          .executeTakeFirst();
-
-        const espnAuth = authRow?.espn_swid && authRow?.espn_s2
-          ? { SWID: authRow.espn_swid, espn_s2: authRow.espn_s2 }
-          : undefined;
-
         // Count teams in league
         const teamsResult = await db
           .selectFrom("team")
@@ -490,21 +479,19 @@ export async function draftRoutes(app: FastifyInstance) {
         const acquisitionRules = settings.acquisition_rules || {};
         const budget = acquisitionRules.auction_budget || 260; // Default ESPN auction budget
 
-        // Fetch ESPN's pre-draft auction values
+        // Fetch ESPN's global draft data (auction values + ADP)
         const { ESPNAdapter } = await import("../adapters/espn.js");
         const espnAdapter = new ESPNAdapter(request.log as any);
-        const espnValues = await espnAdapter.fetchPreDraftAuctionValues({
-          leagueId: league.espn_league_id,
+        const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: league.season,
-          auth: espnAuth,
         });
 
-        if (espnValues.length === 0) {
+        if (espnDraftData.length === 0) {
           return reply.code(400).send({
-            error: "ESPN pre-draft auction values not available for this league",
+            error: "ESPN draft data not available for this season",
             details:
-              "This may occur if the league is not configured for auction drafts, " +
-              "or if the draft has already started/completed.",
+              "Could not fetch global draft rankings from ESPN. " +
+              "This may occur if the season has not started yet.",
           });
         }
 
@@ -522,7 +509,7 @@ export async function draftRoutes(app: FastifyInstance) {
             : undefined,
           budget,
           minBid: 1,
-          limit: 500, // Get enough to match ESPN's list
+          limit: 500,
         });
 
         // Create a map of our valuations by player ID
@@ -536,6 +523,8 @@ export async function draftRoutes(app: FastifyInstance) {
           playerName: string;
           positions: string[];
           espnValue: number;
+          espnAdp: number;
+          espnAvgAuction: number;
           ourValue: number;
           absoluteDelta: number;
           percentDelta: number;
@@ -544,9 +533,10 @@ export async function draftRoutes(app: FastifyInstance) {
 
         const comparisons: Comparison[] = [];
 
-        for (const espnPlayer of espnValues) {
+        for (const espnPlayer of espnDraftData) {
+          if (espnPlayer.espnAuctionValue <= 0) continue;
           const ourValue = ourValueMap.get(espnPlayer.playerId);
-          if (ourValue === undefined) continue; // Skip players not in our valuations
+          if (ourValue === undefined) continue;
 
           const absoluteDelta = ourValue - espnPlayer.espnAuctionValue;
           const percentDelta =
@@ -558,6 +548,8 @@ export async function draftRoutes(app: FastifyInstance) {
             playerName: espnPlayer.playerName,
             positions: espnPlayer.positions,
             espnValue: espnPlayer.espnAuctionValue,
+            espnAdp: espnPlayer.averageDraftPosition,
+            espnAvgAuction: espnPlayer.averageAuctionValue,
             ourValue,
             absoluteDelta,
             percentDelta,
@@ -691,11 +683,7 @@ export async function draftRoutes(app: FastifyInstance) {
       minBid?: string;
       projectionsRunId?: string;
       limit?: string;
-      // ESPN league context for fetching their baseline values
-      espnLeagueId: string;
-      espnSeason: string;
-      espnSwid?: string;
-      espnS2?: string;
+      espnSeason?: string;
     };
   }>(
     "/api/draft/auction/validate",
@@ -720,33 +708,19 @@ export async function draftRoutes(app: FastifyInstance) {
         minBid,
         projectionsRunId,
         limit,
-        espnLeagueId,
         espnSeason,
-        espnSwid,
-        espnS2,
       } = request.query;
 
       const auctionBudget = budget ? parseInt(budget, 10) : 260;
       const minimumBid = minBid ? parseInt(minBid, 10) : 1;
       const maxPlayers = limit ? parseInt(limit, 10) : 100;
 
-      // Validate ESPN context
-      if (!espnLeagueId || !espnSeason) {
+      const espnSeasonNum = espnSeason
+        ? parseInt(espnSeason, 10)
+        : new Date().getFullYear();
+      if (!Number.isInteger(espnSeasonNum)) {
         return reply.code(400).send({
-          error:
-            "espnLeagueId and espnSeason required to fetch ESPN baseline values",
-        });
-      }
-
-      const espnLeagueIdNum = parseInt(espnLeagueId, 10);
-      const espnSeasonNum = parseInt(espnSeason, 10);
-
-      if (
-        !Number.isInteger(espnLeagueIdNum) ||
-        !Number.isInteger(espnSeasonNum)
-      ) {
-        return reply.code(400).send({
-          error: "espnLeagueId and espnSeason must be integers",
+          error: `espnSeason must be a valid integer (received ${espnSeason})`,
         });
       }
 
@@ -763,27 +737,20 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Fetch ESPN's pre-draft auction values
+        // Fetch ESPN's global draft data (auction values + ADP)
         const { ESPNAdapter } = await import("../adapters/espn.js");
         const espnAdapter = new ESPNAdapter(request.log as any);
 
-        const espnAuth =
-          espnSwid && espnS2
-            ? { SWID: espnSwid, espn_s2: espnS2 }
-            : undefined;
-
-        const espnValues = await espnAdapter.fetchPreDraftAuctionValues({
-          leagueId: espnLeagueIdNum,
+        const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: espnSeasonNum,
-          auth: espnAuth,
         });
 
-        if (espnValues.length === 0) {
+        if (espnDraftData.length === 0) {
           return reply.code(400).send({
-            error: "ESPN pre-draft auction values not available",
+            error: "ESPN draft data not available",
             details:
-              "This may occur if the league is not configured for auction drafts, " +
-              "or if the draft has already started/completed.",
+              "Could not fetch global draft rankings from ESPN. " +
+              "This may occur if the season has not started yet.",
           });
         }
 
@@ -803,7 +770,7 @@ export async function draftRoutes(app: FastifyInstance) {
               : undefined,
             budget: auctionBudget,
             minBid: minimumBid,
-            limit: 500, // Get enough to match ESPN's list
+            limit: 500,
           },
         );
 
@@ -818,6 +785,8 @@ export async function draftRoutes(app: FastifyInstance) {
           playerName: string;
           positions: string[];
           espnValue: number;
+          espnAdp: number;
+          espnAvgAuction: number;
           ourValue: number;
           absoluteDelta: number;
           percentDelta: number;
@@ -826,9 +795,10 @@ export async function draftRoutes(app: FastifyInstance) {
 
         const comparisons: Comparison[] = [];
 
-        for (const espnPlayer of espnValues) {
+        for (const espnPlayer of espnDraftData) {
+          if (espnPlayer.espnAuctionValue <= 0) continue;
           const ourValue = ourValueMap.get(espnPlayer.playerId);
-          if (ourValue === undefined) continue; // Skip players not in our valuations
+          if (ourValue === undefined) continue;
 
           const absoluteDelta = ourValue - espnPlayer.espnAuctionValue;
           const percentDelta =
@@ -840,6 +810,8 @@ export async function draftRoutes(app: FastifyInstance) {
             playerName: espnPlayer.playerName,
             positions: espnPlayer.positions,
             espnValue: espnPlayer.espnAuctionValue,
+            espnAdp: espnPlayer.averageDraftPosition,
+            espnAvgAuction: espnPlayer.averageAuctionValue,
             ourValue,
             absoluteDelta,
             percentDelta,
@@ -867,7 +839,7 @@ export async function draftRoutes(app: FastifyInstance) {
               2
             : sortedDeltas[Math.floor(sortedDeltas.length / 2)];
 
-        // RMSE: sqrt(sum((ourValue - espnValue)^2) / n)
+        // RMSE
         const squaredErrors = comparisons.map(
           (c) => Math.pow(c.absoluteDelta, 2),
         );
@@ -915,7 +887,7 @@ export async function draftRoutes(app: FastifyInstance) {
           (a, b) => b.ourValue - a.ourValue,
         )[0];
 
-        // Apply limit to returned comparisons (sorted by absolute delta descending)
+        // Apply limit (sorted by absolute delta descending)
         const limitedComparisons = [...comparisons]
           .sort((a, b) => Math.abs(b.absoluteDelta) - Math.abs(a.absoluteDelta))
           .slice(0, maxPlayers);
@@ -941,13 +913,11 @@ export async function draftRoutes(app: FastifyInstance) {
             totalTeams: config.totalTeams,
             budget: auctionBudget,
             minBid: minimumBid,
-            espnLeagueId: espnLeagueIdNum,
             espnSeason: espnSeasonNum,
             generatedAt: new Date().toISOString(),
           },
         };
 
-        // Add warning if small overlap
         if (comparisons.length < 10) {
           (result as any).warning =
             "Small sample size - fewer than 10 overlapping players found. Results may not be statistically meaningful.";
@@ -1024,6 +994,56 @@ export async function draftRoutes(app: FastifyInstance) {
         request.log.error({ error }, "Failed to calculate projected standings");
         return reply.code(500).send({
           error: "Failed to calculate projected standings",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+  // GET /api/draft/espn - Fetch ESPN global draft data (ADP + auction values)
+  app.get<{
+    Querystring: {
+      season?: string;
+      limit?: string;
+    };
+  }>(
+    "/api/draft/espn",
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const season = request.query.season
+        ? parseInt(request.query.season, 10)
+        : new Date().getFullYear();
+      const maxPlayers = request.query.limit
+        ? parseInt(request.query.limit, 10)
+        : 500;
+
+      try {
+        const { ESPNAdapter } = await import("../adapters/espn.js");
+        const espnAdapter = new ESPNAdapter(request.log as any);
+
+        const draftData = await espnAdapter.fetchGlobalDraftData({
+          season,
+          limit: maxPlayers,
+        });
+
+        return {
+          players: draftData,
+          meta: {
+            season,
+            totalPlayers: draftData.length,
+            generatedAt: new Date().toISOString(),
+          },
+        };
+      } catch (error) {
+        request.log.error({ error }, "Failed to fetch ESPN draft data");
+        return reply.code(500).send({
+          error: "Failed to fetch ESPN draft data",
           details: error instanceof Error ? error.message : String(error),
         });
       }
