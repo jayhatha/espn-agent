@@ -90,6 +90,21 @@ export interface ESPNFreeAgent {
   pctStarted: number;
 }
 
+export interface ESPNGlobalDraftPlayer {
+  playerId: number;
+  playerName: string;
+  positions: string[];
+  mlbTeam: string;
+  espnAuctionValue: number;       // ESPN's pre-ranked auction value (STANDARD)
+  rotoAuctionValue: number;       // ESPN's roto-specific auction value
+  averageDraftPosition: number;   // ADP from real ESPN drafts
+  averageAuctionValue: number;    // Average auction $ from real ESPN drafts
+  percentOwned: number;
+  percentStarted: number;
+  rank: number;                   // ESPN STANDARD rank
+  espnProjectedStats?: Record<string, number>; // ESPN's projected stats (statSourceId=1)
+}
+
 export interface ESPNTransactionItem {
   playerId: number;
   playerName: string;
@@ -181,12 +196,13 @@ export const ESPN_STAT_MAP: Record<number, { key: string; name: string; type: "C
   63: { key: "QS", name: "Quality Starts", type: "COUNTING" },
 };
 
-/** ESPN lineup slot ID → position label */
+/** ESPN lineup slot ID → position label
+ * Source: https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/constant.py */
 export const ESPN_LINEUP_SLOT_MAP: Record<number, string> = {
   0: "C", 1: "1B", 2: "2B", 3: "3B", 4: "SS",
-  5: "OF", 6: "LF", 7: "CF", 8: "RF", 9: "DH",
-  10: "DH", 11: "IF", 12: "UTIL", 13: "P",
-  14: "SP", 15: "RP", 16: "BE", 17: "IL", 19: "NA",
+  5: "OF", 6: "MI", 7: "CI", 8: "LF", 9: "CF",
+  10: "RF", 11: "DH", 12: "UTIL", 13: "P",
+  14: "SP", 15: "RP", 16: "BE", 17: "IL", 19: "IF",
 };
 
 /** ESPN eligible position slot ID → position label (for player eligibility) */
@@ -197,19 +213,19 @@ const ESPN_POSITION_MAP: Record<number, string> = {
   3: "3B",
   4: "SS",
   5: "OF",
-  6: "LF",
-  7: "CF",
-  8: "RF",
-  9: "DH",
-  10: "DH",
-  11: "IF",
+  6: "MI",
+  7: "CI",
+  8: "LF",
+  9: "CF",
+  10: "RF",
+  11: "DH",
   12: "UTIL",
   13: "P",
   14: "SP",
   15: "RP",
   16: "BE",
   17: "IL",
-  19: "NA",
+  19: "IF",
 };
 
 /** ESPN pro team ID → MLB team abbreviation */
@@ -658,7 +674,7 @@ export class ESPNAdapter {
         if (!player) continue;
 
         const eligibleSlots = (player.eligibleSlots || [])
-          .filter((s: number) => s <= 15 && s !== 12)
+          .filter((s: number) => s <= 15 && s !== 12 && s !== 6 && s !== 7)
           .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`);
 
         const ownership = player.ownership || {};
@@ -829,6 +845,7 @@ export class ESPNAdapter {
     playerName: string;
     positions: string[];
     espnAuctionValue: number;
+    espnProjectedStats?: Record<string, number>; // ESPN's projected stats (statSourceId=1)
   }>> {
     const { leagueId, season, auth } = options;
 
@@ -842,6 +859,7 @@ export class ESPNAdapter {
         playerName: string;
         positions: string[];
         espnAuctionValue: number;
+        espnProjectedStats?: Record<string, number>;
       }>;
     }
 
@@ -876,7 +894,7 @@ export class ESPNAdapter {
 
         const params: Record<string, unknown> = {
           view: ["kona_player_info"],
-          scoringPeriodId: 1,
+          scoringPeriodId: 0,  // Full-season projections (statSourceId=1 available at period 0)
         };
 
         this.logger?.info(
@@ -960,27 +978,48 @@ export class ESPNAdapter {
         playerName: string;
         positions: string[];
         espnAuctionValue: number;
+        espnProjectedStats?: Record<string, number>;
       }> = [];
 
       for (const entry of allPlayers) {
         const player = entry.player;
         if (!player) continue;
 
-        // Read auction value from draftRanksByRankType (requires scoringPeriodId=1)
+        // Read auction value from draftRanksByRankType
         const auctionValue = player.draftRanksByRankType?.STANDARD?.auctionValue ??
                             player.draftRanksByRankType?.ROTO?.auctionValue ??
                             0;
         if (auctionValue <= 0) continue;
 
         const eligibleSlots = (player.eligibleSlots || [])
-          .filter((s: number) => s <= 15 && s !== 12)
+          .filter((s: number) => s <= 15 && s !== 12 && s !== 6 && s !== 7)
           .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`);
+
+        // Extract ESPN projected stats (statSourceId=1, statSplitTypeId=0)
+        let espnProjectedStats: Record<string, number> | undefined;
+        const statsArray = player.stats as any[] | undefined;
+        if (statsArray) {
+          const projEntry = statsArray.find(
+            (s: any) => s.statSourceId === 1 && s.statSplitTypeId === 0
+          );
+          if (projEntry?.stats) {
+            espnProjectedStats = {};
+            for (const [espnIdStr, value] of Object.entries(projEntry.stats)) {
+              const espnId = parseInt(espnIdStr, 10);
+              const mapping = ESPN_STAT_MAP[espnId];
+              if (mapping && typeof value === "number") {
+                espnProjectedStats[mapping.key] = value;
+              }
+            }
+          }
+        }
 
         auctionValues.push({
           playerId: entry.id,
           playerName: player.fullName || `Player ${entry.id}`,
           positions: [...new Set(eligibleSlots)] as string[],
           espnAuctionValue: auctionValue,
+          espnProjectedStats,
         });
       }
 
@@ -1005,6 +1044,158 @@ export class ESPNAdapter {
         "Failed to fetch pre-draft auction values",
       );
       // Return empty array on error (graceful degradation)
+      return [];
+    }
+  }
+
+  /**
+   * Fetch global draft data (auction values + ADP) from ESPN's leaguedefaults endpoint.
+   * No league ID required — uses the same data source as ESPN's Live Draft Trends page.
+   */
+  async fetchGlobalDraftData(options: {
+    season: number;
+    limit?: number;
+  }): Promise<ESPNGlobalDraftPlayer[]> {
+    const { season, limit: maxPlayers = 500 } = options;
+
+    // Check cache first (1-hour TTL)
+    const cacheKey = `global-draft-data:${season}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger?.debug({ cacheKey }, "Using cached global draft data");
+      return cached.data as ESPNGlobalDraftPlayer[];
+    }
+
+    const batchSize = 50; // ESPN caps at 50 per request on this endpoint
+    const maxIterations = Math.ceil(maxPlayers / batchSize);
+
+    try {
+      let offset = 0;
+      const allPlayers: ESPNGlobalDraftPlayer[] = [];
+
+      for (let i = 0; i < maxIterations; i++) {
+        const headers: Record<string, string> = {
+          "x-fantasy-filter": JSON.stringify({
+            players: {
+              limit: batchSize,
+              offset,
+              sortDraftRanks: {
+                sortPriority: 100,
+                sortAsc: true,
+                value: "STANDARD",
+              },
+            },
+          }),
+        };
+
+        const url = `/seasons/${season}/segments/0/leaguedefaults/1`;
+        const params: Record<string, unknown> = {
+          view: ["kona_player_info"],
+          scoringPeriodId: 0,  // Full-season projections (statSourceId=1 available at period 0)
+        };
+
+        this.logger?.info(
+          { season, offset, batchSize, iteration: i + 1 },
+          "Fetching global draft data batch",
+        );
+
+        await throttleEspnCall();
+
+        const response = await this.client.get(url, { params, headers });
+
+        if (response.status !== 200) {
+          throw new Error(`ESPN API returned status ${response.status}`);
+        }
+
+        const data = response.data as any;
+        const batch = (data?.players as any[]) || [];
+
+        for (const entry of batch) {
+          const player = entry.player;
+          if (!player) continue;
+
+          const ranks = player.draftRanksByRankType || {};
+          const std = ranks.STANDARD || {};
+          const roto = ranks.ROTO || {};
+          const ownership = player.ownership || {};
+
+          const auctionValue = std.auctionValue ?? roto.auctionValue ?? 0;
+          const rank = std.rank ?? 9999;
+
+          // Skip players with no meaningful draft data
+          if (auctionValue <= 0 && rank >= 9999) continue;
+
+          const eligibleSlots = (player.eligibleSlots || [])
+            .filter((s: number) => s <= 15 && s !== 12 && s !== 6 && s !== 7)
+            .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`);
+
+          // Extract ESPN projected stats (statSourceId=1, statSplitTypeId=0)
+          let espnProjectedStats: Record<string, number> | undefined;
+          const statsArray = player.stats as any[] | undefined;
+          if (statsArray) {
+            const projEntry = statsArray.find(
+              (s: any) => s.statSourceId === 1 && s.statSplitTypeId === 0
+            );
+            if (projEntry?.stats) {
+              espnProjectedStats = {};
+              for (const [espnIdStr, value] of Object.entries(projEntry.stats)) {
+                const espnId = parseInt(espnIdStr, 10);
+                const mapping = ESPN_STAT_MAP[espnId];
+                if (mapping && typeof value === "number") {
+                  espnProjectedStats[mapping.key] = value;
+                }
+              }
+            }
+          }
+
+          allPlayers.push({
+            playerId: entry.id,
+            playerName: player.fullName || `Player ${entry.id}`,
+            positions: [...new Set(eligibleSlots)] as string[],
+            mlbTeam: ESPN_PRO_TEAM_MAP[player.proTeamId] || `team_${player.proTeamId}`,
+            espnAuctionValue: std.auctionValue ?? 0,
+            rotoAuctionValue: roto.auctionValue ?? 0,
+            averageDraftPosition: ownership.averageDraftPosition ?? 0,
+            averageAuctionValue: ownership.auctionValueAverage ?? 0,
+            percentOwned: ownership.percentOwned ?? 0,
+            percentStarted: ownership.percentStarted ?? 0,
+            rank,
+            espnProjectedStats,
+          });
+        }
+
+        this.logger?.info({
+          season,
+          offset,
+          received: batch.length,
+          totalSoFar: allPlayers.length,
+        }, "Global draft data batch fetched");
+
+        // Partial page or no results signals end
+        if (batch.length < batchSize) break;
+        offset += batchSize;
+      }
+
+      // Sort by rank ascending
+      allPlayers.sort((a, b) => a.rank - b.rank);
+
+      this.logger?.info(
+        { season, totalPlayers: allPlayers.length },
+        "Global draft data fetched",
+      );
+
+      // Cache the result
+      this.cache.set(cacheKey, {
+        data: allPlayers,
+        expiresAt: Date.now() + 1000 * 60 * 60, // 1 hour
+      });
+
+      return allPlayers;
+    } catch (error) {
+      this.logger?.error(
+        { error, season },
+        "Failed to fetch global draft data",
+      );
       return [];
     }
   }
@@ -1078,7 +1269,7 @@ export class ESPNAdapter {
             name: player.fullName || `Player ${entry.playerId}`,
             mlbTeam: ESPN_PRO_TEAM_MAP[player.proTeamId] || `team_${player.proTeamId}`,
             positions: (player.eligibleSlots || [])
-              .filter((s: number) => s <= 15 && s !== 12)
+              .filter((s: number) => s <= 15 && s !== 12 && s !== 6 && s !== 7)
               .map((s: number) => ESPN_LINEUP_SLOT_MAP[s] || `slot_${s}`),
             lineupSlotId,
             rosterStatus,
@@ -1123,7 +1314,7 @@ export class ESPNAdapter {
         const eligibleSlots = player.player?.eligibleSlots || player.eligibleSlots || [];
         const positions = eligibleSlots
           .map((slotId: number) => ESPN_POSITION_MAP[slotId])
-          .filter((pos: string | undefined) => pos && pos !== "UTIL" && pos !== "BE");
+          .filter((pos: string | undefined) => pos && !["UTIL", "BE", "IL", "MI", "CI", "IF"].includes(pos));
 
         freeAgents.push({
           playerId: player.id,

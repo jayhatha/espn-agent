@@ -214,6 +214,7 @@ export class AuctionValuationAgent {
         dollarValue,
         vbdScore: ranking.vbdScore,
         sgpTotal: ranking.sgpTotal,
+        projectedStats: ranking.projectedStats,
       };
     });
 
@@ -227,6 +228,7 @@ export class AuctionValuationAgent {
       dollarValue: minBid,
       vbdScore: ranking.vbdScore,
       sgpTotal: ranking.sgpTotal,
+      projectedStats: ranking.projectedStats,
     }));
 
     // Combine rostered + free agents

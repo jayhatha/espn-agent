@@ -774,9 +774,9 @@ export async function draftRoutes(app: FastifyInstance) {
           },
         );
 
-        // Create a map of our valuations by player ID
+        // Create maps of our valuations and projections by player ID
         const ourValueMap = new Map(
-          ourValuations.map((v) => [v.playerId, v.dollarValue]),
+          ourValuations.map((v) => [v.playerId, v]),
         );
 
         // Join on player ID and calculate deltas
@@ -791,19 +791,37 @@ export async function draftRoutes(app: FastifyInstance) {
           absoluteDelta: number;
           percentDelta: number;
           ratio: number;
+          projectionComparison?: Record<string, { espn: number; fangraphs: number; delta: number }>;
         }
 
         const comparisons: Comparison[] = [];
 
         for (const espnPlayer of espnDraftData) {
           if (espnPlayer.espnAuctionValue <= 0) continue;
-          const ourValue = ourValueMap.get(espnPlayer.playerId);
-          if (ourValue === undefined) continue;
+          const ourData = ourValueMap.get(espnPlayer.playerId);
+          if (!ourData) continue;
 
-          const absoluteDelta = ourValue - espnPlayer.espnAuctionValue;
+          const absoluteDelta = ourData.dollarValue - espnPlayer.espnAuctionValue;
           const percentDelta =
             (absoluteDelta / espnPlayer.espnAuctionValue) * 100;
-          const ratio = ourValue / espnPlayer.espnAuctionValue;
+          const ratio = ourData.dollarValue / espnPlayer.espnAuctionValue;
+
+          // Build per-stat projection comparison if ESPN projected stats available
+          let projectionComparison: Record<string, { espn: number; fangraphs: number; delta: number }> | undefined;
+          if (espnPlayer.espnProjectedStats && ourData.projectedStats) {
+            projectionComparison = {};
+            const fgStats = ourData.projectedStats as Record<string, number>;
+            for (const [key, espnVal] of Object.entries(espnPlayer.espnProjectedStats)) {
+              const fgVal = fgStats[key];
+              if (fgVal !== undefined && espnVal !== 0) {
+                projectionComparison[key] = {
+                  espn: Math.round(espnVal * 100) / 100,
+                  fangraphs: Math.round(fgVal * 100) / 100,
+                  delta: Math.round((fgVal - espnVal) * 100) / 100,
+                };
+              }
+            }
+          }
 
           comparisons.push({
             playerId: espnPlayer.playerId,
@@ -812,10 +830,11 @@ export async function draftRoutes(app: FastifyInstance) {
             espnValue: espnPlayer.espnAuctionValue,
             espnAdp: espnPlayer.averageDraftPosition,
             espnAvgAuction: espnPlayer.averageAuctionValue,
-            ourValue,
+            ourValue: ourData.dollarValue,
             absoluteDelta,
             percentDelta,
             ratio,
+            projectionComparison,
           });
         }
 
@@ -887,6 +906,9 @@ export async function draftRoutes(app: FastifyInstance) {
           (a, b) => b.ourValue - a.ourValue,
         )[0];
 
+        // Count how many players have projection comparisons
+        const withProjections = comparisons.filter(c => c.projectionComparison && Object.keys(c.projectionComparison).length > 0).length;
+
         // Apply limit (sorted by absolute delta descending)
         const limitedComparisons = [...comparisons]
           .sort((a, b) => Math.abs(b.absoluteDelta) - Math.abs(a.absoluteDelta))
@@ -896,6 +918,7 @@ export async function draftRoutes(app: FastifyInstance) {
           comparisons: limitedComparisons,
           summary: {
             totalCompared: comparisons.length,
+            playersWithProjectionComparison: withProjections,
             meanDelta: Math.round(meanDelta * 100) / 100,
             medianDelta: Math.round(medianDelta * 100) / 100,
             rmse: Math.round(rmse * 100) / 100,

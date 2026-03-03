@@ -295,6 +295,7 @@ export interface AuctionValue {
   dollarValue: number;
   vbdScore: number;
   sgpTotal: number;
+  projectedStats?: StatComponents;
   inflationAdjustedValue?: number;
 }
 
