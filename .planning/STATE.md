@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 5 of 9 in current phase
+Plan: 6 of 9 in current phase
 Status: In Progress
-Last activity: 2026-03-02 - Completed 17-05-PLAN.md: League list, connect, and dashboard pages plus 5 league-specific components migrated to design system
+Last activity: 2026-03-02 - Completed 17-06-PLAN.md: Trades, waivers, standings pages and impact components (PlayerRow, ScarcityBadge, ImpactBadge, ImpactDetailCard) migrated to design system
 
-Progress: Phase 17: [█████░░░░░] 55% (5 of 9 plans complete)
+Progress: Phase 17: [██████░░░░] 66% (6 of 9 plans complete)
 
 ## Performance Metrics
 
@@ -114,6 +114,7 @@ Progress: Phase 17: [█████░░░░░] 55% (5 of 9 plans complete)
 | Phase 17 P03 | 3 | 2 tasks | 6 files |
 | Phase 17 P04 | 4 | 2 tasks | 4 files |
 | Phase 17 P05 | 14 | 2 tasks | 8 files |
+| Phase 17 P06 | 15 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: Container size='wide' used for league dashboard to maximize data density in the most-used page
 - [Phase 17]: lucide-react icons replace all inline SVGs across league pages and components for consistency
 - [Phase 17]: CHART_THEME.colors[0] as default teamColor in CategoryMiniChart aligns chart colors with design tokens
+- [Phase 17]: ScarcityBadge delegates entirely to Badge component variants (positive/negative/default) using lucide-react Check/ArrowDown/Minus icons
+- [Phase 17]: Trades/waivers mode toggles: Button variant=primary for active state, variant=secondary for inactive - eliminates conditional color class string
 
 ### Roadmap Evolution
 
@@ -287,5 +290,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 17-04-PLAN.md - Entry pages (landing, login, signup, onboarding) redesigned with design system components, lucide-react icons, and FadeIn scroll animations
+Stopped at: Completed 17-06-PLAN.md - Trades, waivers, standings pages and impact components migrated to design system with Container, Card, Button, semantic tokens, and lucide-react icons
 Resume file: None
