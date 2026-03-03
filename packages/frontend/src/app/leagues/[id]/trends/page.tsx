@@ -16,6 +16,10 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import { COLORS } from "@/lib/constants";
+import { CHART_THEME } from "@/lib/chart-theme";
+import { cn } from "@/lib/cn";
+import { Container } from "@/components/ui/Container";
+import { Heading } from "@/components/ui/Heading";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { TransactionMarker } from "@/components/league/TransactionMarker";
@@ -307,8 +311,16 @@ export default function TrendsPage() {
 
   const relevantAnnotations = annotationsData?.annotations || [];
 
+  const tabClass = (active: boolean) =>
+    cn(
+      "whitespace-nowrap py-4 px-6 border-b-2 font-medium text-body-sm transition-colors",
+      active
+        ? "border-accent text-content font-semibold"
+        : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300"
+    );
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Container size="wide" className="py-8">
       <PageHeader
         title="Performance Trends"
         subtitle="Track standings and category performance over time for all teams in your league."
@@ -316,47 +328,31 @@ export default function TrendsPage() {
       />
 
       {/* View Mode Tabs */}
-      <div className="bg-white shadow rounded-lg mb-6">
-        <div className="border-b border-gray-200">
+      <div className="bg-white shadow-card rounded-card border border-neutral-200 mb-6">
+        <div className="border-b border-neutral-200">
           <div className="flex items-center justify-between">
             <nav className="-mb-px flex">
               <button
                 onClick={() => setViewMode("overall")}
-                className={`${
-                  viewMode === "overall"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+                className={tabClass(viewMode === "overall")}
               >
                 Overall Standings
               </button>
               <button
                 onClick={() => setViewMode("category")}
-                className={`${
-                  viewMode === "category"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+                className={tabClass(viewMode === "category")}
               >
                 Category Rankings
               </button>
               <button
                 onClick={() => setViewMode("projected")}
-                className={`${
-                  viewMode === "projected"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+                className={tabClass(viewMode === "projected")}
               >
                 Projected Standings
               </button>
               <button
                 onClick={() => setViewMode("values")}
-                className={`${
-                  viewMode === "values"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm`}
+                className={tabClass(viewMode === "values")}
               >
                 Category Values
               </button>
@@ -367,7 +363,7 @@ export default function TrendsPage() {
               <select
                 value={selectedSeason || ""}
                 onChange={(e) => setSelectedSeason(e.target.value || undefined)}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white text-gray-900"
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-body-sm bg-white text-content focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Current Season</option>
                 {seasonsData?.seasons?.map((s: number) => (
@@ -382,10 +378,10 @@ export default function TrendsPage() {
 
         {/* Category selector for category view */}
         {(viewMode === "category" || viewMode === "values") && (
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6 border-b border-neutral-200">
             <label
               htmlFor="category-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-body-sm font-medium text-content-secondary mb-2"
             >
               Select Category:
             </label>
@@ -394,7 +390,7 @@ export default function TrendsPage() {
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               disabled={categoriesLoading}
-              className="block w-full md:w-64 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border bg-white text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="block w-full md:w-64 rounded-lg border border-neutral-300 bg-white text-content text-body-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {categories.map((cat: { value: string; label: string }) => (
                 <option key={cat.value} value={cat.value}>
@@ -406,7 +402,7 @@ export default function TrendsPage() {
         )}
 
         {/* Filter controls */}
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-neutral-200">
           <div className="flex flex-row gap-6 items-end">
             <DateRangeFilter
               onRangeChange={(from, to) => {
@@ -424,11 +420,11 @@ export default function TrendsPage() {
                   type="checkbox"
                   checked={showAnnotations}
                   onChange={(e) => setShowAnnotations(e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
                 />
                 <label
                   htmlFor="show-annotations"
-                  className="ml-2 block text-sm text-gray-700"
+                  className="ml-2 block text-body-sm text-content-secondary"
                 >
                   Show Transactions
                 </label>
@@ -441,11 +437,11 @@ export default function TrendsPage() {
                     type="checkbox"
                     checked={showInflectionPoints}
                     onChange={(e) => setShowInflectionPoints(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
                   />
                   <label
                     htmlFor="show-inflection-points"
-                    className="ml-2 block text-sm text-gray-700"
+                    className="ml-2 block text-body-sm text-content-secondary"
                   >
                     Show Inflection Points
                   </label>
@@ -457,19 +453,19 @@ export default function TrendsPage() {
       </div>
 
       {/* Chart Display */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="bg-white shadow-card rounded-card border border-neutral-200 p-6">
         {isLoading ? (
           <LoadingSpinner message="Loading chart data..." />
         ) : chartData.length > 0 ? (
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
+            <Heading level={3} className="mb-4">
               {viewMode === "overall" && "Overall Standings Over Time"}
               {viewMode === "category" &&
                 `${categories.find((c: { value: string; label: string }) => c.value === selectedCategory)?.label} Rankings Over Time`}
               {viewMode === "projected" && "Projected Standings Over Time"}
               {viewMode === "values" &&
                 `${categories.find((c: { value: string; label: string }) => c.value === selectedCategory)?.label} Values Over Time`}
-            </h2>
+            </Heading>
 
             <div className="h-96">
               <ResponsiveContainer width="100%" height="100%">
@@ -477,9 +473,13 @@ export default function TrendsPage() {
                   data={chartData}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid
+                    stroke={CHART_THEME.grid.stroke}
+                    strokeDasharray={CHART_THEME.grid.strokeDasharray}
+                  />
                   <XAxis
                     dataKey="date"
+                    tick={CHART_THEME.axis.tick}
                     tickFormatter={(date) =>
                       new Date(date).toLocaleDateString(undefined, {
                         month: "short",
@@ -488,15 +488,22 @@ export default function TrendsPage() {
                     }
                   />
                   <YAxis
+                    tick={CHART_THEME.axis.tick}
                     reversed={viewMode !== "values"}
                     domain={viewMode === "values" ? ["auto", "auto"] : [1, teamNames.length]}
                     label={{
                       value: viewMode === "values" ? selectedCategory : "Rank",
                       angle: -90,
                       position: "insideLeft",
+                      ...CHART_THEME.axis.label,
                     }}
                   />
                   <Tooltip
+                    contentStyle={{
+                      backgroundColor: CHART_THEME.tooltip.backgroundColor,
+                      borderColor: CHART_THEME.tooltip.borderColor,
+                      borderRadius: CHART_THEME.tooltip.borderRadius,
+                    }}
                     labelFormatter={(date) =>
                       new Date(date).toLocaleDateString(undefined, {
                         month: "long",
@@ -532,7 +539,7 @@ export default function TrendsPage() {
                         key={teamName}
                         type="monotone"
                         dataKey={teamName}
-                        stroke={COLORS[index % COLORS.length]}
+                        stroke={CHART_THEME.colors[index % CHART_THEME.colors.length]}
                         strokeWidth={isSelected ? 3 : 2}
                         opacity={isSelected ? 1 : 0.4}
                         dot={{ r: isSelected ? 4 : 2 }}
@@ -546,7 +553,13 @@ export default function TrendsPage() {
                     <ReferenceLine
                       key={annotation.id}
                       x={annotation.event_date}
-                      stroke={annotation.event_type === 'trade' ? '#8b5cf6' : annotation.event_type === 'drop' ? '#ef4444' : '#10b981'}
+                      stroke={
+                        annotation.event_type === "trade"
+                          ? CHART_THEME.colors[5]
+                          : annotation.event_type === "drop"
+                          ? CHART_THEME.colors[4]
+                          : CHART_THEME.colors[3]
+                      }
                       strokeDasharray="3 3"
                       strokeOpacity={0.5}
                       label={<TransactionMarker annotation={annotation} />}
@@ -558,7 +571,7 @@ export default function TrendsPage() {
                     <ReferenceLine
                       key={`ip-${ip.date}`}
                       x={ip.date}
-                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? '#10b981' : '#ef4444') : (ip.pointsDelta != null && ip.pointsDelta > 0 ? '#10b981' : '#ef4444')}
+                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? CHART_THEME.colors[3] : CHART_THEME.colors[4]) : (ip.pointsDelta != null && ip.pointsDelta > 0 ? CHART_THEME.colors[3] : CHART_THEME.colors[4])}
                       strokeDasharray="6 3"
                       strokeOpacity={0.6}
                       label={<InflectionPointMarker point={ip} />}
@@ -568,7 +581,7 @@ export default function TrendsPage() {
               </ResponsiveContainer>
             </div>
 
-            <div className="mt-6 text-xs text-gray-500">
+            <div className="mt-6 text-body-sm text-content-tertiary">
               <p>
                 <strong>Note:</strong>{" "}
                 {viewMode === "values"
@@ -582,7 +595,7 @@ export default function TrendsPage() {
         ) : (
           <div className="text-center py-12">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className="mx-auto h-12 w-12 text-content-tertiary"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -595,16 +608,16 @@ export default function TrendsPage() {
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">
+            <Heading level={3} className="mt-2 text-body-sm font-medium">
               No trend data available
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
+            </Heading>
+            <p className="mt-1 text-body-sm text-content-secondary">
               Trend data will appear after snapshots have been created for your
               league.
             </p>
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 }

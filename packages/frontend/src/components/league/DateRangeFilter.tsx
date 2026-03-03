@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/Button";
 
 interface DateRangeFilterProps {
   onRangeChange: (from: string | undefined, to: string | undefined) => void;
@@ -35,6 +37,13 @@ export function DateRangeFilter({
     onRangeChange(undefined, undefined);
   };
 
+  const inputClass = cn(
+    "block rounded-lg border border-neutral-300 bg-white text-content",
+    "text-body-sm px-3 py-2",
+    "focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent",
+    "transition-colors"
+  );
+
   return (
     <div>
       <div className="flex flex-row gap-3 items-end">
@@ -42,7 +51,7 @@ export function DateRangeFilter({
         <div>
           <label
             htmlFor="from-date"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-body-sm font-medium text-content-secondary mb-1"
           >
             From
           </label>
@@ -51,7 +60,7 @@ export function DateRangeFilter({
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border bg-white text-gray-900"
+            className={inputClass}
           />
         </div>
 
@@ -59,7 +68,7 @@ export function DateRangeFilter({
         <div>
           <label
             htmlFor="to-date"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-body-sm font-medium text-content-secondary mb-1"
           >
             To
           </label>
@@ -68,29 +77,31 @@ export function DateRangeFilter({
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border bg-white text-gray-900"
+            className={inputClass}
           />
         </div>
 
         {/* Apply button */}
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleApply}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm"
         >
           Apply
-        </button>
+        </Button>
 
         {/* Clear button */}
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleClear}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 text-sm"
         >
           Clear
-        </button>
+        </Button>
       </div>
 
       {/* Error message */}
-      {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
+      {error && <div className="mt-2 text-body-sm text-negative">{error}</div>}
     </div>
   );
 }

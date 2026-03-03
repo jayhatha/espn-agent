@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CHART_THEME } from "@/lib/chart-theme";
 
 interface PlayerDetail {
   id: number;
@@ -51,7 +52,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
   const isCategoryMode = point.categoryId != null;
   const isPositive = isCategoryMode ? (point.rankDelta ?? 0) > 0 : (point.pointsDelta ?? 0) > 0;
-  const color = isPositive ? "#10b981" : "#ef4444";
+  const color = isPositive ? CHART_THEME.colors[3] : CHART_THEME.colors[4]; // positive/negative from theme
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -113,8 +114,15 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
           width={260}
           height={tooltipHeight}
         >
-          <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs">
-            <div className="font-bold mb-2">
+          <div
+            className="rounded-lg shadow-lg p-3 text-xs"
+            style={{
+              backgroundColor: CHART_THEME.tooltip.backgroundColor,
+              border: `1px solid ${CHART_THEME.tooltip.borderColor}`,
+              borderRadius: CHART_THEME.tooltip.borderRadius,
+            }}
+          >
+            <div className="font-bold mb-2 text-content">
               {formatDate(point.date)}: Rank {point.rankBefore}{rankSuffix(point.rankBefore)} → {point.rankAfter}{rankSuffix(point.rankAfter)}
               {isCategoryMode && ` (${point.categoryId})`}
               {!isCategoryMode && point.pointsDelta != null && ` · ${point.pointsDelta > 0 ? "+" : ""}${point.pointsDelta} pts`}
@@ -122,12 +130,12 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
             {point.categoryChanges && point.categoryChanges.length > 0 && (
               <div className="mb-2">
-                <div className="font-semibold text-gray-700 mb-1">Category Changes:</div>
+                <div className="font-semibold text-content-secondary mb-1">Category Changes:</div>
                 {point.categoryChanges.map((cat, idx) => {
-                  const catColor = cat.deltaPts > 0 ? "text-green-700" : "text-red-700";
+                  const catColorClass = cat.deltaPts > 0 ? "text-positive" : "text-negative";
                   const catLabel = cat.deltaPts > 0 ? `+${cat.deltaPts}` : String(cat.deltaPts);
                   return (
-                    <div key={idx} className={catColor}>
+                    <div key={idx} className={catColorClass}>
                       {cat.categoryId}: {catLabel} pts ({cat.rankBefore}{rankSuffix(cat.rankBefore)} → {cat.rankAfter}{rankSuffix(cat.rankAfter)})
                     </div>
                   );
@@ -137,16 +145,16 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
             {point.transactions.length > 0 ? (
               <div>
-                <div className="font-semibold text-gray-700 mb-1">Roster Moves:</div>
+                <div className="font-semibold text-content-secondary mb-1">Roster Moves:</div>
                 {point.transactions.map((tx, idx) => (
                   <div key={idx} className="mb-1">
                     {tx.playersAdded.length > 0 && (
-                      <div className="text-green-700">
+                      <div className="text-positive">
                         + {tx.playersAdded.map((p) => p.name).join(", ")}
                       </div>
                     )}
                     {tx.playersDropped.length > 0 && (
-                      <div className="text-red-700">
+                      <div className="text-negative">
                         - {tx.playersDropped.map((p) => p.name).join(", ")}
                       </div>
                     )}
@@ -154,7 +162,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
                 ))}
               </div>
             ) : (
-              <div className="text-gray-500 italic">No roster moves in this period</div>
+              <div className="text-content-tertiary italic">No roster moves in this period</div>
             )}
           </div>
         </foreignObject>
