@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-03 - Completed quick task 24: Apply Phase 18 editorial composition design to Chrome extension
+Last activity: 2026-03-03 - Completed quick task 25: Audit trade recommendation agent - fix stat_key mismatch and dynamic category logic
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
@@ -247,6 +247,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 18]: Impact number promoted from text-body-sm to text-h2 font-display as leftmost visual anchor in action items
 - [Phase 18]: CategoryStatsTable uses border-b-2 header separator and text-data for monospace numeric values instead of bg-surface-secondary thead
 - [Phase 18]: IL table keeps bg-negative-light header as functional distinction (injury status signal, not decoration)
+- [Phase quick-25]: PITCHING_STAT_KEYS set membership replaces hardcoded batter/pitcher arrays in trade-recommendation.ts — stays in sync with standings-projection.ts
+- [Phase quick-25]: category.formula_id used for rate stat calculation (not catId.toLowerCase()) — aligns with Category interface contract
+- [Phase quick-25]: category.direction === 'LOWER_BETTER' replaces hardcoded ['ERA', 'WHIP'] list in isLowerBetter — works for any league config
 
 ### Roadmap Evolution
 
@@ -309,6 +312,7 @@ None yet.
 | 22 | Replace JSON inputs with checkboxes for category and roster selection in auction validation page | 2026-02-28 | 2f84614 | ✅ | [22-replace-json-inputs-with-checkboxes-for-](./quick/22-replace-json-inputs-with-checkboxes-for-/) |
 | 23 | Migrate player table to use ESPN player IDs as primary keys instead of auto-increment IDs | 2026-02-28 | 88aa469 | ✅ | [23-migrate-player-table-to-use-espn-player-](./quick/23-migrate-player-table-to-use-espn-player-/) |
 | 24 | Apply Phase 18 editorial composition design to Chrome extension | 2026-03-03 | dcdc219 | ✅ | [24-apply-phase-18-editorial-composition-des](./quick/24-apply-phase-18-editorial-composition-des/) |
+| 25 | Audit trade recommendation agent: fix stat_key mismatch, dynamic category logic, add WPCT formula | 2026-03-03 | 77a74fd | ✅ | [25-audit-waiver-and-trade-recommendation-ma](./quick/25-audit-waiver-and-trade-recommendation-ma/) |
 
 ## Session Continuity
 
