@@ -167,51 +167,22 @@ export class DraftRankingsAgent {
     const allBatterProjections = allProjections.filter((p) => (p.AB ?? 0) > 0);
     const allPitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
 
-    // Count roster slots by type to determine rosterable pool sizes
+    // Batter slot keys (used for UTIL replacement level calculation)
     const batterSlotKeys = ["C", "1B", "2B", "SS", "3B", "OF", "CI", "MI", "IF", "UTIL"];
-    const pitcherSlotKeys = ["SP", "RP", "P"];
-    const batterSlots = batterSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
-    const pitcherSlots = pitcherSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
-    const rosterableBatters = batterSlots * totalTeams;
-    const rosterablePitchers = pitcherSlots * totalTeams;
 
-    // Trim SGP pools to rosterable players (with 1.5x buffer for depth)
-    // This prevents fringe players (e.g., 600 pitchers with 0 SV) from
-    // skewing z-score distributions for scarce stats like saves
-    const batterPoolSize = Math.min(allBatterProjections.length, Math.ceil(rosterableBatters * 1.5));
-    const pitcherPoolSize = Math.min(allPitcherProjections.length, Math.ceil(rosterablePitchers * 1.5));
-
-    // Sort by total counting stat volume to pick the most relevant players
-    const sortedBatters = [...allBatterProjections].sort((a, b) =>
-      ((b.R ?? 0) + (b.HR ?? 0) + (b.RBI ?? 0) + (b.SB ?? 0)) -
-      ((a.R ?? 0) + (a.HR ?? 0) + (a.RBI ?? 0) + (a.SB ?? 0))
-    );
-    const sortedPitchers = [...allPitcherProjections].sort((a, b) =>
-      ((b.IP ?? 0) + (b.K ?? 0)) - ((a.IP ?? 0) + (a.K ?? 0))
-    );
-
-    // Build pitcher pool: take top N by IP+K, then ensure closers (SV > 0) are included
-    // This prevents trimming from excluding all RP/closers who have low IP+K but high SV
-    const topPitchersByVolume = new Set(sortedPitchers.slice(0, pitcherPoolSize));
-    for (const p of allPitcherProjections) {
-      if ((p.SV ?? 0) > 0) topPitchersByVolume.add(p);
-      if ((p.HLD ?? 0) > 0) topPitchersByVolume.add(p);
-    }
-
-    const batterProjections = sortedBatters.slice(0, batterPoolSize);
-    const pitcherProjections = [...topPitchersByVolume];
+    // Use full type-split pools for SGP calculation
+    // The scarce stat filter (>50% zeros → compare only among contributors)
+    // handles skewed distributions like SV without needing pool trimming
+    const batterProjections = allBatterProjections;
+    const pitcherProjections = allPitcherProjections;
 
     this.logger?.info(
       {
         totalPlayers: allProjections.length,
-        allBatters: allBatterProjections.length,
-        allPitchers: allPitcherProjections.length,
-        rosterableBatters,
-        rosterablePitchers,
-        sgpPoolBatters: batterProjections.length,
-        sgpPoolPitchers: pitcherProjections.length,
+        batters: batterProjections.length,
+        pitchers: pitcherProjections.length,
       },
-      "Split and trimmed player pools for SGP calculation",
+      "Split player pools for SGP calculation",
     );
 
     // DIAGNOSTIC: Log category-level statistics to validate SGP spread
