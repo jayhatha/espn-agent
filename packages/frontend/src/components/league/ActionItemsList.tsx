@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ExternalLinkIcon, ClockIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 
 export interface ActionItem {
   id: string;
@@ -28,22 +29,11 @@ export function ActionItemsList({
   const displayItems = items.slice(0, maxItems);
   const remainingCount = Math.max(0, items.length - maxItems);
 
-  const getPriorityClasses = (priority: "high" | "medium" | "low") => {
-    switch (priority) {
-      case "high":
-        return "border-l-4 border-l-negative bg-negative-light";
-      case "medium":
-        return "border-l-4 border-l-warning bg-warning-light";
-      case "low":
-        return "border-l-4 border-l-positive bg-positive-light";
-    }
-  };
-
   const getImpactClasses = (impact: string) => {
     if (impact.startsWith("+")) {
-      return "text-positive font-semibold";
+      return "text-positive";
     } else if (impact.startsWith("-")) {
-      return "text-negative font-semibold";
+      return "text-negative";
     }
     return "text-content-secondary";
   };
@@ -56,72 +46,62 @@ export function ActionItemsList({
 
   if (items.length === 0) {
     return (
-      <div className="border border-neutral-200 rounded-card p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-          <ClockIcon className="w-12 h-12 text-warning" />
-        </div>
-        <h3 className="text-body-lg font-semibold text-content mb-2">
-          No Recommended Actions
-        </h3>
-        <p className="text-body-sm text-content-secondary">
-          No recommended actions at this time. Your team is performing well!
-        </p>
+      <div className="py-12 text-center">
+        <ClockIcon className="w-10 h-10 text-content-tertiary mx-auto mb-3" />
+        <p className="text-body font-medium text-content-secondary mb-1">No Recommended Actions</p>
+        <p className="text-body-sm text-content-tertiary">Your team is performing well!</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {displayItems.map((item) => (
-        <div
-          key={item.id}
-          className={cn(
-            getPriorityClasses(item.priority),
-            "rounded-lg p-4 border border-neutral-200 transition-shadow hover:shadow-card-hover"
-          )}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            {/* Left side: Type badge, title, description, and impact */}
+    <div>
+      <div className="divide-y divide-neutral-200">
+        {displayItems.map((item) => (
+          <div
+            key={item.id}
+            className="py-5 flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-6"
+          >
+            {/* Impact number: oversized, left-aligned on mobile, right-aligned on desktop */}
+            <div className="sm:w-24 sm:text-right flex-shrink-0 pt-1">
+              <span className={cn("text-h2 font-display leading-none", getImpactClasses(item.impact))}>
+                {item.impact}
+              </span>
+            </div>
+
+            {/* Content: badge + priority + title + description */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-1">
                 <Badge variant={getTypeBadgeVariant(item.type)} className="uppercase tracking-wide">
                   {item.type}
                 </Badge>
-                <span className={cn("text-body-sm", getImpactClasses(item.impact))}>
-                  {item.impact}
+                <span className="text-caption uppercase tracking-wide text-content-tertiary">
+                  {item.priority} priority
                 </span>
               </div>
-              <h4 className="text-body font-bold text-content mb-1">
-                {item.title}
-              </h4>
+              <p className="text-body font-semibold text-content mb-0.5">{item.title}</p>
               <p className="text-body-sm text-content-secondary">{item.description}</p>
             </div>
 
-            {/* Right side: Action buttons */}
-            <div className="flex flex-row sm:flex-col gap-2 sm:items-end">
+            {/* CTAs: stacked vertically on right */}
+            <div className="flex flex-col gap-2 flex-shrink-0">
               {item.internalLink && (
-                <Link
-                  href={item.internalLink}
-                  className="px-4 py-2 border border-neutral-300 bg-white text-content rounded-lg hover:bg-surface-secondary font-medium text-body-sm transition-colors text-center whitespace-nowrap"
-                >
-                  Analyze
+                <Link href={item.internalLink}>
+                  <Button variant="secondary" size="sm">Analyze</Button>
                 </Link>
               )}
               {item.espnLink && (
-                <a
-                  href={item.espnLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
-                >
-                  ESPN
-                  <ExternalLinkIcon className="h-4 w-4" />
+                <a href={item.espnLink} target="_blank" rel="noopener noreferrer">
+                  <Button size="sm">
+                    ESPN
+                    <ExternalLinkIcon className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
                 </a>
               )}
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {remainingCount > 0 && (
         <div className="text-center py-2">
