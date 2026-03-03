@@ -50,7 +50,7 @@ export default function DraftSidebar() {
     return (
       <button
         onClick={toggleSidebar}
-        className="fixed top-4 right-4 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-blue-700"
+        className="fixed top-4 right-4 bg-accent text-white px-3 py-2 rounded-lg shadow-lg hover:bg-accent-hover"
       >
         Show Assistant
       </button>
@@ -60,10 +60,10 @@ export default function DraftSidebar() {
   return (
     <div className="h-full bg-white flex flex-col">
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4 flex justify-between items-center">
+      <div className="bg-surface-secondary text-content p-4 flex justify-between items-center border-b border-surface-tertiary">
         <div>
-          <h1 className="text-lg font-bold">ESPN Draft Assistant</h1>
-          <p className="text-sm opacity-90">
+          <h1 className="text-base font-semibold text-content">ESPN Draft Assistant</h1>
+          <p className="text-body-sm text-content-secondary">
             League {leagueId} • {draftFormat === "snake" ? "Snake" : "Auction"}{" "}
             Draft
           </p>
@@ -71,31 +71,31 @@ export default function DraftSidebar() {
         <div className="flex items-center gap-1">
           <button
             onClick={handleRefresh}
-            className="text-white text-xs hover:bg-blue-700 px-2 py-1 rounded border border-blue-300"
+            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
           >
             Refresh
           </button>
           <button
             onClick={handleDockLeft}
-            className="text-white text-xs hover:bg-blue-700 px-2 py-1 rounded border border-blue-300"
+            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
           >
             Left
           </button>
           <button
             onClick={handleDockRight}
-            className="text-white text-xs hover:bg-blue-700 px-2 py-1 rounded border border-blue-300"
+            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
           >
             Right
           </button>
           <button
             onClick={handlePopOut}
-            className="text-white text-xs hover:bg-blue-700 px-2 py-1 rounded border border-blue-300"
+            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
           >
             Pop Out
           </button>
           <button
             onClick={toggleSidebar}
-            className="text-white hover:bg-blue-700 px-2 py-1 rounded"
+            className="text-content-secondary hover:bg-surface-tertiary px-2 py-1 rounded"
           >
             ✕
           </button>
@@ -104,11 +104,11 @@ export default function DraftSidebar() {
 
       {/* Config Detection Warning Banner */}
       {configWarnings.length > 0 && (
-        <div className="bg-yellow-100 border-l-4 border-yellow-500 p-4">
-          <p className="text-sm text-yellow-700">
+        <div className="bg-warning-light border-l-4 border-warning p-4">
+          <p className="text-sm text-warning">
             <strong>Warning:</strong> League config detection incomplete. Using 5x5 defaults.
           </p>
-          <ul className="text-xs text-yellow-600 mt-2">
+          <ul className="text-xs text-warning mt-2">
             {configWarnings.map((warning, i) => (
               <li key={i}>• {warning}</li>
             ))}
@@ -117,7 +117,7 @@ export default function DraftSidebar() {
       )}
 
       {/* Draft Status */}
-      <div className="bg-gray-100 p-4 border-b">
+      <div className="bg-surface-secondary p-4 border-b border-surface-tertiary">
         <div className="flex justify-between text-sm">
           <span>Pick #{currentPick}</span>
           {draftFormat === "auction" && (
@@ -126,7 +126,7 @@ export default function DraftSidebar() {
             </span>
           )}
         </div>
-        <div className="mt-2 text-sm text-gray-600">
+        <div className="mt-2 text-sm text-content-secondary">
           Roster: {myRoster.length} players
         </div>
       </div>

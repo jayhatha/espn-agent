@@ -81,18 +81,18 @@ export default function PlayerCard({
   return (
     <div
       className={`
-        p-3 border-b hover:bg-blue-50 cursor-pointer transition-colors
-        ${isAtTurn ? "bg-yellow-50 border-yellow-200" : "border-gray-200"}
+        p-3 hover:bg-accent-light cursor-pointer transition-colors
+        ${isAtTurn ? "bg-warning-light border-l-2 border-warning" : ""}
       `}
     >
       {/* Player name and positions */}
       <div className="flex justify-between items-start mb-1">
         <div className="flex-1">
-          <div className="font-semibold text-gray-900">{player.playerName}</div>
-          <div className="text-xs text-gray-500">
+          <div className="font-semibold text-content">{player.playerName}</div>
+          <div className="text-caption text-content-tertiary">
             {player.positions.join(", ")} • Tier {player.tier}
             {player.adp && (
-              <span className="ml-2 text-blue-600">
+              <span className="ml-2 text-content-secondary">
                 ADP: {formatNumber(player.adp, 1)}
               </span>
             )}
@@ -109,8 +109,8 @@ export default function PlayerCard({
           )}
         </div>
         <div className="text-right">
-          <div className="text-sm font-bold text-blue-600">#{rank}</div>
-          <div className="text-xs text-gray-500">
+          <div className="text-sm font-semibold text-content">#{rank}</div>
+          <div className="text-caption text-content-tertiary">
             VBD: {formatNumber(player.vbdScore, 1)}
           </div>
         </div>
@@ -118,14 +118,14 @@ export default function PlayerCard({
 
       {/* Picks until turn indicator */}
       {picksUntilMyTurn !== null && picksUntilMyTurn <= 5 && (
-        <div className="mt-1 text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded inline-block">
+        <div className="mt-1 text-xs bg-warning-light text-warning px-2 py-1 rounded inline-block">
           {picksUntilMyTurn} pick{picksUntilMyTurn !== 1 ? "s" : ""} until your
           turn
         </div>
       )}
 
       {/* Projected stats (abbreviated) */}
-      <div className="text-xs text-gray-600 mt-2 flex gap-3">
+      <div className="text-data text-content-secondary mt-2 flex gap-3">
         {/* Counting stats - read directly */}
         {player.projectedStats.HR && (
           <span>HR: {player.projectedStats.HR}</span>

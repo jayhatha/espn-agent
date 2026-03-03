@@ -194,13 +194,13 @@ export default function DraftRecommendations() {
   return (
     <div className="flex flex-col h-full">
       {/* Filter controls */}
-      <div className="p-3 bg-gray-50 border-b space-y-2">
+      <div className="p-3 bg-surface-secondary border-b border-surface-tertiary space-y-2">
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => setPositionFilter(null)}
             className={`
               px-2 py-1 text-xs rounded
-              ${!selectedPosition ? "bg-blue-600 text-white" : "bg-white text-gray-700 border"}
+              ${!selectedPosition ? "bg-accent text-white" : "bg-surface text-content-secondary border border-surface-tertiary"}
             `}
           >
             All
@@ -211,7 +211,7 @@ export default function DraftRecommendations() {
               onClick={() => setPositionFilter(pos)}
               className={`
                 px-2 py-1 text-xs rounded
-                ${selectedPosition === pos ? "bg-blue-600 text-white" : "bg-white text-gray-700 border"}
+                ${selectedPosition === pos ? "bg-accent text-white" : "bg-surface text-content-secondary border border-surface-tertiary"}
               `}
             >
               {pos}
@@ -219,7 +219,7 @@ export default function DraftRecommendations() {
           ))}
         </div>
 
-        <label className="flex items-center text-sm text-gray-700 cursor-pointer">
+        <label className="flex items-center text-body-sm text-content-secondary cursor-pointer">
           <input
             type="checkbox"
             checked={showOnlyNeeds}
@@ -231,9 +231,9 @@ export default function DraftRecommendations() {
       </div>
 
       {/* Player list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto divide-y divide-surface-tertiary">
         {filteredPlayers.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div className="p-4 text-center text-content-tertiary">
             {rankings.length === 0
               ? "Loading rankings..."
               : "No players match filters"}

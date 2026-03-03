@@ -71,15 +71,15 @@ export default function AuctionPlayerCard({
   const projectedStats = playerRanking?.projectedStats || {};
 
   return (
-    <div className="p-3 border-b hover:bg-blue-50 cursor-pointer transition-colors border-gray-200">
+    <div className="p-3 hover:bg-accent-light cursor-pointer transition-colors">
       {/* Player name and positions */}
       <div className="flex justify-between items-start mb-1">
         <div className="flex-1">
-          <div className="font-semibold text-gray-900">{player.playerName}</div>
-          <div className="text-xs text-gray-500">
+          <div className="font-semibold text-content">{player.playerName}</div>
+          <div className="text-caption text-content-tertiary">
             {player.positions.join(", ")}
             {playerRanking?.adp && (
-              <span className="ml-2 text-blue-600">
+              <span className="ml-2 text-content-secondary">
                 ADP: {formatNumber(playerRanking.adp, 1)}
               </span>
             )}
@@ -99,29 +99,29 @@ export default function AuctionPlayerCard({
 
             {/* Budget pacing indicators */}
             {!actualPrice && isValuePick && (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                ⭐ Value
+              <span className="text-xs bg-positive-light text-positive px-2 py-1 rounded">
+                Value
               </span>
             )}
             {!actualPrice && !isAffordable && (
-              <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+              <span className="text-xs bg-negative-light text-negative px-2 py-1 rounded">
                 Over budget
               </span>
             )}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-green-600">
+          <div className="text-h3 font-semibold text-content">
             ${player.dollarValue}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-caption text-content-tertiary">
             VBD: {formatNumber(auctionPlayer.vbdScore, 1)}
           </div>
         </div>
       </div>
 
       {/* Projected stats (abbreviated) */}
-      <div className="text-xs text-gray-600 mt-2 flex gap-3">
+      <div className="text-data text-content-secondary mt-2 flex gap-3">
         {/* Counting stats - read directly */}
         {projectedStats.HR && <span>HR: {projectedStats.HR}</span>}
         {projectedStats.RBI && <span>RBI: {projectedStats.RBI}</span>}
