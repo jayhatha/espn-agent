@@ -453,10 +453,7 @@ export const api = {
     budget?: number;
     minBid?: number;
     limit?: number;
-    espnLeagueId: number;
     espnSeason: number;
-    espnSwid?: string;
-    espnS2?: string;
     projectionsRunId?: number;
   }) {
     const queryParams = new URLSearchParams();
