@@ -1,13 +1,13 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-export const headingVariants = cva("font-semibold tracking-tight text-content", {
+export const headingVariants = cva("tracking-tight text-content", {
   variants: {
     level: {
-      1: "text-h1",
-      2: "text-h2",
-      3: "text-h3",
-      4: "text-h4",
+      1: "text-h1 font-display",
+      2: "text-h2 font-display",
+      3: "text-h3 font-semibold",
+      4: "text-h4 font-semibold",
     },
   },
   defaultVariants: {
