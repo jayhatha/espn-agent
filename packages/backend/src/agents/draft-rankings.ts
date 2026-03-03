@@ -164,27 +164,71 @@ export class DraftRankingsAgent {
     const allProjections = projections.map(
       (p) => p.stat_components_json as StatComponents,
     );
-    const batterProjections = allProjections.filter((p) => (p.AB ?? 0) > 0);
-    const pitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
+    const allBatterProjections = allProjections.filter((p) => (p.AB ?? 0) > 0);
+    const allPitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
+
+    // Count roster slots by type to determine rosterable pool sizes
+    const batterSlotKeys = ["C", "1B", "2B", "SS", "3B", "OF", "CI", "MI", "IF", "UTIL"];
+    const pitcherSlotKeys = ["SP", "RP", "P"];
+    const batterSlots = batterSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
+    const pitcherSlots = pitcherSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
+    const rosterableBatters = batterSlots * totalTeams;
+    const rosterablePitchers = pitcherSlots * totalTeams;
+
+    // Trim SGP pools to rosterable players (with 1.5x buffer for depth)
+    // This prevents fringe players (e.g., 600 pitchers with 0 SV) from
+    // skewing z-score distributions for scarce stats like saves
+    const batterPoolSize = Math.min(allBatterProjections.length, Math.ceil(rosterableBatters * 1.5));
+    const pitcherPoolSize = Math.min(allPitcherProjections.length, Math.ceil(rosterablePitchers * 1.5));
+
+    // Sort by total counting stat volume to pick the most relevant players
+    const sortedBatters = [...allBatterProjections].sort((a, b) =>
+      ((b.R ?? 0) + (b.HR ?? 0) + (b.RBI ?? 0) + (b.SB ?? 0)) -
+      ((a.R ?? 0) + (a.HR ?? 0) + (a.RBI ?? 0) + (a.SB ?? 0))
+    );
+    const sortedPitchers = [...allPitcherProjections].sort((a, b) =>
+      ((b.IP ?? 0) + (b.K ?? 0)) - ((a.IP ?? 0) + (a.K ?? 0))
+    );
+
+    // Build pitcher pool: take top N by IP+K, then ensure closers (SV > 0) are included
+    // This prevents trimming from excluding all RP/closers who have low IP+K but high SV
+    const topPitchersByVolume = new Set(sortedPitchers.slice(0, pitcherPoolSize));
+    for (const p of allPitcherProjections) {
+      if ((p.SV ?? 0) > 0) topPitchersByVolume.add(p);
+      if ((p.HLD ?? 0) > 0) topPitchersByVolume.add(p);
+    }
+
+    const batterProjections = sortedBatters.slice(0, batterPoolSize);
+    const pitcherProjections = [...topPitchersByVolume];
 
     this.logger?.info(
       {
         totalPlayers: allProjections.length,
-        batters: batterProjections.length,
-        pitchers: pitcherProjections.length,
+        allBatters: allBatterProjections.length,
+        allPitchers: allPitcherProjections.length,
+        rosterableBatters,
+        rosterablePitchers,
+        sgpPoolBatters: batterProjections.length,
+        sgpPoolPitchers: pitcherProjections.length,
       },
-      "Split player pools for SGP calculation",
+      "Split and trimmed player pools for SGP calculation",
     );
 
     // DIAGNOSTIC: Log category-level statistics to validate SGP spread
-    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number; poolSize: number }> = {};
+    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number; poolSize: number; scarce: boolean }> = {};
     for (const category of categories) {
       const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
       const pool = isPitchingCat ? pitcherProjections : batterProjections;
       let allValues: number[];
+      let isScarce = false;
 
       if (category.type === "COUNTING") {
-        allValues = pool.map((p) => p[category.stat_key] || 0);
+        const rawValues = pool.map((p) => p[category.stat_key] || 0);
+        const nonZeroValues = rawValues.filter((v) => v > 0);
+        const zeroRatio = 1 - nonZeroValues.length / rawValues.length;
+        isScarce = zeroRatio > 0.5;
+        allValues = isScarce ? nonZeroValues : rawValues;
+        if (allValues.length === 0) continue;
       } else if (category.type === "RATE" && category.formula_id) {
         allValues = pool.map((p) => {
           try {
@@ -205,7 +249,7 @@ export class DraftRankingsAgent {
       const min = Math.min(...allValues);
       const max = Math.max(...allValues);
 
-      categoryStats[category.category_id] = { mean, stdDev, min, max, poolSize: pool.length };
+      categoryStats[category.category_id] = { mean, stdDev, min, max, poolSize: allValues.length, scarce: isScarce };
     }
 
     this.logger?.info(
@@ -218,6 +262,7 @@ export class DraftRankingsAgent {
           max: stats.max.toFixed(2),
           range: (stats.max - stats.min).toFixed(2),
           poolSize: stats.poolSize,
+          scarce: stats.scarce,
         })),
       },
       "Category statistics for SGP calculation (type-split pools)",
@@ -277,9 +322,26 @@ export class DraftRankingsAgent {
 
     for (const pos of positions) {
       // Find players eligible at this position
-      const eligiblePlayers = playersWithSGP.filter((p) =>
-        p.positions.includes(pos),
-      );
+      // UTIL = any batter (AB > 0), P = any pitcher (IP > 0)
+      let eligiblePlayers: PlayerWithProjection[];
+      let replacementIndex: number;
+
+      if (pos === "UTIL") {
+        // UTIL can be filled by any batter — replacement level is after all
+        // dedicated hitter slots are consumed across the league
+        eligiblePlayers = playersWithSGP.filter((p) => (p.projectedStats.AB ?? 0) > 0);
+        const allBatterSlots = batterSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
+        replacementIndex = allBatterSlots * totalTeams + 1;
+      } else if (pos === "P") {
+        // Generic P slot can be filled by any pitcher — replacement level is
+        // after all dedicated pitcher slots (SP + RP) are consumed
+        eligiblePlayers = playersWithSGP.filter((p) => (p.projectedStats.IP ?? 0) > 0);
+        const dedicatedPitcherSlots = (rosterSlots["SP"] || 0) + (rosterSlots["RP"] || 0);
+        replacementIndex = (dedicatedPitcherSlots + (rosterSlots["P"] || 0)) * totalTeams + 1;
+      } else {
+        eligiblePlayers = playersWithSGP.filter((p) => p.positions.includes(pos));
+        replacementIndex = getReplacementLevel(pos, rosterSlots, totalTeams);
+      }
 
       if (eligiblePlayers.length === 0) {
         replacementSGPs[pos] = 0;
@@ -289,22 +351,13 @@ export class DraftRankingsAgent {
       // Sort by SGP descending
       eligiblePlayers.sort((a, b) => b.sgpTotal - a.sgpTotal);
 
-      // Get replacement level index
-      const replacementIndex = getReplacementLevel(
-        pos,
-        rosterSlots,
-        totalTeams,
-      );
-
-      // Get replacement player's SGP (or 0 if not enough players)
-      // AUDIT FIX: replacementIndex is 1-based from getReplacementLevel()
-      // Convert to 0-based array index by subtracting 1
+      // Get replacement player's SGP
+      // replacementIndex is 1-based, convert to 0-based array index
       if (replacementIndex <= eligiblePlayers.length) {
         replacementSGPs[pos] = eligiblePlayers[replacementIndex - 1].sgpTotal;
       } else {
         // Sparse position: not enough projected players to fill all rosters.
-        // Use the worst available player as the replacement level — don't artificially inflate
-        // values by using a hardcoded floor (that would overvalue all catchers, etc.)
+        // Use the worst available player as the replacement level
         replacementSGPs[pos] = eligiblePlayers[eligiblePlayers.length - 1].sgpTotal;
       }
 
@@ -429,7 +482,20 @@ export class DraftRankingsAgent {
 
     if (category.type === "COUNTING") {
       statValue = projection[category.stat_key] || 0;
-      allValues = allProjections.map((p) => p[category.stat_key] || 0);
+      const rawValues = allProjections.map((p) => p[category.stat_key] || 0);
+      const nonZeroValues = rawValues.filter((v) => v > 0);
+      const zeroRatio = 1 - nonZeroValues.length / rawValues.length;
+
+      // For scarce counting stats (>50% of pool has 0, e.g., SV, HLD),
+      // compare only among players who accumulate the stat.
+      // Players with 0 get SGP = 0 (they don't contribute to this category).
+      // This prevents closers from getting +13 SGP just from saves.
+      if (zeroRatio > 0.5) {
+        if (statValue === 0) return 0;
+        allValues = nonZeroValues;
+      } else {
+        allValues = rawValues;
+      }
     } else if (category.type === "RATE" && category.formula_id) {
       try {
         statValue = calculateFinalRate(category.formula_id, {}, projection);
