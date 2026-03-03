@@ -139,6 +139,10 @@ Plans:
 | 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
 | 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
 | 14. ESPN Auction Values Bug Fix | v1.2 | Complete    | 2026-02-28 | - |
+| 15. Fix Empty SGP Categories | v1.2 | 1/1 | Complete | 2026-03-03 |
+| 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
+| 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
+| 18. Dashboard Compositional Layout | v1.3 | 2/2 | Complete | 2026-03-03 |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -307,5 +311,5 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 18-01-PLAN.md — Install DM Serif Display font, configure typography foundation, decompose dashboard into 6 section components with compositional layout
-- [ ] 18-02-PLAN.md — Rework ActionItemsList, TeamHealthOverview, CategoryStatsTable, and roster tables to match editorial style, visual verification
+- [x] 18-01-PLAN.md — Install DM Serif Display font, configure typography foundation, decompose dashboard into 6 section components with compositional layout — completed 2026-03-03
+- [x] 18-02-PLAN.md — Rework ActionItemsList, TeamHealthOverview, CategoryStatsTable, and roster tables to match editorial style, visual verification — completed 2026-03-03
