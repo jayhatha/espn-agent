@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 7 of 9 in current phase
-Status: In Progress
-Last activity: 2026-03-02 - Completed 17-07-PLAN.md: Trends, moves, and projections pages migrated with CHART_THEME, design token tables, Badge components, Card layouts
+Plan: 9 of 9 in current phase
+Status: Complete
+Last activity: 2026-03-03 - Completed 17-09-PLAN.md: Legacy primary colors removed from Tailwind config, all anti-patterns eliminated (shadow-lg, max-w-7xl, purple classes), build verified passing
 
-Progress: Phase 17: [███████░░░] 77% (7 of 9 plans complete)
+Progress: Phase 17: [██████████] 100% (9 of 9 plans complete)
 
 ## Performance Metrics
 
@@ -233,6 +233,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: Trades/waivers mode toggles: Button variant=primary for active state, variant=secondary for inactive - eliminates conditional color class string
 - [Phase 17]: getTierVariant() maps tier numbers to Badge semantic variants instead of ad-hoc Tailwind color classes
 - [Phase 17]: Semantic status helpers (getJobStatusVariant, getStalenessVariant, getLeagueStatusVariant) centralize status-to-Badge-variant mapping in admin page
+- [Phase 17 P09]: Legacy primary color block (50/100/500/600/700) removed from tailwind.config.js after confirming zero references across all page/component files
+- [Phase 17 P09]: SVG foreignObject tooltip shadow-lg classes removed as redundant — CHART_THEME inline styles handle tooltip appearance in SVG context where Tailwind shadow may not apply
+- [Phase 17 P09]: max-w-content-wide replaces max-w-7xl in navigation.tsx to use design token instead of hardcoded Tailwind class
 
 ### Roadmap Evolution
 
@@ -296,6 +299,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-02
-Stopped at: Completed 17-07-PLAN.md - Trends, moves, and projections pages migrated with CHART_THEME Recharts theming, Badge components, design token table styling, Card layouts
+Last session: 2026-03-03
+Stopped at: Completed 17-09-PLAN.md - Final cleanup: legacy primary colors removed, all anti-patterns eliminated, build verified, design system migration complete. Visual verification checkpoint pending manual review.
 Resume file: None
