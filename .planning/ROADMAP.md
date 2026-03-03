@@ -304,7 +304,7 @@ Plans:
   6. Quick actions rendered as compact text links, not bordered icon cards
   7. Data tables use tighter padding with text-data monospace for values
   8. All existing functionality preserved (team selector, auth modal, snapshot, roster)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 18-01-PLAN.md — Install DM Serif Display font, configure typography foundation, decompose dashboard into 6 section components with compositional layout

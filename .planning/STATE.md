@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 18 (Dashboard Compositional Layout)
-Plan: 1 of 1 in current phase
-Status: Complete
-Last activity: 2026-03-03 - Completed 18-01-PLAN.md: DM Serif Display installed, dashboard decomposed into 6 section components, KPI StatCards removed, section-based alternating backgrounds implemented
+Plan: 2 of 2 in current phase
+Status: Checkpoint - awaiting visual verification
+Last activity: 2026-03-03 - 18-02 auto tasks complete: ActionItemsList reworked with divider-list and text-h2 impact numbers, TeamHealthOverview borderless with spacing hierarchy, CategoryStatsTable/RosterSection tighter with text-data — awaiting Task 3 human-verify checkpoint
 
-Progress: Phase 18: [██████████] 100% (1 of 1 plans complete)
+Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
 ## Performance Metrics
 
@@ -118,6 +118,7 @@ Progress: Phase 18: [██████████] 100% (1 of 1 plans complete
 | Phase 17 P06 | 15 | 2 tasks | 7 files |
 | Phase 17 P07 | 4 | 2 tasks | 7 files |
 | Phase 17 P08 | 12 | 2 tasks | 6 files |
+| Phase 18 P02 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -242,6 +243,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 18 P01]: Sections own their Container internally, page.tsx has no outer Container — enables full-width section background alternation (white / surface-secondary / surface-tertiary)
 - [Phase 18 P01]: Card kept only for CategoryMiniChart — charts need a contained surface; all other dashboard sections use section background alone for grouping
 - [Phase 18 P01]: Quick access rendered as compact link strip (not bordered card grid) — hover:bg-accent-light text links in 5-column grid on desktop
+- [Phase 18]: Divider-list pattern (divide-y) replaces card-per-item in ActionItemsList — priority shown as text label, not colored left border
+- [Phase 18]: Impact number promoted from text-body-sm to text-h2 font-display as leftmost visual anchor in action items
+- [Phase 18]: CategoryStatsTable uses border-b-2 header separator and text-data for monospace numeric values instead of bg-surface-secondary thead
+- [Phase 18]: IL table keeps bg-negative-light header as functional distinction (injury status signal, not decoration)
 
 ### Roadmap Evolution
 
@@ -307,5 +312,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 18-01-PLAN.md: DM Serif Display installed, dashboard decomposed into 6 named section components, KPI StatCards removed, section-based alternating backgrounds implemented, build verified passing.
+Stopped at: 18-02 Task 3 checkpoint:human-verify — auto tasks complete, awaiting visual verification of complete dashboard redesign at http://localhost:3000/leagues/[id]
 Resume file: None
