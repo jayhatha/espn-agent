@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { AdminRoute } from "@/components/ProtectedRoute";
 import { api } from "@/lib/api";
+import { Container } from "@/components/ui/Container";
+import { Card, CardHeader, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Heading } from "@/components/ui/Heading";
+import { Input } from "@/components/ui/Input";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { cn } from "@/lib/cn";
+import { XCircle } from "lucide-react";
 
 interface PlayerComparison {
   playerId: number;
@@ -189,34 +198,38 @@ function AuctionValidationPageContent() {
     }
   };
 
+  const getDeltaClass = (delta: number): string => {
+    if (delta > 0) return "text-positive";
+    if (delta < 0) return "text-negative";
+    return "text-content-secondary";
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Auction Value Validation
-        </h1>
-        <p className="text-gray-600 mb-8">
+    <Container size="wide" className="py-8">
+      <div className="mb-8">
+        <Heading level={1}>Auction Value Validation</Heading>
+        <p className="text-body-sm text-content-secondary mt-2">
           Compare VBD-based auction values against ESPN's pre-draft baseline values
         </p>
+      </div>
 
-        {/* Configuration Form */}
-        <div className="bg-white shadow rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Validation Parameters
-          </h2>
-
+      {/* Configuration Form */}
+      <Card className="mb-8">
+        <CardHeader>
+          <Heading level={2}>Validation Parameters</Heading>
+        </CardHeader>
+        <CardContent>
           <form onSubmit={handleSubmit}>
             {/* Draft Settings */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   Number of Teams
                 </label>
-                <input
+                <Input
                   type="number"
                   value={numTeams}
                   onChange={(e) => setNumTeams(parseInt(e.target.value, 10))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   min="2"
                   max="30"
                   required
@@ -224,14 +237,13 @@ function AuctionValidationPageContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   Auction Budget ($)
                 </label>
-                <input
+                <Input
                   type="number"
                   value={budget}
                   onChange={(e) => setBudget(parseInt(e.target.value, 10))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   min="100"
                   max="1000"
                   required
@@ -239,14 +251,13 @@ function AuctionValidationPageContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   Minimum Bid ($)
                 </label>
-                <input
+                <Input
                   type="number"
                   value={minBid}
                   onChange={(e) => setMinBid(parseInt(e.target.value, 10))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   min="1"
                   max="10"
                   required
@@ -257,28 +268,26 @@ function AuctionValidationPageContent() {
             {/* ESPN Context */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   ESPN League ID *
                 </label>
-                <input
+                <Input
                   type="text"
                   value={espnLeagueId}
                   onChange={(e) => setEspnLeagueId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="e.g., 123456"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   ESPN Season
                 </label>
-                <input
+                <Input
                   type="number"
                   value={espnSeason}
                   onChange={(e) => setEspnSeason(parseInt(e.target.value, 10))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   min="2020"
                   max={new Date().getFullYear() + 1}
                   required
@@ -286,27 +295,25 @@ function AuctionValidationPageContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   ESPN SWID (optional)
                 </label>
-                <input
+                <Input
                   type="text"
                   value={espnSwid}
                   onChange={(e) => setEspnSwid(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="For private leagues"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-body-sm font-medium text-content mb-2">
                   ESPN S2 (optional)
                 </label>
-                <input
+                <Input
                   type="text"
                   value={espnS2}
                   onChange={(e) => setEspnS2(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="For private leagues"
                 />
               </div>
@@ -314,30 +321,28 @@ function AuctionValidationPageContent() {
 
             {/* Advanced Settings */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-body-sm font-medium text-content mb-2">
                 Maximum Players to Compare
               </label>
-              <input
+              <Input
                 type="number"
                 value={limit}
                 onChange={(e) => setLimit(parseInt(e.target.value, 10))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
                 min="10"
                 max="500"
                 required
+                className="max-w-xs"
               />
             </div>
 
             {/* Categories Selection */}
             <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Scoring Categories
-              </h3>
+              <Heading level={3} className="mb-4">Scoring Categories</Heading>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Batting Categories */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <div className="border border-neutral-200 rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content mb-3">
                     Batting Categories
                   </h4>
                   <div className="space-y-2">
@@ -349,9 +354,9 @@ function AuctionValidationPageContent() {
                             type="checkbox"
                             checked={selectedCategories.has(cat.stat_key)}
                             onChange={() => handleCategoryToggle(cat.stat_key)}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
                           />
-                          <span className="ml-2 text-sm text-gray-700">
+                          <span className="ml-2 text-body-sm text-content">
                             {cat.name} ({cat.type})
                           </span>
                         </label>
@@ -360,8 +365,8 @@ function AuctionValidationPageContent() {
                 </div>
 
                 {/* Pitching Categories */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <div className="border border-neutral-200 rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content mb-3">
                     Pitching Categories
                   </h4>
                   <div className="space-y-2">
@@ -373,9 +378,9 @@ function AuctionValidationPageContent() {
                             type="checkbox"
                             checked={selectedCategories.has(cat.stat_key)}
                             onChange={() => handleCategoryToggle(cat.stat_key)}
-                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
                           />
-                          <span className="ml-2 text-sm text-gray-700">
+                          <span className="ml-2 text-body-sm text-content">
                             {cat.name} ({cat.type})
                           </span>
                         </label>
@@ -385,7 +390,7 @@ function AuctionValidationPageContent() {
               </div>
 
               {selectedCategories.size === 0 && (
-                <p className="mt-2 text-sm text-red-600">
+                <p className="mt-2 text-body-sm text-negative">
                   Please select at least one category
                 </p>
               )}
@@ -393,14 +398,12 @@ function AuctionValidationPageContent() {
 
             {/* Roster Slots Selection */}
             <div className="mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Roster Slots
-              </h3>
+              <Heading level={3} className="mb-4">Roster Slots</Heading>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Position Players */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <div className="border border-neutral-200 rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content mb-3">
                     Position Players
                   </h4>
                   <div className="space-y-2">
@@ -413,18 +416,18 @@ function AuctionValidationPageContent() {
                               type="checkbox"
                               checked={selectedSlots.has(slot.key)}
                               onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
-                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                              className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
                             />
-                            <span className="ml-2 text-sm text-gray-700">
+                            <span className="ml-2 text-body-sm text-content">
                               {slot.label}
                             </span>
                           </label>
                           {selectedSlots.has(slot.key) && (
-                            <input
+                            <Input
                               type="number"
                               value={selectedSlots.get(slot.key)}
                               onChange={(e) => handleSlotCountChange(slot.key, parseInt(e.target.value, 10))}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-16 h-8 px-2 text-body-sm"
                               min="1"
                               max="10"
                             />
@@ -435,8 +438,8 @@ function AuctionValidationPageContent() {
                 </div>
 
                 {/* Pitchers */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <div className="border border-neutral-200 rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content mb-3">
                     Pitchers & Bench
                   </h4>
                   <div className="space-y-2">
@@ -449,18 +452,18 @@ function AuctionValidationPageContent() {
                               type="checkbox"
                               checked={selectedSlots.has(slot.key)}
                               onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
-                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                              className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
                             />
-                            <span className="ml-2 text-sm text-gray-700">
+                            <span className="ml-2 text-body-sm text-content">
                               {slot.label}
                             </span>
                           </label>
                           {selectedSlots.has(slot.key) && (
-                            <input
+                            <Input
                               type="number"
                               value={selectedSlots.get(slot.key)}
                               onChange={(e) => handleSlotCountChange(slot.key, parseInt(e.target.value, 10))}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-16 h-8 px-2 text-body-sm"
                               min="1"
                               max="10"
                             />
@@ -472,7 +475,7 @@ function AuctionValidationPageContent() {
               </div>
 
               {selectedSlots.size === 0 && (
-                <p className="mt-2 text-sm text-red-600">
+                <p className="mt-2 text-body-sm text-negative">
                   Please select at least one roster slot
                 </p>
               )}
@@ -480,187 +483,163 @@ function AuctionValidationPageContent() {
 
             {/* Submit Button */}
             <div className="flex justify-end">
-              <button
+              <Button
                 type="submit"
+                variant="primary"
                 disabled={loading}
-                className="px-6 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Validating..." : "Validate Values"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8">
-            <div className="flex">
-              <svg
-                className="h-5 w-5 text-red-400 mr-2"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <div>
-                <h3 className="text-sm font-medium text-red-800">Validation Error</h3>
-                <p className="mt-1 text-sm text-red-700">{error}</p>
-              </div>
+      {/* Error Display */}
+      {error && (
+        <div className="bg-negative-light border border-negative-border rounded-card p-4 mb-8">
+          <div className="flex">
+            <XCircle className="h-5 w-5 text-negative mr-2 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-body-sm font-medium text-negative">Validation Error</h3>
+              <p className="mt-1 text-body-sm text-negative opacity-75">{error}</p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Loading Spinner */}
-        {loading && (
-          <div className="flex items-center justify-center py-12">
-            <svg
-              className="animate-spin h-12 w-12 text-purple-600"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              ></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          </div>
-        )}
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner />
+        </div>
+      )}
 
-        {/* Results Display */}
-        {results && !loading && (
-          <>
-            {/* Summary Statistics */}
-            <div className="bg-white shadow rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Summary Statistics</h2>
-
+      {/* Results Display */}
+      {results && !loading && (
+        <>
+          {/* Summary Statistics */}
+          <Card className="mb-8">
+            <CardHeader>
+              <Heading level={2}>Summary Statistics</Heading>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Players Compared</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">Players Compared</div>
+                  <div className="text-2xl font-bold text-content">
                     {results.summary.totalCompared}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Mean Delta</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">Mean Delta</div>
+                  <div className={cn("text-2xl font-bold", getDeltaClass(results.summary.meanDelta))}>
                     ${results.summary.meanDelta.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Median Delta</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">Median Delta</div>
+                  <div className={cn("text-2xl font-bold", getDeltaClass(results.summary.medianDelta))}>
                     ${results.summary.medianDelta.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">RMSE</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">RMSE</div>
+                  <div className="text-2xl font-bold text-content">
                     ${results.summary.rmse.toFixed(2)}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Correlation</div>
-                  <div className="text-2xl font-bold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">Correlation</div>
+                  <div className="text-2xl font-bold text-content">
                     {results.summary.correlation.toFixed(3)}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">Our Top Player</div>
-                  <div className="text-lg font-semibold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">Our Top Player</div>
+                  <div className="text-lg font-semibold text-content">
                     {results.summary.ourTopPlayer.name}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <div className="text-body-sm text-content-secondary mt-1">
                     ${results.summary.ourTopPlayer.value}
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="text-sm text-gray-600 mb-1">ESPN Top Player</div>
-                  <div className="text-lg font-semibold text-gray-900">
+                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
+                  <div className="text-body-sm text-content-secondary mb-1">ESPN Top Player</div>
+                  <div className="text-lg font-semibold text-content">
                     {results.summary.espnTopPlayer.name}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <div className="text-body-sm text-content-secondary mt-1">
                     ${results.summary.espnTopPlayer.value}
                   </div>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Comparison Table */}
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Player-by-Player Comparison
-              </h2>
-
+          {/* Comparison Table */}
+          <Card>
+            <CardHeader>
+              <Heading level={2}>Player-by-Player Comparison</Heading>
+            </CardHeader>
+            <CardContent>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-neutral-100">
+                  <thead className="bg-surface-secondary">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         Player
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         Positions
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         ESPN Value
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         Our Value
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         Delta ($)
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                         Delta (%)
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-neutral-100">
                     {results.comparisons.map((comp, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <tr key={idx} className="hover:bg-surface-secondary transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content">
                           {comp.playerName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
                           {comp.positions.join(", ")}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content text-right">
                           ${comp.espnValue}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content text-right">
                           ${comp.ourValue}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${
-                          comp.absoluteDelta > 0 ? 'text-green-600' : comp.absoluteDelta < 0 ? 'text-red-600' : 'text-gray-600'
-                        }`}>
+                        <td className={cn(
+                          "px-6 py-4 whitespace-nowrap text-data font-medium text-right",
+                          getDeltaClass(comp.absoluteDelta)
+                        )}>
                           {comp.absoluteDelta > 0 ? '+' : ''}${comp.absoluteDelta.toFixed(2)}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${
-                          comp.percentDelta > 0 ? 'text-green-600' : comp.percentDelta < 0 ? 'text-red-600' : 'text-gray-600'
-                        }`}>
+                        <td className={cn(
+                          "px-6 py-4 whitespace-nowrap text-data text-right",
+                          getDeltaClass(comp.percentDelta)
+                        )}>
                           {comp.percentDelta > 0 ? '+' : ''}{comp.percentDelta.toFixed(1)}%
                         </td>
                       </tr>
@@ -671,14 +650,14 @@ function AuctionValidationPageContent() {
 
               {results.comparisons.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-sm text-gray-500">No players found to compare</p>
+                  <p className="text-body-sm text-content-secondary">No players found to compare</p>
                 </div>
               )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </Container>
   );
 }
 
