@@ -338,8 +338,18 @@ export class DraftRankingsAgent {
       let primaryPosition = player.positions[0] || "UTIL";
 
       // Calculate VBD for each position the player is eligible for
+      // Map DH → UTIL since DH isn't a roster slot (DH players compete for UTIL)
+      const rosterPositions = new Set<string>();
       for (const pos of player.positions) {
-        const replacementSGP = replacementSGPs[pos] || 0;
+        if (pos in replacementSGPs) {
+          rosterPositions.add(pos);
+        } else if (pos === "DH" && "UTIL" in replacementSGPs) {
+          rosterPositions.add("UTIL");
+        }
+      }
+
+      for (const pos of rosterPositions) {
+        const replacementSGP = replacementSGPs[pos];
         const vbd = calculateVBD(player.sgpTotal, replacementSGP);
 
         if (vbd > maxVBD) {
