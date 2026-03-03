@@ -9,57 +9,65 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { cn } from "@/lib/cn";
+import { CHART_THEME } from "@/lib/chart-theme";
 
 interface CategoryMiniChartProps {
   data: Array<{ date: string; rank: number }>;
   height?: number;
   teamColor?: string;
   label?: string;
+  className?: string;
 }
 
 export function CategoryMiniChart({
   data,
   height = 120,
-  teamColor = "#3b82f6",
+  teamColor = CHART_THEME.colors[0],
   label,
+  className,
 }: CategoryMiniChartProps) {
   if (data.length === 0) {
     return (
-      <div className="text-center py-4 text-sm text-gray-500">
+      <div className={cn("text-center py-4 text-body-sm text-content-tertiary", className)}>
         No trend data available
       </div>
     );
   }
 
   return (
-    <div>
+    <div className={cn(className)}>
       {label && (
-        <h4 className="text-sm font-medium text-gray-700 mb-1">{label}</h4>
+        <h4 className="text-body-sm font-medium text-content mb-1">{label}</h4>
       )}
       <ResponsiveContainer width="100%" height={height}>
         <LineChart
           data={data}
           margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+          <CartesianGrid
+            strokeDasharray={CHART_THEME.grid.strokeDasharray}
+            stroke={CHART_THEME.grid.stroke}
+            opacity={0.3}
+          />
           <XAxis
             dataKey="date"
             hide
             tick={false}
-            axisLine={{ stroke: "#e5e7eb" }}
+            axisLine={{ stroke: CHART_THEME.grid.stroke }}
           />
           <YAxis
             reversed
             domain={[1, "dataMax"]}
-            tick={{ fontSize: 11 }}
-            axisLine={{ stroke: "#e5e7eb" }}
-            tickLine={{ stroke: "#e5e7eb" }}
+            tick={CHART_THEME.axis.tick}
+            axisLine={{ stroke: CHART_THEME.grid.stroke }}
+            tickLine={{ stroke: CHART_THEME.grid.stroke }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "rgba(255, 255, 255, 0.95)",
-              border: "1px solid #e5e7eb",
-              borderRadius: "6px",
+              backgroundColor: CHART_THEME.tooltip.backgroundColor,
+              border: `1px solid ${CHART_THEME.tooltip.borderColor}`,
+              borderRadius: `${CHART_THEME.tooltip.borderRadius}px`,
               padding: "8px 12px",
             }}
             labelFormatter={(date) =>

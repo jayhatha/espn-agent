@@ -1,5 +1,7 @@
 "use client";
 
+import { CheckCircleIcon, AlertTriangleIcon } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { ScarcityBadge, getScarcityLevel } from "./ScarcityBadge";
 import {
   formatStatValue,
@@ -38,22 +40,10 @@ export function TeamHealthOverview({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Strengths Card */}
-      <div className="bg-white shadow rounded-lg p-6 border-t-4 border-green-500">
+      <div className="bg-white shadow-card rounded-card p-6 border-t-4 border-positive">
         <div className="flex items-center gap-2 mb-4">
-          <svg
-            className="h-5 w-5 text-green-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <CheckCircleIcon className="h-5 w-5 text-positive" />
+          <h3 className="text-body-lg font-semibold text-content">
             Top Strengths
           </h3>
         </div>
@@ -63,24 +53,27 @@ export function TeamHealthOverview({
             {strengths.map((cat) => (
               <div
                 key={cat.category_id}
-                className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                className="flex items-center justify-between p-3 bg-positive-light rounded-lg border border-positive-border"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-content">
                       {cat.name}
                     </span>
                     <ScarcityBadge
                       level={getScarcityLevel(cat.rank, totalTeams)}
                     />
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-3 text-body-sm">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRankColor(cat.rank, totalTeams)}`}
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                        getRankColor(cat.rank, totalTeams)
+                      )}
                     >
                       Rank #{cat.rank}
                     </span>
-                    <span className="text-gray-700">
+                    <span className="text-content-secondary">
                       {formatStatValue(cat.value, cat.type, cat.stat_key)}
                     </span>
                   </div>
@@ -89,29 +82,17 @@ export function TeamHealthOverview({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-body-sm text-content-secondary italic">
             No top-tier categories yet
           </p>
         )}
       </div>
 
       {/* Weaknesses Card */}
-      <div className="bg-white shadow rounded-lg p-6 border-t-4 border-red-500">
+      <div className="bg-white shadow-card rounded-card p-6 border-t-4 border-negative">
         <div className="flex items-center gap-2 mb-4">
-          <svg
-            className="h-5 w-5 text-red-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <AlertTriangleIcon className="h-5 w-5 text-negative" />
+          <h3 className="text-body-lg font-semibold text-content">
             Areas for Improvement
           </h3>
         </div>
@@ -121,24 +102,27 @@ export function TeamHealthOverview({
             {weaknesses.map((cat) => (
               <div
                 key={cat.category_id}
-                className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
+                className="flex items-center justify-between p-3 bg-negative-light rounded-lg border border-negative-border"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-content">
                       {cat.name}
                     </span>
                     <ScarcityBadge
                       level={getScarcityLevel(cat.rank, totalTeams)}
                     />
                   </div>
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-3 text-body-sm">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRankColor(cat.rank, totalTeams)}`}
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                        getRankColor(cat.rank, totalTeams)
+                      )}
                     >
                       Rank #{cat.rank}
                     </span>
-                    <span className="text-gray-700">
+                    <span className="text-content-secondary">
                       {formatStatValue(cat.value, cat.type, cat.stat_key)}
                     </span>
                   </div>
@@ -147,7 +131,7 @@ export function TeamHealthOverview({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-body-sm text-content-secondary italic">
             No weak categories—great job!
           </p>
         )}

@@ -4,8 +4,28 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useState, useMemo } from "react";
+import {
+  KeyRoundIcon,
+  RefreshCwIcon,
+  Loader2Icon,
+  TableIcon,
+  TrendingUpIcon,
+  PlusIcon,
+  ArrowRightLeftIcon,
+  BarChart3Icon,
+  ClipboardListIcon,
+  ActivityIcon,
+  DollarSignIcon,
+  XIcon,
+} from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/cn";
+import { Container } from "@/components/ui/Container";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Heading } from "@/components/ui/Heading";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -274,131 +294,94 @@ function LeagueDetailPageContent() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Container size="wide" className="py-8">
         <LoadingSpinner message="Loading league data..." />
-      </div>
+      </Container>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Container size="wide" className="py-8">
         <ErrorAlert
           message={error ? (error as Error).message : "League not found"}
           backLink={{ href: "/leagues", label: "\u2190 Back to leagues" }}
         />
-      </div>
+      </Container>
     );
   }
 
   const { league, latestSnapshot, snapshotCount } = data;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Container size="wide" className="py-8">
       {/* Header */}
       <PageHeader
         title={league.name}
         backLink={{ href: "/leagues", label: "Back to Leagues" }}
         actions={
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setShowAuthModal(true)}
-            className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            <svg
-              className="mr-1.5 h-4 w-4"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-              />
-            </svg>
+            <KeyRoundIcon className="mr-1.5 h-4 w-4" />
             Update Auth
-          </button>
+          </Button>
         }
       />
 
       {/* League metadata row */}
-      <div className="mb-6 flex items-center text-sm text-gray-500 space-x-4">
+      <div className="mb-6 flex items-center text-body-sm text-content-secondary space-x-4">
         <span>
           Season:{" "}
-          <span className="font-medium text-gray-700">{league.season}</span>
+          <span className="font-medium text-content">{league.season}</span>
         </span>
         <span>
           ESPN ID:{" "}
-          <span className="font-medium text-gray-700">
+          <span className="font-medium text-content">
             {league.espn_league_id}
           </span>
         </span>
         <span>
           Timezone:{" "}
-          <span className="font-medium text-gray-700">
+          <span className="font-medium text-content">
             {league.timezone}
           </span>
         </span>
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => createSnapshotMutation.mutate()}
           disabled={createSnapshotMutation.isPending}
-          className="ml-auto inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+          className="ml-auto"
         >
-          <svg
-            className={`-ml-0.5 mr-1.5 h-3.5 w-3.5 ${createSnapshotMutation.isPending ? "animate-spin" : ""}`}
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          <RefreshCwIcon
+            className={cn(
+              "-ml-0.5 mr-1.5 h-3.5 w-3.5",
+              createSnapshotMutation.isPending ? "animate-spin" : ""
+            )}
+          />
           {createSnapshotMutation.isPending ? "Refreshing..." : "Refresh Snapshot"}
-        </button>
+        </Button>
       </div>
 
       {/* Initial Snapshot Banner */}
       {showSnapshotBanner && (
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="mb-6 bg-info-light border border-info-border rounded-lg p-4">
           <div className="flex items-start">
-            <svg
-              className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0 animate-spin"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            <Loader2Icon className="h-5 w-5 text-info mt-0.5 mr-3 flex-shrink-0 animate-spin" />
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-blue-800">
+              <h3 className="text-body-sm font-medium text-info">
                 Initial snapshot in progress
               </h3>
-              <p className="mt-1 text-sm text-blue-700">
+              <p className="mt-1 text-body-sm text-info">
                 We're fetching your league data from ESPN. This may take a
                 minute. The page will update automatically when complete.
               </p>
               <button
                 onClick={() => setShowSnapshotBanner(false)}
-                className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline"
+                className="mt-2 text-xs text-info hover:underline"
               >
                 Dismiss
               </button>
@@ -408,100 +391,69 @@ function LeagueDetailPageContent() {
       )}
 
       {/* Team Selector */}
-      <div className="bg-white shadow rounded-lg p-6 mb-8">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Your Team</h2>
-        {teamsData && teamsData.teams.length > 0 ? (
-          <TeamSelector
-            leagueId={leagueId}
-            teams={teamsData.teams}
-            selectedTeamId={selectedTeamId}
-            onSelect={handleTeamSelect}
-            autoDetectedTeamId={data.league.user_team_id}
-            loading={teamsLoading}
-            error={!!teamsError}
-          />
-        ) : teamsLoading ? (
-          <TeamSelector
-            leagueId={leagueId}
-            teams={[]}
-            selectedTeamId={null}
-            onSelect={handleTeamSelect}
-            loading={true}
-          />
-        ) : teamsError ? (
-          <TeamSelector
-            leagueId={leagueId}
-            teams={[]}
-            selectedTeamId={null}
-            onSelect={handleTeamSelect}
-            error={true}
-          />
-        ) : (
-          <div>
-            <div className="text-sm text-gray-600 mb-4">
-              No teams found. Create a snapshot to sync league data from ESPN.
-            </div>
-            {createSnapshotMutation.isError && (
-              <div className="mb-4">
-                <ErrorAlert
-                  message={
-                    (createSnapshotMutation.error as Error).message
-                  }
-                />
-              </div>
-            )}
-            <button
-              onClick={() => createSnapshotMutation.mutate()}
-              disabled={createSnapshotMutation.isPending}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {createSnapshotMutation.isPending ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Creating Snapshot...
-                </>
-              ) : (
-                <>
-                  <svg
-                    className="-ml-1 mr-2 h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                  Create Snapshot
-                </>
+      <Card className="mb-8">
+        <CardContent>
+          <Heading level={2} className="mb-4">Your Team</Heading>
+          {teamsData && teamsData.teams.length > 0 ? (
+            <TeamSelector
+              leagueId={leagueId}
+              teams={teamsData.teams}
+              selectedTeamId={selectedTeamId}
+              onSelect={handleTeamSelect}
+              autoDetectedTeamId={data.league.user_team_id}
+              loading={teamsLoading}
+              error={!!teamsError}
+            />
+          ) : teamsLoading ? (
+            <TeamSelector
+              leagueId={leagueId}
+              teams={[]}
+              selectedTeamId={null}
+              onSelect={handleTeamSelect}
+              loading={true}
+            />
+          ) : teamsError ? (
+            <TeamSelector
+              leagueId={leagueId}
+              teams={[]}
+              selectedTeamId={null}
+              onSelect={handleTeamSelect}
+              error={true}
+            />
+          ) : (
+            <div>
+              <p className="text-body-sm text-content-secondary mb-4">
+                No teams found. Create a snapshot to sync league data from ESPN.
+              </p>
+              {createSnapshotMutation.isError && (
+                <div className="mb-4">
+                  <ErrorAlert
+                    message={
+                      (createSnapshotMutation.error as Error).message
+                    }
+                  />
+                </div>
               )}
-            </button>
-          </div>
-        )}
-      </div>
+              <Button
+                onClick={() => createSnapshotMutation.mutate()}
+                disabled={createSnapshotMutation.isPending}
+              >
+                {createSnapshotMutation.isPending ? (
+                  <>
+                    <Loader2Icon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                    Creating Snapshot...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCwIcon className="-ml-1 mr-2 h-4 w-4" />
+                    Create Snapshot
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Degraded Warning */}
       {latestSnapshot?.is_degraded &&
@@ -523,9 +475,11 @@ function LeagueDetailPageContent() {
       {selectedTeamId && (
         <div className="mb-8">
           {teamOverviewLoading ? (
-            <div className="bg-white shadow rounded-lg p-6">
-              <LoadingSkeleton lines={2} />
-            </div>
+            <Card>
+              <CardContent>
+                <LoadingSkeleton lines={2} />
+              </CardContent>
+            </Card>
           ) : teamOverviewError ? (
             <ErrorAlert
               message={(teamOverviewError as Error).message}
@@ -534,497 +488,363 @@ function LeagueDetailPageContent() {
             <>
               {/* Overall Standing Banner */}
               {teamOverview.overall && (
-                <div className="bg-white shadow rounded-lg p-6 mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900">
-                        {teamOverview.team.name}
-                      </h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Snapshot:{" "}
-                        {teamOverview.snapshotDate.split("T")[0]}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-8">
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-gray-500">
-                          Overall Rank
-                        </p>
-                        <p className="text-3xl font-bold text-gray-900">
-                          {teamOverview.overall.overall_rank}
-                          <span className="text-lg font-normal text-gray-400">
-                            /{teamOverview.overall.total_teams}
-                          </span>
+                <Card className="mb-6">
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Heading level={2}>
+                          {teamOverview.team.name}
+                        </Heading>
+                        <p className="text-body-sm text-content-secondary mt-1">
+                          Snapshot:{" "}
+                          {teamOverview.snapshotDate.split("T")[0]}
                         </p>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm font-medium text-gray-500">
-                          Total Points
-                        </p>
-                        <p className="text-3xl font-bold text-blue-600">
-                          {Number(teamOverview.overall.overall_points)}
-                        </p>
+                      <div className="flex items-center space-x-8">
+                        <div className="text-center">
+                          <p className="text-body-sm font-medium text-content-secondary">
+                            Overall Rank
+                          </p>
+                          <p className="text-3xl font-bold text-content">
+                            {teamOverview.overall.overall_rank}
+                            <span className="text-lg font-normal text-content-tertiary">
+                              /{teamOverview.overall.total_teams}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-body-sm font-medium text-content-secondary">
+                            Total Points
+                          </p>
+                          <p className="text-3xl font-bold text-content">
+                            {Number(teamOverview.overall.overall_points)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-grid mb-6">
                 <StatCard
                   label="Total Snapshots"
                   value={snapshotCount}
                   icon={
-                    <svg
-                      className="h-8 w-8 text-blue-600"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
+                    <TableIcon className="h-8 w-8 text-content-secondary" />
                   }
                 />
                 <StatCard
                   label="Latest Snapshot"
                   value={latestSnapshot ? latestSnapshot.snapshot_date : "None"}
                   icon={
-                    <svg
-                      className={`h-8 w-8 ${latestSnapshot ? "text-green-600" : "text-gray-400"}`}
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <ActivityIcon
+                      className={cn(
+                        "h-8 w-8",
+                        latestSnapshot ? "text-positive" : "text-content-tertiary"
+                      )}
+                    />
                   }
                 />
                 <StatCard
                   label="Status"
                   value={latestSnapshot?.is_degraded ? "Degraded" : "Healthy"}
                   icon={
-                    <svg
-                      className={`h-8 w-8 ${latestSnapshot?.is_degraded ? "text-yellow-600" : "text-green-600"}`}
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      />
-                    </svg>
+                    <BarChart3Icon
+                      className={cn(
+                        "h-8 w-8",
+                        latestSnapshot?.is_degraded ? "text-warning" : "text-positive"
+                      )}
+                    />
                   }
                 />
               </div>
 
               {/* Health Overview + Mini Chart - Two-column grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-grid mb-6">
                 <div className="lg:col-span-2">
                   <TeamHealthOverview
                     categories={teamOverview.categories}
                     totalTeams={teamOverview.overall?.total_teams ?? 10}
                   />
                 </div>
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-gray-900 mb-4">Standings Trend</h3>
-                  <CategoryMiniChart data={miniChartData} />
-                </div>
+                <Card>
+                  <CardContent>
+                    <Heading level={3} className="text-body-sm mb-4">Standings Trend</Heading>
+                    <CategoryMiniChart data={miniChartData} />
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Action Items */}
               {actionItems.length > 0 && (
-                <div className="bg-white shadow rounded-lg p-6 mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-medium text-gray-900">Recommended Actions</h2>
-                    <div className="flex gap-2">
-                      <Link href={`/leagues/${leagueId}/waivers`} className="text-sm text-blue-600 hover:text-blue-700">All Waivers →</Link>
-                      <Link href={`/leagues/${leagueId}/trades`} className="text-sm text-blue-600 hover:text-blue-700">All Trades →</Link>
+                <Card className="mb-6">
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <Heading level={2}>Recommended Actions</Heading>
+                      <div className="flex gap-2">
+                        <Link href={`/leagues/${leagueId}/waivers`} className="text-body-sm text-content-secondary hover:text-content transition-colors">All Waivers &rarr;</Link>
+                        <Link href={`/leagues/${leagueId}/trades`} className="text-body-sm text-content-secondary hover:text-content transition-colors">All Trades &rarr;</Link>
+                      </div>
                     </div>
-                  </div>
-                  <ActionItemsList items={actionItems} maxItems={5} />
-                </div>
+                    <ActionItemsList items={actionItems} maxItems={5} />
+                  </CardContent>
+                </Card>
               )}
 
               {/* Category Stats Table */}
-              <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <CategoryStatsTable
-                  title="Category Stats"
-                  categories={teamOverview.categories}
-                  totalTeams={teamOverview.overall?.total_teams ?? 10}
-                />
-              </div>
+              <Card className="mb-6">
+                <CardContent>
+                  <CategoryStatsTable
+                    title="Category Stats"
+                    categories={teamOverview.categories}
+                    totalTeams={teamOverview.overall?.total_teams ?? 10}
+                  />
+                </CardContent>
+              </Card>
 
-              {/* Quick Actions - moved below category table */}
-              <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Quick Actions
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Link
-                    href={`/leagues/${leagueId}/standings`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-indigo-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+              {/* Quick Actions */}
+              <Card className="mb-6">
+                <CardContent>
+                  <Heading level={2} className="mb-4">
+                    Quick Actions
+                  </Heading>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-grid">
+                    <Link
+                      href={`/leagues/${leagueId}/standings`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Standings</span>
-                  </Link>
+                      <TableIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Standings</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/trends`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-blue-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/trends`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">View Trends</span>
-                  </Link>
+                      <TrendingUpIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">View Trends</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/waivers`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-green-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/waivers`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Waivers</span>
-                  </Link>
+                      <PlusIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Waivers</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/trades`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-purple-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/trades`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Trade Analyzer</span>
-                  </Link>
+                      <ArrowRightLeftIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Trade Analyzer</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/moves`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-rose-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/moves`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Move Impact</span>
-                  </Link>
+                      <BarChart3Icon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Move Impact</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/lineup`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-amber-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/lineup`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Lineup Optimizer</span>
-                  </Link>
+                      <ClipboardListIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Lineup Optimizer</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/streaming`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-cyan-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/streaming`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Streaming Pitchers</span>
-                  </Link>
+                      <ActivityIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Streaming Pitchers</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/draft/rankings`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-orange-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/draft/rankings`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Draft Rankings</span>
-                  </Link>
+                      <BarChart3Icon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Draft Rankings</span>
+                    </Link>
 
-                  <Link
-                    href={`/leagues/${leagueId}/draft/auction`}
-                    className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6 text-emerald-600 mr-3"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <Link
+                      href={`/leagues/${leagueId}/draft/auction`}
+                      className="flex items-center p-4 border border-neutral-200 rounded-card hover:bg-surface-secondary transition-colors"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <span className="font-medium text-gray-900">Auction Values</span>
-                  </Link>
-                </div>
-              </div>
+                      <DollarSignIcon className="h-6 w-6 text-content-secondary mr-3" />
+                      <span className="font-medium text-content">Auction Values</span>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Roster Section */}
-              <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Roster
-                </h2>
-                {teamOverview.roster.length > 0 && groupedRoster ? (
-                  <div className="space-y-6">
-                    {/* Active Lineup */}
-                    {groupedRoster.active.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                          Active Lineup ({groupedRoster.active.length})
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-16">
-                                  Slot
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Player
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Team
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Positions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {groupedRoster.active.map((p) => (
-                                <tr key={p.player_id}>
-                                  <td className="px-4 py-2 text-sm font-medium text-gray-500 w-16">
-                                    {p.roster_slot}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                    {p.player_name}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {p.mlb_team || "-"}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {(p.positions || []).join(", ")}
-                                  </td>
+              <Card className="mb-6">
+                <CardContent>
+                  <Heading level={2} className="mb-4">
+                    Roster
+                  </Heading>
+                  {teamOverview.roster.length > 0 && groupedRoster ? (
+                    <div className="space-y-6">
+                      {/* Active Lineup */}
+                      {groupedRoster.active.length > 0 && (
+                        <div>
+                          <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider mb-2">
+                            Active Lineup ({groupedRoster.active.length})
+                          </h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-neutral-200">
+                              <thead className="bg-surface-secondary">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase w-16">
+                                    Slot
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Player
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Team
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Positions
+                                  </th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-neutral-100">
+                                {groupedRoster.active.map((p) => (
+                                  <tr key={p.player_id}>
+                                    <td className="px-4 py-2 text-body-sm font-medium text-content-secondary w-16">
+                                      {p.roster_slot}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm font-medium text-content">
+                                      {p.player_name}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {p.mlb_team || "-"}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {(p.positions || []).join(", ")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Bench */}
-                    {groupedRoster.bench.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                          Bench ({groupedRoster.bench.length})
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase w-16">
-                                  Slot
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Player
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Team
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                                  Positions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {groupedRoster.bench.map((p) => (
-                                <tr key={p.player_id}>
-                                  <td className="px-4 py-2 text-sm font-medium text-gray-400 w-16">
-                                    BE
-                                  </td>
-                                  <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                    {p.player_name}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {p.mlb_team || "-"}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {(p.positions || []).join(", ")}
-                                  </td>
+                      {/* Bench */}
+                      {groupedRoster.bench.length > 0 && (
+                        <div>
+                          <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider mb-2">
+                            Bench ({groupedRoster.bench.length})
+                          </h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-neutral-200">
+                              <thead className="bg-surface-secondary">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase w-16">
+                                    Slot
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Player
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Team
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-content-secondary uppercase">
+                                    Positions
+                                  </th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-neutral-100">
+                                {groupedRoster.bench.map((p) => (
+                                  <tr key={p.player_id}>
+                                    <td className="px-4 py-2 text-body-sm font-medium text-content-tertiary w-16">
+                                      BE
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm font-medium text-content">
+                                      {p.player_name}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {p.mlb_team || "-"}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {(p.positions || []).join(", ")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Injured List */}
-                    {groupedRoster.il.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-red-700 uppercase tracking-wider mb-2">
-                          Injured List ({groupedRoster.il.length})
-                        </h3>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-red-50">
-                              <tr>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-red-500 uppercase w-16">
-                                  Slot
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-red-500 uppercase">
-                                  Player
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-red-500 uppercase">
-                                  Team
-                                </th>
-                                <th className="px-4 py-2 text-left text-xs font-medium text-red-500 uppercase">
-                                  Positions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {groupedRoster.il.map((p) => (
-                                <tr
-                                  key={p.player_id}
-                                  className="bg-red-50/30"
-                                >
-                                  <td className="px-4 py-2 text-sm font-medium text-red-400 w-16">
-                                    IL
-                                  </td>
-                                  <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                    {p.player_name}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {p.mlb_team || "-"}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-gray-500">
-                                    {(p.positions || []).join(", ")}
-                                  </td>
+                      {/* Injured List */}
+                      {groupedRoster.il.length > 0 && (
+                        <div>
+                          <h3 className="text-body-sm font-semibold text-negative uppercase tracking-wider mb-2">
+                            Injured List ({groupedRoster.il.length})
+                          </h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-neutral-200">
+                              <thead className="bg-negative-light">
+                                <tr>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase w-16">
+                                    Slot
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                                    Player
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                                    Team
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-xs font-medium text-negative uppercase">
+                                    Positions
+                                  </th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody className="divide-y divide-neutral-100">
+                                {groupedRoster.il.map((p) => (
+                                  <tr
+                                    key={p.player_id}
+                                    className="bg-negative-light/30"
+                                  >
+                                    <td className="px-4 py-2 text-body-sm font-medium text-negative w-16">
+                                      IL
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm font-medium text-content">
+                                      {p.player_name}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {p.mlb_team || "-"}
+                                    </td>
+                                    <td className="px-4 py-2 text-body-sm text-content-secondary">
+                                      {(p.positions || []).join(", ")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No roster data available for this snapshot.
-                  </p>
-                )}
-              </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-body-sm text-content-secondary">
+                      No roster data available for this snapshot.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </>
           ) : null}
         </div>
@@ -1040,39 +860,26 @@ function LeagueDetailPageContent() {
 
       {/* Auth Update Modal */}
       {showAuthModal && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-lg w-full p-6">
+        <div className="fixed inset-0 bg-neutral-900/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-card max-w-lg w-full p-6 shadow-card">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
+              <Heading level={3}>
                 Update ESPN Authentication
-              </h3>
+              </Heading>
               <button
                 onClick={() => setShowAuthModal(false)}
-                className="text-gray-400 hover:text-gray-500"
+                className="text-content-tertiary hover:text-content-secondary transition-colors"
               >
-                <svg
-                  className="h-6 w-6"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <XIcon className="h-6 w-6" />
               </button>
             </div>
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-body-sm text-content-secondary mb-4">
                 For private leagues, you'll need to provide your ESPN cookies.
                 Find these in your browser's DevTools:
               </p>
-              <ol className="text-sm text-gray-600 space-y-1 ml-5 list-decimal">
+              <ol className="text-body-sm text-content-secondary space-y-1 ml-5 list-decimal">
                 <li>Log into ESPN Fantasy Baseball</li>
                 <li>Open DevTools (F12)</li>
                 <li>Go to Application/Storage &rarr; Cookies</li>
@@ -1094,50 +901,48 @@ function LeagueDetailPageContent() {
               <div>
                 <label
                   htmlFor="swid"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-body-sm font-medium text-content mb-1"
                 >
                   SWID
                 </label>
-                <input
+                <Input
                   type="text"
                   id="swid"
                   value={authSwid}
                   onChange={(e) => setAuthSwid(e.target.value)}
                   placeholder="{12345678-ABCD-1234-ABCD-123456789ABC}"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="espn_s2"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-body-sm font-medium text-content mb-1"
                 >
                   espn_s2
                 </label>
-                <input
+                <Input
                   type="text"
                   id="espn_s2"
                   value={authS2}
                   onChange={(e) => setAuthS2(e.target.value)}
                   placeholder="AEBx..."
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
                 />
               </div>
             </div>
 
             <div className="mt-6 flex justify-end space-x-3">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setShowAuthModal(false);
                   setAuthSwid("");
                   setAuthS2("");
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() =>
                   updateAuthMutation.mutate({
                     SWID: authSwid,
@@ -1147,14 +952,13 @@ function LeagueDetailPageContent() {
                 disabled={
                   updateAuthMutation.isPending || !authSwid || !authS2
                 }
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {updateAuthMutation.isPending ? "Updating..." : "Update"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

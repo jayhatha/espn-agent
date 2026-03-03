@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/cn";
+
 interface CategoryData {
   category_id?: string;
   name: string;
@@ -39,10 +41,10 @@ function formatStatValue(
 
 function getRankColor(rank: number, total: number): string {
   const ratio = rank / total;
-  if (ratio <= 0.25) return "text-green-700 bg-green-50";
-  if (ratio <= 0.5) return "text-green-600 bg-green-50/50";
-  if (ratio <= 0.75) return "text-yellow-700 bg-yellow-50";
-  return "text-red-700 bg-red-50";
+  if (ratio <= 0.25) return "text-positive bg-positive-light";
+  if (ratio <= 0.5) return "text-positive bg-positive-light/50";
+  if (ratio <= 0.75) return "text-warning bg-warning-light";
+  return "text-negative bg-negative-light";
 }
 
 export function CategoryStatsTable({
@@ -53,7 +55,7 @@ export function CategoryStatsTable({
 }: CategoryStatsTableProps) {
   if (categories.length === 0) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-body-sm text-content-secondary">
         No category data available for this snapshot.
       </p>
     );
@@ -62,58 +64,61 @@ export function CategoryStatsTable({
   return (
     <div>
       {title && (
-        <h2 className="text-lg font-medium text-gray-900 mb-4">{title}</h2>
+        <h2 className="text-body-lg font-medium text-content mb-4">{title}</h2>
       )}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-neutral-200">
+          <thead className="bg-surface-secondary">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                 Category
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                 Value
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-center text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                 Rank
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                 Roto Pts
               </th>
               {showProjected && (
                 <>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Proj. Value
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Proj. Rank
                   </th>
                 </>
               )}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-neutral-100">
             {categories.map((cat) => (
-              <tr key={cat.category_id || cat.name}>
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+              <tr key={cat.category_id || cat.name} className="border-b border-neutral-100">
+                <td className="px-4 py-3 whitespace-nowrap text-body-sm font-medium text-content">
                   {cat.name}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
+                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right text-content">
                   {formatStatValue(cat.value, cat.type, cat.stat_key)}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
+                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-center">
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRankColor(cat.rank, totalTeams)}`}
+                    className={cn(
+                      "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                      getRankColor(cat.rank, totalTeams)
+                    )}
                   >
                     #{cat.rank}
                   </span>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right font-semibold text-content">
                   {Number(cat.roto_points)}
                 </td>
                 {showProjected && (
                   <>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-700">
+                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-right text-content-secondary">
                       {cat.projected_value != null
                         ? formatStatValue(
                             cat.projected_value,
@@ -122,10 +127,13 @@ export function CategoryStatsTable({
                           )
                         : "-"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
+                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-center">
                       {cat.projected_rank != null ? (
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRankColor(cat.projected_rank, totalTeams)}`}
+                          className={cn(
+                            "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                            getRankColor(cat.projected_rank, totalTeams)
+                          )}
                         >
                           #{cat.projected_rank}
                         </span>

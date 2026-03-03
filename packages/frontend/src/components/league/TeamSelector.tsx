@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { CheckCircleIcon } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Text } from "@/components/ui/Text";
+import { Select } from "@/components/ui/Select";
 
 interface TeamOption {
   id: number;
@@ -49,52 +53,41 @@ export function TeamSelector({
   if (loading) {
     return (
       <div className="animate-pulse">
-        <div className="h-10 bg-gray-200 rounded w-full" />
+        <div className="h-10 bg-neutral-200 rounded-lg w-full" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-sm text-red-600">
+      <Text size="sm" color="secondary">
         Failed to load teams. Try refreshing the page.
-      </div>
+      </Text>
     );
   }
 
   if (teams.length === 0) {
     return (
-      <div className="text-sm text-gray-600">
+      <Text size="sm" color="secondary">
         No teams found. Create a snapshot to sync league data from ESPN.
-      </div>
+      </Text>
     );
   }
 
   return (
     <div>
       {autoDetectedTeamId && (
-        <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+        <div className="mb-4 bg-positive-light border border-positive-border rounded-lg p-3">
           <div className="flex items-center">
-            <svg
-              className="h-5 w-5 text-green-400 mr-2"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <CheckCircleIcon className="h-5 w-5 text-positive mr-2 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-green-800">
+              <p className="text-body-sm font-medium text-positive">
                 Team Auto-Detected
               </p>
-              <p className="text-sm text-green-700">
+              <Text size="sm" color="secondary">
                 We automatically detected your team based on your ESPN account.
                 You can change it below if needed.
-              </p>
+              </Text>
             </div>
           </div>
         </div>
@@ -102,17 +95,16 @@ export function TeamSelector({
 
       <label
         htmlFor="team-select"
-        className="block text-sm font-medium text-gray-700 mb-2"
+        className="block text-body-sm font-medium text-content mb-2"
       >
         {autoDetectedTeamId
           ? "Your auto-detected team:"
           : "Select your team to get personalized recommendations:"}
       </label>
-      <select
+      <Select
         id="team-select"
         value={selectedTeamId || ""}
         onChange={(e) => handleSelect(parseInt(e.target.value, 10))}
-        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
       >
         <option value="">-- Select a team --</option>
         {teams.map((team) => (
@@ -120,27 +112,15 @@ export function TeamSelector({
             {team.name}
           </option>
         ))}
-      </select>
+      </Select>
       {!selectedTeamId && !autoDetectedTeamId && (
-        <p className="mt-2 text-sm text-gray-500">
-          Select your team to access waiver recommendations, trade analysis, and
-          projections.
-        </p>
+        <Text size="sm" color="tertiary" className="mt-2">
+          Select your team to access waiver recommendations, trade analysis, and projections.
+        </Text>
       )}
       {selectedTeamId && !autoDetectedTeamId && (
-        <p className="mt-2 text-sm text-green-600 flex items-center">
-          <svg
-            className="mr-1 h-4 w-4"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
+        <p className={cn("mt-2 text-body-sm text-positive flex items-center")}>
+          <CheckCircleIcon className="mr-1 h-4 w-4" />
           Team selected!
         </p>
       )}

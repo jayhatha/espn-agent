@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { ExternalLinkIcon, ClockIcon } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui/Badge";
 
 export interface ActionItem {
   id: string;
@@ -25,52 +28,42 @@ export function ActionItemsList({
   const displayItems = items.slice(0, maxItems);
   const remainingCount = Math.max(0, items.length - maxItems);
 
-  const getPriorityColor = (priority: "high" | "medium" | "low") => {
+  const getPriorityClasses = (priority: "high" | "medium" | "low") => {
     switch (priority) {
       case "high":
-        return "border-l-4 border-l-red-500 bg-red-50";
+        return "border-l-4 border-l-negative bg-negative-light";
       case "medium":
-        return "border-l-4 border-l-yellow-500 bg-yellow-50";
+        return "border-l-4 border-l-warning bg-warning-light";
       case "low":
-        return "border-l-4 border-l-green-500 bg-green-50";
+        return "border-l-4 border-l-positive bg-positive-light";
     }
   };
 
-  const getImpactColor = (impact: string) => {
+  const getImpactClasses = (impact: string) => {
     if (impact.startsWith("+")) {
-      return "text-green-600";
+      return "text-positive font-semibold";
     } else if (impact.startsWith("-")) {
-      return "text-red-600";
+      return "text-negative font-semibold";
     }
-    return "text-gray-500";
+    return "text-content-secondary";
   };
 
-  const getTypeBadgeColor = (type: "waiver" | "trade") => {
-    return type === "waiver"
-      ? "bg-blue-100 text-blue-800"
-      : "bg-purple-100 text-purple-800";
+  const getTypeBadgeVariant = (
+    type: "waiver" | "trade"
+  ): "info" | "default" => {
+    return type === "waiver" ? "info" : "default";
   };
 
   if (items.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+      <div className="border border-neutral-200 rounded-card p-8 text-center">
         <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-          <svg
-            className="w-12 h-12 text-yellow-400"
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <ClockIcon className="w-12 h-12 text-warning" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-body-lg font-semibold text-content mb-2">
           No Recommended Actions
         </h3>
-        <p className="text-sm text-gray-600">
+        <p className="text-body-sm text-content-secondary">
           No recommended actions at this time. Your team is performing well!
         </p>
       </div>
@@ -82,27 +75,26 @@ export function ActionItemsList({
       {displayItems.map((item) => (
         <div
           key={item.id}
-          className={`${getPriorityColor(item.priority)} rounded-lg p-4 border border-gray-200 transition-shadow hover:shadow-md`}
+          className={cn(
+            getPriorityClasses(item.priority),
+            "rounded-lg p-4 border border-neutral-200 transition-shadow hover:shadow-card-hover"
+          )}
         >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             {/* Left side: Type badge, title, description, and impact */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide ${getTypeBadgeColor(item.type)}`}
-                >
+                <Badge variant={getTypeBadgeVariant(item.type)} className="uppercase tracking-wide">
                   {item.type}
-                </span>
-                <span
-                  className={`text-sm font-semibold ${getImpactColor(item.impact)}`}
-                >
+                </Badge>
+                <span className={cn("text-body-sm", getImpactClasses(item.impact))}>
                   {item.impact}
                 </span>
               </div>
-              <h4 className="text-base font-bold text-gray-900 mb-1">
+              <h4 className="text-body font-bold text-content mb-1">
                 {item.title}
               </h4>
-              <p className="text-sm text-gray-600">{item.description}</p>
+              <p className="text-body-sm text-content-secondary">{item.description}</p>
             </div>
 
             {/* Right side: Action buttons */}
@@ -110,7 +102,7 @@ export function ActionItemsList({
               {item.internalLink && (
                 <Link
                   href={item.internalLink}
-                  className="px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors text-center whitespace-nowrap"
+                  className="px-4 py-2 border border-neutral-300 bg-white text-content rounded-lg hover:bg-surface-secondary font-medium text-body-sm transition-colors text-center whitespace-nowrap"
                 >
                   Analyze
                 </Link>
@@ -120,22 +112,10 @@ export function ActionItemsList({
                   href={item.espnLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
+                  className="px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm flex items-center justify-center gap-2 transition-colors whitespace-nowrap"
                 >
                   ESPN
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
+                  <ExternalLinkIcon className="h-4 w-4" />
                 </a>
               )}
             </div>
@@ -145,7 +125,7 @@ export function ActionItemsList({
 
       {remainingCount > 0 && (
         <div className="text-center py-2">
-          <p className="text-sm text-gray-500">
+          <p className="text-body-sm text-content-tertiary">
             and {remainingCount} more recommendation{remainingCount > 1 ? "s" : ""}...
           </p>
         </div>
