@@ -16,6 +16,15 @@ import {
  * - Fairness scoring based on projected standings impact
  */
 
+/** Stat keys that belong to pitching categories (mirrors standings-projection.ts) */
+const PITCHING_STAT_KEYS = new Set([
+  // Pitching counting stats
+  "K", "W", "L", "SV", "HLD", "QS", "CG", "BLSV", "SVO",
+  "ER", "OUTS", "HA", "BBA", "HRA",
+  // Pitching rate stats
+  "ERA", "WHIP", "K9", "WPCT",
+]);
+
 const POSITION_SCARCITY: Record<string, number> = {
   C: 1.5,    // Very scarce - few quality catchers
   SS: 1.2,   // Moderately scarce
@@ -816,23 +825,21 @@ export class TradeRecommendationAgent {
     // Store original values before modifications (for currentValue in CategoryImpact)
     const originalValues = new Map<string, number>();
     for (const category of categories) {
-      const catId = category.statKey;
+      const catId = category.stat_key;
       const current = userTeamCategories.get(catId);
       originalValues.set(catId, current?.value || 0);
     }
 
     // Apply trade adjustments to user team's projected category values
     for (const category of categories) {
-      const catId = category.statKey;
+      const catId = category.stat_key;
       const current = userTeamCategories.get(catId) || {
         value: 0,
         components: null,
       };
 
       // For rate stats, we need to adjust components, not the rate itself
-      const isRateStat = ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"].includes(
-        catId,
-      );
+      const isRateStat = category.type === "RATE";
 
       if (isRateStat) {
         // Handle rate stats with component math
@@ -875,7 +882,7 @@ export class TradeRecommendationAgent {
           // Use calculateFinalRate with empty current components since we've already
           // combined everything into adjustedComponents
           projectedValue = calculateFinalRate(
-            catId.toLowerCase(), // Convert "AVG" to "avg", "ERA" to "era", etc.
+            category.formula_id!, // Use formula_id from Category, not lowercased stat_key
             {}, // Empty current components
             adjustedComponents // All combined components (current + projected - given + received)
           );
@@ -924,7 +931,7 @@ export class TradeRecommendationAgent {
     let projectedOverallPoints = 0;
 
     for (const category of categories) {
-      const catId = category.statKey;
+      const catId = category.stat_key;
 
       // Build array of {teamId, value} for ranking
       const teamValues: Array<{ teamId: number; value: number }> = [];
@@ -987,71 +994,34 @@ export class TradeRecommendationAgent {
 
   private isCategoryRelevant(category: any, projection: any): boolean {
     // Check if the projection has data for this category
-    // Batting categories apply to batters (has AB), pitching to pitchers (has IP)
+    // Pitching categories apply to pitchers (has IP or ER), batting to batters (has AB)
     const components: StatComponents = JSON.parse(projection.stat_components_json);
-    const isBatter = components.AB != null && Number(components.AB) > 0;
-    const isPitcher = components.IP != null && Number(components.IP) > 0;
-
-    const batterCategories = ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"];
-    const pitcherCategories = ["W", "SV", "K", "ERA", "WHIP", "QS", "HLD"];
-
-    if (batterCategories.includes(category.statKey)) {
-      return isBatter;
+    const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
+    if (isPitchingCat) {
+      return (components.IP ?? 0) > 0 || components.ER !== undefined;
+    } else {
+      return (components.AB ?? 0) > 0;
     }
-    if (pitcherCategories.includes(category.statKey)) {
-      return isPitcher;
-    }
-
-    return false;
   }
 
   private getProjectedCategoryValue(category: any, projection: any): number {
-    const statKey = category.statKey;
     const components: StatComponents = JSON.parse(projection.stat_components_json);
 
-    // Map statKey to formula_id for calculateFinalRate
-    const formulaIdMap: Record<string, string> = {
-      AVG: "avg",
-      OBP: "obp",
-      SLG: "slg",
-      OPS: "ops",
-      ERA: "era",
-      WHIP: "whip",
-    };
-
-    // Handle rate stats using shared calculateFinalRate function
-    if (formulaIdMap[statKey]) {
-      return calculateFinalRate(formulaIdMap[statKey], {}, components);
-    }
-
-    // Counting stats - direct access
-    switch (statKey) {
-      case "R":
-        return components.R || 0;
-      case "HR":
-        return components.HR || 0;
-      case "RBI":
-        return components.RBI || 0;
-      case "SB":
-        return components.SB || 0;
-      case "W":
-        return components.W || 0;
-      case "SV":
-        return components.SV || 0;
-      case "K":
-        return components.K || 0;
-      case "QS":
-        return components.QS || 0;
-      case "HLD":
-        return components.HLD || 0;
-      default:
+    // RATE stats: use formula_id with calculateFinalRate
+    if (category.type === "RATE" && category.formula_id) {
+      try {
+        return calculateFinalRate(category.formula_id, {}, components);
+      } catch {
         return 0;
+      }
     }
+
+    // COUNTING: direct component lookup — no switch needed
+    return components[category.stat_key] ?? 0;
   }
 
   private isLowerBetter(category: any): boolean {
-    const lowerBetterCategories = ["ERA", "WHIP"];
-    return lowerBetterCategories.includes(category.statKey);
+    return category.direction === "LOWER_BETTER";
   }
 
   private calculateFairnessScore(
