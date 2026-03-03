@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 17 (Site Redesign - Typography-Driven Design System)
-Plan: 6 of 9 in current phase
+Plan: 7 of 9 in current phase
 Status: In Progress
-Last activity: 2026-03-02 - Completed 17-06-PLAN.md: Trades, waivers, standings pages and impact components (PlayerRow, ScarcityBadge, ImpactBadge, ImpactDetailCard) migrated to design system
+Last activity: 2026-03-02 - Completed 17-07-PLAN.md: Trends, moves, and projections pages migrated with CHART_THEME, design token tables, Badge components, Card layouts
 
-Progress: Phase 17: [██████░░░░] 66% (6 of 9 plans complete)
+Progress: Phase 17: [███████░░░] 77% (7 of 9 plans complete)
 
 ## Performance Metrics
 
@@ -115,6 +115,7 @@ Progress: Phase 17: [██████░░░░] 66% (6 of 9 plans complete)
 | Phase 17 P04 | 4 | 2 tasks | 4 files |
 | Phase 17 P05 | 14 | 2 tasks | 8 files |
 | Phase 17 P06 | 15 | 2 tasks | 7 files |
+| Phase 17 P07 | 4 | 2 tasks | 7 files |
 | Phase 17 P08 | 12 | 2 tasks | 6 files |
 
 ## Accumulated Context
@@ -222,6 +223,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 17]: StatsTable highlightClassName default changed from bg-blue-50 to bg-accent-light to align with design tokens
 - [Phase 17]: All inline SVGs in navigation and shared UI components replaced with lucide-react equivalents for consistency and maintainability
 - [Phase 17]: buttonVariants helper used for Link elements that need Button styling (landing page CTA) — avoids wrapping Link inside Button which creates invalid DOM nesting
+- [Phase 17 P07]: CHART_THEME.colors replaces ad-hoc COLORS array for Recharts series colors — chart line palette managed centrally in chart-theme.ts
+- [Phase 17 P07]: Badge component with variant=positive/info/default replaces MOVE_TYPE_COLORS map for move type labels in tables
+- [Phase 17 P07]: TransactionMarker and InflectionPointMarker use inline style objects for tooltip (not Tailwind classes) since foreignObject in SVG may not process Tailwind correctly
 - [Phase 17]: Container size='wide' used for league dashboard to maximize data density in the most-used page
 - [Phase 17]: lucide-react icons replace all inline SVGs across league pages and components for consistency
 - [Phase 17]: CHART_THEME.colors[0] as default teamColor in CategoryMiniChart aligns chart colors with design tokens
@@ -293,5 +297,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 17-06-PLAN.md - Trades, waivers, standings pages and impact components migrated to design system with Container, Card, Button, semantic tokens, and lucide-react icons
+Stopped at: Completed 17-07-PLAN.md - Trends, moves, and projections pages migrated with CHART_THEME Recharts theming, Badge components, design token table styling, Card layouts
 Resume file: None
