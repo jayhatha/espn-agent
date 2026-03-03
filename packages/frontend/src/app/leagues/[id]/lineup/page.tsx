@@ -8,6 +8,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { TeamSelector } from "@/components/league/TeamSelector";
+import { Container } from "@/components/ui/Container";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/cn";
+import { CheckCircle, AlertTriangle, ArrowLeftRight, TrendingUp } from "lucide-react";
 
 interface Team {
   id: number;
@@ -81,7 +86,7 @@ export default function LineupOptimizerPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <Container className="py-8">
       <PageHeader
         title="Lineup Optimizer"
         subtitle="Daily start/sit recommendations based on today's MLB schedule and RoS projections"
@@ -116,7 +121,7 @@ export default function LineupOptimizerPage() {
             error={true}
           />
         ) : (
-          <div className="text-sm text-gray-600">
+          <div className="text-body-sm text-content-secondary">
             No teams found. Create a snapshot to sync league data from ESPN.
           </div>
         )}
@@ -129,179 +134,138 @@ export default function LineupOptimizerPage() {
           message="Select a team to see lineup recommendations."
         />
       ) : isLoading ? (
-        <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-6">
-          <LoadingSkeleton lines={5} />
-        </div>
+        <Card>
+          <CardContent>
+            <LoadingSkeleton lines={5} />
+          </CardContent>
+        </Card>
       ) : error ? (
-        <div className="bg-white shadow-lg rounded-xl border border-gray-200 p-6">
-          <ErrorAlert
-            message={(error as Error).message}
-            onRetry={() => refetch()}
-          />
-        </div>
+        <Card>
+          <CardContent>
+            <ErrorAlert
+              message={(error as Error).message}
+              onRetry={() => refetch()}
+            />
+          </CardContent>
+        </Card>
       ) : data ? (
         <div className="space-y-6">
           {/* Summary Banner */}
           {data.isOptimal ? (
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6">
-              <div className="flex items-center">
-                <svg
-                  className="h-8 w-8 text-green-600 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div>
-                  <h2 className="text-xl font-bold text-green-900">
-                    Your Lineup is Optimal!
-                  </h2>
-                  <p className="text-sm text-green-700 mt-1">
-                    No recommended changes for today's schedule.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6">
-              <div className="flex items-center justify-between">
+            <Card className="border-positive-border bg-positive-light">
+              <CardContent className="py-5">
                 <div className="flex items-center">
-                  <svg
-                    className="h-8 w-8 text-amber-600 mr-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
+                  <CheckCircle className="h-8 w-8 text-positive mr-3 flex-shrink-0" />
                   <div>
-                    <h2 className="text-xl font-bold text-amber-900">
-                      {data.recommendations.length} Recommended Swap
-                      {data.recommendations.length !== 1 ? "s" : ""}
+                    <h2 className="text-h3 font-semibold text-content">
+                      Your Lineup is Optimal!
                     </h2>
-                    <p className="text-sm text-amber-700 mt-1">
-                      Projected gain: +{data.totalProjectedGain.toFixed(2)} SGP
+                    <p className="text-body-sm text-content-secondary mt-1">
+                      No recommended changes for today's schedule.
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-warning-border bg-warning-light">
+              <CardContent className="py-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-8 w-8 text-warning mr-3 flex-shrink-0" />
+                    <div>
+                      <h2 className="text-h3 font-semibold text-content">
+                        {data.recommendations.length} Recommended Swap
+                        {data.recommendations.length !== 1 ? "s" : ""}
+                      </h2>
+                      <p className="text-body-sm text-content-secondary mt-1">
+                        Projected gain: +{data.totalProjectedGain.toFixed(2)} SGP
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Recommendation Cards */}
           {!data.isOptimal && data.recommendations.length > 0 && (
             <div className="space-y-4">
               {data.recommendations.map((rec, idx) => (
-                <div
-                  key={`${rec.slotName}-${idx}`}
-                  className="bg-white shadow-lg rounded-xl border border-gray-200 p-6"
-                >
-                  {/* Slot Header */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {rec.slotName}
-                    </h3>
-                  </div>
+                <Card key={`${rec.slotName}-${idx}`}>
+                  <CardContent className="py-5">
+                    {/* Slot Header */}
+                    <div className="mb-4">
+                      <h3 className="text-h4 font-semibold text-content">
+                        {rec.slotName}
+                      </h3>
+                    </div>
 
-                  {/* Two-column layout */}
-                  <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-center">
-                    {/* Bench Player (Start) */}
-                    <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
-                      <div className="flex items-center mb-2">
-                        <span className="text-green-700 font-semibold text-xs uppercase tracking-wide">
-                          Start
-                        </span>
+                    {/* Two-column layout */}
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                      {/* Bench Player (Start) */}
+                      <div className="border-2 border-positive-border rounded-lg p-4 bg-positive-light">
+                        <div className="flex items-center mb-2">
+                          <Badge variant="positive" className="text-xs uppercase tracking-wide">
+                            Start
+                          </Badge>
+                        </div>
+                        <div className="font-bold text-lg text-content mb-1">
+                          {rec.benchPlayerName}
+                        </div>
+                        <div className="text-body-sm text-content-secondary mb-2">
+                          {rec.benchPlayerPositions.join(", ")}
+                        </div>
+                        <div className="text-2xl font-bold text-positive">
+                          {rec.benchPlayerProjectedValue.toFixed(2)}
+                        </div>
                       </div>
-                      <div className="font-bold text-lg text-gray-900 mb-1">
-                        {rec.benchPlayerName}
+
+                      {/* Arrow */}
+                      <div className="flex justify-center">
+                        <ArrowLeftRight className="w-8 h-8 text-content-tertiary rotate-90 md:rotate-0" />
                       </div>
-                      <div className="text-sm text-gray-600 mb-2">
-                        {rec.benchPlayerPositions.join(", ")}
-                      </div>
-                      <div className="text-2xl font-bold text-green-600">
-                        {rec.benchPlayerProjectedValue.toFixed(2)}
+
+                      {/* Starter Player (Sit) */}
+                      <div className="border-2 border-negative-border rounded-lg p-4 bg-negative-light opacity-75">
+                        <div className="flex items-center mb-2">
+                          <Badge variant="negative" className="text-xs uppercase tracking-wide">
+                            Sit
+                          </Badge>
+                        </div>
+                        <div className="font-bold text-lg text-content mb-1">
+                          {rec.starterPlayerName}
+                        </div>
+                        <div className="text-body-sm text-content-secondary mb-2">
+                          {rec.starterPlayerPositions.join(", ")}
+                        </div>
+                        <div className="text-2xl font-medium text-content-secondary">
+                          {rec.starterPlayerProjectedValue.toFixed(2)}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Arrow */}
-                    <div className="flex justify-center">
-                      <svg
-                        className="w-8 h-8 text-gray-400 rotate-90 md:rotate-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
-                    </div>
-
-                    {/* Starter Player (Sit) */}
-                    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 opacity-75">
-                      <div className="flex items-center mb-2">
-                        <span className="text-red-700 font-semibold text-xs uppercase tracking-wide">
-                          Sit
-                        </span>
-                      </div>
-                      <div className="font-bold text-lg text-gray-900 mb-1">
-                        {rec.starterPlayerName}
-                      </div>
-                      <div className="text-sm text-gray-600 mb-2">
-                        {rec.starterPlayerPositions.join(", ")}
-                      </div>
-                      <div className="text-2xl font-medium text-gray-500">
-                        {rec.starterPlayerProjectedValue.toFixed(2)}
+                    {/* Reason and Gain */}
+                    <div className="mt-4 pt-4 border-t border-neutral-100">
+                      <p className="text-body-sm text-content-secondary mb-2">{rec.reason}</p>
+                      <div className="inline-flex items-center px-3 py-1 rounded-full bg-positive-light border border-positive-border text-body-sm font-semibold text-positive">
+                        <TrendingUp className="w-4 h-4 mr-1" />
+                        +{rec.projectedGain.toFixed(2)} SGP
                       </div>
                     </div>
-                  </div>
-
-                  {/* Reason and Gain */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-600 mb-2">{rec.reason}</p>
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-semibold">
-                      <svg
-                        className="w-4 h-4 mr-1"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                        />
-                      </svg>
-                      +{rec.projectedGain.toFixed(2)} SGP
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
 
           {/* Note */}
-          <div className="text-xs text-gray-500 text-center mt-6">
+          <div className="text-body-sm text-content-tertiary text-center mt-6">
             Recommendations based on today's MLB schedule and rest-of-season
             projections. Snapshot date: {data.snapshotDate}
           </div>
         </div>
       ) : null}
-    </div>
+    </Container>
   );
 }

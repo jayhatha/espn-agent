@@ -8,6 +8,10 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { Container } from "@/components/ui/Container";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/cn";
+import { ClipboardList } from "lucide-react";
 
 interface DraftRanking {
   playerId: number;
@@ -33,16 +37,16 @@ interface DraftRankingsResponse {
 
 const POSITIONS = ["ALL", "C", "1B", "2B", "3B", "SS", "OF", "SP", "RP", "DH"];
 
-const getTierColor = (tier: number): string => {
+const getTierVariant = (tier: number): "default" | "positive" | "warning" | "info" => {
   switch (tier) {
     case 1:
-      return "bg-green-100 text-green-800";
+      return "positive";
     case 2:
-      return "bg-blue-100 text-blue-800";
+      return "info";
     case 3:
-      return "bg-yellow-100 text-yellow-800";
+      return "warning";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "default";
   }
 };
 
@@ -76,7 +80,7 @@ export default function DraftRankingsPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <Container size="wide" className="py-8">
       <PageHeader
         title="Draft Rankings"
         subtitle={
@@ -92,7 +96,7 @@ export default function DraftRankingsPage() {
         <div className="flex items-center gap-3">
           <label
             htmlFor="position-filter"
-            className="text-sm font-medium text-gray-700"
+            className="text-body-sm font-medium text-content"
           >
             Position:
           </label>
@@ -100,7 +104,7 @@ export default function DraftRankingsPage() {
             id="position-filter"
             value={position}
             onChange={(e) => setPosition(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-neutral-300 rounded-lg px-3 py-2 text-body-sm text-content bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {POSITIONS.map((pos) => (
               <option key={pos} value={pos}>
@@ -112,7 +116,7 @@ export default function DraftRankingsPage() {
 
         <Link
           href={`/leagues/${leagueId}/draft/auction`}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="inline-flex items-center px-4 py-2 border border-neutral-300 rounded-lg text-body-sm font-medium text-content bg-white hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
         >
           View Auction Values
         </Link>
@@ -140,23 +144,11 @@ export default function DraftRankingsPage() {
       {/* Empty State */}
       {!isLoading && !error && data?.rankings.length === 0 && (
         <div className="text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <ClipboardList className="mx-auto h-12 w-12 text-content-tertiary" />
+          <h3 className="mt-2 text-body-sm font-medium text-content">
             No rankings available
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-body-sm text-content-secondary">
             Upload projections first to generate draft rankings.
           </p>
         </div>
@@ -164,60 +156,58 @@ export default function DraftRankingsPage() {
 
       {/* Rankings Table */}
       {!isLoading && !error && data && data.rankings.length > 0 && (
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        <div className="rounded-card border border-neutral-200 bg-white shadow-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+            <table className="min-w-full divide-y divide-neutral-100">
+              <thead className="bg-surface-secondary sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Rank
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Player
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Position
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     VBD
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     SGP
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-center text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Tier
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-neutral-100">
                 {data.rankings.map((ranking, index) => (
                   <tr
                     key={ranking.playerId}
-                    className="even:bg-gray-50 hover:bg-blue-50"
+                    className="border-b border-neutral-100 hover:bg-surface-secondary transition-colors"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
                       {index + 1}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-body-sm font-medium text-content">
                         {ranking.playerName}
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-content-secondary">
                       {ranking.positions.join("/")}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content text-right">
                       {ranking.vbdScore.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-content-secondary text-right">
                       {ranking.sgpTotal.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${getTierColor(ranking.tier)}`}
-                      >
+                      <Badge variant={getTierVariant(ranking.tier)}>
                         {getTierLabel(ranking.tier)}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -226,8 +216,8 @@ export default function DraftRankingsPage() {
           </div>
 
           {/* Meta Info */}
-          <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="bg-surface-secondary px-4 py-3 border-t border-neutral-100">
+            <p className="text-body-sm text-content-secondary">
               Showing {data.rankings.length} player
               {data.rankings.length !== 1 ? "s" : ""} for{" "}
               {data.meta.totalTeams}-team league
@@ -235,6 +225,6 @@ export default function DraftRankingsPage() {
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }

@@ -8,6 +8,10 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
+import { Container } from "@/components/ui/Container";
+import { Input } from "@/components/ui/Input";
+import { cn } from "@/lib/cn";
+import { DollarSign } from "lucide-react";
 
 interface AuctionValue {
   playerId: number;
@@ -35,10 +39,10 @@ interface AuctionValuationsResponse {
 
 const POSITIONS = ["ALL", "C", "1B", "2B", "3B", "SS", "OF", "SP", "RP", "DH"];
 
-const getDollarValueColor = (value: number): string => {
-  if (value >= 20) return "text-green-700 font-bold";
-  if (value >= 10) return "text-gray-900 font-semibold";
-  return "text-gray-500";
+const getDollarValueClass = (value: number): string => {
+  if (value >= 20) return "text-positive font-semibold";
+  if (value >= 10) return "text-content font-medium";
+  return "text-content-secondary";
 };
 
 export default function AuctionValuationPage() {
@@ -60,7 +64,7 @@ export default function AuctionValuationPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <Container size="wide" className="py-8">
       <PageHeader
         title="Auction Values"
         subtitle={
@@ -78,11 +82,11 @@ export default function AuctionValuationPage() {
           <div className="flex items-center gap-3">
             <label
               htmlFor="budget-input"
-              className="text-sm font-medium text-gray-700"
+              className="text-body-sm font-medium text-content whitespace-nowrap"
             >
               Budget:
             </label>
-            <input
+            <Input
               id="budget-input"
               type="number"
               min="100"
@@ -90,18 +94,18 @@ export default function AuctionValuationPage() {
               step="10"
               value={budget}
               onChange={(e) => setBudget(parseInt(e.target.value, 10))}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-24"
             />
           </div>
 
           <div className="flex items-center gap-3">
             <label
               htmlFor="minbid-input"
-              className="text-sm font-medium text-gray-700"
+              className="text-body-sm font-medium text-content whitespace-nowrap"
             >
               Min Bid:
             </label>
-            <input
+            <Input
               id="minbid-input"
               type="number"
               min="1"
@@ -109,14 +113,14 @@ export default function AuctionValuationPage() {
               step="1"
               value={minBid}
               onChange={(e) => setMinBid(parseInt(e.target.value, 10))}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-20"
             />
           </div>
 
           <div className="flex items-center gap-3">
             <label
               htmlFor="position-filter"
-              className="text-sm font-medium text-gray-700"
+              className="text-body-sm font-medium text-content whitespace-nowrap"
             >
               Position:
             </label>
@@ -124,7 +128,7 @@ export default function AuctionValuationPage() {
               id="position-filter"
               value={position}
               onChange={(e) => setPosition(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-neutral-300 rounded-lg px-3 py-2 text-body-sm text-content bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               {POSITIONS.map((pos) => (
                 <option key={pos} value={pos}>
@@ -136,7 +140,7 @@ export default function AuctionValuationPage() {
 
           <Link
             href={`/leagues/${leagueId}/draft/rankings`}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="inline-flex items-center px-4 py-2 border border-neutral-300 rounded-lg text-body-sm font-medium text-content bg-white hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
           >
             View Draft Rankings
           </Link>
@@ -144,13 +148,13 @@ export default function AuctionValuationPage() {
 
         {/* Meta Display */}
         {data && (
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+          <div className="flex flex-wrap gap-4 text-body-sm text-content-secondary">
             <span>
-              <span className="font-medium">Players above replacement:</span>{" "}
+              <span className="font-medium text-content">Players above replacement:</span>{" "}
               {data.meta.playersAboveReplacement}
             </span>
             <span>
-              <span className="font-medium">Total spending:</span> $
+              <span className="font-medium text-content">Total spending:</span> $
               {data.meta.budget * data.meta.totalTeams}
             </span>
           </div>
@@ -179,23 +183,11 @@ export default function AuctionValuationPage() {
       {/* Empty State */}
       {!isLoading && !error && data?.valuations.length === 0 && (
         <div className="text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+          <DollarSign className="mx-auto h-12 w-12 text-content-tertiary" />
+          <h3 className="mt-2 text-body-sm font-medium text-content">
             No valuations available
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-body-sm text-content-secondary">
             Upload projections first to generate auction valuations.
           </p>
         </div>
@@ -203,57 +195,60 @@ export default function AuctionValuationPage() {
 
       {/* Valuations Table */}
       {!isLoading && !error && data && data.valuations.length > 0 && (
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        <div className="rounded-card border border-neutral-200 bg-white shadow-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+            <table className="min-w-full divide-y divide-neutral-100">
+              <thead className="bg-surface-secondary sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Rank
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Player
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Position
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Value
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     VBD
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     SGP
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-neutral-100">
                 {data.valuations.map((valuation, index) => (
                   <tr
                     key={valuation.playerId}
-                    className="even:bg-gray-50 hover:bg-blue-50"
+                    className="border-b border-neutral-100 hover:bg-surface-secondary transition-colors"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
                       {index + 1}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-body-sm font-medium text-content">
                         {valuation.playerName}
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-content-secondary">
                       {valuation.positions.join("/")}
                     </td>
                     <td
-                      className={`px-4 py-3 whitespace-nowrap text-sm text-right ${getDollarValueColor(valuation.dollarValue)}`}
+                      className={cn(
+                        "px-4 py-3 whitespace-nowrap text-data text-right",
+                        getDollarValueClass(valuation.dollarValue)
+                      )}
                     >
                       ${valuation.dollarValue}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-content-secondary text-right">
                       {valuation.vbdScore.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-content-secondary text-right">
                       {valuation.sgpTotal.toFixed(2)}
                     </td>
                   </tr>
@@ -263,8 +258,8 @@ export default function AuctionValuationPage() {
           </div>
 
           {/* Meta Info */}
-          <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
-            <p className="text-xs text-gray-500">
+          <div className="bg-surface-secondary px-4 py-3 border-t border-neutral-100">
+            <p className="text-body-sm text-content-secondary">
               Showing {data.valuations.length} player
               {data.valuations.length !== 1 ? "s" : ""} for{" "}
               {data.meta.totalTeams}-team league with ${data.meta.budget}{" "}
@@ -273,6 +268,6 @@ export default function AuctionValuationPage() {
           </div>
         </div>
       )}
-    </div>
+    </Container>
   );
 }
