@@ -36,7 +36,7 @@ export function Navigation() {
       role="navigation"
       className="bg-white border-b border-neutral-200 sticky top-0 z-50"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-content-wide mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo/Brand */}
           <div className="flex items-center space-x-3">
@@ -50,7 +50,7 @@ export function Navigation() {
               </span>
             </Link>
             {isAdmin && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info-light text-info border border-info-border">
                 <Zap className="mr-1 h-3 w-3" />
                 Admin
               </span>

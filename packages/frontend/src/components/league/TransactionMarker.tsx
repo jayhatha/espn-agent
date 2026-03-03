@@ -90,7 +90,7 @@ export function TransactionMarker({ viewBox, annotation }: TransactionMarkerProp
           height={90}
         >
           <div
-            className="rounded-lg shadow-lg p-2 text-xs pointer-events-none"
+            className="rounded-lg p-2 text-xs pointer-events-none"
             style={{
               backgroundColor: CHART_THEME.tooltip.backgroundColor,
               border: `1px solid ${CHART_THEME.tooltip.borderColor}`,

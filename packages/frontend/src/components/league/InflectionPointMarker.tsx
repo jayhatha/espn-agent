@@ -115,7 +115,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
           height={tooltipHeight}
         >
           <div
-            className="rounded-lg shadow-lg p-3 text-xs"
+            className="rounded-lg p-3 text-xs"
             style={{
               backgroundColor: CHART_THEME.tooltip.backgroundColor,
               border: `1px solid ${CHART_THEME.tooltip.borderColor}`,

@@ -201,7 +201,7 @@ export default function StreamingPitchersPage() {
           {data.candidates.map((candidate, idx) => (
             <Card
               key={candidate.playerId}
-              className="hover:shadow-lg transition-shadow"
+              className="hover:shadow-card-hover transition-shadow"
             >
               <CardContent className="py-5">
                 <div className="flex items-start gap-4">

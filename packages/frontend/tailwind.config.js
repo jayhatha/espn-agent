@@ -24,14 +24,6 @@ module.exports = {
         'data': ['0.8125rem', { lineHeight: '1.4', fontFamily: 'var(--font-mono, ui-monospace)' }],
       },
       colors: {
-        // Keep existing primary colors so existing pages don't break
-        primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-        },
         // Neutral base (spec: white/off-white/near-black)
         surface: {
           DEFAULT: '#ffffff',

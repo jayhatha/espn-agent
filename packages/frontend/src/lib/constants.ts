@@ -1,3 +1,4 @@
+// Chart series colors for team differentiation in Recharts -- not part of design system tokens
 export const COLORS = [
   "#3b82f6", // blue
   "#ef4444", // red
