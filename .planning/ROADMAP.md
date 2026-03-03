@@ -290,3 +290,22 @@ Plans:
 - [ ] 17-07-PLAN.md — Migrate trends, moves, projections pages with chart theming
 - [ ] 17-08-PLAN.md — Migrate draft rankings, auction, lineup, streaming, and admin pages
 - [ ] 17-09-PLAN.md — Remove legacy config, verify no anti-patterns, visual verification checkpoint
+
+### Phase 18: Refactor dashboard from card-based SaaS layout into composition-driven layout inspired by high-end creative web design
+
+**Goal:** Transform the league dashboard from a card-grid SaaS layout into a composition-driven editorial layout with DM Serif Display typography, section-based background alternation, asymmetric grids, oversized impact numbers, and reduced visual borders
+**Depends on:** Phase 17
+**Success Criteria** (what must be TRUE):
+  1. DM Serif Display renders on display-scale and h1/h2 headings; Inter on body/UI
+  2. Dashboard uses alternating section backgrounds instead of floating Card wrappers
+  3. Identity section shows team name, rank, and points with editorial typography scale
+  4. Recommended Actions is the dominant visual section with oversized point deltas
+  5. Health + chart grid uses asymmetric 8/4 column layout
+  6. Quick actions rendered as compact text links, not bordered icon cards
+  7. Data tables use tighter padding with text-data monospace for values
+  8. All existing functionality preserved (team selector, auth modal, snapshot, roster)
+**Plans:** 2 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — Install DM Serif Display font, configure typography foundation, decompose dashboard into 6 section components with compositional layout
+- [ ] 18-02-PLAN.md — Rework ActionItemsList, TeamHealthOverview, CategoryStatsTable, and roster tables to match editorial style, visual verification
