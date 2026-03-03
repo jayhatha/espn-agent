@@ -59,15 +59,19 @@ const AVAILABLE_CATEGORIES: Category[] = [
   { category_id: 2, stat_key: "HR", name: "HR", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 3, stat_key: "RBI", name: "RBI", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 4, stat_key: "SB", name: "SB", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 9, stat_key: "BB", name: "BB", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 5, stat_key: "AVG", name: "AVG", type: "RATE", direction: "HIGHER_BETTER", formula_id: "avg" },
   { category_id: 6, stat_key: "OBP", name: "OBP", type: "RATE", direction: "HIGHER_BETTER", formula_id: "obp" },
   { category_id: 7, stat_key: "SLG", name: "SLG", type: "RATE", direction: "HIGHER_BETTER", formula_id: "slg" },
   { category_id: 8, stat_key: "OPS", name: "OPS", type: "RATE", direction: "HIGHER_BETTER", formula_id: "ops" },
   { category_id: 16, stat_key: "K", name: "K", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 17, stat_key: "W", name: "W", type: "COUNTING", direction: "HIGHER_BETTER" },
+  { category_id: 25, stat_key: "L", name: "L", type: "COUNTING", direction: "LOWER_BETTER" },
+  { category_id: 24, stat_key: "WPCT", name: "WPCT", type: "RATE", direction: "HIGHER_BETTER", formula_id: "wpct" },
   { category_id: 18, stat_key: "SV", name: "SV", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 19, stat_key: "ERA", name: "ERA", type: "RATE", direction: "LOWER_BETTER", formula_id: "era" },
   { category_id: 20, stat_key: "WHIP", name: "WHIP", type: "RATE", direction: "LOWER_BETTER", formula_id: "whip" },
+  { category_id: 23, stat_key: "K9", name: "K9", type: "RATE", direction: "HIGHER_BETTER", formula_id: "k9" },
   { category_id: 21, stat_key: "QS", name: "QS", type: "COUNTING", direction: "HIGHER_BETTER" },
   { category_id: 22, stat_key: "HLD", name: "HLD", type: "COUNTING", direction: "HIGHER_BETTER" },
 ];
@@ -110,10 +114,7 @@ function AuctionValidationPageContent() {
   const [budget, setBudget] = useState<number>(260);
   const [minBid, setMinBid] = useState<number>(1);
   const [limit, setLimit] = useState<number>(100);
-  const [espnLeagueId, setEspnLeagueId] = useState<string>("");
   const [espnSeason, setEspnSeason] = useState<number>(2025);
-  const [espnSwid, setEspnSwid] = useState<string>("");
-  const [espnS2, setEspnS2] = useState<string>("");
 
   // Results state
   const [results, setResults] = useState<ValidationResponse | null>(null);
@@ -156,11 +157,6 @@ function AuctionValidationPageContent() {
     setLoading(true);
 
     try {
-      // Validate ESPN league ID
-      if (!espnLeagueId || espnLeagueId.trim() === "") {
-        throw new Error("ESPN League ID is required");
-      }
-
       // Build categories JSON from selections
       const categoriesArray = AVAILABLE_CATEGORIES
         .filter(cat => selectedCategories.has(cat.stat_key))
@@ -183,10 +179,7 @@ function AuctionValidationPageContent() {
         budget,
         minBid,
         limit,
-        espnLeagueId: parseInt(espnLeagueId, 10),
         espnSeason,
-        ...(espnSwid && espnSwid.trim() !== "" && { espnSwid }),
-        ...(espnS2 && espnS2.trim() !== "" && { espnS2 }),
       };
 
       const data = await api.validateAuctionValues(params);
@@ -266,20 +259,7 @@ function AuctionValidationPageContent() {
             </div>
 
             {/* ESPN Context */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
-                  ESPN League ID *
-                </label>
-                <Input
-                  type="text"
-                  value={espnLeagueId}
-                  onChange={(e) => setEspnLeagueId(e.target.value)}
-                  placeholder="e.g., 123456"
-                  required
-                />
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
               <div>
                 <label className="block text-body-sm font-medium text-content mb-2">
                   ESPN Season
@@ -291,30 +271,7 @@ function AuctionValidationPageContent() {
                   min="2020"
                   max={new Date().getFullYear() + 1}
                   required
-                />
-              </div>
-
-              <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
-                  ESPN SWID (optional)
-                </label>
-                <Input
-                  type="text"
-                  value={espnSwid}
-                  onChange={(e) => setEspnSwid(e.target.value)}
-                  placeholder="For private leagues"
-                />
-              </div>
-
-              <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
-                  ESPN S2 (optional)
-                </label>
-                <Input
-                  type="text"
-                  value={espnS2}
-                  onChange={(e) => setEspnS2(e.target.value)}
-                  placeholder="For private leagues"
+                  className="max-w-xs"
                 />
               </div>
             </div>
@@ -347,7 +304,7 @@ function AuctionValidationPageContent() {
                   </h4>
                   <div className="space-y-2">
                     {AVAILABLE_CATEGORIES
-                      .filter(cat => ["R", "HR", "RBI", "SB", "AVG", "OBP", "SLG", "OPS"].includes(cat.stat_key))
+                      .filter(cat => ["R", "HR", "RBI", "SB", "BB", "AVG", "OBP", "SLG", "OPS"].includes(cat.stat_key))
                       .map(cat => (
                         <label key={cat.stat_key} className="flex items-center cursor-pointer">
                           <input
@@ -371,7 +328,7 @@ function AuctionValidationPageContent() {
                   </h4>
                   <div className="space-y-2">
                     {AVAILABLE_CATEGORIES
-                      .filter(cat => ["K", "W", "SV", "HLD", "QS", "ERA", "WHIP"].includes(cat.stat_key))
+                      .filter(cat => ["K", "W", "L", "WPCT", "SV", "HLD", "QS", "ERA", "WHIP", "K9"].includes(cat.stat_key))
                       .map(cat => (
                         <label key={cat.stat_key} className="flex items-center cursor-pointer">
                           <input
