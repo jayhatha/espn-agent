@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-04 - Completed quick task 36: Circular rank badge in extension sidebar
+Last activity: 2026-03-04 - Completed quick task 37: Detect teams from auction pick train
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
@@ -272,6 +272,7 @@ Recent decisions affecting v1.1 work:
 - Phase 14 added: Fix ESPN auction values endpoint - only returning 6 players instead of full player pool
 - Phase 17 added: Site redesign — typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
 - Phase 18 added: Refactor dashboard from card-based SaaS layout into composition-driven layout inspired by high-end creative web design
+- Phase 20 added: Deterministic draft engine — inflation model, category gap projections, budget curve, strategy anchors with pivot logic, and structured alert system for extension sidebar
 
 ### Pending Todos
 
@@ -331,9 +332,10 @@ None yet.
 | 34 | Add position scarcity alerts to extension sidebar (critical/warning severity, my-team-needs highlighting) | 2026-03-04 | 3573f3c | ✅ | [34-add-position-scarcity-alerts-to-extensio](./quick/34-add-position-scarcity-alerts-to-extensio/) |
 | 35 | Parse ESPN auction values from fixedDataTable DOM — scrape live $values, merge into store, display in sidebar | 2026-03-04 | 0bca97f | ✅ | [35-parse-espn-auction-values-from-dom-table](./quick/35-parse-espn-auction-values-from-dom-table/) |
 | 36 | Large circular ranking number in display serif font showing remaining-player rank | 2026-03-04 | 8e12048 | ✅ | [36-add-large-circular-ranking-number-displa](./quick/36-add-large-circular-ranking-number-displa/) |
+| 37 | Detect team count and user's team from ESPN auction pick train DOM | 2026-03-04 | bebdabb | ✅ | [37-detect-team-count-and-user-s-team-from-e](./quick/37-detect-team-count-and-user-s-team-from-e/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 36: Circular rank badge in extension sidebar
+Stopped at: Completed quick task 37: Detect teams from auction pick train
 Resume file: None
