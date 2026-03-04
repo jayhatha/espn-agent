@@ -120,6 +120,7 @@ Progress: Phase 18: [██████████] 100% (2 of 2 plans complete
 | Phase 17 P08 | 12 | 2 tasks | 6 files |
 | Phase 18 P02 | 3 | 2 tasks | 4 files |
 | Phase quick-26 P01 | 1 | 2 tasks | 2 files |
+| Phase quick-29 P01 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -251,6 +252,7 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-25]: PITCHING_STAT_KEYS set membership replaces hardcoded batter/pitcher arrays in trade-recommendation.ts — stays in sync with standings-projection.ts
 - [Phase quick-25]: category.formula_id used for rate stat calculation (not catId.toLowerCase()) — aligns with Category interface contract
 - [Phase quick-25]: category.direction === 'LOWER_BETTER' replaces hardcoded ['ERA', 'WHIP'] list in isLowerBetter — works for any league config
+- [Phase quick-29]: rankDiff = ESPN rank - external rank (positive = undervalued bargain), sort by absolute value descending
 
 ### Roadmap Evolution
 
