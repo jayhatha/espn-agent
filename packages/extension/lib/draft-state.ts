@@ -89,6 +89,7 @@ interface DraftState {
   clearPlayerOverride: (playerId: number) => void;
   clearAllOverrides: () => void;
   setConfigWarnings: (warnings: string[]) => void;
+  dismissConfigWarnings: () => void;
   updateTeamRoster: (teamId: string, teamName: string, playerId: number) => void;
   setAllTeamRosters: (rosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>) => void;
   clearTeamRosters: () => void;
@@ -122,13 +123,19 @@ export const useDraftStore = create<DraftState>()(
 
       // Actions
       initializeDraft: (config) => {
+        const current = get();
+        const sameLeague = current.leagueId === config.leagueId;
+
         set({
           leagueId: config.leagueId,
           draftFormat: config.draftFormat,
           totalTeams: config.totalTeams,
           rosterSize: config.rosterSize,
           myTeamId: config.myTeamId,
-          remainingBudget: config.budget || 260, // Use detected budget or fallback to 260
+          // Preserve budget/roster state on reload (same league)
+          remainingBudget: sameLeague && current.myRoster.length > 0
+            ? current.remainingBudget
+            : config.budget || 260,
         });
       },
 
@@ -202,6 +209,7 @@ export const useDraftStore = create<DraftState>()(
       clearAllOverrides: () => set({ userRankingOverrides: {} }),
 
       setConfigWarnings: (warnings) => set({ configWarnings: warnings }),
+      dismissConfigWarnings: () => set({ configWarnings: [] }),
 
       updateTeamRoster: (teamId, teamName, playerId) => {
         set((state) => {
@@ -278,6 +286,16 @@ export const useDraftStore = create<DraftState>()(
         };
       },
       partialize: (state) => ({
+        // Draft progress (survives reload)
+        leagueId: state.leagueId,
+        draftFormat: state.draftFormat,
+        totalTeams: state.totalTeams,
+        rosterSize: state.rosterSize,
+        currentPick: state.currentPick,
+        myRoster: state.myRoster,
+        remainingBudget: state.remainingBudget,
+        allPicks: state.allPicks,
+        // User preferences
         userRankingOverrides: state.userRankingOverrides,
         selectedPosition: state.selectedPosition,
         showOnlyNeeds: state.showOnlyNeeds,

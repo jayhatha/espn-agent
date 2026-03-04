@@ -17,6 +17,7 @@ export default function DraftSidebar() {
     myRoster,
     rosterSize,
     configWarnings,
+    dismissConfigWarnings,
     currentAuctionPlayer,
     rankings,
     auctionValues,
@@ -105,8 +106,15 @@ export default function DraftSidebar() {
 
       {/* Config Detection Warning Banner */}
       {configWarnings.length > 0 && (
-        <div className="bg-warning-light border-l-4 border-warning p-4">
-          <p className="text-sm text-warning">
+        <div className="bg-warning-light border-l-4 border-warning p-4 relative">
+          <button
+            onClick={dismissConfigWarnings}
+            className="absolute top-2 right-2 text-warning hover:text-warning/70 text-sm px-1"
+            aria-label="Dismiss warnings"
+          >
+            ✕
+          </button>
+          <p className="text-sm text-warning pr-6">
             <strong>Warning:</strong> League config detection incomplete. Using 5x5 defaults.
           </p>
           <ul className="text-xs text-warning mt-2">

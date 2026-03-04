@@ -1,8 +1,6 @@
-import baselineRankings from "../assets/baseline-rankings.json";
 import pitcherlistRankings from "../assets/pitcherlist-rankings.json";
-import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
-import { backOff } from "exponential-backoff";
-import { isPracticeDraft, detectLeagueConfig } from "./draft-config-detector";
+import fangraphsAuctionValues from "../assets/fangraphs-auction-values.json";
+import { isPracticeDraft } from "./draft-config-detector";
 
 /**
  * Throttle helper - limits function execution to once per wait period
@@ -56,47 +54,6 @@ function dedupedRequest<T>(
 
 // Export throttle for use in content script
 export { throttle };
-
-// ESPN stat ID to our stat key mapping
-// Reference: packages/backend/src/adapters/espn.ts
-const ESPN_STAT_MAP: Record<number, {
-  key: string;
-  name: string;
-  type: "COUNTING" | "RATE";
-  formulaId?: string;
-  requiredComponents?: string[];
-}> = {
-  // Batting stats
-  5: { key: "HR", name: "Home Runs", type: "COUNTING" },
-  20: { key: "R", name: "Runs", type: "COUNTING" },
-  21: { key: "RBI", name: "RBI", type: "COUNTING" },
-  23: { key: "SB", name: "Stolen Bases", type: "COUNTING" },
-  3: { key: "AVG", name: "Batting Average", type: "RATE", formulaId: "avg", requiredComponents: ["AB", "H"] },
-  17: { key: "OBP", name: "On Base Percentage", type: "RATE", formulaId: "obp", requiredComponents: ["H", "BB", "HBP", "AB", "SF"] },
-  18: { key: "OPS", name: "On-Base Plus Slugging", type: "RATE", formulaId: "ops", requiredComponents: ["H", "BB", "HBP", "AB", "SF", "TB"] },
-  // Pitching stats
-  48: { key: "K", name: "Strikeouts", type: "COUNTING" },
-  53: { key: "W", name: "Wins", type: "COUNTING" },
-  57: { key: "SV", name: "Saves", type: "COUNTING" },
-  47: { key: "ERA", name: "Earned Run Average", type: "RATE", formulaId: "era", requiredComponents: ["ER", "IP"] },
-  41: { key: "WHIP", name: "WHIP", type: "RATE", formulaId: "whip", requiredComponents: ["IP", "H", "BB"] },
-};
-
-// ESPN lineup slot ID to position mapping
-const ESPN_LINEUP_SLOT_MAP: Record<number, string> = {
-  0: "C",
-  1: "1B",
-  2: "2B",
-  3: "3B",
-  4: "SS",
-  5: "OF",
-  7: "UT",  // Utility
-  13: "P",
-  14: "SP",
-  15: "RP",
-  16: "BE",  // Bench
-  17: "IL",  // Injured List
-};
 
 export interface PlayerRanking {
   playerId: number;
@@ -175,86 +132,6 @@ interface RawLeagueSummary {
 const DEFAULT_BACKEND_URL = "http://localhost:3001";
 const REQUEST_TIMEOUT_MS = 10000;
 
-/**
- * Fetch league settings from ESPN API
- */
-async function fetchEspnLeagueSettings(
-  espnLeagueId: string,
-  season?: number
-): Promise<DraftConfiguration | null> {
-  // Skip ESPN API call for practice drafts - they have no real league data
-  if (isPracticeDraft()) {
-    console.log("[API Client] Practice draft detected - skipping ESPN API call");
-    return null;
-  }
-
-  try {
-    const year = season || new Date().getFullYear();
-    const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${year}/segments/0/leagues/${espnLeagueId}?view=mSettings`;
-
-    const response = await fetch(url, { credentials: "include" });
-    if (!response.ok) {
-      console.warn("[API Client] ESPN settings fetch failed:", response.status);
-      return null;
-    }
-
-    const data = await response.json();
-
-    // Map ESPN categories to our format
-    const categories: Category[] = (data.settings?.scoringSettings?.scoringItems || [])
-      .map((item: any) => {
-        const mapping = ESPN_STAT_MAP[item.statId];
-        if (!mapping) {
-          console.warn("[API Client] Unknown ESPN stat ID:", item.statId);
-          return null;
-        }
-
-        return {
-          category_id: `cat_${item.statId}`,
-          name: mapping.name,
-          stat_key: mapping.key,
-          type: mapping.type,
-          direction: item.isReverseItem ? "LOWER_BETTER" : "HIGHER_BETTER",
-          formula_id: mapping.formulaId,
-          required_components: mapping.requiredComponents,
-        };
-      })
-      .filter(Boolean);
-
-    // Map ESPN roster slots to our format
-    const rosterSlots: Record<string, number> = {};
-    const lineupSlotCounts = data.settings?.rosterSettings?.lineupSlotCounts || {};
-
-    for (const [slotId, count] of Object.entries(lineupSlotCounts)) {
-      const position = ESPN_LINEUP_SLOT_MAP[Number(slotId)];
-      if (position && typeof count === "number" && count > 0) {
-        rosterSlots[position] = count;
-      }
-    }
-
-    const totalTeams = data.settings?.size || 12;
-    const budget = data.settings?.draftSettings?.budget || 260;
-    const minBid = data.settings?.draftSettings?.minBid || 1;
-
-    console.log("[API Client] Fetched ESPN settings:", {
-      totalTeams,
-      categories: categories.length,
-      rosterSlots,
-    });
-
-    return {
-      categories,
-      rosterSlots,
-      totalTeams,
-      budget,
-      minBid,
-    };
-  } catch (error) {
-    console.error("[API Client] Failed to fetch ESPN league settings:", error);
-    return null;
-  }
-}
-
 function normalizeBackendUrl(rawBackendUrl?: string): string {
   const value = (rawBackendUrl || "").trim();
   const backendUrl = value || DEFAULT_BACKEND_URL;
@@ -305,6 +182,122 @@ interface PitcherListRanking {
   tierName: string;
   handedness: string;
   team: string;
+}
+
+interface FangraphsPlayer {
+  name: string;
+  team: string;
+  pos: string;
+  dollars: number;
+  mlbamId: number;
+  fgId: string;
+}
+
+/**
+ * Build rankings and auction values from bundled FanGraphs auction values + PitcherList tiers.
+ * No backend or network calls required. Used as fallback when getDraftBoardData() fails.
+ */
+function buildBundledRankings(): {
+  rankings: PlayerRanking[];
+  auctionValues: AuctionValue[];
+} {
+  // Build FanGraphs dollar value lookup
+  const fgLookup = new Map<string, FangraphsPlayer>();
+  for (const p of fangraphsAuctionValues.hitters as FangraphsPlayer[]) {
+    fgLookup.set(normalizeName(p.name), p);
+  }
+  for (const p of fangraphsAuctionValues.pitchers as FangraphsPlayer[]) {
+    fgLookup.set(normalizeName(p.name), p);
+  }
+
+  // Build PitcherList tier lookup
+  const plLookup = new Map<string, PitcherListRanking>();
+  for (const p of pitcherlistRankings.pitchers as PitcherListRanking[]) {
+    plLookup.set(normalizeName(p.playerName), p);
+  }
+  for (const p of pitcherlistRankings.relievers as PitcherListRanking[]) {
+    plLookup.set(normalizeName(p.playerName), p);
+  }
+  for (const p of pitcherlistRankings.hitters as PitcherListRanking[]) {
+    plLookup.set(normalizeName(p.playerName), p);
+  }
+
+  // Collect all unique players from both sources
+  const seen = new Set<string>();
+  const merged: Array<{
+    name: string;
+    pos: string;
+    dollars: number;
+    mlbamId: number;
+    tier: number;
+    tierName?: string;
+    plRank?: number;
+  }> = [];
+
+  // FanGraphs players first (they have real dollar values)
+  for (const [key, fg] of fgLookup) {
+    seen.add(key);
+    const pl = plLookup.get(key);
+    merged.push({
+      name: fg.name,
+      pos: fg.pos,
+      dollars: fg.dollars,
+      mlbamId: fg.mlbamId,
+      tier: pl?.tier ?? 99,
+      tierName: pl?.tierName,
+      plRank: pl?.rank,
+    });
+  }
+
+  // PitcherList players not in FanGraphs (assign $1 value)
+  for (const [key, pl] of plLookup) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({
+      name: pl.playerName,
+      pos: pl.handedness?.includes("P") ? "SP" : "UT",
+      dollars: 1,
+      mlbamId: 0,
+      tier: pl.tier,
+      tierName: pl.tierName,
+      plRank: pl.rank,
+    });
+  }
+
+  // Sort by dollar value descending
+  merged.sort((a, b) => b.dollars - a.dollars);
+
+  const rankings: PlayerRanking[] = [];
+  const auctionValues: AuctionValue[] = [];
+
+  for (let i = 0; i < merged.length; i++) {
+    const p = merged[i];
+    const positions = p.pos ? p.pos.split("/").map(s => s.trim()) : ["UT"];
+    const syntheticId = p.mlbamId || -(i + 1);
+
+    rankings.push({
+      playerId: syntheticId,
+      playerName: p.name,
+      positions,
+      primaryPosition: positions[0],
+      vbdScore: p.dollars,
+      tier: p.tier,
+      projectedStats: {},
+      tierName: p.tierName,
+      externalRank: p.plRank,
+    });
+
+    auctionValues.push({
+      playerId: syntheticId,
+      playerName: p.name,
+      dollarValue: Math.round(p.dollars),
+      vbdScore: p.dollars,
+      positions,
+    });
+  }
+
+  console.log("[API Client] Built bundled rankings:", rankings.length, "players (FG:", fgLookup.size, "+ PL-only:", merged.length - fgLookup.size, ")");
+  return { rankings, auctionValues };
 }
 
 /**
@@ -1011,76 +1004,13 @@ export async function getRankings(
         return draftBoardData.rankings;
       }
     } catch (error) {
-      console.warn("[API Client] Draft board data unavailable, falling back to VBD:", error);
+      console.warn("[API Client] Draft board data unavailable:", error);
     }
-    console.log("[API Client] Draft board data unavailable, falling back to VBD");
 
-    try {
-      const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
-      const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
-
-      // Fetch ESPN settings for league-agnostic draft
-      console.log("[API Client] Fetching ESPN settings for league:", espnLeagueId);
-      let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
-
-      // If ESPN settings failed (e.g., practice draft), try DOM detection
-      if (!espnConfig) {
-        console.log("[API Client] ESPN settings not available, attempting DOM detection");
-        const domDetection = detectLeagueConfig();
-
-        if (domDetection.config && domDetection.confidence !== "failed") {
-          console.log("[API Client] Using DOM-detected config:", {
-            confidence: domDetection.confidence,
-            isPracticeDraft: domDetection.isPracticeDraft,
-            warnings: domDetection.warnings
-          });
-          espnConfig = domDetection.config;
-        } else {
-          console.warn("[API Client] DOM detection failed, using baseline rankings");
-          return baselineRankings as PlayerRanking[];
-        }
-      }
-
-      // Build query params with JSON-encoded config
-      const params = new URLSearchParams({
-        numTeams: espnConfig.totalTeams.toString(),
-        categories: JSON.stringify(espnConfig.categories),
-        rosterSlots: JSON.stringify(espnConfig.rosterSlots),
-        limit: "300",
-      });
-
-      if (options.position) params.set("position", options.position);
-
-      const url = `${normalizedBackendUrl}/api/draft/rankings?${params}`;
-
-      console.log("[API Client] Fetching generic draft rankings");
-
-      // Fetch with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-        mode: "cors",
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await parseJsonSafely(response);
-      const rankings = data?.rankings || [];
-
-      console.log("[API Client] Received", rankings.length, "rankings");
-
-      return rankings.length > 0 ? rankings : (baselineRankings as PlayerRanking[]);
-
-    } catch (error) {
-      console.warn("[API Client] Failed to fetch live rankings, using baseline:", error);
-      return baselineRankings as PlayerRanking[];
-    }
+    // Fallback: PitcherList-only rankings (no backend needed)
+    console.log("[API Client] Using bundled PitcherList rankings (no backend required)");
+    const pitcherListData = buildBundledRankings();
+    return pitcherListData.rankings;
   });
 }
 
@@ -1102,73 +1032,13 @@ export async function getAuctionValues(
         return draftBoardData.auctionValues;
       }
     } catch (error) {
-      console.warn("[API Client] Draft board data unavailable, falling back to VBD:", error);
+      console.warn("[API Client] Draft board data unavailable:", error);
     }
-    console.log("[API Client] Draft board data unavailable, falling back to VBD");
 
-    try {
-      const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
-      const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
-
-      // Fetch ESPN settings
-      console.log("[API Client] Fetching ESPN settings for auction values");
-      let espnConfig = await fetchEspnLeagueSettings(espnLeagueId);
-
-      // If ESPN settings failed (e.g., practice draft), try DOM detection
-      if (!espnConfig) {
-        console.log("[API Client] ESPN settings not available, attempting DOM detection");
-        const domDetection = detectLeagueConfig();
-
-        if (domDetection.config && domDetection.confidence !== "failed") {
-          console.log("[API Client] Using DOM-detected config for auction values");
-          espnConfig = domDetection.config;
-        } else {
-          console.warn("[API Client] DOM detection failed, no auction values available");
-          return [];
-        }
-      }
-
-      // Build query params
-      const params = new URLSearchParams({
-        numTeams: espnConfig.totalTeams.toString(),
-        categories: JSON.stringify(espnConfig.categories),
-        rosterSlots: JSON.stringify(espnConfig.rosterSlots),
-        budget: (options.budget || espnConfig.budget || 260).toString(),
-        minBid: "1",
-        limit: "300",
-      });
-
-      if (options.position) params.set("position", options.position);
-
-      const url = `${normalizedBackendUrl}/api/draft/auction?${params}`;
-
-      console.log("[API Client] Fetching generic auction values");
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-      const response = await fetch(url, {
-        signal: controller.signal,
-        mode: "cors",
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await parseJsonSafely(response);
-      const valuations = data?.valuations || [];
-
-      console.log("[API Client] Received", valuations.length, "auction values");
-
-      return valuations;
-
-    } catch (error) {
-      console.warn("[API Client] Failed to fetch auction values:", error);
-      return [];
-    }
+    // Fallback: PitcherList-only auction values (no backend needed)
+    console.log("[API Client] Using bundled PitcherList auction values (no backend required)");
+    const pitcherListData = buildBundledRankings();
+    return pitcherListData.auctionValues;
   });
 }
 
@@ -1225,30 +1095,6 @@ export async function getProjectedStandings(
   } catch {
     return null;
   }
-}
-
-/**
- * Generate baseline auction values from rankings (simple linear scale)
- */
-function generateBaselineAuctionValues(): AuctionValue[] {
-  const rankings = baselineRankings as PlayerRanking[];
-  const maxValue = 50; // Top player worth $50
-  const minValue = 1; // Bottom ranked player worth $1
-
-  return rankings.map((player, index) => {
-    // Linear scale from max to min based on ranking
-    const value = Math.round(
-      maxValue - (index / (rankings.length - 1)) * (maxValue - minValue),
-    );
-
-    return {
-      playerId: player.playerId,
-      playerName: player.playerName,
-      positions: player.positions,
-      dollarValue: Math.max(value, minValue),
-      vbdScore: player.vbdScore ?? 0,
-    };
-  });
 }
 
 /**

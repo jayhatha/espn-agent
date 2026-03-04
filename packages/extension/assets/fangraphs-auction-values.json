@@ -1,0 +1,2110 @@
+{
+  "hitters": [
+    {
+      "name": "Shohei Ohtani",
+      "team": "LAD",
+      "pos": "DH",
+      "dollars": 56.4,
+      "mlbamId": 660271,
+      "fgId": "19755"
+    },
+    {
+      "name": "Aaron Judge",
+      "team": "NYY",
+      "pos": "OF/DH",
+      "dollars": 52.6,
+      "mlbamId": 592450,
+      "fgId": "15640"
+    },
+    {
+      "name": "Bobby Witt Jr.",
+      "team": "KCR",
+      "pos": "SS",
+      "dollars": 49.7,
+      "mlbamId": 677951,
+      "fgId": "25764"
+    },
+    {
+      "name": "Ronald Acuna Jr.",
+      "team": "ATL",
+      "pos": "OF",
+      "dollars": 49.6,
+      "mlbamId": 660670,
+      "fgId": "18401"
+    },
+    {
+      "name": "Juan Soto",
+      "team": "NYM",
+      "pos": "OF",
+      "dollars": 45.8,
+      "mlbamId": 665742,
+      "fgId": "20123"
+    },
+    {
+      "name": "Vladimir Guerrero Jr.",
+      "team": "TOR",
+      "pos": "1B/DH",
+      "dollars": 45.1,
+      "mlbamId": 665489,
+      "fgId": "19611"
+    },
+    {
+      "name": "Gunnar Henderson",
+      "team": "BAL",
+      "pos": "SS",
+      "dollars": 39.5,
+      "mlbamId": 683002,
+      "fgId": "26289"
+    },
+    {
+      "name": "Yordan Alvarez",
+      "team": "HOU",
+      "pos": "DH",
+      "dollars": 38,
+      "mlbamId": 670541,
+      "fgId": "19556"
+    },
+    {
+      "name": "Jose Ramirez",
+      "team": "CLE",
+      "pos": "3B/DH",
+      "dollars": 37.2,
+      "mlbamId": 608070,
+      "fgId": "13510"
+    },
+    {
+      "name": "Corbin Carroll",
+      "team": "ARI",
+      "pos": "OF",
+      "dollars": 36.8,
+      "mlbamId": 682998,
+      "fgId": "25878"
+    },
+    {
+      "name": "Julio Rodriguez",
+      "team": "SEA",
+      "pos": "OF",
+      "dollars": 35.8,
+      "mlbamId": 677594,
+      "fgId": "23697"
+    },
+    {
+      "name": "Fernando Tatis Jr.",
+      "team": "SDP",
+      "pos": "OF",
+      "dollars": 34.6,
+      "mlbamId": 665487,
+      "fgId": "19709"
+    },
+    {
+      "name": "Elly De La Cruz",
+      "team": "CIN",
+      "pos": "SS",
+      "dollars": 33.6,
+      "mlbamId": 682829,
+      "fgId": "26668"
+    },
+    {
+      "name": "Freddie Freeman",
+      "team": "LAD",
+      "pos": "1B",
+      "dollars": 33.2,
+      "mlbamId": 518692,
+      "fgId": "5361"
+    },
+    {
+      "name": "Kyle Tucker",
+      "team": "LAD",
+      "pos": "OF",
+      "dollars": 31.7,
+      "mlbamId": 663656,
+      "fgId": "18345"
+    },
+    {
+      "name": "Bryce Harper",
+      "team": "PHI",
+      "pos": "1B",
+      "dollars": 30.1,
+      "mlbamId": 547180,
+      "fgId": "11579"
+    },
+    {
+      "name": "Ketel Marte",
+      "team": "ARI",
+      "pos": "2B/DH",
+      "dollars": 29.4,
+      "mlbamId": 606466,
+      "fgId": "13613"
+    },
+    {
+      "name": "Trea Turner",
+      "team": "PHI",
+      "pos": "SS",
+      "dollars": 27.3,
+      "mlbamId": 607208,
+      "fgId": "16252"
+    },
+    {
+      "name": "Pete Alonso",
+      "team": "BAL",
+      "pos": "1B",
+      "dollars": 25.9,
+      "mlbamId": 624413,
+      "fgId": "19251"
+    },
+    {
+      "name": "Jackson Chourio",
+      "team": "MIL",
+      "pos": "OF",
+      "dollars": 25.9,
+      "mlbamId": 694192,
+      "fgId": "28806"
+    },
+    {
+      "name": "Mookie Betts",
+      "team": "LAD",
+      "pos": "SS",
+      "dollars": 24.6,
+      "mlbamId": 605141,
+      "fgId": "13611"
+    },
+    {
+      "name": "Matt Olson",
+      "team": "ATL",
+      "pos": "1B",
+      "dollars": 24.5,
+      "mlbamId": 621566,
+      "fgId": "14344"
+    },
+    {
+      "name": "Yandy Diaz",
+      "team": "TBR",
+      "pos": "1B/DH",
+      "dollars": 24.1,
+      "mlbamId": 650490,
+      "fgId": "16578"
+    },
+    {
+      "name": "Francisco Lindor",
+      "team": "NYM",
+      "pos": "SS",
+      "dollars": 23.1,
+      "mlbamId": 596019,
+      "fgId": "12916"
+    },
+    {
+      "name": "Brent Rooker",
+      "team": "ATH",
+      "pos": "OF/DH",
+      "dollars": 23,
+      "mlbamId": 667670,
+      "fgId": "19627"
+    },
+    {
+      "name": "Maikel Garcia",
+      "team": "KCR",
+      "pos": "3B",
+      "dollars": 22.9,
+      "mlbamId": 672580,
+      "fgId": "22715"
+    },
+    {
+      "name": "Junior Caminero",
+      "team": "TBR",
+      "pos": "3B",
+      "dollars": 22.7,
+      "mlbamId": 691406,
+      "fgId": "28163"
+    },
+    {
+      "name": "Kyle Schwarber",
+      "team": "PHI",
+      "pos": "DH",
+      "dollars": 21.8,
+      "mlbamId": 656941,
+      "fgId": "16478"
+    },
+    {
+      "name": "Zach Neto",
+      "team": "LAA",
+      "pos": "SS",
+      "dollars": 21.2,
+      "mlbamId": 687263,
+      "fgId": "31347"
+    },
+    {
+      "name": "Manny Machado",
+      "team": "SDP",
+      "pos": "3B",
+      "dollars": 21,
+      "mlbamId": 592518,
+      "fgId": "11493"
+    },
+    {
+      "name": "George Springer",
+      "team": "TOR",
+      "pos": "OF/DH",
+      "dollars": 20.9,
+      "mlbamId": 543807,
+      "fgId": "12856"
+    },
+    {
+      "name": "Bo Bichette",
+      "team": "NYM",
+      "pos": "SS",
+      "dollars": 20.8,
+      "mlbamId": 666182,
+      "fgId": "19612"
+    },
+    {
+      "name": "Josh Naylor",
+      "team": "SEA",
+      "pos": "1B/DH",
+      "dollars": 20.6,
+      "mlbamId": 647304,
+      "fgId": "18839"
+    },
+    {
+      "name": "Wyatt Langford",
+      "team": "TEX",
+      "pos": "OF",
+      "dollars": 20.5,
+      "mlbamId": 694671,
+      "fgId": "33333"
+    },
+    {
+      "name": "Corey Seager",
+      "team": "TEX",
+      "pos": "SS",
+      "dollars": 19.4,
+      "mlbamId": 608369,
+      "fgId": "13624"
+    },
+    {
+      "name": "Jackson Merrill",
+      "team": "SDP",
+      "pos": "OF",
+      "dollars": 18.9,
+      "mlbamId": 701538,
+      "fgId": "29490"
+    },
+    {
+      "name": "Luis Arraez",
+      "team": "SFG",
+      "pos": "1B/DH",
+      "dollars": 18.8,
+      "mlbamId": 650333,
+      "fgId": "18568"
+    },
+    {
+      "name": "Vinnie Pasquantino",
+      "team": "KCR",
+      "pos": "1B/DH",
+      "dollars": 18.8,
+      "mlbamId": 686469,
+      "fgId": "27676"
+    },
+    {
+      "name": "Nick Kurtz",
+      "team": "ATH",
+      "pos": "1B",
+      "dollars": 18.8,
+      "mlbamId": 701762,
+      "fgId": "35110"
+    },
+    {
+      "name": "Cody Bellinger",
+      "team": "NYY",
+      "pos": "OF",
+      "dollars": 18.6,
+      "mlbamId": 641355,
+      "fgId": "15998"
+    },
+    {
+      "name": "Jeremy Pena",
+      "team": "HOU",
+      "pos": "SS",
+      "dollars": 18.2,
+      "mlbamId": 665161,
+      "fgId": "21636"
+    },
+    {
+      "name": "CJ Abrams",
+      "team": "WSN",
+      "pos": "SS",
+      "dollars": 17.7,
+      "mlbamId": 682928,
+      "fgId": "25768"
+    },
+    {
+      "name": "James Wood",
+      "team": "WSN",
+      "pos": "OF/DH",
+      "dollars": 17.2,
+      "mlbamId": 695578,
+      "fgId": "29518"
+    },
+    {
+      "name": "Rafael Devers",
+      "team": "SFG",
+      "pos": "1B/DH",
+      "dollars": 17.1,
+      "mlbamId": 646240,
+      "fgId": "17350"
+    },
+    {
+      "name": "Nico Hoerner",
+      "team": "CHC",
+      "pos": "2B",
+      "dollars": 17,
+      "mlbamId": 663538,
+      "fgId": "21479"
+    },
+    {
+      "name": "Geraldo Perdomo",
+      "team": "ARI",
+      "pos": "SS",
+      "dollars": 16.9,
+      "mlbamId": 672695,
+      "fgId": "22799"
+    },
+    {
+      "name": "Alec Burleson",
+      "team": "STL",
+      "pos": "1B/OF/DH",
+      "dollars": 16.9,
+      "mlbamId": 676475,
+      "fgId": "27615"
+    },
+    {
+      "name": "Riley Greene",
+      "team": "DET",
+      "pos": "OF/DH",
+      "dollars": 16.8,
+      "mlbamId": 682985,
+      "fgId": "25976"
+    },
+    {
+      "name": "Jarren Duran",
+      "team": "BOS",
+      "pos": "OF",
+      "dollars": 16.7,
+      "mlbamId": 680776,
+      "fgId": "24617"
+    },
+    {
+      "name": "Austin Riley",
+      "team": "ATL",
+      "pos": "3B",
+      "dollars": 16.5,
+      "mlbamId": 663586,
+      "fgId": "18360"
+    },
+    {
+      "name": "Jose Altuve",
+      "team": "HOU",
+      "pos": "2B/OF/DH",
+      "dollars": 16.4,
+      "mlbamId": 514888,
+      "fgId": "5417"
+    },
+    {
+      "name": "Michael Harris II",
+      "team": "ATL",
+      "pos": "OF",
+      "dollars": 16.4,
+      "mlbamId": 671739,
+      "fgId": "25931"
+    },
+    {
+      "name": "Alex Bregman",
+      "team": "CHC",
+      "pos": "3B",
+      "dollars": 16.3,
+      "mlbamId": 608324,
+      "fgId": "17678"
+    },
+    {
+      "name": "Cal Raleigh",
+      "team": "SEA",
+      "pos": "C/DH",
+      "dollars": 16.1,
+      "mlbamId": 663728,
+      "fgId": "21534"
+    },
+    {
+      "name": "Brandon Nimmo",
+      "team": "TEX",
+      "pos": "OF",
+      "dollars": 16,
+      "mlbamId": 607043,
+      "fgId": "12927"
+    },
+    {
+      "name": "Pete Crow-Armstrong",
+      "team": "CHC",
+      "pos": "OF",
+      "dollars": 15.9,
+      "mlbamId": 691718,
+      "fgId": "27769"
+    },
+    {
+      "name": "William Contreras",
+      "team": "MIL",
+      "pos": "C/DH",
+      "dollars": 15.8,
+      "mlbamId": 661388,
+      "fgId": "20503"
+    },
+    {
+      "name": "Xavier Edwards",
+      "team": "MIA",
+      "pos": "2B/SS",
+      "dollars": 15.7,
+      "mlbamId": 669364,
+      "fgId": "22266"
+    },
+    {
+      "name": "Jazz Chisholm Jr.",
+      "team": "NYY",
+      "pos": "2B/3B",
+      "dollars": 15.7,
+      "mlbamId": 665862,
+      "fgId": "20454"
+    },
+    {
+      "name": "Steven Kwan",
+      "team": "CLE",
+      "pos": "OF",
+      "dollars": 15.6,
+      "mlbamId": 680757,
+      "fgId": "24610"
+    },
+    {
+      "name": "Brice Turang",
+      "team": "MIL",
+      "pos": "2B",
+      "dollars": 15.3,
+      "mlbamId": 668930,
+      "fgId": "22186"
+    },
+    {
+      "name": "Seiya Suzuki",
+      "team": "CHC",
+      "pos": "OF/DH",
+      "dollars": 14.1,
+      "mlbamId": 673548,
+      "fgId": "30116"
+    },
+    {
+      "name": "Ezequiel Tovar",
+      "team": "COL",
+      "pos": "SS",
+      "dollars": 13.6,
+      "mlbamId": 678662,
+      "fgId": "24064"
+    },
+    {
+      "name": "Byron Buxton",
+      "team": "MIN",
+      "pos": "OF",
+      "dollars": 13.4,
+      "mlbamId": 621439,
+      "fgId": "14161"
+    },
+    {
+      "name": "Oneil Cruz",
+      "team": "PIT",
+      "pos": "OF",
+      "dollars": 13.3,
+      "mlbamId": 665833,
+      "fgId": "21711"
+    },
+    {
+      "name": "Jacob Wilson",
+      "team": "ATH",
+      "pos": "SS",
+      "dollars": 13.2,
+      "mlbamId": 805779,
+      "fgId": "33266"
+    },
+    {
+      "name": "Teoscar Hernandez",
+      "team": "LAD",
+      "pos": "OF",
+      "dollars": 13.1,
+      "mlbamId": 606192,
+      "fgId": "13066"
+    },
+    {
+      "name": "Munetaka Murakami",
+      "team": "CHW",
+      "pos": "1B",
+      "dollars": 12.7,
+      "mlbamId": 808959,
+      "fgId": "sa3063258"
+    },
+    {
+      "name": "Jurickson Profar",
+      "team": "ATL",
+      "pos": "OF",
+      "dollars": 12.5,
+      "mlbamId": 595777,
+      "fgId": "10815"
+    },
+    {
+      "name": "Ivan Herrera",
+      "team": "STL",
+      "pos": "DH",
+      "dollars": 12.2,
+      "mlbamId": 671056,
+      "fgId": "20599"
+    },
+    {
+      "name": "Xander Bogaerts",
+      "team": "SDP",
+      "pos": "SS",
+      "dollars": 12,
+      "mlbamId": 593428,
+      "fgId": "12161"
+    },
+    {
+      "name": "Nolan Schanuel",
+      "team": "LAA",
+      "pos": "1B",
+      "dollars": 11.9,
+      "mlbamId": 694384,
+      "fgId": "33189"
+    },
+    {
+      "name": "Roman Anthony",
+      "team": "BOS",
+      "pos": "OF",
+      "dollars": 11.5,
+      "mlbamId": 701350,
+      "fgId": "31812"
+    },
+    {
+      "name": "Taylor Ward",
+      "team": "BAL",
+      "pos": "OF",
+      "dollars": 11.4,
+      "mlbamId": 621493,
+      "fgId": "17548"
+    },
+    {
+      "name": "Randy Arozarena",
+      "team": "SEA",
+      "pos": "OF",
+      "dollars": 11.1,
+      "mlbamId": 668227,
+      "fgId": "19290"
+    },
+    {
+      "name": "Gleyber Torres",
+      "team": "DET",
+      "pos": "2B",
+      "dollars": 10.5,
+      "mlbamId": 650402,
+      "fgId": "16997"
+    },
+    {
+      "name": "Masyn Winn",
+      "team": "STL",
+      "pos": "SS",
+      "dollars": 10.4,
+      "mlbamId": 691026,
+      "fgId": "27479"
+    },
+    {
+      "name": "Luke Keaschall",
+      "team": "MIN",
+      "pos": "2B",
+      "dollars": 10.3,
+      "mlbamId": 807712,
+      "fgId": "33321"
+    },
+    {
+      "name": "Ian Happ",
+      "team": "CHC",
+      "pos": "OF",
+      "dollars": 10.3,
+      "mlbamId": 664023,
+      "fgId": "17919"
+    },
+    {
+      "name": "Tyler Soderstrom",
+      "team": "ATH",
+      "pos": "1B/OF",
+      "dollars": 10.3,
+      "mlbamId": 691016,
+      "fgId": "27467"
+    },
+    {
+      "name": "Bryan Reynolds",
+      "team": "PIT",
+      "pos": "OF/DH",
+      "dollars": 9.9,
+      "mlbamId": 668804,
+      "fgId": "19326"
+    },
+    {
+      "name": "Alec Bohm",
+      "team": "PHI",
+      "pos": "3B",
+      "dollars": 9.6,
+      "mlbamId": 664761,
+      "fgId": "21618"
+    },
+    {
+      "name": "Michael Busch",
+      "team": "CHC",
+      "pos": "1B",
+      "dollars": 9.5,
+      "mlbamId": 683737,
+      "fgId": "26319"
+    },
+    {
+      "name": "Eugenio Suarez",
+      "team": "CIN",
+      "pos": "3B",
+      "dollars": 9.3,
+      "mlbamId": 553993,
+      "fgId": "12552"
+    },
+    {
+      "name": "Andy Pages",
+      "team": "LAD",
+      "pos": "OF",
+      "dollars": 8.9,
+      "mlbamId": 681624,
+      "fgId": "24816"
+    },
+    {
+      "name": "Brendan Donovan",
+      "team": "SEA",
+      "pos": "2B",
+      "dollars": 8.9,
+      "mlbamId": 680977,
+      "fgId": "24679"
+    },
+    {
+      "name": "Bryson Stott",
+      "team": "PHI",
+      "pos": "2B",
+      "dollars": 8.6,
+      "mlbamId": 681082,
+      "fgId": "26294"
+    },
+    {
+      "name": "Ceddanne Rafaela",
+      "team": "BOS",
+      "pos": "2B/OF",
+      "dollars": 8.5,
+      "mlbamId": 678882,
+      "fgId": "24262"
+    },
+    {
+      "name": "Luis Garcia Jr.",
+      "team": "WSN",
+      "pos": "2B",
+      "dollars": 8.5,
+      "mlbamId": 671277,
+      "fgId": "20391"
+    },
+    {
+      "name": "Shea Langeliers",
+      "team": "ATH",
+      "pos": "C",
+      "dollars": 8.2,
+      "mlbamId": 669127,
+      "fgId": "25816"
+    },
+    {
+      "name": "Ozzie Albies",
+      "team": "ATL",
+      "pos": "2B",
+      "dollars": 8.2,
+      "mlbamId": 645277,
+      "fgId": "16556"
+    },
+    {
+      "name": "Matt Chapman",
+      "team": "SFG",
+      "pos": "3B",
+      "dollars": 8.2,
+      "mlbamId": 656305,
+      "fgId": "16505"
+    },
+    {
+      "name": "Christian Yelich",
+      "team": "MIL",
+      "pos": "DH",
+      "dollars": 8,
+      "mlbamId": 592885,
+      "fgId": "11477"
+    },
+    {
+      "name": "Salvador Perez",
+      "team": "KCR",
+      "pos": "C/1B/DH",
+      "dollars": 8,
+      "mlbamId": 521692,
+      "fgId": "7304"
+    },
+    {
+      "name": "Jakob Marsee",
+      "team": "MIA",
+      "pos": "OF",
+      "dollars": 7.5,
+      "mlbamId": 805300,
+      "fgId": "31370"
+    },
+    {
+      "name": "Daylen Lile",
+      "team": "WSN",
+      "pos": "OF",
+      "dollars": 7.5,
+      "mlbamId": 695734,
+      "fgId": "29995"
+    },
+    {
+      "name": "Dylan Crews",
+      "team": "WSN",
+      "pos": "OF",
+      "dollars": 7.4,
+      "mlbamId": 686611,
+      "fgId": "33541"
+    },
+    {
+      "name": "Willy Adames",
+      "team": "SFG",
+      "pos": "SS",
+      "dollars": 7.1,
+      "mlbamId": 642715,
+      "fgId": "15986"
+    },
+    {
+      "name": "Lawrence Butler",
+      "team": "ATH",
+      "pos": "OF",
+      "dollars": 7,
+      "mlbamId": 671732,
+      "fgId": "22542"
+    },
+    {
+      "name": "Chandler Simpson",
+      "team": "TBR",
+      "pos": "OF",
+      "dollars": 6.5,
+      "mlbamId": 802415,
+      "fgId": "31912"
+    },
+    {
+      "name": "Caleb Durbin",
+      "team": "BOS",
+      "pos": "3B",
+      "dollars": 6.4,
+      "mlbamId": 702332,
+      "fgId": "29646"
+    },
+    {
+      "name": "Carlos Correa",
+      "team": "HOU",
+      "pos": "3B/SS",
+      "dollars": 6.3,
+      "mlbamId": 621043,
+      "fgId": "14162"
+    },
+    {
+      "name": "Heliot Ramos",
+      "team": "SFG",
+      "pos": "OF",
+      "dollars": 6.1,
+      "mlbamId": 671218,
+      "fgId": "22515"
+    },
+    {
+      "name": "Drake Baldwin",
+      "team": "ATL",
+      "pos": "C",
+      "dollars": 6,
+      "mlbamId": 686948,
+      "fgId": "31539"
+    },
+    {
+      "name": "Marcus Semien",
+      "team": "NYM",
+      "pos": "2B",
+      "dollars": 5.9,
+      "mlbamId": 543760,
+      "fgId": "12533"
+    },
+    {
+      "name": "Hunter Goodman",
+      "team": "COL",
+      "pos": "C/DH",
+      "dollars": 5.8,
+      "mlbamId": 696100,
+      "fgId": "29715"
+    },
+    {
+      "name": "Yainer Diaz",
+      "team": "HOU",
+      "pos": "C/DH",
+      "dollars": 5.5,
+      "mlbamId": 673237,
+      "fgId": "23003"
+    },
+    {
+      "name": "Jake Burger",
+      "team": "TEX",
+      "pos": "1B",
+      "dollars": 5.5,
+      "mlbamId": 669394,
+      "fgId": "22275"
+    },
+    {
+      "name": "Sal Stewart",
+      "team": "CIN",
+      "pos": "1B/3B",
+      "dollars": 5.5,
+      "mlbamId": 701398,
+      "fgId": "31505"
+    },
+    {
+      "name": "Royce Lewis",
+      "team": "MIN",
+      "pos": "3B",
+      "dollars": 5.3,
+      "mlbamId": 668904,
+      "fgId": "20437"
+    },
+    {
+      "name": "Otto Lopez",
+      "team": "MIA",
+      "pos": "2B/SS",
+      "dollars": 5.2,
+      "mlbamId": 672640,
+      "fgId": "19608"
+    },
+    {
+      "name": "Isaac Paredes",
+      "team": "HOU",
+      "pos": "3B",
+      "dollars": 5.2,
+      "mlbamId": 670623,
+      "fgId": "20036"
+    },
+    {
+      "name": "Ben Rice",
+      "team": "NYY",
+      "pos": "C/1B/DH",
+      "dollars": 5.2,
+      "mlbamId": 700250,
+      "fgId": "29576"
+    },
+    {
+      "name": "Jung Hoo Lee",
+      "team": "SFG",
+      "pos": "OF",
+      "dollars": 5.2,
+      "mlbamId": 808982,
+      "fgId": "33824"
+    },
+    {
+      "name": "Willson Contreras",
+      "team": "BOS",
+      "pos": "1B",
+      "dollars": 5,
+      "mlbamId": 575929,
+      "fgId": "11609"
+    },
+    {
+      "name": "Luis Robert Jr.",
+      "team": "NYM",
+      "pos": "OF",
+      "dollars": 5,
+      "mlbamId": 673357,
+      "fgId": "20043"
+    },
+    {
+      "name": "Sal Frelick",
+      "team": "MIL",
+      "pos": "OF",
+      "dollars": 5,
+      "mlbamId": 686217,
+      "fgId": "29622"
+    },
+    {
+      "name": "Ryan O'Hearn",
+      "team": "PIT",
+      "pos": "1B/OF/DH",
+      "dollars": 5,
+      "mlbamId": 656811,
+      "fgId": "16442"
+    },
+    {
+      "name": "Wilyer Abreu",
+      "team": "BOS",
+      "pos": "OF",
+      "dollars": 4.9,
+      "mlbamId": 677800,
+      "fgId": "23772"
+    },
+    {
+      "name": "Jo Adell",
+      "team": "LAA",
+      "pos": "OF",
+      "dollars": 4.9,
+      "mlbamId": 666176,
+      "fgId": "20220"
+    },
+    {
+      "name": "Jordan Westburg",
+      "team": "BAL",
+      "pos": "3B",
+      "dollars": 4.8,
+      "mlbamId": 676059,
+      "fgId": "27815"
+    },
+    {
+      "name": "Kazuma Okamoto",
+      "team": "TOR",
+      "pos": "3B",
+      "dollars": 4.7,
+      "mlbamId": 672960,
+      "fgId": "sa3063134"
+    },
+    {
+      "name": "Adley Rutschman",
+      "team": "BAL",
+      "pos": "C",
+      "dollars": 4.5,
+      "mlbamId": 668939,
+      "fgId": "26288"
+    },
+    {
+      "name": "Jonathan Aranda",
+      "team": "TBR",
+      "pos": "1B",
+      "dollars": 4.4,
+      "mlbamId": 666018,
+      "fgId": "21837"
+    },
+    {
+      "name": "Jorge Polanco",
+      "team": "NYM",
+      "pos": "2B/DH",
+      "dollars": 4.2,
+      "mlbamId": 593871,
+      "fgId": "13152"
+    },
+    {
+      "name": "Will Smith",
+      "team": "LAD",
+      "pos": "C",
+      "dollars": 4,
+      "mlbamId": 669257,
+      "fgId": "19197"
+    },
+    {
+      "name": "Josh Bell",
+      "team": "MIN",
+      "pos": "1B/DH",
+      "dollars": 3.9,
+      "mlbamId": 605137,
+      "fgId": "13145"
+    },
+    {
+      "name": "Andres Gimenez",
+      "team": "TOR",
+      "pos": "2B",
+      "dollars": 3.8,
+      "mlbamId": 665926,
+      "fgId": "19950"
+    },
+    {
+      "name": "Kerry Carpenter",
+      "team": "DET",
+      "pos": "OF/DH",
+      "dollars": 3.7,
+      "mlbamId": 681481,
+      "fgId": "25961"
+    },
+    {
+      "name": "TJ Friedl",
+      "team": "CIN",
+      "pos": "OF",
+      "dollars": 3.5,
+      "mlbamId": 670770,
+      "fgId": "19522"
+    },
+    {
+      "name": "Mickey Moniak",
+      "team": "COL",
+      "pos": "OF",
+      "dollars": 3.5,
+      "mlbamId": 666160,
+      "fgId": "19956"
+    },
+    {
+      "name": "Kyle Stowers",
+      "team": "MIA",
+      "pos": "OF",
+      "dollars": 3.5,
+      "mlbamId": 669065,
+      "fgId": "26151"
+    },
+    {
+      "name": "Adolis Garcia",
+      "team": "PHI",
+      "pos": "OF",
+      "dollars": 3.3,
+      "mlbamId": 666969,
+      "fgId": "19287"
+    },
+    {
+      "name": "Ernie Clement",
+      "team": "TOR",
+      "pos": "2B/3B/SS",
+      "dollars": 3.3,
+      "mlbamId": 676391,
+      "fgId": "20352"
+    },
+    {
+      "name": "Brandon Lowe",
+      "team": "PIT",
+      "pos": "2B",
+      "dollars": 3.3,
+      "mlbamId": 664040,
+      "fgId": "18882"
+    },
+    {
+      "name": "Brenton Doyle",
+      "team": "COL",
+      "pos": "OF",
+      "dollars": 3.3,
+      "mlbamId": 686668,
+      "fgId": "25479"
+    },
+    {
+      "name": "Alejandro Kirk",
+      "team": "TOR",
+      "pos": "C",
+      "dollars": 3.1,
+      "mlbamId": 672386,
+      "fgId": "22581"
+    },
+    {
+      "name": "Jeff McNeil",
+      "team": "ATH",
+      "pos": "2B/OF",
+      "dollars": 2.8,
+      "mlbamId": 643446,
+      "fgId": "15362"
+    },
+    {
+      "name": "Nolan Arenado",
+      "team": "ARI",
+      "pos": "3B",
+      "dollars": 2.7,
+      "mlbamId": 571448,
+      "fgId": "9777"
+    },
+    {
+      "name": "Jordan Beck",
+      "team": "COL",
+      "pos": "OF",
+      "dollars": 2.7,
+      "mlbamId": 687597,
+      "fgId": "31431"
+    },
+    {
+      "name": "Lars Nootbaar",
+      "team": "STL",
+      "pos": "OF",
+      "dollars": 2.6,
+      "mlbamId": 663457,
+      "fgId": "21454"
+    },
+    {
+      "name": "Chase Meidroth",
+      "team": "CHW",
+      "pos": "2B/SS",
+      "dollars": 2.4,
+      "mlbamId": 805367,
+      "fgId": "31580"
+    },
+    {
+      "name": "Gabriel Moreno",
+      "team": "ARI",
+      "pos": "C",
+      "dollars": 2.2,
+      "mlbamId": 672515,
+      "fgId": "22664"
+    },
+    {
+      "name": "Trevor Story",
+      "team": "BOS",
+      "pos": "SS",
+      "dollars": 2.2,
+      "mlbamId": 596115,
+      "fgId": "12564"
+    },
+    {
+      "name": "Colt Keith",
+      "team": "DET",
+      "pos": "2B/3B/DH",
+      "dollars": 2.2,
+      "mlbamId": 690993,
+      "fgId": "27899"
+    },
+    {
+      "name": "Lourdes Gurriel Jr.",
+      "team": "ARI",
+      "pos": "OF",
+      "dollars": 2.2,
+      "mlbamId": 666971,
+      "fgId": "19238"
+    },
+    {
+      "name": "Noelvi Marte",
+      "team": "CIN",
+      "pos": "3B/OF",
+      "dollars": 1.9,
+      "mlbamId": 682622,
+      "fgId": "26517"
+    },
+    {
+      "name": "Spencer Torkelson",
+      "team": "DET",
+      "pos": "1B",
+      "dollars": 1.9,
+      "mlbamId": 679529,
+      "fgId": "27465"
+    },
+    {
+      "name": "Addison Barger",
+      "team": "TOR",
+      "pos": "3B/OF",
+      "dollars": 1.2,
+      "mlbamId": 680718,
+      "fgId": "24598"
+    },
+    {
+      "name": "Agustin Ramirez",
+      "team": "MIA",
+      "pos": "C/DH",
+      "dollars": 1,
+      "mlbamId": 682663,
+      "fgId": "26546"
+    },
+    {
+      "name": "Mark Vientos",
+      "team": "NYM",
+      "pos": "3B/DH",
+      "dollars": 1,
+      "mlbamId": 668901,
+      "fgId": "22184"
+    },
+    {
+      "name": "Willi Castro",
+      "team": "COL",
+      "pos": "2B/3B/OF",
+      "dollars": 1,
+      "mlbamId": 650489,
+      "fgId": "17338"
+    },
+    {
+      "name": "Dansby Swanson",
+      "team": "CHC",
+      "pos": "SS",
+      "dollars": 1,
+      "mlbamId": 621020,
+      "fgId": "18314"
+    },
+    {
+      "name": "Christian Walker",
+      "team": "HOU",
+      "pos": "1B",
+      "dollars": 1,
+      "mlbamId": 572233,
+      "fgId": "13419"
+    },
+    {
+      "name": "Josh Lowe",
+      "team": "LAA",
+      "pos": "OF",
+      "dollars": 1,
+      "mlbamId": 666139,
+      "fgId": "19953"
+    }
+  ],
+  "pitchers": [
+    {
+      "name": "Tarik Skubal",
+      "team": "DET",
+      "pos": "SP",
+      "dollars": 43.1,
+      "mlbamId": 669373,
+      "fgId": "22267"
+    },
+    {
+      "name": "Paul Skenes",
+      "team": "PIT",
+      "pos": "SP",
+      "dollars": 35.5,
+      "mlbamId": 694973,
+      "fgId": "33677"
+    },
+    {
+      "name": "Garrett Crochet",
+      "team": "BOS",
+      "pos": "SP",
+      "dollars": 34.6,
+      "mlbamId": 676979,
+      "fgId": "27463"
+    },
+    {
+      "name": "Chris Sale",
+      "team": "ATL",
+      "pos": "SP",
+      "dollars": 26.3,
+      "mlbamId": 519242,
+      "fgId": "10603"
+    },
+    {
+      "name": "Cristopher Sanchez",
+      "team": "PHI",
+      "pos": "SP",
+      "dollars": 23.4,
+      "mlbamId": 650911,
+      "fgId": "20778"
+    },
+    {
+      "name": "Zack Wheeler",
+      "team": "PHI",
+      "pos": "SP",
+      "dollars": 23.1,
+      "mlbamId": 554430,
+      "fgId": "10310"
+    },
+    {
+      "name": "Jacob deGrom",
+      "team": "TEX",
+      "pos": "SP",
+      "dollars": 21.7,
+      "mlbamId": 594798,
+      "fgId": "10954"
+    },
+    {
+      "name": "Mason Miller",
+      "team": "SDP",
+      "pos": "RP",
+      "dollars": 21.7,
+      "mlbamId": 695243,
+      "fgId": "31757"
+    },
+    {
+      "name": "Logan Gilbert",
+      "team": "SEA",
+      "pos": "SP",
+      "dollars": 21.4,
+      "mlbamId": 669302,
+      "fgId": "22250"
+    },
+    {
+      "name": "Cole Ragans",
+      "team": "KCR",
+      "pos": "SP",
+      "dollars": 20.1,
+      "mlbamId": 666142,
+      "fgId": "21846"
+    },
+    {
+      "name": "Bryan Woo",
+      "team": "SEA",
+      "pos": "SP",
+      "dollars": 19.8,
+      "mlbamId": 693433,
+      "fgId": "30279"
+    },
+    {
+      "name": "George Kirby",
+      "team": "SEA",
+      "pos": "SP",
+      "dollars": 19.3,
+      "mlbamId": 669923,
+      "fgId": "25436"
+    },
+    {
+      "name": "Logan Webb",
+      "team": "SFG",
+      "pos": "SP",
+      "dollars": 17.9,
+      "mlbamId": 657277,
+      "fgId": "17995"
+    },
+    {
+      "name": "Max Fried",
+      "team": "NYY",
+      "pos": "SP",
+      "dollars": 17.6,
+      "mlbamId": 608331,
+      "fgId": "13743"
+    },
+    {
+      "name": "Edwin Diaz",
+      "team": "LAD",
+      "pos": "RP",
+      "dollars": 16.8,
+      "mlbamId": 621242,
+      "fgId": "14710"
+    },
+    {
+      "name": "Dylan Cease",
+      "team": "TOR",
+      "pos": "SP",
+      "dollars": 16.4,
+      "mlbamId": 656302,
+      "fgId": "18525"
+    },
+    {
+      "name": "Cade Smith",
+      "team": "CLE",
+      "pos": "RP",
+      "dollars": 15.4,
+      "mlbamId": 671922,
+      "fgId": "27867"
+    },
+    {
+      "name": "Jesus Luzardo",
+      "team": "PHI",
+      "pos": "SP",
+      "dollars": 15.3,
+      "mlbamId": 666200,
+      "fgId": "19959"
+    },
+    {
+      "name": "Jhoan Duran",
+      "team": "PHI",
+      "pos": "RP",
+      "dollars": 15.1,
+      "mlbamId": 661395,
+      "fgId": "21029"
+    },
+    {
+      "name": "Shane McClanahan",
+      "team": "TBR",
+      "pos": "SP",
+      "dollars": 14.4,
+      "mlbamId": 663556,
+      "fgId": "21483"
+    },
+    {
+      "name": "Joe Ryan",
+      "team": "MIN",
+      "pos": "SP",
+      "dollars": 14.3,
+      "mlbamId": 657746,
+      "fgId": "21390"
+    },
+    {
+      "name": "Yoshinobu Yamamoto",
+      "team": "LAD",
+      "pos": "SP",
+      "dollars": 13.2,
+      "mlbamId": 808967,
+      "fgId": "33825"
+    },
+    {
+      "name": "David Bednar",
+      "team": "NYY",
+      "pos": "RP",
+      "dollars": 12.9,
+      "mlbamId": 670280,
+      "fgId": "19569"
+    },
+    {
+      "name": "Aroldis Chapman",
+      "team": "BOS",
+      "pos": "RP",
+      "dollars": 12.7,
+      "mlbamId": 547973,
+      "fgId": "10233"
+    },
+    {
+      "name": "Hunter Brown",
+      "team": "HOU",
+      "pos": "SP",
+      "dollars": 12.5,
+      "mlbamId": 686613,
+      "fgId": "25880"
+    },
+    {
+      "name": "Andres Munoz",
+      "team": "SEA",
+      "pos": "RP",
+      "dollars": 12.5,
+      "mlbamId": 662253,
+      "fgId": "20373"
+    },
+    {
+      "name": "Devin Williams",
+      "team": "NYM",
+      "pos": "RP",
+      "dollars": 12.4,
+      "mlbamId": 642207,
+      "fgId": "15816"
+    },
+    {
+      "name": "Hunter Greene",
+      "team": "CIN",
+      "pos": "SP",
+      "dollars": 12.4,
+      "mlbamId": 668881,
+      "fgId": "22182"
+    },
+    {
+      "name": "Sonny Gray",
+      "team": "BOS",
+      "pos": "SP",
+      "dollars": 12.1,
+      "mlbamId": 543243,
+      "fgId": "12768"
+    },
+    {
+      "name": "Nathan Eovaldi",
+      "team": "TEX",
+      "pos": "SP",
+      "dollars": 11.9,
+      "mlbamId": 543135,
+      "fgId": "9132"
+    },
+    {
+      "name": "Josh Hader",
+      "team": "HOU",
+      "pos": "RP",
+      "dollars": 11.8,
+      "mlbamId": 623352,
+      "fgId": "14212"
+    },
+    {
+      "name": "Shohei Ohtani",
+      "team": "LAD",
+      "pos": "SP",
+      "dollars": 11.8,
+      "mlbamId": 660271,
+      "fgId": "19755"
+    },
+    {
+      "name": "Framber Valdez",
+      "team": "DET",
+      "pos": "SP",
+      "dollars": 10.6,
+      "mlbamId": 664285,
+      "fgId": "17295"
+    },
+    {
+      "name": "Brandon Woodruff",
+      "team": "MIL",
+      "pos": "SP",
+      "dollars": 10.2,
+      "mlbamId": 605540,
+      "fgId": "16162"
+    },
+    {
+      "name": "Griffin Jax",
+      "team": "TBR",
+      "pos": "RP",
+      "dollars": 10.1,
+      "mlbamId": 643377,
+      "fgId": "20253"
+    },
+    {
+      "name": "Tyler Glasnow",
+      "team": "LAD",
+      "pos": "SP",
+      "dollars": 10,
+      "mlbamId": 607192,
+      "fgId": "14374"
+    },
+    {
+      "name": "Blake Snell",
+      "team": "LAD",
+      "pos": "SP",
+      "dollars": 9.5,
+      "mlbamId": 605483,
+      "fgId": "13543"
+    },
+    {
+      "name": "Jeff Hoffman",
+      "team": "TOR",
+      "pos": "RP",
+      "dollars": 9.4,
+      "mlbamId": 656546,
+      "fgId": "17432"
+    },
+    {
+      "name": "Ryan Walker",
+      "team": "SFG",
+      "pos": "RP",
+      "dollars": 9.1,
+      "mlbamId": 676254,
+      "fgId": "20423"
+    },
+    {
+      "name": "Freddy Peralta",
+      "team": "NYM",
+      "pos": "SP",
+      "dollars": 9,
+      "mlbamId": 642547,
+      "fgId": "18679"
+    },
+    {
+      "name": "Spencer Strider",
+      "team": "ATL",
+      "pos": "SP",
+      "dollars": 8.8,
+      "mlbamId": 675911,
+      "fgId": "27498"
+    },
+    {
+      "name": "Drew Rasmussen",
+      "team": "TBR",
+      "pos": "SP",
+      "dollars": 8.7,
+      "mlbamId": 656876,
+      "fgId": "25385"
+    },
+    {
+      "name": "Nick Pivetta",
+      "team": "SDP",
+      "pos": "SP",
+      "dollars": 8.4,
+      "mlbamId": 601713,
+      "fgId": "15454"
+    },
+    {
+      "name": "Chase Burns",
+      "team": "CIN",
+      "pos": "SP",
+      "dollars": 7.7,
+      "mlbamId": 695505,
+      "fgId": "35333"
+    },
+    {
+      "name": "Luis Castillo",
+      "team": "SEA",
+      "pos": "SP",
+      "dollars": 7.7,
+      "mlbamId": 622491,
+      "fgId": "15689"
+    },
+    {
+      "name": "Abner Uribe",
+      "team": "MIL",
+      "pos": "RP",
+      "dollars": 7.6,
+      "mlbamId": 682842,
+      "fgId": "25327"
+    },
+    {
+      "name": "Ryan Helsley",
+      "team": "BAL",
+      "pos": "RP",
+      "dollars": 7.4,
+      "mlbamId": 664854,
+      "fgId": "18138"
+    },
+    {
+      "name": "Daniel Palencia",
+      "team": "CHC",
+      "pos": "RP",
+      "dollars": 7.4,
+      "mlbamId": 694037,
+      "fgId": "27914"
+    },
+    {
+      "name": "Kyle Bradish",
+      "team": "BAL",
+      "pos": "SP",
+      "dollars": 7.1,
+      "mlbamId": 680694,
+      "fgId": "24586"
+    },
+    {
+      "name": "Raisel Iglesias",
+      "team": "ATL",
+      "pos": "RP",
+      "dollars": 6.9,
+      "mlbamId": 628452,
+      "fgId": "17130"
+    },
+    {
+      "name": "Michael King",
+      "team": "SDP",
+      "pos": "SP",
+      "dollars": 6.8,
+      "mlbamId": 650633,
+      "fgId": "19853"
+    },
+    {
+      "name": "Emmet Sheehan",
+      "team": "LAD",
+      "pos": "SP",
+      "dollars": 6.6,
+      "mlbamId": 686218,
+      "fgId": "29839"
+    },
+    {
+      "name": "MacKenzie Gore",
+      "team": "TEX",
+      "pos": "SP",
+      "dollars": 6.5,
+      "mlbamId": 669022,
+      "fgId": "22201"
+    },
+    {
+      "name": "Pete Fairbanks",
+      "team": "MIA",
+      "pos": "RP",
+      "dollars": 6.4,
+      "mlbamId": 664126,
+      "fgId": "17998"
+    },
+    {
+      "name": "Aaron Nola",
+      "team": "PHI",
+      "pos": "SP",
+      "dollars": 6.3,
+      "mlbamId": 605400,
+      "fgId": "16149"
+    },
+    {
+      "name": "Trey Yesavage",
+      "team": "TOR",
+      "pos": "SP",
+      "dollars": 6,
+      "mlbamId": 702056,
+      "fgId": "35456"
+    },
+    {
+      "name": "Grant Taylor",
+      "team": "CHW",
+      "pos": "RP",
+      "dollars": 6,
+      "mlbamId": 691799,
+      "fgId": "33927"
+    },
+    {
+      "name": "Joe Musgrove",
+      "team": "SDP",
+      "pos": "SP",
+      "dollars": 5.7,
+      "mlbamId": 605397,
+      "fgId": "12970"
+    },
+    {
+      "name": "Garrett Cleavinger",
+      "team": "TBR",
+      "pos": "RP",
+      "dollars": 5.6,
+      "mlbamId": 664076,
+      "fgId": "17897"
+    },
+    {
+      "name": "Trevor Megill",
+      "team": "MIL",
+      "pos": "RP",
+      "dollars": 5.5,
+      "mlbamId": 656730,
+      "fgId": "17722"
+    },
+    {
+      "name": "Kevin Gausman",
+      "team": "TOR",
+      "pos": "SP",
+      "dollars": 5.4,
+      "mlbamId": 592332,
+      "fgId": "14107"
+    },
+    {
+      "name": "Bryan Abreu",
+      "team": "HOU",
+      "pos": "RP",
+      "dollars": 5.4,
+      "mlbamId": 650556,
+      "fgId": "16609"
+    },
+    {
+      "name": "Eury Perez",
+      "team": "MIA",
+      "pos": "SP",
+      "dollars": 5.1,
+      "mlbamId": 691587,
+      "fgId": "27768"
+    },
+    {
+      "name": "Carlos Rodon",
+      "team": "NYY",
+      "pos": "SP",
+      "dollars": 5,
+      "mlbamId": 607074,
+      "fgId": "16137"
+    },
+    {
+      "name": "Shane Bieber",
+      "team": "TOR",
+      "pos": "SP",
+      "dollars": 4.9,
+      "mlbamId": 669456,
+      "fgId": "19427"
+    },
+    {
+      "name": "Robert Garcia",
+      "team": "TEX",
+      "pos": "RP",
+      "dollars": 4.8,
+      "mlbamId": 676395,
+      "fgId": "23363"
+    },
+    {
+      "name": "Jeremiah Estrada",
+      "team": "SDP",
+      "pos": "RP",
+      "dollars": 4.8,
+      "mlbamId": 669093,
+      "fgId": "22210"
+    },
+    {
+      "name": "Jack Flaherty",
+      "team": "DET",
+      "pos": "SP",
+      "dollars": 4.6,
+      "mlbamId": 656427,
+      "fgId": "17479"
+    },
+    {
+      "name": "Ranger Suarez",
+      "team": "BOS",
+      "pos": "SP",
+      "dollars": 4.5,
+      "mlbamId": 624133,
+      "fgId": "17277"
+    },
+    {
+      "name": "Sean Manaea",
+      "team": "NYM",
+      "pos": "SP",
+      "dollars": 4.5,
+      "mlbamId": 640455,
+      "fgId": "15873"
+    },
+    {
+      "name": "Gerrit Cole",
+      "team": "NYY",
+      "pos": "SP",
+      "dollars": 4.4,
+      "mlbamId": 543037,
+      "fgId": "13125"
+    },
+    {
+      "name": "Nick Lodolo",
+      "team": "CIN",
+      "pos": "SP",
+      "dollars": 4.2,
+      "mlbamId": 666157,
+      "fgId": "26378"
+    },
+    {
+      "name": "Cody Ponce",
+      "team": "TOR",
+      "pos": "SP",
+      "dollars": 4.2,
+      "mlbamId": 664074,
+      "fgId": "17920"
+    },
+    {
+      "name": "Matt Brash",
+      "team": "SEA",
+      "pos": "RP",
+      "dollars": 4.2,
+      "mlbamId": 666374,
+      "fgId": "25756"
+    },
+    {
+      "name": "Edwin Uceta",
+      "team": "TBR",
+      "pos": "RP",
+      "dollars": 4.1,
+      "mlbamId": 670955,
+      "fgId": "20539"
+    },
+    {
+      "name": "Matthew Boyd",
+      "team": "CHC",
+      "pos": "SP",
+      "dollars": 4.1,
+      "mlbamId": 571510,
+      "fgId": "15440"
+    },
+    {
+      "name": "Emilio Pagan",
+      "team": "CIN",
+      "pos": "RP",
+      "dollars": 4,
+      "mlbamId": 641941,
+      "fgId": "14771"
+    },
+    {
+      "name": "Jose A. Ferrer",
+      "team": "SEA",
+      "pos": "RP",
+      "dollars": 3.7,
+      "mlbamId": 678606,
+      "fgId": "24017"
+    },
+    {
+      "name": "Shota Imanaga",
+      "team": "CHC",
+      "pos": "SP",
+      "dollars": 3.4,
+      "mlbamId": 684007,
+      "fgId": "33829"
+    },
+    {
+      "name": "Ryan Pepiot",
+      "team": "TBR",
+      "pos": "SP",
+      "dollars": 3.4,
+      "mlbamId": 686752,
+      "fgId": "26221"
+    },
+    {
+      "name": "Grayson Rodriguez",
+      "team": "LAA",
+      "pos": "SP",
+      "dollars": 3.3,
+      "mlbamId": 680570,
+      "fgId": "24492"
+    },
+    {
+      "name": "Robert Suarez",
+      "team": "ATL",
+      "pos": "RP",
+      "dollars": 3.2,
+      "mlbamId": 663158,
+      "fgId": "30115"
+    },
+    {
+      "name": "Spencer Schwellenbach",
+      "team": "ATL",
+      "pos": "SP",
+      "dollars": 3.1,
+      "mlbamId": 680885,
+      "fgId": "31846"
+    },
+    {
+      "name": "Will Vest",
+      "team": "DET",
+      "pos": "RP",
+      "dollars": 3.1,
+      "mlbamId": 676684,
+      "fgId": "19769"
+    },
+    {
+      "name": "Gabe Speier",
+      "team": "SEA",
+      "pos": "RP",
+      "dollars": 2.8,
+      "mlbamId": 642100,
+      "fgId": "17170"
+    },
+    {
+      "name": "Garrett Whitlock",
+      "team": "BOS",
+      "pos": "RP",
+      "dollars": 2.7,
+      "mlbamId": 676477,
+      "fgId": "20191"
+    },
+    {
+      "name": "Louis Varland",
+      "team": "TOR",
+      "pos": "RP",
+      "dollars": 2.7,
+      "mlbamId": 686973,
+      "fgId": "27691"
+    },
+    {
+      "name": "Kenley Jansen",
+      "team": "DET",
+      "pos": "RP",
+      "dollars": 2.7,
+      "mlbamId": 445276,
+      "fgId": "3096"
+    },
+    {
+      "name": "Nolan McLean",
+      "team": "NYM",
+      "pos": "SP",
+      "dollars": 2.5,
+      "mlbamId": 690997,
+      "fgId": "33703"
+    },
+    {
+      "name": "Fernando Cruz",
+      "team": "NYY",
+      "pos": "RP",
+      "dollars": 2.5,
+      "mlbamId": 518585,
+      "fgId": "7048"
+    },
+    {
+      "name": "Ryan Weathers",
+      "team": "NYY",
+      "pos": "SP",
+      "dollars": 2.5,
+      "mlbamId": 677960,
+      "fgId": "23796"
+    },
+    {
+      "name": "Adrian Morejon",
+      "team": "SDP",
+      "pos": "RP",
+      "dollars": 2.1,
+      "mlbamId": 670970,
+      "fgId": "20039"
+    },
+    {
+      "name": "Hunter Harvey",
+      "team": "CHC",
+      "pos": "RP",
+      "dollars": 2.1,
+      "mlbamId": 640451,
+      "fgId": "15507"
+    },
+    {
+      "name": "Braxton Garrett",
+      "team": "MIA",
+      "pos": "SP",
+      "dollars": 2.1,
+      "mlbamId": 666129,
+      "fgId": "21844"
+    },
+    {
+      "name": "Seranthony Dominguez",
+      "team": "CHW",
+      "pos": "RP",
+      "dollars": 2.1,
+      "mlbamId": 622554,
+      "fgId": "19249"
+    },
+    {
+      "name": "Jose Alvarado",
+      "team": "PHI",
+      "pos": "RP",
+      "dollars": 2,
+      "mlbamId": 621237,
+      "fgId": "17780"
+    },
+    {
+      "name": "Jared Jones",
+      "team": "PIT",
+      "pos": "SP",
+      "dollars": 2,
+      "mlbamId": 683003,
+      "fgId": "27863"
+    },
+    {
+      "name": "Dennis Santana",
+      "team": "PIT",
+      "pos": "RP",
+      "dollars": 1.9,
+      "mlbamId": 642701,
+      "fgId": "17878"
+    },
+    {
+      "name": "Justin Steele",
+      "team": "CHC",
+      "pos": "SP",
+      "dollars": 1.7,
+      "mlbamId": 657006,
+      "fgId": "17312"
+    },
+    {
+      "name": "David Peterson",
+      "team": "NYM",
+      "pos": "SP",
+      "dollars": 1.7,
+      "mlbamId": 656849,
+      "fgId": "20302"
+    },
+    {
+      "name": "Riley O'Brien",
+      "team": "STL",
+      "pos": "RP",
+      "dollars": 1.7,
+      "mlbamId": 676617,
+      "fgId": "20348"
+    },
+    {
+      "name": "Robert Stephenson",
+      "team": "LAA",
+      "pos": "RP",
+      "dollars": 1.6,
+      "mlbamId": 596112,
+      "fgId": "13594"
+    },
+    {
+      "name": "Chris Martin",
+      "team": "TEX",
+      "pos": "RP",
+      "dollars": 1.5,
+      "mlbamId": 455119,
+      "fgId": "11847"
+    },
+    {
+      "name": "A.J. Minter",
+      "team": "NYM",
+      "pos": "RP",
+      "dollars": 1.3,
+      "mlbamId": 621345,
+      "fgId": "18655"
+    },
+    {
+      "name": "Tanner Scott",
+      "team": "LAD",
+      "pos": "RP",
+      "dollars": 1.2,
+      "mlbamId": 656945,
+      "fgId": "17586"
+    },
+    {
+      "name": "Ben Joyce",
+      "team": "LAA",
+      "pos": "RP",
+      "dollars": 1.1,
+      "mlbamId": 690829,
+      "fgId": "31461"
+    },
+    {
+      "name": "Carlos Estevez",
+      "team": "KCR",
+      "pos": "RP",
+      "dollars": 1.1,
+      "mlbamId": 608032,
+      "fgId": "14542"
+    },
+    {
+      "name": "Tanner Bibee",
+      "team": "CLE",
+      "pos": "SP",
+      "dollars": 1,
+      "mlbamId": 676440,
+      "fgId": "30134"
+    }
+  ]
+}
