@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-04 - Completed quick task 32: Show draft board auction values and player rankings in extension
+Last activity: 2026-03-04 - Completed quick task 33: Fix budget zero on reload, dismissable warnings, FanGraphs auction values
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
@@ -327,9 +327,10 @@ None yet.
 | 29 | Add draft board column showing over-or-undervalued relative to ext ranking | 2026-03-04 | 1a9808d | ✅ | [29-add-draft-board-column-showing-over-or-u](./quick/29-add-draft-board-column-showing-over-or-u/) |
 | 31 | Redesign extension to match fonts and colors: Google Fonts import, design token migration across all components | 2026-03-04 | 08cf0f6 | ✅ | [31-redesign-extension-to-match-fonts-colors](./quick/31-redesign-extension-to-match-fonts-colors/) |
 | 32 | Show draft board auction values and PitcherList tier badges in nominated player banner and auction player cards | 2026-03-04 | e49c93f | ✅ | [32-show-draft-board-auction-values-and-play](./quick/32-show-draft-board-auction-values-and-play/) |
+| 33 | Fix budget zero on reload, dismissable warnings, FanGraphs auction values | 2026-03-04 | 721cb3f | ✅ | [33-fix-budget-showing-zero-on-reload-and-ma](./quick/33-fix-budget-showing-zero-on-reload-and-ma/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 32: Show draft board auction values and PitcherList tiers
+Stopped at: Completed quick task 33: Fix budget zero on reload + dismissable warnings
 Resume file: None
