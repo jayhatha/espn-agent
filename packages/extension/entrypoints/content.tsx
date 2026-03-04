@@ -433,15 +433,7 @@ export default defineContentScript({
 
         reactRootInstance = createRoot(reactRoot);
         reactRootInstance.render(
-          <div
-            style={{
-              height: "100%",
-              background: "#ffffff",
-              color: "#111827",
-              fontFamily:
-                'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            }}
-          >
+          <div className="h-full bg-surface text-content font-sans">
             <DraftSidebar />
           </div>,
         );
@@ -483,6 +475,11 @@ export default defineContentScript({
       popupDocument.body.style.background = "#ffffff";
       popupDocument.body.style.height = "100vh";
 
+      const fontLink = popupDocument.createElement("link");
+      fontLink.rel = "stylesheet";
+      fontLink.href = "https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap";
+      popupDocument.head.appendChild(fontLink);
+
       const styleSheet = popupDocument.createElement("style");
       styleSheet.textContent = contentStyles;
       popupDocument.head.appendChild(styleSheet);
@@ -493,15 +490,7 @@ export default defineContentScript({
 
       popoutRootInstance = createRoot(mountNode);
       popoutRootInstance.render(
-        <div
-          style={{
-            height: "100%",
-            background: "#ffffff",
-            color: "#111827",
-            fontFamily:
-              'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          }}
-        >
+        <div className="h-full bg-surface text-content font-sans">
           <DraftSidebar />
         </div>,
       );
