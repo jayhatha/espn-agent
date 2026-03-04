@@ -144,6 +144,7 @@ Plans:
 | 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
 | 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
 | 20. Deterministic Draft Engine | 2/2 | Complete    | 2026-03-04 | - |
+| 21. Build Archetype Analysis | - | 0/3 | Planning | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -342,3 +343,22 @@ Plans:
 Plans:
 - [ ] 20-01-PLAN.md — Extend Zustand store with allTeamBudgets and leagueCategories, create lib/engine/ with inflation, scarcity, category-gap, budget-curve models, alert generator, and orchestrator
 - [ ] 20-02-PLAN.md — Create useDraftEngineSignals hook, EngineAlerts and EngineInsights components, integrate into DraftSidebar, upgrade AuctionBudgetTracker
+
+### Phase 21: Dynamic build archetype analysis — show how roster commitments constrain remaining draft strategy using FanGraphs projections and auction values
+
+**Goal:** Show the user during a live auction draft how their roster picks shape their team archetype and what strategic paths remain, by computing category ceilings via greedy fill, classifying build archetypes, and identifying pivot players — all using bundled FanGraphs projections and auction values running offline in the extension sidebar
+**Depends on:** Phase 20
+**Success Criteria** (what must be TRUE):
+  1. FanGraphs leaderboard projections and auction calculator data bundled as typed JSON assets in the extension
+  2. Category ceilings computed via greedy fill showing current totals, optimal-fill maximums, and competitive targets
+  3. Archetype classifier labels the team build (Power Build, Speed Build, Pitching-First, Balanced, etc.) with confidence indicator
+  4. Punt detection flags categories where ceiling falls below 70% of competitive target
+  5. Pivot players identified — specific affordable undrafted players that would unlock category ceiling improvements
+  6. Build Analysis panel replaces Category Gaps section in EngineInsights, collapsed by default
+  7. All engine code is pure deterministic functions within 300ms performance budget
+**Plans:** 3 plans
+
+Plans:
+- [ ] 21-01-PLAN.md — Convert FanGraphs CSVs to bundled JSON assets, create typed data module, extend engine types with BuildArchetypeSignal
+- [ ] 21-02-PLAN.md — Implement computeBuildArchetype pure function with greedy fill, archetype classification, ceiling computation (TDD), wire into engine orchestrator
+- [ ] 21-03-PLAN.md — Create BuildArchetypePanel UI component, replace Category Gaps in EngineInsights, visual verification
