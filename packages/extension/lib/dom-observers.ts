@@ -682,16 +682,24 @@ export function detectDraftFormat(): "snake" | "auction" {
     return "auction";
   }
 
-  // Strategy: Bid button detection
+  // Strategy: Bid/Offer button detection (ESPN uses "Offer $X" buttons)
   const hasBidButton = Array.from(document.querySelectorAll("button")).some(
-    (btn) => /bid/i.test(btn.textContent || ""),
+    (btn) => /bid|offer\s*\$/i.test(btn.textContent || ""),
   );
   if (hasBidButton) {
     return "auction";
   }
 
+  // Strategy: ESPN-specific auction selectors
+  const espnAuctionEls = document.querySelectorAll(
+    '.pickArea, [data-testid="player-selected"], .bidding-form__container, .current-amount, .playerinfo__playername',
+  );
+  if (espnAuctionEls.length > 0) {
+    return "auction";
+  }
+
   // Strategy: Nomination-related text patterns
-  if (/up for bid|current nomination|place.*bid|nominating/i.test(draftBoardText)) {
+  if (/up for bid|current (offer|nomination)|place.*bid|nominating|pre-draft val/i.test(draftBoardText)) {
     return "auction";
   }
 
@@ -918,22 +926,25 @@ export function logRosterDiagnostics(): void {
 /**
  * Current auction player selector strategies
  * ESPN displays the current player up for auction with bidding UI
+ *
+ * Real ESPN DOM (2026):
+ *   div.pickArea > div[data-testid="player-selected"].player-selected
+ *     span.playerinfo__playername  → player name
+ *     span.playerinfo__playerpos   → position
+ *     span.playerinfo__playerteam  → MLB team
+ *     div.current-amount           → "Current offer: $1"
+ *     img src="/players/full/42404.png" → player ID
  */
 const CURRENT_AUCTION_PLAYER_SELECTORS = [
-  // Primary: ESPN's typical current player containers
-  ".currentPlayer",
-  '[class*="currentPlayer"]',
-  '[class*="CurrentPlayer"]',
+  // Primary: ESPN's actual auction selectors (verified 2026)
+  '[data-testid="player-selected"]',
+  ".player-selected",
+  ".pickArea",
 
-  // Secondary: Active player containers
-  ".activePlayer",
+  // Fallback: Broader patterns
+  '[class*="currentPlayer"]',
   '[class*="activePlayer"]',
   '[data-testid*="current-player"]',
-
-  // Fallback: Auction header often contains current player
-  ".auctionHeader",
-  '[class*="auctionHeader"]',
-  '[class*="auction-header"]',
 ].join(", ");
 
 export interface CurrentAuctionPlayer {
@@ -945,71 +956,40 @@ export interface CurrentAuctionPlayer {
 
 /**
  * Parse current auction player from ESPN DOM element
- * Extracts player name, current bid, positions
+ * Uses real ESPN selectors verified against live auction draft pages (2026)
  */
 export function parseCurrentAuctionPlayer(
   playerElement: Element,
 ): CurrentAuctionPlayer | null {
   try {
-    // Strategy 1: Extract player name
-    const playerNameSelectors = [
-      ".playerName",
-      '[class*="playerName"]',
-      '[class*="PlayerName"]',
-      ".player-name",
-      ".name",
-      '[class*="name"]',
-      '[data-testid*="player-name"]',
-    ];
-
-    let playerNameEl: Element | null = null;
-    for (const selector of playerNameSelectors) {
-      playerNameEl = playerElement.querySelector(selector);
-      if (playerNameEl?.textContent?.trim()) break;
-    }
+    // ESPN uses .playerinfo__playername for the nominated player's name
+    const playerNameEl =
+      playerElement.querySelector(".playerinfo__playername") ||
+      playerElement.querySelector('[class*="playername"]') ||
+      playerElement.querySelector('[class*="playerName"]');
 
     const playerName = playerNameEl?.textContent?.trim();
     if (!playerName) {
       return null;
     }
 
-    // Strategy 2: Extract current bid
-    const bidSelectors = [
-      ".currentBid",
-      ".bid",
-      ".winningPrice",
-      '[class*="currentBid"]',
-      '[class*="bid"]',
-      '[class*="price"]',
-      '[data-testid*="bid"]',
-      '[data-testid*="price"]',
-    ];
+    // ESPN uses .current-amount with text like "Current offer: $1"
+    const bidEl =
+      playerElement.querySelector(".current-amount") ||
+      playerElement.querySelector('[class*="current-amount"]') ||
+      playerElement.querySelector('[class*="currentBid"]');
 
-    let bidEl: Element | null = null;
-    for (const selector of bidSelectors) {
-      bidEl = playerElement.querySelector(selector);
-      if (bidEl?.textContent?.trim()) break;
+    let currentBid: number | undefined;
+    const bidText = bidEl?.textContent || "";
+    const bidMatch = bidText.match(/\$(\d+)/);
+    if (bidMatch) {
+      currentBid = parseInt(bidMatch[1], 10);
     }
 
-    const bidText = bidEl?.textContent;
-    const currentBid = bidText
-      ? parseInt(bidText.replace(/\D/g, "") || "0", 10) || undefined
-      : undefined;
-
-    // Strategy 3: Extract positions
-    const positionSelectors = [
-      ".positionPill",
-      ".position",
-      '[class*="position"]',
-      '[class*="Position"]',
-      '[data-testid*="position"]',
-    ];
-
-    let positionEl: Element | null = null;
-    for (const selector of positionSelectors) {
-      positionEl = playerElement.querySelector(selector);
-      if (positionEl?.textContent?.trim()) break;
-    }
+    // ESPN uses .playerinfo__playerpos for position (e.g., "RF")
+    const positionEl =
+      playerElement.querySelector(".playerinfo__playerpos") ||
+      playerElement.querySelector('[class*="playerpos"]');
 
     const positionText = positionEl?.textContent?.trim() || "";
     const positions = positionText
@@ -1018,22 +998,36 @@ export function parseCurrentAuctionPlayer(
       .map((part) => part.trim())
       .filter(Boolean);
 
-    // Strategy 4: Extract player ID if available
-    const playerId = parseInt(
-      playerElement.getAttribute("data-player-id") ||
-        playerElement.getAttribute("data-playerid") ||
-        "0",
-      10,
-    ) || undefined;
+    // Extract player ID from headshot URL: /players/full/42404.png
+    let playerId: number | undefined;
+    const headshotImg = playerElement.querySelector(
+      'img[src*="/players/full/"]',
+    );
+    if (headshotImg) {
+      const srcMatch = headshotImg
+        .getAttribute("src")
+        ?.match(/\/players\/full\/(\d+)\./);
+      if (srcMatch) {
+        playerId = parseInt(srcMatch[1], 10);
+      }
+    }
 
-    // Generate fallback ID if needed
-    const fallbackPlayerId = playerId || hashString(playerName.toLowerCase());
+    // Fallback: data attributes or hash
+    if (!playerId) {
+      playerId =
+        parseInt(
+          playerElement.getAttribute("data-player-id") ||
+            playerElement.getAttribute("data-playerid") ||
+            "0",
+          10,
+        ) || hashString(playerName.toLowerCase());
+    }
 
     return {
       playerName,
       currentBid,
       positions: positions.length > 0 ? positions : undefined,
-      playerId: fallbackPlayerId,
+      playerId,
     };
   } catch (error) {
     console.error(
