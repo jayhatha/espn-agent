@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-04 - Completed quick task 31: Redesign extension to match fonts and colors
+Last activity: 2026-03-04 - Completed quick task 32: Show draft board auction values and player rankings in extension
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
