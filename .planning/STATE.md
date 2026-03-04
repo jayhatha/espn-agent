@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 18 (Dashboard Compositional Layout)
 Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-04 - Completed quick task 29: Add Rank +/- column to draft board
+Last activity: 2026-03-04 - Completed quick task 30: Fix auction detection, nominated player banner, sidebar cleanup
 
 Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
 
@@ -121,6 +121,7 @@ Progress: Phase 18: [██████████] 100% (2 of 2 plans complete
 | Phase 18 P02 | 3 | 2 tasks | 4 files |
 | Phase quick-26 P01 | 1 | 2 tasks | 2 files |
 | Phase quick-29 P01 | 2 | 1 tasks | 1 files |
+| Phase quick-30 P01 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
