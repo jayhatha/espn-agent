@@ -257,6 +257,8 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-31]: Google Fonts loaded via both @import in content.css (for Shadow DOM sidebar) and a link element appended to popout window head
 - [Phase quick-31]: Inline fontFamily style in React root wrapper replaced with font-sans Tailwind class to use tailwind.config.js fontFamily.sans token
 - [Phase quick-31]: indigo-* color classes mapped to info-* tokens for consistency with design system
+- [Phase quick-32]: Add tierName/externalRank/espnAuctionValue to shared DraftRanking type so store typing is compatible and components can access fields without casting
+- [Phase quick-32]: Nominated banner dual lookup: auctionValues.find() for ESPN dollar value, rankings.find() for PitcherList tier — fixes pre-existing bug where rankings.dollarValue didn't exist on DraftRanking
 
 ### Roadmap Evolution
 
@@ -324,9 +326,10 @@ None yet.
 | 28 | Update extension to fetch from /api/draft/espn and merge with bundled PitcherList rankings | 2026-03-04 | d0ac457 | ✅ | [28-update-extension-to-rely-on-draft-board](./quick/28-update-extension-to-rely-on-draft-board/) |
 | 29 | Add draft board column showing over-or-undervalued relative to ext ranking | 2026-03-04 | 1a9808d | ✅ | [29-add-draft-board-column-showing-over-or-u](./quick/29-add-draft-board-column-showing-over-or-u/) |
 | 31 | Redesign extension to match fonts and colors: Google Fonts import, design token migration across all components | 2026-03-04 | 08cf0f6 | ✅ | [31-redesign-extension-to-match-fonts-colors](./quick/31-redesign-extension-to-match-fonts-colors/) |
+| 32 | Show draft board auction values and PitcherList tier badges in nominated player banner and auction player cards | 2026-03-04 | e49c93f | ✅ | [32-show-draft-board-auction-values-and-play](./quick/32-show-draft-board-auction-values-and-play/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 31: Redesign extension to match fonts and colors
+Stopped at: Completed quick task 32: Show draft board auction values and PitcherList tiers
 Resume file: None
