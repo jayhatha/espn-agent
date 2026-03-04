@@ -4,6 +4,7 @@ import { calculateBudgetPacing } from "../lib/value-calculations";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
 import DraftRecommendations from "./DraftRecommendations";
+import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
 
@@ -208,11 +209,13 @@ export default function DraftSidebar() {
         {draftFormat === "auction" ? (
           <>
             <AuctionBudgetTracker />
+            <PositionScarcityAlerts />
             <AuctionRecommendations />
           </>
         ) : (
           <>
             <RosterSummary />
+            <PositionScarcityAlerts />
             <SnakeTurnPairs />
             <DraftRecommendations />
           </>
