@@ -53,7 +53,6 @@ export default function AuctionRecommendations() {
     myRoster,
     rosterSize,
     allPicks,
-    currentAuctionPlayer,
   } = useDraftStore();
 
   // Calculate budget pacing for filtering
@@ -213,33 +212,6 @@ export default function AuctionRecommendations() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Current player up for auction */}
-      {currentAuctionPlayer && (
-        <div className="p-3 bg-blue-50 border-b border-blue-200">
-          <div className="text-xs font-medium text-blue-900 mb-1">NOW BIDDING</div>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-sm text-gray-900">
-                {currentAuctionPlayer.playerName}
-              </div>
-              {currentAuctionPlayer.positions && currentAuctionPlayer.positions.length > 0 && (
-                <div className="text-xs text-gray-600">
-                  {currentAuctionPlayer.positions.join(", ")}
-                </div>
-              )}
-            </div>
-            {currentAuctionPlayer.currentBid !== undefined && (
-              <div className="text-right">
-                <div className="text-xs text-gray-600">Current Bid</div>
-                <div className="text-lg font-bold text-blue-600">
-                  ${currentAuctionPlayer.currentBid}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Filter controls */}
       <div className="p-3 bg-gray-50 border-b space-y-2">
         <div className="flex gap-1 flex-wrap">

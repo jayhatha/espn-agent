@@ -590,6 +590,14 @@ export default defineContentScript({
         budget: latestState.remainingBudget || cachedLeagueConfig?.budget || 260,
       });
 
+      // Start auction player observer since we just switched to auction format
+      if (!auctionPlayerCleanup) {
+        auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
+          useDraftStore.getState().setCurrentAuctionPlayer(player);
+        });
+        console.log("[ESPN Draft Assistant] Started auction player observer after delayed detection");
+      }
+
       refreshAssistantData(); // Throttled, will respect 3s minimum
     }, 2000);
 

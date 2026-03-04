@@ -4,8 +4,6 @@ import { calculateBudgetPacing } from "../lib/value-calculations";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
 import DraftRecommendations from "./DraftRecommendations";
-import PickValueTracker from "./PickValueTracker";
-import ProjectedStandingsPanel from "./ProjectedStandingsPanel";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
 
@@ -19,6 +17,8 @@ export default function DraftSidebar() {
     myRoster,
     rosterSize,
     configWarnings,
+    currentAuctionPlayer,
+    rankings,
   } = useDraftStore();
 
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
@@ -131,21 +131,59 @@ export default function DraftSidebar() {
         </div>
       </div>
 
+      {/* Nominated Player Banner — fixed position, does not scroll */}
+      {draftFormat === "auction" && currentAuctionPlayer && (
+        <div className="p-4 bg-accent/5 border-b-2 border-accent">
+          <div className="text-xs font-semibold tracking-wide text-accent uppercase mb-1">Now Nominated</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-base font-semibold text-content">
+                {currentAuctionPlayer.playerName}
+              </div>
+              {currentAuctionPlayer.positions && currentAuctionPlayer.positions.length > 0 && (
+                <div className="text-body-sm text-content-secondary">
+                  {currentAuctionPlayer.positions.join(" / ")}
+                </div>
+              )}
+            </div>
+            <div className="text-right">
+              {currentAuctionPlayer.currentBid !== undefined && (
+                <div>
+                  <div className="text-xs text-content-secondary">Current Bid</div>
+                  <div className="text-h3 font-display text-accent">
+                    ${currentAuctionPlayer.currentBid}
+                  </div>
+                </div>
+              )}
+              {(() => {
+                const matchedRanking = rankings.find(r =>
+                  r.playerId === currentAuctionPlayer.playerId ||
+                  r.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
+                );
+                if (!matchedRanking?.dollarValue) return null;
+                return (
+                  <div className="text-xs text-content-secondary mt-0.5">
+                    Our Value: <span className="font-semibold">${matchedRanking.dollarValue}</span>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto flex flex-col">
-        <ProjectedStandingsPanel />
         {draftFormat === "auction" ? (
           <>
             <AuctionBudgetTracker />
             <AuctionRecommendations />
-            <PickValueTracker />
           </>
         ) : (
           <>
             <RosterSummary />
             <SnakeTurnPairs />
             <DraftRecommendations />
-            <PickValueTracker />
           </>
         )}
       </div>

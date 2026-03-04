@@ -669,6 +669,32 @@ export function detectDraftFormat(): "snake" | "auction" {
     return "auction";
   }
 
+  // Strategy: Nomination queue detection
+  const nominationEls = document.querySelectorAll(
+    '[class*="nominat"], [class*="Nominat"], [class*="queue"], [class*="Queue"]',
+  );
+  if (nominationEls.length > 0) {
+    return "auction";
+  }
+
+  // Strategy: Budget/dollar display text anywhere on page
+  if (/\$\d+\s*(remaining|left|budget)/i.test(draftBoardText)) {
+    return "auction";
+  }
+
+  // Strategy: Bid button detection
+  const hasBidButton = Array.from(document.querySelectorAll("button")).some(
+    (btn) => /bid/i.test(btn.textContent || ""),
+  );
+  if (hasBidButton) {
+    return "auction";
+  }
+
+  // Strategy: Nomination-related text patterns
+  if (/up for bid|current nomination|place.*bid|nominating/i.test(draftBoardText)) {
+    return "auction";
+  }
+
   // Default to snake
   return "snake";
 }
