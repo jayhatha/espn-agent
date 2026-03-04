@@ -1,9 +1,11 @@
 import React from "react";
 import { useDraftStore } from "../lib/draft-state";
-import { calculateBudgetPacing } from "../lib/value-calculations";
+import { useDraftEngineSignals } from "../lib/use-draft-engine";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
 import DraftRecommendations from "./DraftRecommendations";
+import EngineAlerts from "./EngineAlerts";
+import EngineInsights from "./EngineInsights";
 import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
@@ -16,6 +18,7 @@ export default function DraftSidebar() {
     draftFormat,
     currentPick,
     myRoster,
+    remainingBudget,
     rosterSize,
     configWarnings,
     dismissConfigWarnings,
@@ -25,7 +28,7 @@ export default function DraftSidebar() {
     espnDomAuctionValues,
   } = useDraftStore();
 
-  const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
+  const engineSignals = useDraftEngineSignals();
 
   const dispatchAssistantEvent = (eventName: string, detail?: unknown) => {
     const targetWindow =
@@ -133,7 +136,7 @@ export default function DraftSidebar() {
           <span>Pick #{currentPick}</span>
           {draftFormat === "auction" && (
             <span className="font-semibold">
-              ${pacing.remainingBudget} remaining
+              ${remainingBudget} remaining
             </span>
           )}
         </div>
@@ -223,7 +226,12 @@ export default function DraftSidebar() {
       <div className="flex-1 overflow-y-auto flex flex-col">
         {draftFormat === "auction" ? (
           <>
-            <AuctionBudgetTracker />
+            {/* Engine alerts at top -- most actionable */}
+            {engineSignals && engineSignals.alerts.length > 0 && (
+              <EngineAlerts alerts={engineSignals.alerts} />
+            )}
+            <AuctionBudgetTracker engineSignals={engineSignals} />
+            <EngineInsights engineSignals={engineSignals} />
             <PositionScarcityAlerts />
             <AuctionRecommendations />
           </>
@@ -236,6 +244,13 @@ export default function DraftSidebar() {
           </>
         )}
       </div>
+
+      {/* DEV-only performance indicator */}
+      {import.meta.env.DEV && engineSignals && (
+        <div className="text-body-xs text-content-secondary p-2 border-t border-surface-tertiary">
+          Engine: {engineSignals.computeTimeMs}ms
+        </div>
+      )}
     </div>
   );
 }
