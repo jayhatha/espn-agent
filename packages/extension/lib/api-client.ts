@@ -1,4 +1,5 @@
 import baselineRankings from "../assets/baseline-rankings.json";
+import pitcherlistRankings from "../assets/pitcherlist-rankings.json";
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 import { backOff } from "exponential-backoff";
 import { isPracticeDraft, detectLeagueConfig } from "./draft-config-detector";
@@ -265,6 +266,159 @@ function normalizeText(value: string): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Normalize player name for PitcherList matching (same logic as draft board page).
+ * Uses NFD (not NFKD) and strips everything except letters and spaces.
+ * Kept separate from normalizeText which is used for league name matching.
+ */
+function normalizeName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z\s]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+interface ESPNDraftPlayer {
+  playerId: number;
+  playerName: string;
+  positions: string[];
+  mlbTeam: string;
+  espnAuctionValue: number;
+  rotoAuctionValue: number;
+  averageDraftPosition: number;
+  averageAuctionValue: number;
+  percentOwned: number;
+  rank: number;
+}
+
+interface PitcherListRanking {
+  rank: number;
+  playerName: string;
+  tier: number;
+  tierName: string;
+  handedness: string;
+  team: string;
+}
+
+/**
+ * Fetch draft data from /api/draft/espn and merge with bundled PitcherList rankings.
+ * Uses the same data source as the admin draft board page for consistency.
+ * Returns null if fetch fails or returns empty data.
+ */
+export async function getDraftBoardData(): Promise<{
+  rankings: PlayerRanking[];
+  auctionValues: AuctionValue[];
+} | null> {
+  return dedupedRequest("draftBoardData", async () => {
+    try {
+      const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
+      const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+      const response = await fetch(`${normalizedBackendUrl}/api/draft/espn?limit=500`, {
+        signal: controller.signal,
+        mode: "cors",
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn("[API Client] Draft board endpoint returned", response.status);
+        return null;
+      }
+
+      const data = await parseJsonSafely(response);
+      const players: ESPNDraftPlayer[] = data?.players || [];
+
+      if (players.length === 0) {
+        console.warn("[API Client] Draft board endpoint returned empty players list");
+        return null;
+      }
+
+      // Build PitcherList lookup maps (same approach as draft board page matchPlayers)
+      const pitcherMap = new Map<string, PitcherListRanking>();
+      for (const ext of pitcherlistRankings.pitchers as PitcherListRanking[]) {
+        pitcherMap.set(normalizeName(ext.playerName), ext);
+      }
+      const hitterMap = new Map<string, PitcherListRanking>();
+      for (const ext of pitcherlistRankings.hitters as PitcherListRanking[]) {
+        hitterMap.set(normalizeName(ext.playerName), ext);
+      }
+      const relieverMap = new Map<string, PitcherListRanking>();
+      for (const ext of pitcherlistRankings.relievers as PitcherListRanking[]) {
+        relieverMap.set(normalizeName(ext.playerName), ext);
+      }
+
+      const rankings: PlayerRanking[] = [];
+      const auctionValues: AuctionValue[] = [];
+
+      for (const player of players) {
+        const normalized = normalizeName(player.playerName);
+
+        // Try exact match first (SP > RP > Hitter priority)
+        let match = pitcherMap.get(normalized) || relieverMap.get(normalized) || hitterMap.get(normalized);
+
+        // Try last name fallback
+        if (!match) {
+          const lastName = normalized.split(" ").pop() || "";
+          if (lastName.length > 3) {
+            for (const [key, val] of pitcherMap) {
+              if (key.endsWith(lastName) && !key.startsWith(lastName)) {
+                match = val;
+                break;
+              }
+            }
+            if (!match) {
+              for (const [key, val] of relieverMap) {
+                if (key.endsWith(lastName) && !key.startsWith(lastName)) {
+                  match = val;
+                  break;
+                }
+              }
+            }
+            if (!match) {
+              for (const [key, val] of hitterMap) {
+                if (key.endsWith(lastName) && !key.startsWith(lastName)) {
+                  match = val;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        rankings.push({
+          playerId: player.playerId,
+          playerName: player.playerName,
+          positions: player.positions,
+          primaryPosition: player.positions[0] || "UT",
+          vbdScore: player.espnAuctionValue,
+          tier: match?.tier ?? 99,
+          projectedStats: {},
+        });
+
+        auctionValues.push({
+          playerId: player.playerId,
+          playerName: player.playerName,
+          dollarValue: player.espnAuctionValue,
+          vbdScore: player.espnAuctionValue,
+          positions: player.positions,
+        });
+      }
+
+      console.log("[API Client] Using draft board data for rankings:", players.length, "players");
+      return { rankings, auctionValues };
+    } catch (error) {
+      console.warn("[API Client] getDraftBoardData failed:", error);
+      return null;
+    }
+  });
 }
 
 function extractPracticeDraftHints(titleText?: string): {
@@ -843,6 +997,18 @@ export async function getRankings(
   const cacheKey = `rankings:${espnLeagueId}:${JSON.stringify(options)}`;
 
   return dedupedRequest(cacheKey, async () => {
+    // Try draft board data first (ESPN ADP/auction merged with PitcherList)
+    try {
+      const draftBoardData = await getDraftBoardData();
+      if (draftBoardData && draftBoardData.rankings.length > 0) {
+        console.log("[API Client] Using draft board data for rankings");
+        return draftBoardData.rankings;
+      }
+    } catch (error) {
+      console.warn("[API Client] Draft board data unavailable, falling back to VBD:", error);
+    }
+    console.log("[API Client] Draft board data unavailable, falling back to VBD");
+
     try {
       const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
       const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
@@ -922,6 +1088,18 @@ export async function getAuctionValues(
   const cacheKey = `auction:${espnLeagueId}:${JSON.stringify(options)}`;
 
   return dedupedRequest(cacheKey, async () => {
+    // Try draft board data first (ESPN ADP/auction merged with PitcherList)
+    try {
+      const draftBoardData = await getDraftBoardData();
+      if (draftBoardData && draftBoardData.auctionValues.length > 0) {
+        console.log("[API Client] Using draft board data for auction values");
+        return draftBoardData.auctionValues;
+      }
+    } catch (error) {
+      console.warn("[API Client] Draft board data unavailable, falling back to VBD:", error);
+    }
+    console.log("[API Client] Draft board data unavailable, falling back to VBD");
+
     try {
       const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
       const normalizedBackendUrl = normalizeBackendUrl(backendUrl);
