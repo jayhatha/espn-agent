@@ -48,7 +48,14 @@ export default function AuctionPlayerCard({
   actualPrice,
 }: AuctionPlayerCardProps) {
   const auctionPlayer = player as AuctionValueWithOptionalVbd;
-  const { myRoster, rosterSize, rankings } = useDraftStore();
+  const { myRoster, rosterSize, rankings, espnDomAuctionValues } = useDraftStore();
+
+  // Prefer DOM-scraped ESPN value (live from the draft page table) over
+  // the backend-derived dollarValue stored on the AuctionValue object.
+  const espnDisplayValue =
+    player.playerId && espnDomAuctionValues[player.playerId] !== undefined
+      ? espnDomAuctionValues[player.playerId]
+      : player.dollarValue;
 
   // Calculate value indicator
   const valueIndicator = calculateAuctionValue(player, actualPrice ?? null);
@@ -126,10 +133,15 @@ export default function AuctionPlayerCard({
         </div>
         <div className="text-right">
           <div className="text-h3 font-semibold text-content">
-            ${player.dollarValue}
+            ${espnDisplayValue}
           </div>
+          {espnDisplayValue !== player.dollarValue && (
+            <div className="text-caption text-content-tertiary">
+              VBD: ${player.dollarValue}
+            </div>
+          )}
           <div className="text-caption text-content-tertiary">
-            VBD: {formatNumber(auctionPlayer.vbdScore, 1)}
+            VBD score: {formatNumber(auctionPlayer.vbdScore, 1)}
           </div>
         </div>
       </div>

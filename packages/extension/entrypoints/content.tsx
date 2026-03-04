@@ -10,6 +10,7 @@ import {
   parseTeamRostersFromDOM,
   logRosterDiagnostics,
   observeCurrentAuctionPlayer,
+  scrapeESPNAuctionTable,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -507,10 +508,42 @@ export default defineContentScript({
 
     // Observe current auction player (auction only)
     let auctionPlayerCleanup: (() => void) | null = null;
+    let auctionTableScrapeInterval: ReturnType<typeof setInterval> | null = null;
+
+    const runAuctionTableScrape = () => {
+      try {
+        const scraped = scrapeESPNAuctionTable();
+        if (scraped.size > 0) {
+          const valuesRecord: Record<number, number> = {};
+          scraped.forEach((entry, playerId) => {
+            valuesRecord[playerId] = entry.espnValue;
+          });
+          useDraftStore.getState().setEspnDomAuctionValues(valuesRecord);
+        }
+      } catch (err) {
+        console.error(
+          "[ESPN Draft Assistant] Failed to scrape ESPN auction table:",
+          err,
+        );
+      }
+    };
+
+    const startAuctionTableScraping = () => {
+      if (auctionTableScrapeInterval) {
+        return; // Already running
+      }
+      // Initial scrape
+      runAuctionTableScrape();
+      // Re-scrape every 10 seconds to catch newly scrolled rows
+      auctionTableScrapeInterval = setInterval(runAuctionTableScrape, 10_000);
+      console.log("[ESPN Draft Assistant] Started ESPN auction table scraper (10s interval)");
+    };
+
     if (resolvedDraftFormat === "auction") {
       auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
         useDraftStore.getState().setCurrentAuctionPlayer(player);
       });
+      startAuctionTableScraping();
     }
 
     const sidebarMountObserver = new MutationObserver(() => {
@@ -587,6 +620,9 @@ export default defineContentScript({
         console.log("[ESPN Draft Assistant] Started auction player observer after delayed detection");
       }
 
+      // Start table scraping if not already running
+      startAuctionTableScraping();
+
       refreshAssistantData(); // Throttled, will respect 3s minimum
     }, 2000);
 
@@ -638,6 +674,9 @@ export default defineContentScript({
     window.addEventListener("beforeunload", () => {
       cleanup();
       auctionPlayerCleanup?.();
+      if (auctionTableScrapeInterval) {
+        clearInterval(auctionTableScrapeInterval);
+      }
       window.clearInterval(sidebarHeartbeat);
       window.clearInterval(popoutHeartbeat);
       sidebarMountObserver.disconnect();

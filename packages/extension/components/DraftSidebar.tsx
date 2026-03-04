@@ -22,6 +22,7 @@ export default function DraftSidebar() {
     currentAuctionPlayer,
     rankings,
     auctionValues,
+    espnDomAuctionValues,
   } = useDraftStore();
 
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
@@ -174,12 +175,26 @@ export default function DraftSidebar() {
                   r.playerId === currentAuctionPlayer.playerId ||
                   r.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
                 );
-                if (!matchedAuction && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
+
+                // Prefer DOM-scraped ESPN value for the nominated player
+                const domEspnValue =
+                  currentAuctionPlayer.playerId !== undefined
+                    ? espnDomAuctionValues[currentAuctionPlayer.playerId]
+                    : undefined;
+                const espnDisplayValue =
+                  domEspnValue !== undefined
+                    ? domEspnValue
+                    : matchedAuction?.dollarValue;
+
+                if (espnDisplayValue === undefined && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
                 return (
                   <div className="mt-1 space-y-0.5">
-                    {matchedAuction?.dollarValue !== undefined && (
+                    {espnDisplayValue !== undefined && (
                       <div className="text-xs text-content-secondary">
-                        ESPN Value: <span className="font-semibold">${matchedAuction.dollarValue}</span>
+                        ESPN Value: <span className="font-semibold">${espnDisplayValue}</span>
+                        {domEspnValue !== undefined && (
+                          <span className="ml-1 text-positive text-xs">(live)</span>
+                        )}
                       </div>
                     )}
                     {(matchedRanking?.tierName || matchedRanking?.externalRank) && (

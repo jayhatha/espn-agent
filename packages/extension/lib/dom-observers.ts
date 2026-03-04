@@ -1043,6 +1043,135 @@ export function parseCurrentAuctionPlayer(
   }
 }
 
+export interface ESPNAuctionTableEntry {
+  playerId: number;
+  playerName: string;
+  espnValue: number;
+  position: string;
+  team: string;
+}
+
+/**
+ * Scrape ESPN auction value table from the fixedDataTable on the draft page.
+ *
+ * DOM structure:
+ *   .fixedDataTableLayout_rowsContainer
+ *     .fixedDataTableRowLayout_main[role="row"][aria-rowindex="1"]  <- header (skip)
+ *     .fixedDataTableRowLayout_main[role="row"][aria-rowindex="2+"] <- data rows
+ *       first .public_fixedDataTableCell_cellContent -> "$XX"
+ *       a.player-news[title] -> player name
+ *       button[data-player-id] -> ESPN player ID
+ *       .positionPill -> position text
+ *       .playerinfo__playerteam -> team abbrev
+ *
+ * Falls back to headshot img URL (/players/full/XXXXX.png) for rows that
+ * lack a Queue button (players already owned by a team).
+ *
+ * Returns a Map keyed by playerId -> ESPNAuctionTableEntry.
+ * Returns empty Map when the table is not present on the page.
+ */
+export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
+  const result = new Map<number, ESPNAuctionTableEntry>();
+
+  const container = document.querySelector(
+    ".fixedDataTableLayout_rowsContainer",
+  );
+  if (!container) {
+    return result;
+  }
+
+  const rows = container.querySelectorAll<HTMLElement>(
+    '.fixedDataTableRowLayout_main[role="row"]',
+  );
+
+  for (const row of Array.from(rows)) {
+    // Skip header row (aria-rowindex="1")
+    const rowIndex = parseInt(row.getAttribute("aria-rowindex") || "0", 10);
+    if (rowIndex <= 1) {
+      continue;
+    }
+
+    try {
+      // Dollar value: first cell content e.g. "$56"
+      const firstCell = row.querySelector(
+        ".public_fixedDataTableCell_cellContent",
+      );
+      const valueText = firstCell?.textContent?.trim() || "";
+      const valueMatch = valueText.match(/^\$(\d+)/);
+      if (!valueMatch) {
+        // Not a player row (may be a filler/empty row)
+        continue;
+      }
+      const espnValue = parseInt(valueMatch[1], 10);
+
+      // Player name from the anchor title attribute
+      const playerNameAnchor = row.querySelector<HTMLAnchorElement>(
+        "a.player-news[title]",
+      );
+      const playerName = playerNameAnchor?.getAttribute("title")?.trim() || "";
+      if (!playerName) {
+        continue;
+      }
+
+      // Player ID: primary source is Queue button data-player-id
+      let playerId = 0;
+      const queueButton = row.querySelector<HTMLButtonElement>(
+        "button[data-player-id]",
+      );
+      if (queueButton) {
+        playerId = parseInt(
+          queueButton.getAttribute("data-player-id") || "0",
+          10,
+        );
+      }
+
+      // Fallback: extract from headshot img URL pattern /players/full/XXXXX.png
+      if (!playerId) {
+        const headshotImg = row.querySelector<HTMLImageElement>(
+          'img[src*="/players/full/"]',
+        );
+        if (headshotImg) {
+          const srcMatch = headshotImg
+            .getAttribute("src")
+            ?.match(/\/players\/full\/(\d+)\./);
+          if (srcMatch) {
+            playerId = parseInt(srcMatch[1], 10);
+          }
+        }
+      }
+
+      if (!playerId) {
+        // Cannot associate value with a player ID — skip
+        continue;
+      }
+
+      // Position from .positionPill
+      const positionEl = row.querySelector(".positionPill");
+      const position = positionEl?.textContent?.trim() || "";
+
+      // Team abbreviation from .playerinfo__playerteam
+      const teamEl = row.querySelector(".playerinfo__playerteam");
+      const team = teamEl?.textContent?.trim() || "";
+
+      result.set(playerId, { playerId, playerName, espnValue, position, team });
+    } catch (err) {
+      // Don't let a single row failure abort the rest
+      console.warn(
+        "[ESPN Draft Assistant] scrapeESPNAuctionTable: error parsing row",
+        err,
+      );
+    }
+  }
+
+  if (result.size > 0) {
+    console.log(
+      `[ESPN Draft Assistant] scrapeESPNAuctionTable: scraped ${result.size} entries`,
+    );
+  }
+
+  return result;
+}
+
 /**
  * Observes ESPN auction draft page for current player up for bid
  * Returns cleanup function to disconnect observer

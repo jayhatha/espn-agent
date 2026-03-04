@@ -62,6 +62,11 @@ interface DraftState {
     playerId?: number;
   } | null;
 
+  // ESPN DOM-scraped auction values (playerId -> dollar value)
+  // Scraped from the fixedDataTable on the draft page — more accurate than
+  // backend API values. Merged incrementally as the user scrolls the table.
+  espnDomAuctionValues: Record<number, number>;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -94,6 +99,7 @@ interface DraftState {
   setAllTeamRosters: (rosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>) => void;
   clearTeamRosters: () => void;
   setCurrentAuctionPlayer: (player: DraftState['currentAuctionPlayer']) => void;
+  setEspnDomAuctionValues: (values: Record<number, number>) => void;
   reset: () => void;
 }
 
@@ -116,6 +122,7 @@ export const useDraftStore = create<DraftState>()(
       userRankingOverrides: {},
       teamRosters: new Map(),
       currentAuctionPlayer: null,
+      espnDomAuctionValues: {},
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -240,6 +247,11 @@ export const useDraftStore = create<DraftState>()(
 
       setCurrentAuctionPlayer: (player) => set({ currentAuctionPlayer: player }),
 
+      setEspnDomAuctionValues: (values) =>
+        set((state) => ({
+          espnDomAuctionValues: { ...state.espnDomAuctionValues, ...values },
+        })),
+
       reset: () =>
         set({
           allPicks: [],
@@ -251,6 +263,7 @@ export const useDraftStore = create<DraftState>()(
           projectedStandings: null,
           teamRosters: new Map(),
           currentAuctionPlayer: null,
+          espnDomAuctionValues: {},
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,
@@ -300,6 +313,8 @@ export const useDraftStore = create<DraftState>()(
         selectedPosition: state.selectedPosition,
         showOnlyNeeds: state.showOnlyNeeds,
         teamRosters: Array.from(state.teamRosters.entries()), // Serialize Map to array
+        // ESPN DOM-scraped values (accumulated across page sessions)
+        espnDomAuctionValues: state.espnDomAuctionValues,
       }),
       storage: {
         getItem: async (name) => {
