@@ -315,9 +315,10 @@ None yet.
 | 24 | Apply Phase 18 editorial composition design to Chrome extension | 2026-03-03 | dcdc219 | ✅ | [24-apply-phase-18-editorial-composition-des](./quick/24-apply-phase-18-editorial-composition-des/) |
 | 25 | Audit trade recommendation agent: fix stat_key mismatch, dynamic category logic, add WPCT formula | 2026-03-03 | 77a74fd | ✅ | [25-audit-waiver-and-trade-recommendation-ma](./quick/25-audit-waiver-and-trade-recommendation-ma/) |
 | 26 | Clean up auction validation frontend: remove ESPN auth fields (League ID, SWID, S2), add BB/K9/WPCT/L categories | 2026-03-03 | ec6a7e2 | ✅ | [26-clean-up-auction-validation-frontend-rem](./quick/26-clean-up-auction-validation-frontend-rem/) |
+| 28 | Update extension to fetch from /api/draft/espn and merge with bundled PitcherList rankings | 2026-03-04 | d0ac457 | ✅ | [28-update-extension-to-rely-on-draft-board](./quick/28-update-extension-to-rely-on-draft-board/) |
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Phase 18 complete — 18-02-PLAN.md done, user approved visual verification checkpoint
+Last session: 2026-03-04
+Stopped at: Completed quick task 28: Update extension to rely on draft board endpoint
 Resume file: None
