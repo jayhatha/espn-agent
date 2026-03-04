@@ -4662,7 +4662,7 @@
     },
     {
       "rank": 4,
-      "playerName": "Aroldis Chapman",
+      "playerName": "Jhoan Duran",
       "tier": 1,
       "tierName": "Elite",
       "handedness": "",
@@ -4678,78 +4678,6 @@
     },
     {
       "rank": 6,
-      "playerName": "Griffin Jax",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 7,
-      "playerName": "Jhoan Duran",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 8,
-      "playerName": "Andrés Muñoz",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 9,
-      "playerName": "Trevor Megill",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 10,
-      "playerName": "Bryan Abreu",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 11,
-      "playerName": "Abner Uribe",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 12,
-      "playerName": "Josh Hader",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 13,
-      "playerName": "Jeremiah Estrada",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 14,
-      "playerName": "Garrett Whitlock",
-      "tier": 1,
-      "tierName": "Elite",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 15,
       "playerName": "David Bednar",
       "tier": 2,
       "tierName": "High-End",
@@ -4757,95 +4685,23 @@
       "team": ""
     },
     {
-      "rank": 16,
-      "playerName": "Edwin Uceta",
+      "rank": 7,
+      "playerName": "Aroldis Chapman",
       "tier": 2,
       "tierName": "High-End",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 17,
-      "playerName": "Adrian Morejon",
+      "rank": 8,
+      "playerName": "Andrés Muñoz",
       "tier": 2,
       "tierName": "High-End",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 18,
-      "playerName": "Matt Brash",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 19,
-      "playerName": "Gabe Speier",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 20,
-      "playerName": "Garrett Cleavinger",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 21,
-      "playerName": "Dylan Lee",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 22,
-      "playerName": "Phil Maton",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 23,
-      "playerName": "Alex Vesia",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 24,
-      "playerName": "Andrew Kittredge",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 25,
-      "playerName": "Robert Suarez",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 26,
-      "playerName": "Daniel Palencia",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 27,
+      "rank": 9,
       "playerName": "Ryan Helsley",
       "tier": 2,
       "tierName": "High-End",
@@ -4853,7 +4709,7 @@
       "team": ""
     },
     {
-      "rank": 28,
+      "rank": 10,
       "playerName": "Jeff Hoffman",
       "tier": 2,
       "tierName": "High-End",
@@ -4861,39 +4717,15 @@
       "team": ""
     },
     {
-      "rank": 29,
-      "playerName": "Tanner Scott",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 30,
-      "playerName": "Luke Weaver",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 31,
+      "rank": 11,
       "playerName": "Pete Fairbanks",
-      "tier": 2,
-      "tierName": "High-End",
+      "tier": 3,
+      "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 32,
-      "playerName": "Raisel Iglesias",
-      "tier": 2,
-      "tierName": "High-End",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 33,
+      "rank": 12,
       "playerName": "Emilio Pagán",
       "tier": 3,
       "tierName": "Strong",
@@ -4901,167 +4733,31 @@
       "team": ""
     },
     {
-      "rank": 34,
-      "playerName": "Jason Adam",
+      "rank": 13,
+      "playerName": "Daniel Palencia",
       "tier": 3,
       "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 35,
-      "playerName": "Fernando Cruz",
+      "rank": 14,
+      "playerName": "Raisel Iglesias",
       "tier": 3,
       "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 36,
-      "playerName": "Mason Montgomery",
+      "rank": 15,
+      "playerName": "Josh Hader",
       "tier": 3,
       "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 37,
-      "playerName": "Grant Taylor",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 38,
-      "playerName": "Brad Keller",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 39,
-      "playerName": "Orion Kerkering",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 40,
-      "playerName": "Louis Varland",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 41,
-      "playerName": "Robert Garcia",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 42,
-      "playerName": "Will Vest",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 43,
-      "playerName": "Kyle Finnegan",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 44,
-      "playerName": "Hunter Gaddis",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 45,
-      "playerName": "Aaron Ashby",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 46,
-      "playerName": "Matt Strahm",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 47,
-      "playerName": "Robert Stephenson",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 48,
-      "playerName": "Seranthony Domínguez",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 49,
-      "playerName": "Bryan Baker",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 50,
-      "playerName": "Steven Okert",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 51,
-      "playerName": "Bennett Sousa",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 52,
-      "playerName": "Caleb Thielbar",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 53,
-      "playerName": "Dennis Santana",
-      "tier": 3,
-      "tierName": "Strong",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 54,
+      "rank": 16,
       "playerName": "Kenley Jansen",
       "tier": 3,
       "tierName": "Strong",
@@ -5069,1970 +4765,194 @@
       "team": ""
     },
     {
-      "rank": 55,
-      "playerName": "Connor Phillips",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 56,
-      "playerName": "Justin Sterner",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 57,
-      "playerName": "Erik Sabrowski",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 58,
-      "playerName": "Matt Svanson",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 59,
-      "playerName": "Drew Pomeranz",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 60,
-      "playerName": "Shawn Armstrong",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 61,
-      "playerName": "Chris Martin",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 62,
-      "playerName": "Jordan Leasure",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 63,
-      "playerName": "José Alvarado",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 64,
-      "playerName": "Jose A. Ferrer",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 65,
-      "playerName": "Brooks Raley",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 66,
-      "playerName": "Bryan King",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 67,
-      "playerName": "Camilo Doval",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 68,
-      "playerName": "Clayton Beeter",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 69,
-      "playerName": "Tyler Rogers",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 70,
-      "playerName": "Ryan Walker",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 71,
-      "playerName": "Tony Santillan",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 72,
-      "playerName": "Jared Koenig",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 73,
-      "playerName": "Gregory Soto",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 74,
-      "playerName": "Graham Ashcraft",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 75,
-      "playerName": "Justin Slaten",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 76,
-      "playerName": "Riley O'Brien",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 77,
-      "playerName": "Andrew Nardi",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 78,
-      "playerName": "Lucas Erceg",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 79,
-      "playerName": "Anthony Bender",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 80,
-      "playerName": "Brendon Little",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 81,
-      "playerName": "Eduard Bazardo",
-      "tier": 4,
-      "tierName": "Solid",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 82,
-      "playerName": "Rico Garcia",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 83,
-      "playerName": "Nick Mears",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 84,
-      "playerName": "Cole Sands",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 85,
-      "playerName": "Braydon Fisher",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 86,
-      "playerName": "Matt Festa",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 87,
-      "playerName": "Mason Fluharty",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 88,
-      "playerName": "Dylan Dodd",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 89,
-      "playerName": "Hunter Harvey",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 90,
-      "playerName": "Elvis Alvarado",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 91,
-      "playerName": "Jonathan Bowlan",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 92,
-      "playerName": "Carmen Mlodzinski",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 93,
-      "playerName": "Ryan Zeferjahn",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 94,
-      "playerName": "Dietrich Enns",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 95,
-      "playerName": "Blake Treinen",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 96,
-      "playerName": "Lake Bachar",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 97,
-      "playerName": "Brent Headrick",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 98,
-      "playerName": "Jack Dreyer",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 99,
-      "playerName": "Joel Peguero",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 100,
-      "playerName": "Kirby Yates",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 101,
+      "rank": 17,
       "playerName": "Carlos Estévez",
-      "tier": 5,
-      "tierName": "Useful",
+      "tier": 3,
+      "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 102,
-      "playerName": "Tyler Kinley",
-      "tier": 5,
-      "tierName": "Useful",
+      "rank": 18,
+      "playerName": "Trevor Megill",
+      "tier": 3,
+      "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 103,
-      "playerName": "Pierce Johnson",
-      "tier": 5,
-      "tierName": "Useful",
+      "rank": 19,
+      "playerName": "Dennis Santana",
+      "tier": 3,
+      "tierName": "Strong",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 104,
+      "rank": 20,
+      "playerName": "Ryan Walker",
+      "tier": 3,
+      "tierName": "Strong",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 21,
+      "playerName": "Seranthony Domínguez",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 22,
+      "playerName": "Bryan Abreu",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 23,
+      "playerName": "Griffin Jax",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 24,
+      "playerName": "Abner Uribe",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 25,
+      "playerName": "Robert Suarez",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 26,
+      "playerName": "Garrett Cleavinger",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 27,
+      "playerName": "Garrett Whitlock",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 28,
+      "playerName": "Grant Taylor",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 29,
+      "playerName": "Jeremiah Estrada",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 30,
+      "playerName": "Tanner Scott",
+      "tier": 4,
+      "tierName": "Mid-Tier",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 31,
+      "playerName": "Robert Garcia",
+      "tier": 5,
+      "tierName": "Depth",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 32,
+      "playerName": "Clayton Beeter",
+      "tier": 5,
+      "tierName": "Depth",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 33,
+      "playerName": "Matt Svanson",
+      "tier": 5,
+      "tierName": "Depth",
+      "handedness": "",
+      "team": ""
+    },
+    {
+      "rank": 34,
       "playerName": "JoJo Romero",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 105,
-      "playerName": "Calvin Faucher",
+      "rank": 35,
+      "playerName": "Kirby Yates",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 106,
-      "playerName": "Mark Leiter Jr.",
+      "rank": 36,
+      "playerName": "Drew Pomeranz",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 107,
-      "playerName": "Ryne Stanek",
+      "rank": 37,
+      "playerName": "Luke Weaver",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 108,
-      "playerName": "Kevin Ginkel",
+      "rank": 38,
+      "playerName": "Jack Perkins",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 109,
-      "playerName": "Paul Sewald",
+      "rank": 39,
+      "playerName": "Chris Martin",
       "tier": 5,
-      "tierName": "Useful",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     },
     {
-      "rank": 110,
-      "playerName": "Grant Anderson",
+      "rank": 40,
+      "playerName": "Kyle Finnegan",
       "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 111,
-      "playerName": "Tyler Holton",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 112,
-      "playerName": "Jordan Romano",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 113,
-      "playerName": "Anthony Banda",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 114,
-      "playerName": "Taylor Clarke",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 115,
-      "playerName": "Taylor Rogers",
-      "tier": 5,
-      "tierName": "Useful",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 116,
-      "playerName": "Adbert Alzolay",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 117,
-      "playerName": "David Morgan",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 118,
-      "playerName": "Jacob Webb",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 119,
-      "playerName": "Tommy Nance",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 120,
-      "playerName": "Tanner Banks",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 121,
-      "playerName": "Andre Granillo",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 122,
-      "playerName": "Brock Burke",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 123,
-      "playerName": "Keegan Akin",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 124,
-      "playerName": "Zack Kelly",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 125,
-      "playerName": "Justin Lawrence",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 126,
-      "playerName": "Eric Orze",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 127,
-      "playerName": "Kade Strowd",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 128,
-      "playerName": "Zach Maxwell",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 129,
-      "playerName": "Aaron Bummer",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 130,
-      "playerName": "Kevin Kelly",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 131,
-      "playerName": "Jake Bird",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 132,
-      "playerName": "Caleb Ferguson",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 133,
-      "playerName": "Ben Casparius",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 134,
-      "playerName": "Michael Kopech",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 135,
-      "playerName": "Ryan Fernandez",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 136,
-      "playerName": "John Schreiber",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 137,
-      "playerName": "Danny Coulombe",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 138,
-      "playerName": "Scott Barlow",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 139,
-      "playerName": "Enyel De Los Santos",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 140,
-      "playerName": "Edgardo Henriquez",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 141,
-      "playerName": "Ben Brown",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 142,
-      "playerName": "Connor Brogdon",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 143,
-      "playerName": "Josh Sborz",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 144,
-      "playerName": "Mason Englert",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 145,
-      "playerName": "Jonathan Loáisiga",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 146,
-      "playerName": "Jakob Junis",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 147,
-      "playerName": "Sam Hentges",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 148,
-      "playerName": "Jose Fermin",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 149,
-      "playerName": "Angel Zerpa",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 150,
-      "playerName": "Ryan Thompson",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 151,
-      "playerName": "Eric Lauer",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 152,
-      "playerName": "Cole Sulser",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 153,
-      "playerName": "Brandon Eisert",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 154,
-      "playerName": "Greg Weissert",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 155,
-      "playerName": "Yennier Cano",
-      "tier": 6,
-      "tierName": "Tier 6",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 156,
-      "playerName": "Porter Hodge",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 157,
-      "playerName": "Casey Legumina",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 158,
-      "playerName": "Wikelman González",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 159,
-      "playerName": "Tyler Ferguson",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 160,
-      "playerName": "Juan Mejia",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 161,
-      "playerName": "Kody Funderburk",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 162,
-      "playerName": "Evan Sisk",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 163,
-      "playerName": "Tobias Myers",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 164,
-      "playerName": "Will Klein",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 165,
-      "playerName": "Steven Cruz",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 166,
-      "playerName": "Seth Halvorsen",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 167,
-      "playerName": "Alex Lange",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 168,
-      "playerName": "Hogan Harris",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 169,
-      "playerName": "Tyler Phillips",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 170,
-      "playerName": "Cole Winn",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 171,
-      "playerName": "Hoby Milner",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 172,
-      "playerName": "Paul Blackburn",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 173,
-      "playerName": "Jordan Hicks",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 174,
-      "playerName": "Drey Jameson",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 175,
-      "playerName": "Craig Yoho",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 176,
-      "playerName": "Nate Pearson",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 177,
-      "playerName": "Brant Hurter",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 178,
-      "playerName": "Isaac Mattson",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 179,
-      "playerName": "Hunter Bigge",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 180,
-      "playerName": "Justin Topa",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 181,
-      "playerName": "Erik Miller",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 182,
-      "playerName": "Jimmy Herget",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 183,
-      "playerName": "Yohan Ramírez",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 184,
-      "playerName": "Huascar Brazobán",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 185,
-      "playerName": "Carlos Vargas",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 186,
-      "playerName": "Tim Herrin",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 187,
-      "playerName": "DL Hall",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 188,
-      "playerName": "Cole Henry",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 189,
-      "playerName": "Kyle Nicolas",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 190,
-      "playerName": "Yuki Matsui",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 191,
-      "playerName": "Tyler Alexander",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 192,
-      "playerName": "Tim Hill",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 193,
-      "playerName": "Victor Vodnik",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 194,
-      "playerName": "Wandy Peralta",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 195,
-      "playerName": "Eduarniel Núñez",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 196,
-      "playerName": "Gregory Santos",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 197,
-      "playerName": "PJ Poulin",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 198,
-      "playerName": "Luis García Jr.",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 199,
-      "playerName": "Bradgley Rodriguez",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 200,
-      "playerName": "Brandyn Garcia",
-      "tier": 7,
-      "tierName": "Tier 7",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 201,
-      "playerName": "Juan Morillo",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 202,
-      "playerName": "Marc Church",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 203,
-      "playerName": "Roddery Muñoz",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 204,
-      "playerName": "Steven Wilson",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 205,
-      "playerName": "Brenan Hanifee",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 206,
-      "playerName": "Craig Kimbrel",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 207,
-      "playerName": "Andrew Chafin",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 208,
-      "playerName": "Matt Gage",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 209,
-      "playerName": "Cade Gibson",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 210,
-      "playerName": "Luis Mey",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 211,
-      "playerName": "Gus Varland",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 212,
-      "playerName": "Alexander Alberto",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 213,
-      "playerName": "Michael Kelly",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 214,
-      "playerName": "JT Brubaker",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 215,
-      "playerName": "Tyler Gilbert",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 216,
-      "playerName": "Griff McGarry",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 217,
-      "playerName": "Ryan Brasier",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 218,
-      "playerName": "Josh White",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 219,
-      "playerName": "Jackson Rutledge",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 220,
-      "playerName": "Emiliano Teodo",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 221,
-      "playerName": "Gordon Graceffo",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 222,
-      "playerName": "Joey Wentz",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 223,
-      "playerName": "Yoendrys Gómez",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 224,
-      "playerName": "Jaden Hill",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 225,
-      "playerName": "Daysbel Hernández",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 226,
-      "playerName": "Spencer Bivens",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 227,
-      "playerName": "Travis Adams",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 228,
-      "playerName": "Daniel Lynch IV",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 229,
-      "playerName": "José Buttó",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 230,
-      "playerName": "Alexis Díaz",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 231,
-      "playerName": "John King",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 232,
-      "playerName": "Ryan Lambert",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 233,
-      "playerName": "Richard Lovelady",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 234,
-      "playerName": "Michel Otañez",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 235,
-      "playerName": "Chase Silseth",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 236,
-      "playerName": "Joel Payamps",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 237,
-      "playerName": "Jovani Morán",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 238,
-      "playerName": "Paxton Schultz",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 239,
-      "playerName": "Julian Fernández",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 240,
-      "playerName": "John Klein",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 241,
-      "playerName": "Zach McCambley",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 242,
-      "playerName": "Orlando Ribalta",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 243,
-      "playerName": "Brent Suter",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 244,
-      "playerName": "Colin Holderman",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 245,
-      "playerName": "Ron Marinaccio",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 246,
-      "playerName": "Angel Chivilli",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 247,
-      "playerName": "Beau Brieske",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 248,
-      "playerName": "Rob Zastryzny",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 249,
-      "playerName": "RJ Petit",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 250,
-      "playerName": "Brady Basso",
-      "tier": 8,
-      "tierName": "Tier 8",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 251,
-      "playerName": "Rafael Montero",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 252,
-      "playerName": "Brennan Bernardino",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 253,
-      "playerName": "Grant Wolfram",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 254,
-      "playerName": "Ian Hamilton",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 255,
-      "playerName": "George Soriano",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 256,
-      "playerName": "Justin Bruihl",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 257,
-      "playerName": "Yerry De los Santos",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 258,
-      "playerName": "Luke Little",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 259,
-      "playerName": "Yosver Zulueta",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 260,
-      "playerName": "Jackson Kowar",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 261,
-      "playerName": "Bailey Horn",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 262,
-      "playerName": "Jorge Alcala",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 263,
-      "playerName": "Yariel Rodriguez",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 264,
-      "playerName": "Corbin Martin",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 265,
-      "playerName": "Matt Pushard",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 266,
-      "playerName": "Collin Snider",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 267,
-      "playerName": "Liam Hendriks",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 268,
-      "playerName": "Héctor Neris",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 269,
-      "playerName": "Ryan Yarbrough",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 270,
-      "playerName": "Konnor Pilkington",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 271,
-      "playerName": "Génesis Cabrera",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 272,
-      "playerName": "Kyle Backhus",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 273,
-      "playerName": "Peyton Pallette",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 274,
-      "playerName": "Grant Holman",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 275,
-      "playerName": "John Curtiss",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 276,
-      "playerName": "Kaleb Ort",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 277,
-      "playerName": "Shawn Dubin",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 278,
-      "playerName": "Bailey Falter",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 279,
-      "playerName": "Alek Jacob",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 280,
-      "playerName": "Zach Pop",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 281,
-      "playerName": "Juan Burgos",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 282,
-      "playerName": "Carter Baumler",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 283,
-      "playerName": "Tristan Beck",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 284,
-      "playerName": "Julian Merryweather",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 285,
-      "playerName": "Dylan Ross",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 286,
-      "playerName": "Max Lazar",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 287,
-      "playerName": "Ryan Rolison",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 288,
-      "playerName": "Ryan Watson",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 289,
-      "playerName": "Cade Winquest",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 290,
-      "playerName": "Sam Moll",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 291,
-      "playerName": "Andrew Hoffmann",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 292,
-      "playerName": "Zach Agnos",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 293,
-      "playerName": "Josh Ekness",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 294,
-      "playerName": "Zach Brzykcy",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 295,
-      "playerName": "Seth Johnson",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 296,
-      "playerName": "Troy Taylor",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 297,
-      "playerName": "Jack Neely",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 298,
-      "playerName": "Franco Aleman",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 299,
-      "playerName": "Welinton Herrera",
-      "tier": 9,
-      "tierName": "Tier 9",
-      "handedness": "",
-      "team": ""
-    },
-    {
-      "rank": 300,
-      "playerName": "Luis Peralta",
-      "tier": 9,
-      "tierName": "Tier 9",
+      "tierName": "Depth",
       "handedness": "",
       "team": ""
     }

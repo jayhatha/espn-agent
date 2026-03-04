@@ -414,7 +414,7 @@ function DraftBoardContent() {
     <Container size="wide" className="py-8">
       <PageHeader
         title="Draft Board"
-        subtitle="ESPN auction values with PitcherList expert rankings"
+        subtitle="ESPN auction values with PitcherList + CloserMonkey expert rankings"
         backLink={{ href: "/admin", label: "Back to Admin" }}
       />
 
@@ -469,7 +469,7 @@ function DraftBoardContent() {
       {/* Rankings info */}
       <div className="mb-6 flex flex-wrap items-center gap-2 text-body-sm text-content-secondary">
         <Badge variant="info">{PITCHER_RANKINGS.length} SP rankings</Badge>
-        <Badge variant="info">{RELIEVER_RANKINGS.length} RP rankings</Badge>
+        <Badge variant="info">{RELIEVER_RANKINGS.length} RP rankings (CloserMonkey)</Badge>
         <Badge variant="info">{HITTER_RANKINGS.length} hitter rankings</Badge>
         {espnData && <span>{matchCount} matched to ESPN players</span>}
       </div>
@@ -738,7 +738,7 @@ function DraftBoardContent() {
             <p className="text-body-sm text-content-secondary">
               {espnData?.meta.season} season &middot;{" "}
               {espnData?.meta.totalPlayers} ESPN players &middot;{" "}
-              {matchCount} matched to PitcherList rankings
+              {matchCount} matched to external rankings
               {uploadedSources.length > 0 &&
                 ` \u00b7 ${uploadMatchCount} of ${totalUploadEntries} CSV values matched`}
             </p>

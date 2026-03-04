@@ -63,8 +63,9 @@ export interface PlayerRanking {
   vbdScore: number;
   tier: number;
   projectedStats: Record<string, number>;
-  tierName?: string;       // PitcherList tier name (e.g., "STUD", "AGA 1")
-  externalRank?: number;   // PitcherList rank number
+  tierName?: string;       // External tier name (e.g., "STUD", "Elite")
+  externalRank?: number;   // External ranking number
+  rankSource?: string;     // Source of external rank ("PL" = PitcherList, "CM" = CloserMonkey)
   espnAuctionValue?: number; // ESPN pre-draft auction dollar value
 }
 
@@ -210,12 +211,13 @@ function buildBundledRankings(): {
     fgLookup.set(normalizeName(p.name), p);
   }
 
-  // Build PitcherList tier lookup
+  // Build external ranking lookups (PitcherList for SP/hitters, CloserMonkey for RP)
+  const relieverLookup = new Map<string, PitcherListRanking>();
+  for (const p of pitcherlistRankings.relievers as PitcherListRanking[]) {
+    relieverLookup.set(normalizeName(p.playerName), p);
+  }
   const plLookup = new Map<string, PitcherListRanking>();
   for (const p of pitcherlistRankings.pitchers as PitcherListRanking[]) {
-    plLookup.set(normalizeName(p.playerName), p);
-  }
-  for (const p of pitcherlistRankings.relievers as PitcherListRanking[]) {
     plLookup.set(normalizeName(p.playerName), p);
   }
   for (const p of pitcherlistRankings.hitters as PitcherListRanking[]) {
@@ -231,13 +233,16 @@ function buildBundledRankings(): {
     mlbamId: number;
     tier: number;
     tierName?: string;
-    plRank?: number;
+    extRank?: number;
+    rankSource?: string;
   }> = [];
 
   // FanGraphs players first (they have real dollar values)
   for (const [key, fg] of fgLookup) {
     seen.add(key);
-    const pl = plLookup.get(key);
+    // Check relievers (CloserMonkey) first, then PitcherList
+    const reliever = relieverLookup.get(key);
+    const pl = reliever || plLookup.get(key);
     merged.push({
       name: fg.name,
       pos: fg.pos,
@@ -245,22 +250,29 @@ function buildBundledRankings(): {
       mlbamId: fg.mlbamId,
       tier: pl?.tier ?? 99,
       tierName: pl?.tierName,
-      plRank: pl?.rank,
+      extRank: pl?.rank,
+      rankSource: reliever ? "CM" : pl ? "PL" : undefined,
     });
   }
 
-  // PitcherList players not in FanGraphs (assign $1 value)
-  for (const [key, pl] of plLookup) {
+  // External-only players not in FanGraphs (assign $1 value)
+  const allExternal = new Map<string, { ranking: PitcherListRanking; source: string }>();
+  for (const [key, r] of relieverLookup) allExternal.set(key, { ranking: r, source: "CM" });
+  for (const [key, r] of plLookup) {
+    if (!allExternal.has(key)) allExternal.set(key, { ranking: r, source: "PL" });
+  }
+  for (const [key, { ranking: ext, source }] of allExternal) {
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push({
-      name: pl.playerName,
-      pos: pl.handedness?.includes("P") ? "SP" : "UT",
+      name: ext.playerName,
+      pos: ext.handedness?.includes("P") ? "SP" : "UT",
       dollars: 1,
       mlbamId: 0,
-      tier: pl.tier,
-      tierName: pl.tierName,
-      plRank: pl.rank,
+      tier: ext.tier,
+      tierName: ext.tierName,
+      extRank: ext.rank,
+      rankSource: source,
     });
   }
 
@@ -284,7 +296,8 @@ function buildBundledRankings(): {
       tier: p.tier,
       projectedStats: {},
       tierName: p.tierName,
-      externalRank: p.plRank,
+      externalRank: p.extRank,
+      rankSource: p.rankSource,
     });
 
     auctionValues.push({
@@ -358,7 +371,19 @@ export async function getDraftBoardData(): Promise<{
         const normalized = normalizeName(player.playerName);
 
         // Try exact match first (SP > RP > Hitter priority)
-        let match = pitcherMap.get(normalized) || relieverMap.get(normalized) || hitterMap.get(normalized);
+        let match: PitcherListRanking | undefined;
+        let matchSource: string | undefined;
+
+        if (pitcherMap.has(normalized)) {
+          match = pitcherMap.get(normalized);
+          matchSource = "PL";
+        } else if (relieverMap.has(normalized)) {
+          match = relieverMap.get(normalized);
+          matchSource = "CM";
+        } else if (hitterMap.has(normalized)) {
+          match = hitterMap.get(normalized);
+          matchSource = "PL";
+        }
 
         // Try last name fallback
         if (!match) {
@@ -367,6 +392,7 @@ export async function getDraftBoardData(): Promise<{
             for (const [key, val] of pitcherMap) {
               if (key.endsWith(lastName) && !key.startsWith(lastName)) {
                 match = val;
+                matchSource = "PL";
                 break;
               }
             }
@@ -374,6 +400,7 @@ export async function getDraftBoardData(): Promise<{
               for (const [key, val] of relieverMap) {
                 if (key.endsWith(lastName) && !key.startsWith(lastName)) {
                   match = val;
+                  matchSource = "CM";
                   break;
                 }
               }
@@ -382,6 +409,7 @@ export async function getDraftBoardData(): Promise<{
               for (const [key, val] of hitterMap) {
                 if (key.endsWith(lastName) && !key.startsWith(lastName)) {
                   match = val;
+                  matchSource = "PL";
                   break;
                 }
               }
@@ -399,6 +427,7 @@ export async function getDraftBoardData(): Promise<{
           projectedStats: {},
           tierName: match?.tierName ?? undefined,
           externalRank: match?.rank ?? undefined,
+          rankSource: matchSource,
           espnAuctionValue: player.espnAuctionValue,
         });
 

@@ -285,8 +285,9 @@ export interface DraftRanking {
   projectedStats: StatComponents;
   tier: number; // Players grouped into value tiers
   adp?: number; // Average draft position for comparison
-  tierName?: string;       // PitcherList tier name (e.g., "STUD", "AGA 1")
-  externalRank?: number;   // PitcherList rank number
+  tierName?: string;       // External tier name (e.g., "STUD", "Elite")
+  externalRank?: number;   // External ranking number
+  rankSource?: string;     // Source of external rank ("PL" = PitcherList, "CM" = CloserMonkey)
   espnAuctionValue?: number; // ESPN pre-draft auction dollar value
 }
 

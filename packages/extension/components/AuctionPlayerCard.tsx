@@ -93,7 +93,7 @@ export default function AuctionPlayerCard({
               )}
               {playerRanking.externalRank && (
                 <span className="text-xs text-content-secondary">
-                  PL #{playerRanking.externalRank}
+                  {playerRanking.rankSource || "PL"} #{playerRanking.externalRank}
                 </span>
               )}
             </div>

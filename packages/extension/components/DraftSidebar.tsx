@@ -191,7 +191,7 @@ export default function DraftSidebar() {
                         )}
                         {matchedRanking.externalRank && (
                           <span className="text-xs text-content-secondary">
-                            PL #{matchedRanking.externalRank}
+                            {matchedRanking.rankSource || "PL"} #{matchedRanking.externalRank}
                           </span>
                         )}
                       </div>
