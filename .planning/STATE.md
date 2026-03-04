@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 18 - Dashboard Compositional Layout
+**Current focus:** Phase 20 - Deterministic Draft Engine
 
 ## Current Position
 
-Phase: 18 (Dashboard Compositional Layout)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-03-04 - Completed quick task 37: Detect teams from auction pick train
+Phase: 20 (Deterministic Draft Engine)
+Plan: 1 of 2 in current phase
+Status: In Progress
+Last activity: 2026-03-04 - Completed 20-01: Deterministic Draft Engine Core (engine modules + Zustand store extensions)
 
-Progress: Phase 18: [██████████] 100% (2 of 2 plans complete)
+Progress: Phase 20: [█████     ] 50% (1 of 2 plans complete)
 
 ## Performance Metrics
 
@@ -122,6 +122,7 @@ Progress: Phase 18: [██████████] 100% (2 of 2 plans complete
 | Phase quick-26 P01 | 1 | 2 tasks | 2 files |
 | Phase quick-29 P01 | 2 | 1 tasks | 1 files |
 | Phase quick-30 P01 | 3 | 2 tasks | 4 files |
+| Phase 20 P01 | 5 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -259,6 +260,8 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-31]: indigo-* color classes mapped to info-* tokens for consistency with design system
 - [Phase quick-32]: Add tierName/externalRank/espnAuctionValue to shared DraftRanking type so store typing is compatible and components can access fields without casting
 - [Phase quick-32]: Nominated banner dual lookup: auctionValues.find() for ESPN dollar value, rankings.find() for PitcherList tier — fixes pre-existing bug where rankings.dollarValue didn't exist on DraftRanking
+- [Phase 20]: All engine functions are pure with no Zustand reads or DOM access — testable in isolation
+- [Phase 20]: allTeamBudgets persisted in Zustand partialize for reload survivability; leagueCategories not persisted (set fresh from config detection each page load)
 
 ### Roadmap Evolution
 
@@ -337,5 +340,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 37: Detect teams from auction pick train
+Stopped at: Completed 20-01-PLAN.md: Deterministic Draft Engine Core (engine modules + Zustand store extensions)
 Resume file: None

@@ -143,7 +143,7 @@ Plans:
 | 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
 | 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
-| 20. Deterministic Draft Engine | v1.4 | 0/2 | Planning | - |
+| 20. Deterministic Draft Engine | 1/2 | In Progress|  | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -337,7 +337,7 @@ Plans:
   5. Structured alert system surfaces alerts with severity > 0.65 in the sidebar UI
   6. All engine code is pure deterministic functions (no AI computation)
   7. Engine recomputes in < 300ms with performance logging
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md — Extend Zustand store with allTeamBudgets and leagueCategories, create lib/engine/ with inflation, scarcity, category-gap, budget-curve models, alert generator, and orchestrator
