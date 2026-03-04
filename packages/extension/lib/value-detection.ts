@@ -163,21 +163,21 @@ export function getValueColorClasses(color: ValueIndicator["color"]): {
   switch (color) {
     case "green":
       return {
-        bg: "bg-green-100",
-        text: "text-green-800",
-        border: "border-green-300",
+        bg: "bg-positive-light",
+        text: "text-positive",
+        border: "border-positive-border",
       };
     case "yellow":
       return {
-        bg: "bg-yellow-100",
-        text: "text-yellow-800",
-        border: "border-yellow-300",
+        bg: "bg-warning-light",
+        text: "text-warning",
+        border: "border-warning-border",
       };
     case "red":
       return {
-        bg: "bg-red-100",
-        text: "text-red-800",
-        border: "border-red-300",
+        bg: "bg-negative-light",
+        text: "text-negative",
+        border: "border-negative-border",
       };
   }
 }

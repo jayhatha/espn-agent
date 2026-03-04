@@ -17,9 +17,9 @@ export default function AuctionBudgetTracker() {
   }
 
   const pacingColors = {
-    ahead: "bg-green-50 border-green-200 text-green-900",
-    "on-track": "bg-blue-50 border-blue-200 text-blue-900",
-    behind: "bg-red-50 border-red-200 text-red-900",
+    ahead: "bg-positive-light border-positive-border text-positive",
+    "on-track": "bg-info-light border-info-border text-info",
+    behind: "bg-negative-light border-negative-border text-negative",
   };
 
   const pacingLabels = {
@@ -29,28 +29,28 @@ export default function AuctionBudgetTracker() {
   };
 
   return (
-    <div className="p-3 border-b bg-gray-50">
+    <div className="p-3 border-b border-surface-tertiary bg-surface-secondary">
       <h3 className="font-semibold text-sm mb-2">Budget Pacing</h3>
 
       {/* Budget overview */}
-      <div className="bg-white p-3 rounded border mb-2">
+      <div className="bg-surface p-3 rounded border border-surface-tertiary mb-2">
         <div className="flex justify-between mb-2">
-          <span className="text-sm text-gray-600">Remaining Budget</span>
-          <span className="text-lg font-bold text-gray-900">
+          <span className="text-sm text-content-secondary">Remaining Budget</span>
+          <span className="text-lg font-bold text-content">
             ${pacing.remainingBudget}
           </span>
         </div>
 
         <div className="flex justify-between mb-2">
-          <span className="text-sm text-gray-600">Roster Spots Left</span>
-          <span className="font-semibold text-gray-900">
+          <span className="text-sm text-content-secondary">Roster Spots Left</span>
+          <span className="font-semibold text-content">
             {pacing.remainingRosterSpots}
           </span>
         </div>
 
         <div className="flex justify-between">
-          <span className="text-sm text-gray-600">Avg per Player</span>
-          <span className="font-semibold text-gray-900">
+          <span className="text-sm text-content-secondary">Avg per Player</span>
+          <span className="font-semibold text-content">
             ${Math.round(pacing.averageRemainingPerPlayer)}
           </span>
         </div>
@@ -64,12 +64,12 @@ export default function AuctionBudgetTracker() {
       </div>
 
       {/* Recommended max bid */}
-      <div className="mt-2 bg-blue-50 p-2 rounded border border-blue-200">
-        <div className="text-xs text-blue-700 mb-1">Recommended Max Bid</div>
-        <div className="text-xl font-bold text-blue-900">
+      <div className="mt-2 bg-info-light p-2 rounded border border-info-border">
+        <div className="text-xs text-info mb-1">Recommended Max Bid</div>
+        <div className="text-xl font-bold text-info">
           ${pacing.recommendedMaxBid}
         </div>
-        <div className="text-xs text-blue-600 mt-1">
+        <div className="text-xs text-info mt-1">
           (40% of remaining budget)
         </div>
       </div>

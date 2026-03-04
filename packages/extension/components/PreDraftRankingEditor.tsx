@@ -64,9 +64,9 @@ export default function PreDraftRankingEditor() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="p-3 bg-gray-50 border-b">
+      <div className="p-3 bg-surface-secondary border-b">
         <h3 className="font-semibold text-sm mb-2">Customize Rankings</h3>
-        <p className="text-xs text-gray-600 mb-3">
+        <p className="text-xs text-content-secondary mb-3">
           Adjust player ranks before draft starts. Your changes will affect
           recommendations.
         </p>
@@ -82,13 +82,13 @@ export default function PreDraftRankingEditor() {
 
         {/* Override stats */}
         <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-content-secondary">
             {overrideCount} player{overrideCount !== 1 ? "s" : ""} customized
           </span>
           {overrideCount > 0 && (
             <button
               onClick={clearAllOverrides}
-              className="text-xs text-red-600 hover:text-red-700"
+              className="text-xs text-negative hover:text-negative"
             >
               Clear all
             </button>
@@ -99,7 +99,7 @@ export default function PreDraftRankingEditor() {
       {/* Player list */}
       <div className="flex-1 overflow-y-auto">
         {filteredRankings.length === 0 ? (
-          <div className="p-4 text-center text-sm text-gray-500">
+          <div className="p-4 text-center text-sm text-content-tertiary">
             {searchQuery ? "No players found" : "No rankings available"}
           </div>
         ) : (
@@ -108,8 +108,8 @@ export default function PreDraftRankingEditor() {
               key={player.playerId}
               className={`p-3 border-b ${
                 player.isOverridden
-                  ? "bg-yellow-50 border-yellow-200"
-                  : "hover:bg-gray-50"
+                  ? "bg-warning-light border-warning-border"
+                  : "hover:bg-surface-secondary"
               }`}
             >
               <div className="flex justify-between items-start gap-3">
@@ -117,14 +117,14 @@ export default function PreDraftRankingEditor() {
                   <div className="font-semibold text-sm truncate">
                     {player.playerName}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-content-tertiary">
                     {player.positions.join(", ")} • VBD:{" "}
                     {formatNumber(player.vbdScore, 1)}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="text-xs text-gray-500">Rank:</div>
+                  <div className="text-xs text-content-tertiary">Rank:</div>
                   <input
                     type="number"
                     min="1"
@@ -138,7 +138,7 @@ export default function PreDraftRankingEditor() {
                   {player.isOverridden && (
                     <button
                       onClick={() => clearPlayerOverride(player.playerId)}
-                      className="text-xs text-red-600 hover:text-red-700"
+                      className="text-xs text-negative hover:text-negative"
                     >
                       Reset
                     </button>

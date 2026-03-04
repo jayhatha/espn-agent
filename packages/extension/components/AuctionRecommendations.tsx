@@ -213,13 +213,13 @@ export default function AuctionRecommendations() {
   return (
     <div className="flex flex-col h-full">
       {/* Filter controls */}
-      <div className="p-3 bg-gray-50 border-b space-y-2">
+      <div className="p-3 bg-surface-secondary border-b space-y-2">
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => setPositionFilter(null)}
             className={`
               px-2 py-1 text-xs rounded
-              ${!selectedPosition ? "bg-blue-600 text-white" : "bg-white text-gray-700 border"}
+              ${!selectedPosition ? "bg-accent text-content-inverse" : "bg-surface text-content-secondary border border-surface-tertiary"}
             `}
           >
             All
@@ -230,7 +230,7 @@ export default function AuctionRecommendations() {
               onClick={() => setPositionFilter(pos)}
               className={`
                 px-2 py-1 text-xs rounded
-                ${selectedPosition === pos ? "bg-blue-600 text-white" : "bg-white text-gray-700 border"}
+                ${selectedPosition === pos ? "bg-accent text-content-inverse" : "bg-surface text-content-secondary border border-surface-tertiary"}
               `}
             >
               {pos}
@@ -238,7 +238,7 @@ export default function AuctionRecommendations() {
           ))}
         </div>
 
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-content-secondary">
           {affordablePlayers.length} affordable (≤${pacing.recommendedMaxBid})
         </div>
       </div>
@@ -246,7 +246,7 @@ export default function AuctionRecommendations() {
       {/* Player list */}
       <div className="flex-1 overflow-y-auto">
         {filteredPlayers.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div className="p-4 text-center text-content-tertiary">
             {auctionValues.length === 0
               ? "Loading values..."
               : "No players match filters"}

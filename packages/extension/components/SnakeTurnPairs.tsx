@@ -63,11 +63,11 @@ export default function SnakeTurnPairs() {
   }
 
   return (
-    <div className="p-3 bg-yellow-50 border-b border-yellow-200">
-      <h3 className="font-semibold text-sm mb-2 text-yellow-900">
-        🎯 Turn Pair Recommendations
+    <div className="p-3 bg-warning-light border-b border-warning-border">
+      <h3 className="font-semibold text-sm mb-2 text-warning">
+        Turn Pair Recommendations
       </h3>
-      <p className="text-xs text-yellow-700 mb-3">
+      <p className="text-xs text-warning mb-3">
         You have back-to-back picks. Consider these pairs:
       </p>
 
@@ -75,17 +75,17 @@ export default function SnakeTurnPairs() {
         {pairs.slice(0, 3).map((pair, index) => (
           <div
             key={index}
-            className="bg-white p-2 rounded border border-yellow-300"
+            className="bg-surface p-2 rounded border border-warning-border"
           >
             <div className="flex justify-between items-start mb-1">
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium text-content">
                 {pair.player1.playerName} + {pair.player2.playerName}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-content-tertiary">
                 {formatNumber(pair.combinedValue, 1)} VBD
               </div>
             </div>
-            <div className="text-xs text-gray-600">{pair.rationale}</div>
+            <div className="text-xs text-content-secondary">{pair.rationale}</div>
           </div>
         ))}
       </div>

@@ -43,14 +43,14 @@ export default function PickValueTracker() {
 
   if (allPicks.length === 0) {
     return (
-      <div className="p-3 text-sm text-gray-500 text-center">No picks yet</div>
+      <div className="p-3 text-sm text-content-tertiary text-center">No picks yet</div>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Team efficiency leaderboard */}
-      <div className="p-3 bg-gray-50 border-b">
+      <div className="p-3 bg-surface-secondary border-b">
         <h3 className="font-semibold text-sm mb-2">Draft Efficiency</h3>
         <div className="space-y-1">
           {teamEfficiency.slice(0, 5).map((team, index) => (
@@ -58,8 +58,8 @@ export default function PickValueTracker() {
               key={team.teamName}
               className={`flex justify-between text-xs p-2 rounded ${
                 team.teamName === myTeamId
-                  ? "bg-blue-100 border border-blue-300"
-                  : "bg-white border"
+                  ? "bg-info-light border border-info-border"
+                  : "bg-surface border border-surface-tertiary"
               }`}
             >
               <span className="font-medium">
@@ -68,10 +68,10 @@ export default function PickValueTracker() {
               <span
                 className={
                   team.avgValue > 0
-                    ? "text-green-600"
+                    ? "text-positive"
                     : team.avgValue < 0
-                      ? "text-red-600"
-                      : "text-gray-600"
+                      ? "text-negative"
+                      : "text-content-secondary"
                 }
               >
                 {team.avgValue > 0 ? "+" : ""}
@@ -95,8 +95,8 @@ export default function PickValueTracker() {
                   key={pv.pickNumber}
                   className={`p-2 rounded border ${
                     pv.teamName === myTeamId
-                      ? "bg-blue-50 border-blue-200"
-                      : "bg-white"
+                      ? "bg-info-light border-info-border"
+                      : "bg-surface border-surface-tertiary"
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
@@ -106,16 +106,16 @@ export default function PickValueTracker() {
                     <div
                       className={`text-xs px-2 py-1 rounded ${
                         pv.value > 3
-                          ? "bg-green-100 text-green-700"
+                          ? "bg-positive-light text-positive"
                           : pv.value < -3
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-100 text-gray-600"
+                            ? "bg-negative-light text-negative"
+                            : "bg-surface-tertiary text-content-secondary"
                       }`}
                     >
                       {pv.valueLabel}
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-content-tertiary">
                     {pv.teamName} • Expected rank: #{pv.expectedRank}
                   </div>
                 </div>
