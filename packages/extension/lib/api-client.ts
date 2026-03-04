@@ -106,6 +106,9 @@ export interface PlayerRanking {
   vbdScore: number;
   tier: number;
   projectedStats: Record<string, number>;
+  tierName?: string;       // PitcherList tier name (e.g., "STUD", "AGA 1")
+  externalRank?: number;   // PitcherList rank number
+  espnAuctionValue?: number; // ESPN pre-draft auction dollar value
 }
 
 export interface AuctionValue {
@@ -401,6 +404,9 @@ export async function getDraftBoardData(): Promise<{
           vbdScore: player.espnAuctionValue,
           tier: match?.tier ?? 99,
           projectedStats: {},
+          tierName: match?.tierName ?? undefined,
+          externalRank: match?.rank ?? undefined,
+          espnAuctionValue: player.espnAuctionValue,
         });
 
         auctionValues.push({
