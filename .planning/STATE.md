@@ -280,6 +280,7 @@ Recent decisions affecting v1.1 work:
 - Phase 17 added: Site redesign — typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
 - Phase 18 added: Refactor dashboard from card-based SaaS layout into composition-driven layout inspired by high-end creative web design
 - Phase 20 added: Deterministic draft engine — inflation model, category gap projections, budget curve, strategy anchors with pivot logic, and structured alert system for extension sidebar
+- Phase 21 added: Dynamic build archetype analysis — show how roster commitments constrain remaining draft strategy using FanGraphs projections and auction values
 
 ### Pending Todos
 
