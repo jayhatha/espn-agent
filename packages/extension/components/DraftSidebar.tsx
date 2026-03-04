@@ -19,6 +19,7 @@ export default function DraftSidebar() {
     configWarnings,
     currentAuctionPlayer,
     rankings,
+    auctionValues,
   } = useDraftStore();
 
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
@@ -156,14 +157,36 @@ export default function DraftSidebar() {
                 </div>
               )}
               {(() => {
+                const matchedAuction = auctionValues.find(av =>
+                  av.playerId === currentAuctionPlayer.playerId ||
+                  av.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
+                );
                 const matchedRanking = rankings.find(r =>
                   r.playerId === currentAuctionPlayer.playerId ||
                   r.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
                 );
-                if (!matchedRanking?.dollarValue) return null;
+                if (!matchedAuction && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
                 return (
-                  <div className="text-xs text-content-secondary mt-0.5">
-                    Our Value: <span className="font-semibold">${matchedRanking.dollarValue}</span>
+                  <div className="mt-1 space-y-0.5">
+                    {matchedAuction?.dollarValue !== undefined && (
+                      <div className="text-xs text-content-secondary">
+                        ESPN Value: <span className="font-semibold">${matchedAuction.dollarValue}</span>
+                      </div>
+                    )}
+                    {(matchedRanking?.tierName || matchedRanking?.externalRank) && (
+                      <div className="flex items-center gap-1 justify-end">
+                        {matchedRanking.tierName && (
+                          <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
+                            {matchedRanking.tierName}
+                          </span>
+                        )}
+                        {matchedRanking.externalRank && (
+                          <span className="text-xs text-content-secondary">
+                            PL #{matchedRanking.externalRank}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}

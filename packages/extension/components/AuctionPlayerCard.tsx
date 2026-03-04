@@ -84,6 +84,20 @@ export default function AuctionPlayerCard({
               </span>
             )}
           </div>
+          {(playerRanking?.tierName || playerRanking?.externalRank) && (
+            <div className="flex items-center gap-1 mt-0.5">
+              {playerRanking.tierName && (
+                <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
+                  {playerRanking.tierName}
+                </span>
+              )}
+              {playerRanking.externalRank && (
+                <span className="text-xs text-content-secondary">
+                  PL #{playerRanking.externalRank}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Value indicators */}
           <div className="flex gap-2 mt-2">
