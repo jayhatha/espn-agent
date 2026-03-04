@@ -66,7 +66,7 @@ const refreshRankingsAndProjections = throttle(
         }),
         state.draftFormat === "auction"
           ? getAuctionValuesWithRetry(espnLeagueId, {
-              budget: state.remainingBudget,
+              budget: cachedLeagueConfig?.budget || 260,
               rosterSize: state.rosterSize,
             })
           : Promise.resolve([]),

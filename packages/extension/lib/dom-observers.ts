@@ -371,6 +371,11 @@ export function observeDraftBoard(
  */
 export function parsePickElement(pickElement: Element): DraftPick | null {
   try {
+    // Skip non-pick elements (ESPN buttons like "Dequeue" match broad selectors)
+    if (pickElement.tagName === "BUTTON") {
+      return null;
+    }
+
     // Strategy 1: Look for player name in various ESPN patterns
     const playerNameSelectors = [
       ".playerName",
