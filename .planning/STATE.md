@@ -329,9 +329,10 @@ None yet.
 | 32 | Show draft board auction values and PitcherList tier badges in nominated player banner and auction player cards | 2026-03-04 | e49c93f | ✅ | [32-show-draft-board-auction-values-and-play](./quick/32-show-draft-board-auction-values-and-play/) |
 | 33 | Fix budget zero on reload, dismissable warnings, FanGraphs auction values | 2026-03-04 | 721cb3f | ✅ | [33-fix-budget-showing-zero-on-reload-and-ma](./quick/33-fix-budget-showing-zero-on-reload-and-ma/) |
 | 34 | Add position scarcity alerts to extension sidebar (critical/warning severity, my-team-needs highlighting) | 2026-03-04 | 3573f3c | ✅ | [34-add-position-scarcity-alerts-to-extensio](./quick/34-add-position-scarcity-alerts-to-extensio/) |
+| 35 | Parse ESPN auction values from fixedDataTable DOM — scrape live $values, merge into store, display in sidebar | 2026-03-04 | 0bca97f | ✅ | [35-parse-espn-auction-values-from-dom-table](./quick/35-parse-espn-auction-values-from-dom-table/) |
 
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed quick task 34: Position scarcity alerts in extension sidebar
+Stopped at: Completed quick task 35: Parse ESPN auction values from DOM table
 Resume file: None
