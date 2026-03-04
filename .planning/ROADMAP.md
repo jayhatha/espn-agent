@@ -143,6 +143,7 @@ Plans:
 | 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
 | 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
+| 20. Deterministic Draft Engine | v1.4 | 0/2 | Planning | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -267,7 +268,7 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 16-01-PLAN.md — Fix x-fantasy-filter transport (params → headers) in fetchFreeAgents and fetchPreDraftAuctionValues, add sortDraftRanks to auction filter, implement offset-based pagination loop in fetchPreDraftAuctionValues
+- [ ] 16-01-PLAN.md — Fix x-fantasy-filter transport (params -> headers) in fetchFreeAgents and fetchPreDraftAuctionValues, add sortDraftRanks to auction filter, implement offset-based pagination loop in fetchPreDraftAuctionValues
 
 ### Phase 17: Site redesign -- typography-driven, high-end creative design system with improved spacing, navigation, accessibility, and performance
 
@@ -313,3 +314,31 @@ Plans:
 Plans:
 - [x] 18-01-PLAN.md — Install DM Serif Display font, configure typography foundation, decompose dashboard into 6 section components with compositional layout — completed 2026-03-03
 - [x] 18-02-PLAN.md — Rework ActionItemsList, TeamHealthOverview, CategoryStatsTable, and roster tables to match editorial style, visual verification — completed 2026-03-03
+
+### Phase 19: Apply Phase 18 editorial composition design to Chrome extension package — share design tokens, DM Serif Display font, divider-list patterns, spacing hierarchy, and alternating section backgrounds across popup settings UI and draft sidebar overlay
+
+**Goal:** [To be planned]
+**Depends on:** Phase 18
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 19 to break down)
+
+### Phase 20: Deterministic draft engine — inflation model, category gap projections, budget curve, strategy anchors with pivot logic, and structured alert system for extension sidebar
+
+**Goal:** Build a client-side deterministic draft intelligence engine with four pure-function models (inflation, positional scarcity, category gap, budget curve) and a structured alert system, all running in the Chrome extension sidebar during live auction drafts
+**Depends on:** Phase 19
+**Requirements:** ENGINE-01, ENGINE-02, ENGINE-03, ENGINE-04, ENGINE-05
+**Success Criteria** (what must be TRUE):
+  1. Inflation model tracks remaining budget vs remaining projected value, recomputes per pick, clamped 0.5-2.0
+  2. Positional scarcity model computes supply/demand/tier_drop_value/scarcity_index per position
+  3. Category projection engine computes z-score gaps per category for user's team vs league average
+  4. Budget curve model computes budget_pressure, optimal_remaining_spend, max_bid_recommendation
+  5. Structured alert system surfaces alerts with severity > 0.65 in the sidebar UI
+  6. All engine code is pure deterministic functions (no AI computation)
+  7. Engine recomputes in < 300ms with performance logging
+**Plans:** 2 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — Extend Zustand store with allTeamBudgets and leagueCategories, create lib/engine/ with inflation, scarcity, category-gap, budget-curve models, alert generator, and orchestrator
+- [ ] 20-02-PLAN.md — Create useDraftEngineSignals hook, EngineAlerts and EngineInsights components, integrate into DraftSidebar, upgrade AuctionBudgetTracker
