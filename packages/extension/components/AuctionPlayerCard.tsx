@@ -77,105 +77,108 @@ export default function AuctionPlayerCard({
   });
   const projectedStats = playerRanking?.projectedStats || {};
 
+  const rankTextSize = rank >= 100 ? "text-xs" : "text-lg";
+  const isElite = rank <= 10;
+
   return (
     <div className="p-3 hover:bg-accent-light cursor-pointer transition-colors">
-      {/* Player name and positions */}
-      <div className="flex justify-between items-start mb-1">
-        <div className="flex-1">
-          <div className="font-semibold text-content">{player.playerName}</div>
-          <div className="text-caption text-content-tertiary">
-            {player.positions.join(", ")}
-            {playerRanking?.adp && (
-              <span className="ml-2 text-content-secondary">
-                ADP: {formatNumber(playerRanking.adp, 1)}
-              </span>
-            )}
-          </div>
-          {(playerRanking?.tierName || playerRanking?.externalRank) && (
-            <div className="flex items-center gap-1 mt-0.5">
-              {playerRanking.tierName && (
-                <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
-                  {playerRanking.tierName}
-                </span>
+      <div className="flex items-start gap-3">
+        {/* Circular rank badge */}
+        <div
+          className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-display ${rankTextSize} ${
+            isElite
+              ? "bg-accent text-content-inverse"
+              : "bg-surface-secondary text-content"
+          }`}
+        >
+          {rank}
+        </div>
+
+        {/* Player info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-start mb-1">
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-content truncate">{player.playerName}</div>
+              <div className="text-caption text-content-tertiary">
+                {player.positions.join(", ")}
+                {playerRanking?.adp && (
+                  <span className="ml-2 text-content-secondary">
+                    ADP: {formatNumber(playerRanking.adp, 1)}
+                  </span>
+                )}
+              </div>
+              {(playerRanking?.tierName || playerRanking?.externalRank) && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  {playerRanking.tierName && (
+                    <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
+                      {playerRanking.tierName}
+                    </span>
+                  )}
+                  {playerRanking.externalRank && (
+                    <span className="text-xs text-content-secondary">
+                      {playerRanking.rankSource || "PL"} #{playerRanking.externalRank}
+                    </span>
+                  )}
+                </div>
               )}
-              {playerRanking.externalRank && (
-                <span className="text-xs text-content-secondary">
-                  {playerRanking.rankSource || "PL"} #{playerRanking.externalRank}
-                </span>
-              )}
+              {/* Value indicators */}
+              <div className="flex gap-2 mt-2">
+                {valueIndicator.severity !== "fair" && (
+                  <span
+                    className={`text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+                    title={`VBD $${player.dollarValue} vs actual ${actualPrice ? `$${actualPrice}` : "not drafted"}`}
+                  >
+                    {valueIndicator.label}
+                  </span>
+                )}
+                {!actualPrice && isValuePick && (
+                  <span className="text-xs bg-positive-light text-positive px-2 py-1 rounded">
+                    Value
+                  </span>
+                )}
+                {!actualPrice && !isAffordable && (
+                  <span className="text-xs bg-negative-light text-negative px-2 py-1 rounded">
+                    Over budget
+                  </span>
+                )}
+              </div>
             </div>
-          )}
+            <div className="text-right shrink-0">
+              <div className="text-h3 font-semibold text-content">
+                ${espnDisplayValue}
+              </div>
+              {espnDisplayValue !== player.dollarValue && (
+                <div className="text-caption text-content-tertiary">
+                  VBD: ${player.dollarValue}
+                </div>
+              )}
+              <div className="text-caption text-content-tertiary">
+                VBD score: {formatNumber(auctionPlayer.vbdScore, 1)}
+              </div>
+            </div>
+          </div>
 
-          {/* Value indicators */}
-          <div className="flex gap-2 mt-2">
-            {/* Value detection badge - only show for non-fair values */}
-            {valueIndicator.severity !== "fair" && (
-              <span
-                className={`text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
-                title={`VBD $${player.dollarValue} vs actual ${actualPrice ? `$${actualPrice}` : "not drafted"}`}
-              >
-                {valueIndicator.label}
-              </span>
+          {/* Projected stats */}
+          <div className="text-data text-content-secondary mt-2 flex gap-3 flex-wrap">
+            {projectedStats.HR && <span>HR: {projectedStats.HR}</span>}
+            {projectedStats.RBI && <span>RBI: {projectedStats.RBI}</span>}
+            {projectedStats.SB && <span>SB: {projectedStats.SB}</span>}
+            {projectedStats.W && <span>W: {projectedStats.W}</span>}
+            {projectedStats.SV && <span>SV: {projectedStats.SV}</span>}
+            {projectedStats.AB && projectedStats.AB > 0 && (
+              <>
+                <span>AVG: {formatNumber(calculateAVG(projectedStats), 3)}</span>
+                <span>OPS: {formatNumber(calculateOPS(projectedStats), 3)}</span>
+              </>
             )}
-
-            {/* Budget pacing indicators */}
-            {!actualPrice && isValuePick && (
-              <span className="text-xs bg-positive-light text-positive px-2 py-1 rounded">
-                Value
-              </span>
-            )}
-            {!actualPrice && !isAffordable && (
-              <span className="text-xs bg-negative-light text-negative px-2 py-1 rounded">
-                Over budget
-              </span>
+            {projectedStats.IP && projectedStats.IP > 0 && (
+              <>
+                <span>ERA: {formatNumber(calculateERA(projectedStats), 2)}</span>
+                <span>WHIP: {formatNumber(calculateWHIP(projectedStats), 2)}</span>
+              </>
             )}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-h3 font-semibold text-content">
-            ${espnDisplayValue}
-          </div>
-          {espnDisplayValue !== player.dollarValue && (
-            <div className="text-caption text-content-tertiary">
-              VBD: ${player.dollarValue}
-            </div>
-          )}
-          <div className="text-caption text-content-tertiary">
-            VBD score: {formatNumber(auctionPlayer.vbdScore, 1)}
-          </div>
-        </div>
-      </div>
-
-      {/* Projected stats (abbreviated) */}
-      <div className="text-data text-content-secondary mt-2 flex gap-3">
-        {/* Counting stats - read directly */}
-        {projectedStats.HR && <span>HR: {projectedStats.HR}</span>}
-        {projectedStats.RBI && <span>RBI: {projectedStats.RBI}</span>}
-        {projectedStats.SB && <span>SB: {projectedStats.SB}</span>}
-        {projectedStats.W && <span>W: {projectedStats.W}</span>}
-        {projectedStats.SV && <span>SV: {projectedStats.SV}</span>}
-
-        {/* Rate stats - calculated from components */}
-        {projectedStats.AB && projectedStats.AB > 0 && (
-          <>
-            <span>
-              AVG: {formatNumber(calculateAVG(projectedStats), 3)}
-            </span>
-            <span>
-              OPS: {formatNumber(calculateOPS(projectedStats), 3)}
-            </span>
-          </>
-        )}
-        {projectedStats.IP && projectedStats.IP > 0 && (
-          <>
-            <span>
-              ERA: {formatNumber(calculateERA(projectedStats), 2)}
-            </span>
-            <span>
-              WHIP: {formatNumber(calculateWHIP(projectedStats), 2)}
-            </span>
-          </>
-        )}
       </div>
     </div>
   );
