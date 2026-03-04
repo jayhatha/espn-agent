@@ -21,7 +21,7 @@ import {
   getAuctionValuesWithRetry,
   throttle,
 } from "../lib/api-client";
-import { detectLeagueConfig } from "../lib/draft-config-detector";
+import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
@@ -240,11 +240,20 @@ export default defineContentScript({
     });
     useDraftStore.setState({ sidebarVisible: true });
 
+    // Detect user's own team from the auction pick train
+    const myTeamDetection = detectMyTeam();
+    if (myTeamDetection) {
+      useDraftStore.getState().setMyTeamId(myTeamDetection.teamId);
+      useDraftStore.getState().setRemainingBudget(myTeamDetection.remainingBudget);
+      console.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
+    }
+
     let reactRootInstance: ReturnType<typeof createRoot> | null = null;
     let popoutWindow: Window | null = null;
     let popoutRootInstance: ReturnType<typeof createRoot> | null = null;
     let isPopoutOpen = false;
     let isMounting = false;
+    let pickTrainBudgetInterval: ReturnType<typeof setInterval> | null = null;
     const { [SIDEBAR_DOCK_STORAGE_KEY]: storedDockSide } =
       await chrome.storage.local.get(SIDEBAR_DOCK_STORAGE_KEY);
     let currentDockSide: "left" | "right" =
@@ -539,11 +548,31 @@ export default defineContentScript({
       console.log("[ESPN Draft Assistant] Started ESPN auction table scraper (10s interval)");
     };
 
+    const startPickTrainBudgetPolling = () => {
+      if (pickTrainBudgetInterval) return; // Already running
+      pickTrainBudgetInterval = setInterval(() => {
+        const myTeam = detectMyTeam();
+        if (myTeam) {
+          useDraftStore.getState().setMyTeamId(myTeam.teamId);
+          useDraftStore.getState().setRemainingBudget(myTeam.remainingBudget);
+        }
+        // Also log all team budgets for debugging in dev
+        if (import.meta.env.DEV) {
+          const allBudgets = detectAllTeamBudgets();
+          if (allBudgets.length > 0) {
+            console.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
+          }
+        }
+      }, 5_000);
+      console.log("[ESPN Draft Assistant] Started pick train budget polling (5s interval)");
+    };
+
     if (resolvedDraftFormat === "auction") {
       auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
         useDraftStore.getState().setCurrentAuctionPlayer(player);
       });
       startAuctionTableScraping();
+      startPickTrainBudgetPolling();
     }
 
     const sidebarMountObserver = new MutationObserver(() => {
@@ -623,6 +652,9 @@ export default defineContentScript({
       // Start table scraping if not already running
       startAuctionTableScraping();
 
+      // Start pick train budget polling if not already running
+      startPickTrainBudgetPolling();
+
       refreshAssistantData(); // Throttled, will respect 3s minimum
     }, 2000);
 
@@ -676,6 +708,9 @@ export default defineContentScript({
       auctionPlayerCleanup?.();
       if (auctionTableScrapeInterval) {
         clearInterval(auctionTableScrapeInterval);
+      }
+      if (pickTrainBudgetInterval) {
+        clearInterval(pickTrainBudgetInterval);
       }
       window.clearInterval(sidebarHeartbeat);
       window.clearInterval(popoutHeartbeat);

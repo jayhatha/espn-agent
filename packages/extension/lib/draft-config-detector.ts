@@ -175,10 +175,126 @@ export function detectLeagueConfig(): DetectionResult {
 }
 
 /**
+ * Detect the user's own team from the auction pick train.
+ * ESPN marks the user's team with the CSS class `auction-pick-component--own`
+ * on the `.content` div inside the pick train.
+ *
+ * Returns `{ teamName, teamId, remainingBudget }` or null if not found.
+ */
+export function detectMyTeam(): {
+  teamName: string;
+  teamId: string;
+  remainingBudget: number;
+} | null {
+  // The own-team marker is on the .content div inside .auction-pick-component
+  const ownContent = document.querySelector(".auction-pick-component--own");
+  if (!ownContent) {
+    return null;
+  }
+
+  const teamNameEl = ownContent.querySelector(".team-name");
+  const cashEl = ownContent.querySelector(".cash");
+
+  if (!teamNameEl || !cashEl) {
+    return null;
+  }
+
+  const rawTeamName = (teamNameEl.textContent || "").trim();
+  const cashText = (cashEl.textContent || "").trim();
+
+  // Parse budget: "$112" → 112
+  const budgetMatch = cashText.match(/\$?(\d+)/);
+  const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 0;
+
+  // Strip number prefix: "13. Nathan Fielders" → "Nathan Fielders"
+  // Use the number as teamId for uniqueness
+  const prefixMatch = rawTeamName.match(/^(\d+)\.\s*(.+)$/);
+  const teamId = prefixMatch ? prefixMatch[1] : rawTeamName;
+  const teamName = prefixMatch ? prefixMatch[2] : rawTeamName;
+
+  console.log(
+    `[ESPN Draft Assistant] My team detected from pick train: "${teamName}" (id: ${teamId}, budget: $${remainingBudget})`,
+  );
+
+  return { teamName, teamId, remainingBudget };
+}
+
+/**
+ * Detect all teams' current budgets from the auction pick train.
+ * Useful for monitoring budget changes during the draft.
+ *
+ * Returns an array of `{ teamName, remainingBudget }` in pick-train order.
+ */
+export function detectAllTeamBudgets(): Array<{
+  teamName: string;
+  remainingBudget: number;
+}> {
+  const items = document.querySelectorAll(
+    ".pick-train__content__picks-container .picklist--item",
+  );
+  if (items.length === 0) {
+    // Fallback: any picklist--item on the page
+    const fallbackItems = document.querySelectorAll(".picklist--item");
+    if (fallbackItems.length === 0) {
+      return [];
+    }
+    return Array.from(fallbackItems).flatMap((item) => {
+      const teamNameEl = item.querySelector(".team-name");
+      const cashEl = item.querySelector(".cash");
+      if (!teamNameEl || !cashEl) return [];
+      const rawName = (teamNameEl.textContent || "").trim();
+      const cashText = (cashEl.textContent || "").trim();
+      const budgetMatch = cashText.match(/\$?(\d+)/);
+      const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 0;
+      const prefixMatch = rawName.match(/^(\d+)\.\s*(.+)$/);
+      const teamName = prefixMatch ? prefixMatch[2] : rawName;
+      return [{ teamName, remainingBudget }];
+    });
+  }
+
+  return Array.from(items).flatMap((item) => {
+    const teamNameEl = item.querySelector(".team-name");
+    const cashEl = item.querySelector(".cash");
+    if (!teamNameEl || !cashEl) return [];
+    const rawName = (teamNameEl.textContent || "").trim();
+    const cashText = (cashEl.textContent || "").trim();
+    const budgetMatch = cashText.match(/\$?(\d+)/);
+    const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 0;
+    const prefixMatch = rawName.match(/^(\d+)\.\s*(.+)$/);
+    const teamName = prefixMatch ? prefixMatch[2] : rawName;
+    return [{ teamName, remainingBudget }];
+  });
+}
+
+/**
  * Detect total team count from ESPN draft page
  * Multiple strategies with validation to handle ESPN DOM variations
  */
 function detectTeamCount(): number | null {
+  // Strategy 0: Count .picklist--item elements in the auction pick train
+  // This is the most reliable source on auction draft pages — always visible
+  const pickTrainContainer = document.querySelector(
+    ".pick-train__content__picks-container",
+  );
+  if (pickTrainContainer) {
+    const pickItems = pickTrainContainer.querySelectorAll(".picklist--item");
+    if (pickItems.length >= 2 && pickItems.length <= 20) {
+      console.log(
+        `[ESPN Draft Assistant] Team count detected from pick train: ${pickItems.length}`,
+      );
+      return pickItems.length;
+    }
+  } else {
+    // Fallback: any .picklist--item elements on the page (no container)
+    const anyPickItems = document.querySelectorAll(".picklist--item");
+    if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
+      console.log(
+        `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
+      );
+      return anyPickItems.length;
+    }
+  }
+
   // Strategy 1: Count unique grid columns in completed picks (most reliable)
   const pickElements = document.querySelectorAll('[style*="grid-area"]');
   if (pickElements.length > 0) {
