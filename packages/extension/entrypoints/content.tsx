@@ -238,6 +238,10 @@ export default defineContentScript({
       myTeamId: teamId ?? "user",
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
+    // Store league categories for the deterministic draft engine
+    if (cachedLeagueConfig) {
+      useDraftStore.getState().setLeagueCategories(cachedLeagueConfig.categories);
+    }
     useDraftStore.setState({ sidebarVisible: true });
 
     // Detect user's own team from the auction pick train
@@ -556,10 +560,11 @@ export default defineContentScript({
           useDraftStore.getState().setMyTeamId(myTeam.teamId);
           useDraftStore.getState().setRemainingBudget(myTeam.remainingBudget);
         }
-        // Also log all team budgets for debugging in dev
-        if (import.meta.env.DEV) {
-          const allBudgets = detectAllTeamBudgets();
-          if (allBudgets.length > 0) {
+        // Collect all team budgets for engine inflation model
+        const allBudgets = detectAllTeamBudgets();
+        if (allBudgets.length > 0) {
+          useDraftStore.getState().setAllTeamBudgets(allBudgets);
+          if (import.meta.env.DEV) {
             console.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
           }
         }

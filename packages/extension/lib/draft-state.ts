@@ -5,6 +5,7 @@ import type {
   DraftedPlayer,
   DraftRanking,
   AuctionValue,
+  Category,
 } from "@espn-fantasy/shared";
 
 export interface ProjectedOverallRow {
@@ -67,6 +68,12 @@ interface DraftState {
   // backend API values. Merged incrementally as the user scrolls the table.
   espnDomAuctionValues: Record<number, number>;
 
+  // All team budgets from pick train DOM scraping (populated every 5s in auction drafts)
+  allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>;
+
+  // League categories (set from detected/fallback config at page load, not persisted)
+  leagueCategories: Category[];
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -102,6 +109,8 @@ interface DraftState {
   setEspnDomAuctionValues: (values: Record<number, number>) => void;
   setMyTeamId: (teamId: string) => void;
   setRemainingBudget: (budget: number) => void;
+  setAllTeamBudgets: (budgets: Array<{ teamName: string; remainingBudget: number }>) => void;
+  setLeagueCategories: (categories: Category[]) => void;
   reset: () => void;
 }
 
@@ -125,6 +134,8 @@ export const useDraftStore = create<DraftState>()(
       teamRosters: new Map(),
       currentAuctionPlayer: null,
       espnDomAuctionValues: {},
+      allTeamBudgets: [],
+      leagueCategories: [],
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -258,6 +269,10 @@ export const useDraftStore = create<DraftState>()(
 
       setRemainingBudget: (budget) => set({ remainingBudget: budget }),
 
+      setAllTeamBudgets: (budgets) => set({ allTeamBudgets: budgets }),
+
+      setLeagueCategories: (categories) => set({ leagueCategories: categories }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -270,6 +285,8 @@ export const useDraftStore = create<DraftState>()(
           teamRosters: new Map(),
           currentAuctionPlayer: null,
           espnDomAuctionValues: {},
+          allTeamBudgets: [],
+          leagueCategories: [],
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,
@@ -321,6 +338,8 @@ export const useDraftStore = create<DraftState>()(
         teamRosters: Array.from(state.teamRosters.entries()), // Serialize Map to array
         // ESPN DOM-scraped values (accumulated across page sessions)
         espnDomAuctionValues: state.espnDomAuctionValues,
+        // All team budgets from pick train (persisted across reloads)
+        allTeamBudgets: state.allTeamBudgets,
       }),
       storage: {
         getItem: async (name) => {
