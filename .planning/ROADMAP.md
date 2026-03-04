@@ -143,7 +143,7 @@ Plans:
 | 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
 | 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
 | 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
-| 20. Deterministic Draft Engine | 2/2 | Complete   | 2026-03-04 | - |
+| 20. Deterministic Draft Engine | 2/2 | Complete    | 2026-03-04 | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
