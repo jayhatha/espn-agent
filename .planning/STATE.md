@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 20 (Deterministic Draft Engine)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-03-04 - Completed 20-01: Deterministic Draft Engine Core (engine modules + Zustand store extensions)
+Plan: 2 of 2 in current phase
+Status: Complete
+Last activity: 2026-03-04 - Completed 20-02: UI Integration (useDraftEngineSignals hook, EngineAlerts, EngineInsights, upgraded AuctionBudgetTracker, integrated DraftSidebar)
 
-Progress: Phase 20: [█████     ] 50% (1 of 2 plans complete)
+Progress: Phase 20: [██████████] 100% (2 of 2 plans complete)
 
 ## Performance Metrics
 
@@ -123,6 +123,7 @@ Progress: Phase 20: [█████     ] 50% (1 of 2 plans complete)
 | Phase quick-29 P01 | 2 | 1 tasks | 1 files |
 | Phase quick-30 P01 | 3 | 2 tasks | 4 files |
 | Phase 20 P01 | 5 | 2 tasks | 9 files |
+| Phase 20 P02 | 3 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -262,6 +263,9 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-32]: Nominated banner dual lookup: auctionValues.find() for ESPN dollar value, rankings.find() for PitcherList tier — fixes pre-existing bug where rankings.dollarValue didn't exist on DraftRanking
 - [Phase 20]: All engine functions are pure with no Zustand reads or DOM access — testable in isolation
 - [Phase 20]: allTeamBudgets persisted in Zustand partialize for reload survivability; leagueCategories not persisted (set fresh from config detection each page load)
+- [Phase 20 P02]: useDraftEngineSignals excludes currentAuctionPlayer from useMemo deps to prevent 200ms recomputes from MutationObserver — engine updates on allPicks change instead
+- [Phase 20 P02]: teamRosters.size used in deps array instead of Map reference — prevents stale reference issues with Zustand Map state
+- [Phase 20 P02]: AuctionBudgetTracker accepts optional engineSignals prop with graceful fallback to calculateBudgetPacing — works for snake drafts and pre-data states
 
 ### Roadmap Evolution
 
@@ -340,5 +344,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 20-01-PLAN.md: Deterministic Draft Engine Core (engine modules + Zustand store extensions)
+Stopped at: Completed 20-02-PLAN.md: UI Integration (useDraftEngineSignals hook, EngineAlerts, EngineInsights, upgraded AuctionBudgetTracker, integrated DraftSidebar)
 Resume file: None
