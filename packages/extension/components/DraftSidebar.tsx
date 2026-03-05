@@ -1,14 +1,18 @@
 import React from "react";
 import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
+import { useNarrator } from "../lib/use-narrator";
+import { useNarratorStore } from "../lib/narrator-state";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
+import DraftNarrator from "./DraftNarrator";
 import DraftRecommendations from "./DraftRecommendations";
 import EngineAlerts from "./EngineAlerts";
 import EngineInsights from "./EngineInsights";
 import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
+import StrategySetup from "./StrategySetup";
 
 export default function DraftSidebar() {
   const {
@@ -29,6 +33,8 @@ export default function DraftSidebar() {
   } = useDraftStore();
 
   const engineSignals = useDraftEngineSignals();
+  const { requestAdvice } = useNarrator(engineSignals);
+  const sessionCallCount = useNarratorStore((state) => state.sessionCallCount);
 
   const dispatchAssistantEvent = (eventName: string, detail?: unknown) => {
     const targetWindow =
@@ -226,12 +232,19 @@ export default function DraftSidebar() {
       <div className="flex-1 overflow-y-auto flex flex-col">
         {draftFormat === "auction" ? (
           <>
-            {/* Engine alerts at top -- most actionable */}
+            {/* AI Advisor -- narrator above data-dense engine signals */}
+            <DraftNarrator
+              onAskAdvice={requestAdvice}
+              sessionCallCount={sessionCallCount}
+            />
+            {/* Engine alerts -- severity-based alerts */}
             {engineSignals && engineSignals.alerts.length > 0 && (
               <EngineAlerts alerts={engineSignals.alerts} />
             )}
             <AuctionBudgetTracker engineSignals={engineSignals} />
             <EngineInsights engineSignals={engineSignals} />
+            {/* Strategy anchor/pivot config */}
+            <StrategySetup />
             <PositionScarcityAlerts />
             <AuctionRecommendations />
           </>
