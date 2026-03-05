@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { AuctionValuationAgent } from "../agents/auction-valuation.js";
+import { DraftNarratorAgent } from "../agents/draft-narrator.js";
+import type { NarratorPayload } from "../agents/draft-narrator.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import type {
   DraftConfiguration,
@@ -1022,6 +1024,47 @@ export async function draftRoutes(app: FastifyInstance) {
       }
     },
   );
+  // POST /api/draft/narrate - LLM narration of structured engine signals
+  app.post<{
+    Body: NarratorPayload;
+  }>(
+    "/api/draft/narrate",
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const payload = request.body as NarratorPayload;
+
+      // Basic guard: require at least one meaningful signal to narrate
+      if (!payload.alerts?.length && !payload.archetype && !payload.currentAuctionPlayer) {
+        return reply
+          .code(400)
+          .send({ error: "No meaningful signals provided" });
+      }
+
+      // Instantiate per-request so the constructor's OPENAI_API_KEY check is
+      // caught here and converted to a 503 instead of crashing the server.
+      try {
+        const narrator = new DraftNarratorAgent(request.log as any);
+        const narration = await narrator.narrate(payload);
+        return { narration, generatedAt: new Date().toISOString() };
+      } catch (error) {
+        request.log.error(
+          { error },
+          "[DraftNarrator] Failed to generate narration",
+        );
+        return reply
+          .code(503)
+          .send({ error: "Narration service temporarily unavailable" });
+      }
+    },
+  );
+
   // GET /api/draft/espn - Fetch ESPN global draft data (ADP + auction values)
   app.get<{
     Querystring: {
