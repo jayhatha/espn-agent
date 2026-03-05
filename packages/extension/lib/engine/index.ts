@@ -172,6 +172,43 @@ function computeRosterOptimization(
   const mySpent = input.myRoster.reduce((sum, p) => sum + (p.cost ?? 0), 0);
   const myBudget = input.remainingBudget;
 
+  // Compute remaining roster slots by subtracting my drafted players' positions
+  // (computed outside bid cache so needByPosition is available for top targets sort)
+  const remainingSlots: Record<string, number> = { ...activeSlots };
+  for (const drafted of input.myRoster) {
+    const slotMap = new Map(Object.entries(remainingSlots).filter(([, v]) => v > 0));
+    const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
+    const slot = findBestSlotForPositions(positions, slotMap);
+    if (slot && remainingSlots[slot] > 0) {
+      remainingSlots[slot]--;
+    }
+  }
+  // Remove zero-count slots
+  for (const [slot, count] of Object.entries(remainingSlots)) {
+    if (count <= 0) delete remainingSlots[slot];
+  }
+
+  // Compute positional need from remaining slots (UTIL, P, BN excluded)
+  const needByPosition: Record<string, number> = {};
+  for (const [slot, count] of Object.entries(remainingSlots)) {
+    if (slot === 'UTIL' || slot === 'P' || slot === 'BN') continue;
+    if (count > 0) {
+      needByPosition[slot] = count;
+    }
+  }
+  // Expand combo slots: CI need applies to 1B and 3B, MI need applies to 2B and SS
+  if (needByPosition['CI'] && needByPosition['CI'] > 0) {
+    needByPosition['1B'] = (needByPosition['1B'] ?? 0) + needByPosition['CI'];
+    needByPosition['3B'] = (needByPosition['3B'] ?? 0) + needByPosition['CI'];
+  }
+  if (needByPosition['MI'] && needByPosition['MI'] > 0) {
+    needByPosition['2B'] = (needByPosition['2B'] ?? 0) + needByPosition['MI'];
+    needByPosition['SS'] = (needByPosition['SS'] ?? 0) + needByPosition['MI'];
+  }
+  // Remove combo slot keys themselves (players have real positions, not CI/MI)
+  delete needByPosition['CI'];
+  delete needByPosition['MI'];
+
   let maxBidResult: ReturnType<typeof computeMaxBid> | null = null;
   let monteCarloResult: ReturnType<typeof runMonteCarlo> | null = null;
 
@@ -195,21 +232,6 @@ function computeRosterOptimization(
 
     // Compute max bid for nominated player (or fallback to first player)
     const targetPlayer = nominatedPlayer ?? allPlayers[0];
-
-    // Compute remaining roster slots by subtracting my drafted players' positions
-    const remainingSlots: Record<string, number> = { ...activeSlots };
-    for (const drafted of input.myRoster) {
-      const slotMap = new Map(Object.entries(remainingSlots).filter(([, v]) => v > 0));
-      const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
-      const slot = findBestSlotForPositions(positions, slotMap);
-      if (slot && remainingSlots[slot] > 0) {
-        remainingSlots[slot]--;
-      }
-    }
-    // Remove zero-count slots
-    for (const [slot, count] of Object.entries(remainingSlots)) {
-      if (count <= 0) delete remainingSlots[slot];
-    }
 
     // Compute my current roster SGP by matching drafted players to FG pool
     let myCurrentRosterSGP = 0;
@@ -265,9 +287,19 @@ function computeRosterOptimization(
   let hitterCount = 5 - pitcherCount;
 
   // If one pool is entirely absent (e.g. pitchers-only league), fall back to all 5 from the other
-  const indexedAll = allPlayers.map((p, i) => ({ player: p, sgp: sgpValues[i] ?? 0, index: i }));
-  const hitterPool = indexedAll.filter(e => !e.player.isPitcher).sort((a, b) => b.sgp - a.sgp);
-  const pitcherPool = indexedAll.filter(e => e.player.isPitcher).sort((a, b) => b.sgp - a.sgp);
+  const indexedAll = allPlayers.map((p, i) => {
+    const sgp = sgpValues[i] ?? 0;
+    // Compute max positional need across player's positions
+    const maxNeed = p.positions.reduce((max, pos) => {
+      const posUpper = pos.toUpperCase();
+      return Math.max(max, needByPosition[posUpper] ?? 0);
+    }, 0);
+    // 50% boost per empty slot at the player's best position
+    const adjustedSgp = sgp * (1 + maxNeed * 0.5);
+    return { player: p, sgp, adjustedSgp, index: i };
+  });
+  const hitterPool = indexedAll.filter(e => !e.player.isPitcher).sort((a, b) => b.adjustedSgp - a.adjustedSgp);
+  const pitcherPool = indexedAll.filter(e => e.player.isPitcher).sort((a, b) => b.adjustedSgp - a.adjustedSgp);
 
   if (hitterPool.length === 0) {
     pitcherCount = 5;
