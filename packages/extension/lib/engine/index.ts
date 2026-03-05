@@ -4,6 +4,13 @@ import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
+import { computeBuildArchetype } from "./archetype";
+import {
+  fgLeaderboardHittersData,
+  fgLeaderboardPitchersData,
+  fgAuctionHittersData,
+  fgAuctionPitchersData,
+} from "../fangraphs-data";
 
 export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal } from "./types";
 
@@ -22,7 +29,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     input.remainingBudget,
   );
 
-  // 2. Enhanced scarcity model
+  // 2. Enhanced scarcity model (uses external rankings + auction $ for tier drops)
   const scarcity = computeEnhancedScarcity(
     input.rankings,
     input.allPicks,
@@ -30,6 +37,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     input.totalTeams,
     input.myRoster,
     input.myTeamId,
+    input.auctionValues,
   );
 
   // 3. Category gap engine
@@ -64,6 +72,20 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // 5. Generate alerts from all signals
   const alerts = generateAlerts(inflation, scarcity, categoryGaps, budgetCurve);
 
+  // 6. Build archetype analysis (position-aware greedy fill + classification)
+  const archetype = computeBuildArchetype(
+    input.myRoster,
+    input.remainingBudget,
+    input.allPicks,
+    fgLeaderboardHittersData,
+    fgLeaderboardPitchersData,
+    fgAuctionHittersData,
+    fgAuctionPitchersData,
+    input.leagueCategories,
+    input.rosterSize,
+    input.totalTeams,
+  );
+
   const elapsed = performance.now() - t0;
   if (elapsed > 300) {
     console.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
@@ -76,5 +98,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     budgetCurve,
     alerts,
     computeTimeMs: Math.round(elapsed * 10) / 10,
+    archetype: archetype.picksAnalyzed >= 3 ? archetype : null,
   };
 }
