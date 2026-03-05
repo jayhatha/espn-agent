@@ -1,5 +1,72 @@
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
 
+/**
+ * Detect roster slots from the ESPN players-table DOM.
+ *
+ * ESPN renders each active roster row as a <tr> in the players-table body.
+ * The first <td> in each row contains a <div title="C"> (or "1B", "2B/SS", etc.)
+ * that identifies the slot type.
+ *
+ * Returns { rosterSlots, benchCount } or null if the table isn't found / zero rows detected.
+ */
+export function detectRosterSlotsFromPlayersTable(): {
+  rosterSlots: Record<string, number>;
+  benchCount: number;
+} | null {
+  const table =
+    document.querySelector(".ResponsiveTable.players-table") ??
+    document.querySelector(".players-table");
+
+  if (!table) {
+    return null;
+  }
+
+  const rows = table.querySelectorAll("tbody tr");
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const rosterSlots: Record<string, number> = {};
+  let benchCount = 0;
+
+  rows.forEach((row) => {
+    const firstTd = row.querySelector("td");
+    if (!firstTd) return;
+
+    const titleDiv = firstTd.querySelector("div[title]");
+    if (!titleDiv) return;
+
+    const rawLabel = (titleDiv.getAttribute("title") || "").trim();
+    if (!rawLabel) return;
+
+    // Map ESPN slot labels to engine slot keys
+    let slotKey: string;
+    if (rawLabel === "2B/SS") {
+      slotKey = "MI";
+    } else if (rawLabel === "1B/3B") {
+      slotKey = "CI";
+    } else if (rawLabel === "BE") {
+      // Bench — excluded from active roster slots
+      benchCount++;
+      return;
+    } else {
+      slotKey = rawLabel;
+    }
+
+    rosterSlots[slotKey] = (rosterSlots[slotKey] ?? 0) + 1;
+  });
+
+  if (Object.keys(rosterSlots).length === 0 && benchCount === 0) {
+    return null;
+  }
+
+  console.log(
+    `[ESPN Draft Assistant] Roster slots detected from players-table: ${JSON.stringify(rosterSlots)} (bench: ${benchCount})`,
+  );
+
+  return { rosterSlots, benchCount };
+}
+
 export interface DetectionResult {
   config: (DraftConfiguration & { budget?: number }) | null;
   confidence: "high" | "low" | "failed";

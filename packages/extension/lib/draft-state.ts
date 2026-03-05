@@ -63,14 +63,6 @@ interface DraftState {
     playerId?: number;
   } | null;
 
-  // Draft strategy (anchor/pivot tracking — not persisted, changes each draft)
-  strategy: {
-    anchorPlayerName: string | null;
-    anchorAcquired: boolean;
-    fallbackPaths: string[];
-    strategyState: "nominal" | "anchor_lost" | "pivot_needed";
-  } | null;
-
   // ESPN DOM-scraped auction values (playerId -> dollar value)
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
@@ -81,6 +73,11 @@ interface DraftState {
 
   // League categories (set from detected/fallback config at page load, not persisted)
   leagueCategories: Category[];
+
+  // Roster slot breakdown detected from the ESPN players-table DOM.
+  // Persisted across reloads since roster config doesn't change mid-draft.
+  // null until first successful detection.
+  detectedRosterSlots: Record<string, number> | null;
 
   // UI state
   sidebarVisible: boolean;
@@ -119,8 +116,7 @@ interface DraftState {
   setRemainingBudget: (budget: number) => void;
   setAllTeamBudgets: (budgets: Array<{ teamName: string; remainingBudget: number }>) => void;
   setLeagueCategories: (categories: Category[]) => void;
-  setStrategy: (strategy: DraftState["strategy"]) => void;
-  updateStrategyState: (state: "nominal" | "anchor_lost" | "pivot_needed") => void;
+  setDetectedRosterSlots: (slots: Record<string, number>) => void;
   reset: () => void;
 }
 
@@ -143,10 +139,10 @@ export const useDraftStore = create<DraftState>()(
       userRankingOverrides: {},
       teamRosters: new Map(),
       currentAuctionPlayer: null,
-      strategy: null,
       espnDomAuctionValues: {},
       allTeamBudgets: [],
       leagueCategories: [],
+      detectedRosterSlots: null,
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -154,19 +150,22 @@ export const useDraftStore = create<DraftState>()(
 
       // Actions
       initializeDraft: (config) => {
-        const current = get();
-        const sameLeague = current.leagueId === config.leagueId;
-
         set({
           leagueId: config.leagueId,
           draftFormat: config.draftFormat,
           totalTeams: config.totalTeams,
           rosterSize: config.rosterSize,
           myTeamId: config.myTeamId,
-          // Preserve budget/roster state on reload (same league)
-          remainingBudget: sameLeague && current.myRoster.length > 0
-            ? current.remainingBudget
-            : config.budget || 260,
+          remainingBudget: config.budget || 260,
+          // Always clear accumulated draft data — picks will be
+          // re-detected from DOM by the MutationObserver
+          allPicks: [],
+          myRoster: [],
+          currentPick: 1,
+          teamRosters: new Map(),
+          espnDomAuctionValues: {},
+          allTeamBudgets: [],
+          currentAuctionPlayer: null,
         });
       },
 
@@ -284,13 +283,7 @@ export const useDraftStore = create<DraftState>()(
 
       setLeagueCategories: (categories) => set({ leagueCategories: categories }),
 
-      setStrategy: (strategy) => set({ strategy }),
-
-      updateStrategyState: (strategyState) =>
-        set((state) => {
-          if (!state.strategy) return state;
-          return { strategy: { ...state.strategy, strategyState } };
-        }),
+      setDetectedRosterSlots: (slots) => set({ detectedRosterSlots: slots }),
 
       reset: () =>
         set({
@@ -303,10 +296,10 @@ export const useDraftStore = create<DraftState>()(
           projectedStandings: null,
           teamRosters: new Map(),
           currentAuctionPlayer: null,
-          strategy: null,
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           leagueCategories: [],
+          detectedRosterSlots: null,
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,
@@ -360,7 +353,21 @@ export const useDraftStore = create<DraftState>()(
         espnDomAuctionValues: state.espnDomAuctionValues,
         // All team budgets from pick train (persisted across reloads)
         allTeamBudgets: state.allTeamBudgets,
+        // Roster slot layout detected from players-table (persisted since it doesn't change mid-draft)
+        detectedRosterSlots: state.detectedRosterSlots,
       }),
+      merge: (persisted, current) => {
+        const stored = (persisted as any) ?? {};
+        // Deserialize teamRosters from array back to Map on every restore
+        // (partialize serializes Map → array, but Zustand's default shallow merge
+        // doesn't convert back, so updateTeamRoster fails on the raw array)
+        const teamRosters = Array.isArray(stored.teamRosters)
+          ? new Map(stored.teamRosters)
+          : stored.teamRosters instanceof Map
+            ? stored.teamRosters
+            : new Map();
+        return { ...current, ...stored, teamRosters };
+      },
       storage: {
         getItem: async (name) => {
           const result = await chrome.storage.local.get(name);

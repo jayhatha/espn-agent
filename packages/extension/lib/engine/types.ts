@@ -93,6 +93,8 @@ export interface DraftEngineInput {
   remainingBudget: number;
   totalTeams: number;
   rosterSize: number;
+  /** Detected roster slot breakdown. Falls back to DEFAULT_ROSTER_SLOTS in engine when undefined. */
+  rosterSlots?: Record<string, number>;
   teamRosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>;
   myTeamId: string | null;
   allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>;
@@ -146,7 +148,6 @@ export interface DraftEngineSignals {
   budgetCurve: BudgetCurveSignal;
   alerts: DraftAlert[];
   computeTimeMs: number;
-  archetype: BuildArchetypeSignal | null;  // null when insufficient data (< 3 picks)
   optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
 }
 
