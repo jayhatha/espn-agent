@@ -29,17 +29,6 @@ export interface NarratorPayload {
     maxBidRecommendation: number;
   };
 
-  archetype: {
-    archetypeLabel: string | null;
-    archetypeConfidence: number;
-    puntedCategories: string[];
-    pivotPlayers: Array<{
-      playerName: string;
-      dollarValue: number;
-      category: string;
-    }>;
-  } | null;
-
   topScarcity: Array<{
     position: string;
     scarcityIndex: number;
@@ -62,12 +51,26 @@ export interface NarratorPayload {
     maxBidRecommendation?: number;
   } | null;
 
-  triggerReason: "alert" | "archetype_change" | "budget_pressure" | "user_request";
-
-  strategy: {
-    anchorPlayerName: string | null;
-    anchorAcquired: boolean;
-    fallbackPaths: string[];
-    strategyState: "nominal" | "anchor_lost" | "pivot_needed";
+  /** Roster optimization signals from Phase 23 engine — null when no nomination or insufficient data */
+  optimization: {
+    shouldBid: boolean;
+    maxBid: number;
+    valueSurplus: number;
+    simulationEV: number;
+    simulationConfidence: "high" | "medium" | "low"; // derived from stdDev/EV ratio
+    topTargets: Array<{
+      playerName: string;
+      position: string;
+      sgpValue: number;
+      maxBid: number;
+      expectedMarketPrice: number;
+    }>; // limited to top 3
+    opponentPressure: Array<{
+      position: string;
+      competitionFactor: number;
+    }>; // limited to top 3 by competition factor
   } | null;
+
+  /** What triggered this narration request */
+  triggerReason: "alert" | "budget_pressure" | "nomination" | "user_request";
 }

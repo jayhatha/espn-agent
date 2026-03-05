@@ -3,9 +3,8 @@
  *
  * Trigger conditions (from 22-CONTEXT.md):
  *   1. Any alert severity > 0.65
- *   2. Archetype label changes (only when picksAnalyzed >= 3)
- *   3. Budget pacing status changes
- *   4. Manual "Ask for advice" via requestAdvice()
+ *   2. Budget pacing status changes
+ *   3. Manual "Ask for advice" via requestAdvice()
  *
  * Deduplication: buildDedupeKey() prevents identical consecutive calls
  * Debounce: 1500ms window clusters rapid trigger events into one call
@@ -24,18 +23,37 @@ const SESSION_CAP = 120;
 /**
  * Build a deduplication key from engine signals and trigger reason.
  * Identical key = skip the narrator call (same state already narrated).
+ * Includes player name and shouldBid so new nominations always trigger fresh narration.
  */
 function buildDedupeKey(
   signals: DraftEngineSignals,
-  triggerReason: string
+  triggerReason: string,
+  currentPlayerName: string | null | undefined
 ): string {
   const alertIds = signals.alerts
     .map((a) => a.id)
     .sort()
     .join(",");
-  const archetype = signals.archetype?.archetypeLabel ?? "null";
   const pacing = signals.budgetCurve.pacingStatus;
-  return `${alertIds}|${archetype}|${pacing}|${triggerReason}`;
+  const shouldBid = signals.optimization?.shouldBid ?? "";
+  const playerName = currentPlayerName ?? "";
+  return `${alertIds}|${pacing}|${triggerReason}|${shouldBid}|${playerName}`;
+}
+
+/**
+ * Derive simulation confidence from the stdDev/EV ratio.
+ * < 0.1 = high confidence, < 0.3 = medium, else low.
+ * Guards against simulationEV === 0.
+ */
+function deriveSimulationConfidence(
+  simulationEV: number,
+  simulationStdDev: number
+): "high" | "medium" | "low" {
+  if (simulationEV === 0) return "low";
+  const ratio = simulationStdDev / simulationEV;
+  if (ratio < 0.1) return "high";
+  if (ratio < 0.3) return "medium";
+  return "low";
 }
 
 /**
@@ -59,12 +77,6 @@ interface NarratorContext {
     positions?: string[];
     playerId?: number;
   } | null;
-  strategy: {
-    anchorPlayerName: string | null;
-    anchorAcquired: boolean;
-    fallbackPaths: string[];
-    strategyState: "nominal" | "anchor_lost" | "pivot_needed";
-  } | null;
   auctionValues: import("@espn-fantasy/shared").AuctionValue[];
   leagueCategories: import("@espn-fantasy/shared").Category[];
   espnDomAuctionValues: Record<number, number>;
@@ -82,24 +94,6 @@ function buildNarratorPayload(
 ): NarratorPayload {
   const draftPhase = deriveDraftPhase(context.myRoster.length);
 
-  // Build archetype section if available
-  let archetype: NarratorPayload["archetype"] = null;
-  if (signals.archetype) {
-    const a = signals.archetype;
-    archetype = {
-      archetypeLabel: a.archetypeLabel,
-      archetypeConfidence: a.archetypeConfidence,
-      puntedCategories: a.ceilings
-        .filter((c) => c.isPunted)
-        .map((c) => c.stat_key),
-      pivotPlayers: a.pivotPlayers.map((p) => ({
-        playerName: p.playerName,
-        dollarValue: p.dollarValue,
-        category: p.category,
-      })),
-    };
-  }
-
   // Build currentAuctionPlayer with ESPN DOM value and max bid
   let currentAuctionPlayer: NarratorPayload["currentAuctionPlayer"] = null;
   if (context.currentAuctionPlayer) {
@@ -114,6 +108,37 @@ function buildNarratorPayload(
       positions: cap.positions,
       espnValue,
       maxBidRecommendation: signals.budgetCurve.maxBidRecommendation,
+    };
+  }
+
+  // Map optimization signals to compact payload format
+  let optimization: NarratorPayload["optimization"] = null;
+  if (signals.optimization !== null) {
+    const opt = signals.optimization;
+
+    // topTargets: slice first 3
+    const topTargets = opt.topTargets.slice(0, 3).map((t) => ({
+      playerName: t.playerName,
+      position: t.position,
+      sgpValue: t.sgpValue,
+      maxBid: t.maxBid,
+      expectedMarketPrice: t.expectedMarketPrice,
+    }));
+
+    // opponentPressure: convert Record<string, number> to sorted array, top 3
+    const opponentPressure = Object.entries(opt.opponentPressure)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([position, competitionFactor]) => ({ position, competitionFactor }));
+
+    optimization = {
+      shouldBid: opt.shouldBid,
+      maxBid: opt.maxBid,
+      valueSurplus: opt.valueSurplus,
+      simulationEV: opt.simulationEV,
+      simulationConfidence: deriveSimulationConfidence(opt.simulationEV, opt.simulationStdDev),
+      topTargets,
+      opponentPressure,
     };
   }
 
@@ -137,7 +162,6 @@ function buildNarratorPayload(
       budgetPressure: signals.budgetCurve.budgetPressure,
       maxBidRecommendation: signals.budgetCurve.maxBidRecommendation,
     },
-    archetype,
     topScarcity: signals.scarcity.map((s) => ({
       position: s.position,
       scarcityIndex: s.scarcityIndex,
@@ -151,8 +175,8 @@ function buildNarratorPayload(
       categoryRiskScore: c.categoryRiskScore,
     })),
     currentAuctionPlayer,
+    optimization,
     triggerReason,
-    strategy: context.strategy,
   };
 }
 
@@ -173,7 +197,6 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
     remainingBudget,
     myRoster,
     currentAuctionPlayer,
-    strategy,
     leagueCategories,
     auctionValues,
     allPicks,
@@ -184,8 +207,8 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastDedupeKeyRef = useRef<string>("");
-  const prevArchetypeRef = useRef<string | null>(null);
   const prevPacingRef = useRef<string | null>(null);
+  const prevAuctionPlayerRef = useRef<string | null>(null);
 
   const fireNarration = useCallback(
     async (
@@ -197,8 +220,9 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
       const currentCount = useNarratorStore.getState().sessionCallCount;
       if (currentCount >= SESSION_CAP) return;
 
-      const dedupeKey = buildDedupeKey(signals, triggerReason);
-      if (dedupeKey === lastDedupeKeyRef.current) return; // duplicate — skip
+      const dedupeKey = buildDedupeKey(signals, triggerReason, currentAuctionPlayer?.playerName);
+      // Skip duplicate auto-triggers, but always honor manual user requests
+      if (triggerReason !== "user_request" && dedupeKey === lastDedupeKeyRef.current) return;
       lastDedupeKeyRef.current = dedupeKey;
 
       // Cancel any in-flight narrator request before starting a new one
@@ -222,7 +246,6 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
           remainingBudget,
           myRoster,
           currentAuctionPlayer,
-          strategy,
           auctionValues,
           leagueCategories,
           espnDomAuctionValues,
@@ -260,7 +283,6 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
       remainingBudget,
       myRoster,
       currentAuctionPlayer,
-      strategy,
       auctionValues,
       leagueCategories,
       espnDomAuctionValues,
@@ -277,20 +299,17 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
 
     let triggerReason: NarratorPayload["triggerReason"] | null = null;
 
-    // Trigger 1: Any alert with severity > 0.65
+    // Trigger 1: New player nominated (player name changed and is non-null)
+    const newPlayerName = currentAuctionPlayer?.playerName ?? null;
+    if (newPlayerName !== null && newPlayerName !== prevAuctionPlayerRef.current) {
+      triggerReason = "nomination";
+      prevAuctionPlayerRef.current = newPlayerName;
+    }
+
+    // Trigger 2: Any alert with severity > 0.65
     const highAlerts = engineSignals.alerts.filter((a) => a.severity > 0.65);
     if (highAlerts.length > 0) {
       triggerReason = "alert";
-    }
-
-    // Trigger 2: Archetype label changed (only after 3+ picks to avoid noise)
-    const newArchetype = engineSignals.archetype?.archetypeLabel ?? null;
-    if (
-      newArchetype !== prevArchetypeRef.current &&
-      (engineSignals.archetype?.picksAnalyzed ?? 0) >= 3
-    ) {
-      triggerReason = "archetype_change";
-      prevArchetypeRef.current = newArchetype;
     }
 
     // Trigger 3: Budget pacing status changed
@@ -316,8 +335,8 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     engineSignals?.alerts,
-    engineSignals?.archetype,
     engineSignals?.budgetCurve.pacingStatus,
+    currentAuctionPlayer?.playerName,
     fireNarration,
   ]);
 
