@@ -393,9 +393,10 @@ None yet.
 | 37 | Detect team count and user's team from ESPN auction pick train DOM | 2026-03-04 | bebdabb | ✅ | [37-detect-team-count-and-user-s-team-from-e](./quick/37-detect-team-count-and-user-s-team-from-e/) |
 | 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | 869f303 | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
 | 39 | Detect roster slots from ESPN players-table DOM, store in Zustand, thread into draft engine with DEFAULT_ROSTER_SLOTS fallback | 2026-03-05 | aa15127 | ✅ | [39-detect-roster-slots-from-espn-dom-player](./quick/39-detect-roster-slots-from-espn-dom-player/) |
+| 41 | League-wide category analysis using FanGraphs projections: per-team stat totals, category rankings, demand signals, strategic recommendations in sidebar | 2026-03-05 | 9bdf829 | ✅ | [41-use-projections-to-evaluate-relative-tea](./quick/41-use-projections-to-evaluate-relative-tea/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick-39: detectRosterSlotsFromPlayersTable, detectedRosterSlots in Zustand (persisted), rosterSlots on DraftEngineInput, activeSlots fallback in computeRosterOptimization
+Stopped at: Completed quick-41: league-wide category analysis engine module with FG projections, per-team category rankings, demand signals, and sidebar League Analysis section
 Resume file: None
