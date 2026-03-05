@@ -134,6 +134,7 @@ Stopped at: Completed 22-03-PLAN.md: DraftNarrator component with Ask button and
 | Phase 22 P01 | 5 | 2 tasks | 4 files |
 | Phase 22 P03 | 5 | 2 tasks | 3 files |
 | Phase 23 P01 | 6 | 2 tasks | 6 files |
+| Phase 23 P02 | 23 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -300,6 +301,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 23]: buildSGPVectors O(n*cats): vectorize stat extraction per category, no nested player loops inside category loop
 - [Phase 23]: Locked player SGP not auto-tracked in totalSGPValue — cost/slot correctly reserved, SGP tracking is caller responsibility
 - [Phase 23]: SLOT_PRIORITY assigns dedicated positions (C/SS/2B/1B/OF) before flex slots (CI/MI/UTIL/BN/P) for greedy roster optimizer
+- [Phase 23]: Binary search hi bound = min(budget-minSlots, ceil(dollars*3)) — caps search range proportionally to player dollar value
+- [Phase 23]: Monte Carlo uses Set<number> for available player tracking — O(1) delete vs O(n) array splice, critical for 200-sim performance
+- [Phase 23]: bidEV and passEV both equal expectedTeamValue when no nominated player provided — consistent MonteCarloResult API
 
 ### Roadmap Evolution
 
