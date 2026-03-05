@@ -1,10 +1,11 @@
-import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal } from "./types";
+import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal } from "./types";
 import { computeInflation } from "./inflation";
 import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
 import { buildFgPlayerPool, normalizeName } from "./archetype";
+import { computeLeagueAnalysis } from "./league-analysis";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
@@ -18,7 +19,7 @@ import {
 } from "../fangraphs-data";
 import type { PoolPlayer, TargetRecommendation } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -396,6 +397,23 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // 5. Generate alerts from all signals
   const alerts = generateAlerts(inflation, scarcity, categoryGaps, budgetCurve);
 
+  // 5b. League-wide category analysis
+  let leagueAnalysis: LeagueAnalysisSignal | null = null;
+  if (input.leagueCategories.length > 0 && input.teamRosters.size > 0 && input.myTeamId) {
+    try {
+      leagueAnalysis = computeLeagueAnalysis(
+        input.teamRosters,
+        input.allPicks,
+        input.myTeamId,
+        input.leagueCategories,
+        fgLeaderboardHittersData,
+        fgLeaderboardPitchersData,
+      );
+    } catch (e) {
+      console.warn("[DraftEngine] League analysis failed:", e);
+    }
+  }
+
   // 6. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
@@ -419,5 +437,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     alerts,
     computeTimeMs: Math.round(elapsed * 10) / 10,
     optimization,
+    leagueAnalysis,
   };
 }
