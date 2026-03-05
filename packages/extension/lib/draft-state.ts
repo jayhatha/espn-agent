@@ -63,6 +63,14 @@ interface DraftState {
     playerId?: number;
   } | null;
 
+  // Draft strategy (anchor/pivot tracking — not persisted, changes each draft)
+  strategy: {
+    anchorPlayerName: string | null;
+    anchorAcquired: boolean;
+    fallbackPaths: string[];
+    strategyState: "nominal" | "anchor_lost" | "pivot_needed";
+  } | null;
+
   // ESPN DOM-scraped auction values (playerId -> dollar value)
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
@@ -111,6 +119,8 @@ interface DraftState {
   setRemainingBudget: (budget: number) => void;
   setAllTeamBudgets: (budgets: Array<{ teamName: string; remainingBudget: number }>) => void;
   setLeagueCategories: (categories: Category[]) => void;
+  setStrategy: (strategy: DraftState["strategy"]) => void;
+  updateStrategyState: (state: "nominal" | "anchor_lost" | "pivot_needed") => void;
   reset: () => void;
 }
 
@@ -133,6 +143,7 @@ export const useDraftStore = create<DraftState>()(
       userRankingOverrides: {},
       teamRosters: new Map(),
       currentAuctionPlayer: null,
+      strategy: null,
       espnDomAuctionValues: {},
       allTeamBudgets: [],
       leagueCategories: [],
@@ -273,6 +284,14 @@ export const useDraftStore = create<DraftState>()(
 
       setLeagueCategories: (categories) => set({ leagueCategories: categories }),
 
+      setStrategy: (strategy) => set({ strategy }),
+
+      updateStrategyState: (strategyState) =>
+        set((state) => {
+          if (!state.strategy) return state;
+          return { strategy: { ...state.strategy, strategyState } };
+        }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -284,6 +303,7 @@ export const useDraftStore = create<DraftState>()(
           projectedStandings: null,
           teamRosters: new Map(),
           currentAuctionPlayer: null,
+          strategy: null,
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           leagueCategories: [],
