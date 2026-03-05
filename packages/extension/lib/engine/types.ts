@@ -136,3 +136,42 @@ export interface DraftEngineSignals {
   computeTimeMs: number;
   archetype: BuildArchetypeSignal | null;  // null when insufficient data (< 3 picks)
 }
+
+// ============================================================
+// Plan 02: Bid Optimizer, Opponent Model, Monte Carlo types
+// ============================================================
+
+export interface BidOptimizerResult {
+  maxBid: number;              // Highest profitable bid
+  valueSurplus: number;        // maxBid - projected market value
+  baselineValue: number;       // Team SGP without nominated player
+  withPlayerValue: number;     // Team SGP at maxBid with player
+  expectedMarketPrice: number; // Opponent model estimate
+}
+
+export interface OpponentModel {
+  teamNeeds: Map<string, Set<string>>;    // teamId -> positions still needed
+  teamBudgets: Map<string, number>;       // teamId -> remaining budget
+  competitionFactors: Record<string, number>; // position -> 0-1 competition score
+  leagueInflationFactor: number;
+}
+
+export interface TargetRecommendation {
+  playerId: number;
+  playerName: string;
+  position: string;
+  sgpValue: number;
+  dollarValue: number;
+  maxBid: number;
+  expectedMarketPrice: number;
+}
+
+export interface MonteCarloResult {
+  expectedTeamValue: number;
+  valueStdDev: number;
+  bidEV: number;           // EV if we win the nominated player
+  passEV: number;          // EV if we pass
+  shouldBid: boolean;      // bidEV > passEV
+  simCount: number;
+  computeTimeMs: number;
+}
