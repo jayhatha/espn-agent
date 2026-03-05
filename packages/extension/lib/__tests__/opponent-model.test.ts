@@ -139,33 +139,52 @@ describe("estimateMarketPrice", () => {
     // = 10 * (120 / 100) = 12
     // Competition = 1 + (0.5 * 0.2) = 1.1
     // Final = Math.round(12 * 1.1) = Math.round(13.2) = 13
-    const result = estimateMarketPrice(10, 100, 120, 0.5);
+    // dollarValue = 20 → cap = 40, no clamp
+    const result = estimateMarketPrice(10, 100, 120, 0.5, 20);
     expect(result).toBe(13);
   });
 
   it("returns $1 when totalRemainingValue is 0", () => {
-    const result = estimateMarketPrice(10, 0, 100, 0.5);
+    const result = estimateMarketPrice(10, 0, 100, 0.5, 1);
     expect(result).toBe(1);
   });
 
   it("returns at least $1 even when SGP * ratio is very small", () => {
     // playerSGP = 0.001, ratio = 0.5 → base = 0.0005 < 1 → clamp to 1
-    const result = estimateMarketPrice(0.001, 1000, 500, 0);
+    const result = estimateMarketPrice(0.001, 1000, 500, 0, 1);
     expect(result).toBeGreaterThanOrEqual(1);
   });
 
   it("competition factor 0 applies no competition premium", () => {
     // Base = 10 * (100/100) = 10, competition = 1 + (0 * 0.2) = 1.0
-    // Final = 10
-    const result = estimateMarketPrice(10, 100, 100, 0);
+    // Final = 10; dollarValue = 10 → cap = 20, no clamp
+    const result = estimateMarketPrice(10, 100, 100, 0, 10);
     expect(result).toBe(10);
   });
 
   it("competition factor 1.0 applies maximum 20% premium", () => {
     // Base = 10 * (100/100) = 10, competition = 1 + (1.0 * 0.2) = 1.2
-    // Final = Math.round(12) = 12
-    const result = estimateMarketPrice(10, 100, 100, 1.0);
+    // Final = Math.round(12) = 12; dollarValue = 10 → cap = 20, no clamp
+    const result = estimateMarketPrice(10, 100, 100, 1.0, 10);
     expect(result).toBe(12);
+  });
+
+  it("caps result to 2x playerDollarValue for low-value players", () => {
+    // raw base = 5 * (600 / 100) = 30, but dollarValue = 1 → cap = ceil(1 * 2) = 2
+    const result = estimateMarketPrice(5, 100, 600, 0, 1);
+    expect(result).toBe(2);
+  });
+
+  it("does not cap high-value players when market price is within 2x", () => {
+    // base = 10 * (100 / 100) = 10; dollarValue = 10 → cap = 20, no clamp
+    const result = estimateMarketPrice(10, 100, 100, 0, 10);
+    expect(result).toBe(10);
+  });
+
+  it("caps at exactly 2x for mid-range scenario", () => {
+    // base = 10 * (300 / 100) = 30; dollarValue = 5 → cap = ceil(5 * 2) = 10
+    const result = estimateMarketPrice(10, 100, 300, 0, 5);
+    expect(result).toBe(10);
   });
 });
 
