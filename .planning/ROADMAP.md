@@ -394,3 +394,12 @@ Plans:
 
 Plans:
 - [ ] 24-01-PLAN.md — Add optimization fields to NarratorPayload (both sides), update payload builder with nomination trigger, update backend buildUserMessage and system prompt
+
+### Phase 25: Projected standings engine — full-season category and overall rankings for all teams during draft with draft-progress weighting and sidebar integration
+
+**Goal:** [To be planned]
+**Depends on:** Phase 24
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 25 to break down)

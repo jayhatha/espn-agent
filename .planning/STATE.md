@@ -333,6 +333,7 @@ Recent decisions affecting v1.1 work:
 - Phase 22 added: AI narrator layer — event-triggered LLM interpretation of deterministic engine signals with tactical commentary, strategy state transitions, and anchor/pivot explanations in the extension sidebar
 - Phase 23 added: Roster optimization engine — marginal-value max bid (replacing heuristic), Monte Carlo draft simulation, dynamic replacement levels, and opponent need modeling, adapted from draft engine spec to TypeScript extension
 - Phase 24 added: Feed Phase 23 optimization signals to narrator — add topTargets, simulationEV, shouldBid, maxBid, and opponentPressure to NarratorPayload for richer AI tactical advice during auction drafts
+- Phase 25 added: Projected standings engine — full-season category and overall rankings for all teams during draft with draft-progress weighting and sidebar integration
 
 ### Pending Todos
 
