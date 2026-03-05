@@ -253,12 +253,41 @@ function computeRosterOptimization(
   }
 
   // ----------------------------------------------------------------
-  // Build top 5 targets (sort by SGP descending, compute max bid)
+  // Build top 5 targets proportionally split between hitters/pitchers
   // ----------------------------------------------------------------
-  const indexedPlayers = allPlayers
-    .map((p, i) => ({ player: p, sgp: sgpValues[i] ?? 0, index: i }))
-    .sort((a, b) => b.sgp - a.sgp)
-    .slice(0, 5);
+  // Compute pitcher vs hitter slot counts from activeSlots
+  const pitcherSlots = activeSlots["P"] ?? 0;
+
+  // Proportional counts (clamped to ensure at least 1 of each when both pools have players)
+  let pitcherCount = Math.round(5 * pitcherSlots / activeTotal);
+  pitcherCount = Math.max(1, Math.min(4, pitcherCount));
+  let hitterCount = 5 - pitcherCount;
+
+  // If one pool is entirely absent (e.g. pitchers-only league), fall back to all 5 from the other
+  const indexedAll = allPlayers.map((p, i) => ({ player: p, sgp: sgpValues[i] ?? 0, index: i }));
+  const hitterPool = indexedAll.filter(e => !e.player.isPitcher).sort((a, b) => b.sgp - a.sgp);
+  const pitcherPool = indexedAll.filter(e => e.player.isPitcher).sort((a, b) => b.sgp - a.sgp);
+
+  if (hitterPool.length === 0) {
+    pitcherCount = 5;
+    hitterCount = 0;
+  } else if (pitcherPool.length === 0) {
+    hitterCount = 5;
+    pitcherCount = 0;
+  }
+
+  const topHitters = hitterPool.slice(0, hitterCount);
+  const topPitchers = pitcherPool.slice(0, pitcherCount);
+
+  // If one pool was short, fill remainder from the other
+  const remaining = 5 - topHitters.length - topPitchers.length;
+  if (remaining > 0 && topHitters.length < hitterCount) {
+    topPitchers.push(...pitcherPool.slice(pitcherCount, pitcherCount + remaining));
+  } else if (remaining > 0 && topPitchers.length < pitcherCount) {
+    topHitters.push(...hitterPool.slice(hitterCount, hitterCount + remaining));
+  }
+
+  const indexedPlayers = [...topHitters, ...topPitchers];
 
   const topTargets: TargetRecommendation[] = indexedPlayers.map(({ player, sgp, index }) => {
     // Estimate max bid for each target (lighter computation — use SGP share of budget)
