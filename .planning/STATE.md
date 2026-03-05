@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 20 - Deterministic Draft Engine
+**Current focus:** Phase 21 - Dynamic Build Archetype Analysis
 
 ## Current Position
 
-Phase: 20 (Deterministic Draft Engine)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-03-04 - Completed 20-02: UI Integration (useDraftEngineSignals hook, EngineAlerts, EngineInsights, upgraded AuctionBudgetTracker, integrated DraftSidebar)
+Phase: 21 (Dynamic Build Archetype Analysis)
+Plan: 1 of 3 in current phase
+Status: In Progress
+Last activity: 2026-03-04 - Completed 21-01: FanGraphs JSON assets, typed fangraphs-data.ts module, BuildArchetypeSignal types in engine/types.ts
 
-Progress: Phase 20: [██████████] 100% (2 of 2 plans complete)
+Progress: Phase 21: [████------] 33% (1 of 3 plans complete)
 
 ## Performance Metrics
 
@@ -124,6 +124,7 @@ Progress: Phase 20: [██████████] 100% (2 of 2 plans complete
 | Phase quick-30 P01 | 3 | 2 tasks | 4 files |
 | Phase 20 P01 | 5 | 2 tasks | 9 files |
 | Phase 20 P02 | 3 | 2 tasks | 5 files |
+| Phase 21 P01 | 41 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 20 P02]: useDraftEngineSignals excludes currentAuctionPlayer from useMemo deps to prevent 200ms recomputes from MutationObserver — engine updates on allPicks change instead
 - [Phase 20 P02]: teamRosters.size used in deps array instead of Map reference — prevents stale reference issues with Zustand Map state
 - [Phase 20 P02]: AuctionBudgetTracker accepts optional engineSignals prop with graceful fallback to calculateBudgetPacing — works for snake drafts and pre-data states
+- [Phase 21]: Pitcher H/BB/HR stored as HA/BBA/HRA in JSON assets to avoid collision with hitter stat keys in calculateFinalRate
+- [Phase 21]: archetype field added to DraftEngineSignals as BuildArchetypeSignal | null — null when insufficient data, implementation deferred to Plan 02
+- [Phase 21]: Static JSON imports (not fetch) for bundled FanGraphs data — offline availability required for draft use
 
 ### Roadmap Evolution
 
@@ -345,5 +349,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: Completed 20-02-PLAN.md: UI Integration (useDraftEngineSignals hook, EngineAlerts, EngineInsights, upgraded AuctionBudgetTracker, integrated DraftSidebar)
+Stopped at: Completed 21-01-PLAN.md: FanGraphs JSON assets (4 files, 3154 players), typed fangraphs-data.ts module, BuildArchetypeSignal/CategoryCeiling/PivotPlayer types, archetype field on DraftEngineSignals
 Resume file: None
