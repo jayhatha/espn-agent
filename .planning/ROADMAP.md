@@ -390,7 +390,7 @@ Plans:
 **Goal:** Pipe Phase 23 roster optimization signals (topTargets, simulationEV, shouldBid, maxBid, opponentPressure) through the narrator pipeline so the AI advisor references SGP-based bid recommendations, Monte Carlo simulation confidence, and opponent competition in tactical commentary. Also add a nomination trigger so the narrator fires when a new player is nominated.
 **Depends on:** Phase 23
 **Requirements:** NARRATOR-OPT-01, NARRATOR-OPT-02, NARRATOR-OPT-03
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 24-01-PLAN.md — Add optimization fields to NarratorPayload (both sides), update payload builder with nomination trigger, update backend buildUserMessage and system prompt

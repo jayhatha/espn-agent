@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 23 - Roster Optimization Engine (COMPLETE)
+**Current focus:** Phase 24 - Feed Phase 23 Optimization Signals to Narrator (COMPLETE)
 
 ## Current Position
 
-Phase: 23 (Roster Optimization Engine) - COMPLETE
-Plan: 3 of 3 complete (all plans done)
+Phase: 24 (Feed Phase 23 Optimization Signals to Narrator) - COMPLETE
+Plan: 1 of 1 complete (all plans done)
 Status: Complete
-Last activity: 2026-03-05 - Completed 23-03: computeRosterOptimization wired into computeDraftEngine, SGP max bid in AuctionBudgetTracker, Top Targets in EngineInsights
+Last activity: 2026-03-05 - Completed 24-01: optimization fields in NarratorPayload (both sides), nomination trigger in useNarrator, OPTIMIZATION section in LLM prompt
 
-Progress: Phase 23: [██████████] 100% (3 of 3 plans complete)
+Progress: Phase 24: [██████████] 100% (1 of 1 plans complete)
 
 Last session: 2026-03-05
-Stopped at: Completed 23-03-PLAN.md: computeRosterOptimization wired into computeDraftEngine step 7, RosterOptimizationSignal on DraftEngineSignals, AuctionBudgetTracker SGP max bid with BID/PASS badge, EngineInsights Top Targets section
+Stopped at: Completed 24-01-PLAN.md: optimization fields in NarratorPayload, nomination trigger, backend OPTIMIZATION prompt section
 
 ## Performance Metrics
 
@@ -137,6 +137,7 @@ Stopped at: Completed 23-03-PLAN.md: computeRosterOptimization wired into comput
 | Phase 23 P02 | 23 | 3 tasks | 7 files |
 | Phase 23 P03 | 3 | 2 tasks | 4 files |
 | Phase quick-40 P01 | 2 | 1 tasks | 1 files |
+| Phase 24 P01 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -308,6 +309,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 23]: bidEV and passEV both equal expectedTeamValue when no nominated player provided — consistent MonteCarloResult API
 - [Phase 23]: Two-level cache: sgpCacheKey invalidates on allPicks.length change; bidCacheKey invalidates on nomination OR pick count — prevents redundant bid optimizer and Monte Carlo recomputes between renders
 - [Phase 23]: Hardcoded DEFAULT_ROSTER_SLOTS { C:1, 1B:1, 2B:1, SS:1, 3B:1, CI:1, MI:1, OF:4, UTIL:3, P:9 } per Phase 23 CONTEXT.md locked decision — dynamic detection deferred to future phase
+- [Phase 24]: Simulation confidence derived from stdDev/EV ratio: < 0.1 = high, < 0.3 = medium, else low — guards against EV=0
+- [Phase 24]: opponentPressure Record sorted descending, sliced to top 3 before crossing extension-to-backend boundary
+- [Phase 24]: Nomination trigger fires first in useEffect priority order so every new player gets immediate narration regardless of alert state
+- [Phase 24]: buildDedupeKey includes player name and shouldBid to prevent deduplication suppressing nomination-triggered calls
 
 ### Roadmap Evolution
 
