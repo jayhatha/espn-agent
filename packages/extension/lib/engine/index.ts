@@ -303,6 +303,7 @@ function computeRosterOptimization(
       totalSGP,
       totalBudget,
       competitionFactor,
+      player.dollars,
     ));
 
     return {
@@ -311,7 +312,7 @@ function computeRosterOptimization(
       position: player.positions[0] ?? '',
       sgpValue: Math.round(sgp * 100) / 100,
       dollarValue: player.dollars,
-      maxBid: Math.min(myBudget, expectedPrice),
+      maxBid: Math.min(myBudget, expectedPrice, Math.max(1, Math.ceil(player.dollars * 2.0))),
       expectedMarketPrice: expectedPrice,
     };
   });

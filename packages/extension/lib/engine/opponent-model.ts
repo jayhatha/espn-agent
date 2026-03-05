@@ -238,18 +238,25 @@ export function buildOpponentModel(
  * Formula:
  *   basePrice = max(1, playerSGP * (totalRemainingBudget / totalRemainingValue))
  *   competitionAdjustment = 1 + (competitionFactor * 0.2)
- *   return Math.round(basePrice * competitionAdjustment)
+ *   raw = Math.round(basePrice * competitionAdjustment)
+ *   return min(raw, max(1, ceil(playerDollarValue * 2.0)))
+ *
+ * The 2x cap on playerDollarValue allows up to 2x inflation to account for real
+ * draft inflation while preventing SGP-ratio-driven runaway prices for low-value
+ * players (e.g. a $1 player with high SGP can otherwise produce a $30+ market price).
  *
  * @param playerSGP             The player's SGP value
  * @param totalRemainingValue   Sum of SGP values for all remaining players
  * @param totalRemainingBudget  Total budget remaining across all teams
  * @param competitionFactor     0-1 competition score for this player's position
+ * @param playerDollarValue     The player's pre-draft dollar value (FG/ESPN auction value)
  */
 export function estimateMarketPrice(
   playerSGP: number,
   totalRemainingValue: number,
   totalRemainingBudget: number,
   competitionFactor: number,
+  playerDollarValue: number,
 ): number {
   // Guard: if no remaining value, market price is $1
   if (totalRemainingValue <= 0) return 1;
@@ -260,7 +267,11 @@ export function estimateMarketPrice(
   // Competition adjustment: up to +20% for fully competitive positions
   const competitionAdjustment = 1 + (competitionFactor * 0.2);
 
-  return Math.round(basePrice * competitionAdjustment);
+  const raw = Math.round(basePrice * competitionAdjustment);
+
+  // Cap to 2x dollar value to prevent SGP-ratio-driven runaway prices for low-value players
+  const dollarCap = Math.max(1, Math.ceil(playerDollarValue * 2.0));
+  return Math.min(raw, dollarCap);
 }
 
 // ============================================================

@@ -62,6 +62,7 @@ export function computeMaxBid(
       totalSGP,
       totalBudget,
       competitionFactor,
+      nominatedPlayer.dollars,
     );
     return {
       maxBid: 1,
@@ -132,6 +133,7 @@ export function computeMaxBid(
       totalSGP,
       totalBudget,
       competitionFactor,
+      nominatedPlayer.dollars,
     );
     return {
       maxBid: 1,
@@ -179,7 +181,7 @@ export function computeMaxBid(
   const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
   const expectedMarketPrice = Math.max(
     1,
-    estimateMarketPrice(sgpValues[nominatedIndex], totalSGP, totalBudget, competitionFactor),
+    estimateMarketPrice(sgpValues[nominatedIndex], totalSGP, totalBudget, competitionFactor, nominatedPlayer.dollars),
   );
 
   return {
