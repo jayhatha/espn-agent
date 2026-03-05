@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 24 (Feed Phase 23 Optimization Signals to Narrator) - COMPLETE
 Plan: 1 of 1 complete (all plans done)
 Status: Complete
-Last activity: 2026-03-05 - Completed 24-01: optimization fields in NarratorPayload (both sides), nomination trigger in useNarrator, OPTIMIZATION section in LLM prompt
+Last activity: 2026-03-05 - Completed quick-43: positional need weighting in top targets
 
 Progress: Phase 24: [██████████] 100% (1 of 1 plans complete)
 
@@ -396,9 +396,11 @@ None yet.
 | 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | 869f303 | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
 | 39 | Detect roster slots from ESPN players-table DOM, store in Zustand, thread into draft engine with DEFAULT_ROSTER_SLOTS fallback | 2026-03-05 | aa15127 | ✅ | [39-detect-roster-slots-from-espn-dom-player](./quick/39-detect-roster-slots-from-espn-dom-player/) |
 | 41 | League-wide category analysis using FanGraphs projections: per-team stat totals, category rankings, demand signals, strategic recommendations in sidebar | 2026-03-05 | 9bdf829 | ✅ | [41-use-projections-to-evaluate-relative-tea](./quick/41-use-projections-to-evaluate-relative-tea/) |
+| 42 | Fix inflated max bid recommendations for low-value players by capping to 2x player dollar value | 2026-03-05 | 64364f1 | ✅ | [42-fix-inflated-max-bid-recommendations-for](./quick/42-fix-inflated-max-bid-recommendations-for/) |
+| 43 | Top targets positional need weighting — boost players at positions with empty roster slots (50% SGP boost per empty slot) | 2026-03-05 | be22ca7 | ✅ | [43-top-targets-should-weight-positional-nee](./quick/43-top-targets-should-weight-positional-nee/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick-41: league-wide category analysis engine module with FG projections, per-team category rankings, demand signals, and sidebar League Analysis section
+Stopped at: Completed quick-43: positional need weighting in top targets, plus quick-42 max bid 2x cap
 Resume file: None
