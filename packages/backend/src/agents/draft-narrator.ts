@@ -33,18 +33,6 @@ export interface NarratorPayload {
     maxBidRecommendation: number;
   };
 
-  /** Archetype analysis, null when insufficient data (< 3 picks analyzed) */
-  archetype: {
-    archetypeLabel: string | null;
-    archetypeConfidence: number;
-    puntedCategories: string[];
-    pivotPlayers: Array<{
-      playerName: string;
-      dollarValue: number;
-      category: string;
-    }>;
-  } | null;
-
   /** Position scarcity summary — only include positions with meaningful scarcity */
   topScarcity: Array<{
     position: string;
@@ -70,20 +58,32 @@ export interface NarratorPayload {
     maxBidRecommendation?: number;
   } | null;
 
+  /** Roster optimization signals from Phase 23 engine — null when no nomination or insufficient data */
+  optimization: {
+    shouldBid: boolean;
+    maxBid: number;
+    valueSurplus: number;
+    simulationEV: number;
+    simulationConfidence: "high" | "medium" | "low";
+    topTargets: Array<{
+      playerName: string;
+      position: string;
+      sgpValue: number;
+      maxBid: number;
+      expectedMarketPrice: number;
+    }>; // limited to top 3
+    opponentPressure: Array<{
+      position: string;
+      competitionFactor: number;
+    }>; // limited to top 3 by competition factor
+  } | null;
+
   /** What triggered this narration request */
   triggerReason:
     | "alert"
-    | "archetype_change"
     | "budget_pressure"
+    | "nomination"
     | "user_request";
-
-  /** User-defined anchor/pivot strategy state, null if user has not configured one */
-  strategy: {
-    anchorPlayerName: string | null;
-    anchorAcquired: boolean;
-    fallbackPaths: string[];
-    strategyState: "nominal" | "anchor_lost" | "pivot_needed";
-  } | null;
 }
 
 const MODEL_ID = "gpt-4.1-mini-2025-04-14";
@@ -96,11 +96,15 @@ Rules:
 - Tone: direct, calm, no fluff. Like a sharp coach talking to a prepared player.
 - Never re-derive math or invent values — only interpret the signals given to you
 - Focus on the most actionable single insight for the current moment
-- If a strategy anchor was lost, explain the pivot clearly and concisely
 - If a player is currently nominated, lead with bid guidance if relevant
 - Use plain language, no jargon for jargon's sake
 - If nothing significant is happening, say so briefly
-- You are watching a live fantasy baseball auction draft — context matters`;
+- You are watching a live fantasy baseball auction draft — context matters
+- When OPTIMIZATION data is present:
+  - Lead with the BID/PASS recommendation if a player is nominated
+  - Reference the simulation confidence level (high = strong signal, low = uncertain)
+  - Mention top targets only when the user should PASS the current nomination
+  - Reference position pressure when it explains why a player costs more than expected`;
 
 /**
  * DraftNarratorAgent calls OpenAI gpt-4.1-mini to generate tactical commentary
@@ -198,24 +202,6 @@ export class DraftNarratorAgent {
       `BUDGET: $${payload.budgetSummary.remainingBudget} remaining | Pacing: ${payload.budgetSummary.pacingStatus} | Max bid: $${payload.budgetSummary.maxBidRecommendation}`,
     );
 
-    if (payload.archetype) {
-      const a = payload.archetype;
-      const label = a.archetypeLabel ?? "unclear";
-      const confidence = Math.round(a.archetypeConfidence * 100);
-      parts.push(`ARCHETYPE: ${label} (confidence: ${confidence}%)`);
-
-      if (a.puntedCategories.length > 0) {
-        parts.push(`PUNTED: ${a.puntedCategories.join(", ")}`);
-      }
-
-      if (a.pivotPlayers.length > 0) {
-        const pivotStr = a.pivotPlayers
-          .map((p) => `${p.playerName} $${p.dollarValue} (unlocks ${p.category})`)
-          .join(", ");
-        parts.push(`PIVOT OPTIONS: ${pivotStr}`);
-      }
-    }
-
     const highScarcity = payload.topScarcity.filter(
       (s) => s.scarcityIndex > 0.65,
     );
@@ -242,14 +228,25 @@ export class DraftNarratorAgent {
       parts.push(`CAT GAPS: ${catStr}`);
     }
 
-    if (payload.strategy) {
-      const s = payload.strategy;
-      const anchorInfo = s.anchorPlayerName ?? "none";
-      parts.push(
-        `STRATEGY: ${s.strategyState.toUpperCase()} | Anchor: ${anchorInfo} (acquired: ${s.anchorAcquired})`,
-      );
-      if (s.fallbackPaths.length > 0) {
-        parts.push(`  Fallback paths: ${s.fallbackPaths.join(", ")}`);
+    if (payload.optimization !== null) {
+      const opt = payload.optimization;
+      const bidStatus = opt.shouldBid
+        ? `BID $${opt.maxBid} (surplus: +$${opt.valueSurplus})`
+        : `PASS (surplus: $${opt.valueSurplus})`;
+      parts.push("OPTIMIZATION:");
+      parts.push(`  Bid recommendation: ${bidStatus}`);
+      parts.push(`  Simulation EV: ${opt.simulationEV.toFixed(1)} (confidence: ${opt.simulationConfidence})`);
+      if (opt.topTargets.length > 0) {
+        const targetsStr = opt.topTargets
+          .map((t) => `${t.playerName} ${t.position} (SGP ${t.sgpValue.toFixed(1)}, max $${t.maxBid}, mkt $${t.expectedMarketPrice})`)
+          .join(", ");
+        parts.push(`  Top targets: ${targetsStr}`);
+      }
+      if (opt.opponentPressure.length > 0) {
+        const pressureStr = opt.opponentPressure
+          .map((p) => `${p.position} ${p.competitionFactor.toFixed(2)}`)
+          .join(", ");
+        parts.push(`  Position pressure: ${pressureStr}`);
       }
     }
 
