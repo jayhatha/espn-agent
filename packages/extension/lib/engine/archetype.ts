@@ -16,20 +16,7 @@ import type {
   FgAuctionHitter,
   FgAuctionPitcher,
 } from "../fangraphs-data";
-import type { BuildArchetypeSignal, CategoryCeiling, PivotPlayer } from "./types";
-
-// ============================================================
-// Types used internally
-// ============================================================
-
-/** A player record merged from FG projection + auction value, ready for ceiling computation */
-interface PoolPlayer {
-  name: string;
-  normalizedName: string;
-  dollars: number;
-  isPitcher: boolean;
-  stats: Record<string, number>; // All raw stat keys (HR, RBI, W, HA, BBA, ER, IP, SO, etc.)
-}
+import type { BuildArchetypeSignal, CategoryCeiling, PivotPlayer, PoolPlayer } from "./types";
 
 // ============================================================
 // normalizeName — exact copy of api-client.ts normalizeName
@@ -39,7 +26,7 @@ interface PoolPlayer {
  * Normalize player name for FanGraphs matching.
  * Uses NFD decomposition to strip diacritics, removes non-letter/space chars, lowercases, trims.
  */
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -56,7 +43,7 @@ function normalizeName(name: string): string {
  * Merge FG projection data with auction value data, removing already-drafted players.
  * Returns two sorted pools: undrafted hitters and undrafted pitchers, sorted by dollar value descending.
  */
-function buildFgPlayerPool(
+export function buildFgPlayerPool(
   fgHitters: FgHitterProjection[],
   fgPitchers: FgPitcherProjection[],
   fgAuctionHitters: FgAuctionHitter[],
@@ -103,6 +90,7 @@ function buildFgPlayerPool(
       normalizedName: nName,
       dollars: ah.dollars,
       isPitcher: false,
+      positions: ah.pos ? ah.pos.split("/") : [],
       stats,
     });
   }
@@ -137,6 +125,7 @@ function buildFgPlayerPool(
       normalizedName: nName,
       dollars: ap.dollars,
       isPitcher: true,
+      positions: ap.pos ? ap.pos.split("/") : [],
       stats,
     });
   }
@@ -671,7 +660,7 @@ function findPivotPlayers(
 export function computeBuildArchetype(
   myRoster: DraftedPlayer[],
   remainingBudget: number,
-  allPicks: Array<{ playerId: number }>,
+  allPicks: Array<{ playerId: number; playerName: string }>,
   fgHitters: FgHitterProjection[],
   fgPitchers: FgPitcherProjection[],
   fgAuctionHitters: FgAuctionHitter[],
@@ -694,9 +683,9 @@ export function computeBuildArchetype(
     };
   }
 
-  // ---- 1. Build drafted player name set from myRoster ----
+  // ---- 1. Build drafted player name set from ALL picks (not just myRoster) ----
   const draftedNormalizedNames = new Set<string>();
-  for (const p of myRoster) {
+  for (const p of allPicks) {
     draftedNormalizedNames.add(normalizeName(p.playerName));
   }
 
@@ -774,6 +763,7 @@ export function computeBuildArchetype(
       normalizedName: nName,
       dollars: p.cost ?? 0,
       isPitcher,
+      positions: p.positions,
       stats,
     });
   }

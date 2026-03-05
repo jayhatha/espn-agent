@@ -1,5 +1,40 @@
 import type { DraftPick, DraftedPlayer, DraftRanking, AuctionValue, Category } from "@espn-fantasy/shared";
 
+// ============================================================
+// SGP / Roster Optimizer shared types
+// ============================================================
+
+/** A player record merged from FG projection + auction value, ready for SGP/optimizer computation */
+export interface PoolPlayer {
+  name: string;
+  normalizedName: string;
+  dollars: number;
+  isPitcher: boolean;
+  positions: string[];  // From FG auction pos field, split on "/"
+  stats: Record<string, number>;
+}
+
+export interface CategoryStats {
+  mean: number;
+  std: number;
+  replacementValue: number;
+}
+
+export interface SGPVectors {
+  statVectors: Record<string, number[]>;
+  categoryStats: Record<string, CategoryStats>;
+  playerSGPs: number[];
+  computedAt: number;
+}
+
+/** Result from the greedy knapsack roster optimizer */
+export interface RosterOptimizationResult {
+  roster: PoolPlayer[];
+  totalSGPValue: number;
+  budgetUsed: number;
+  unfilledSlots: number;
+}
+
 export interface InflationSignal {
   inflationFactor: number;       // Clamped 0.5-2.0
   rawInflationFactor: number;    // Unclamped for debugging
@@ -63,6 +98,7 @@ export interface DraftEngineInput {
   allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>;
   leagueCategories: Category[];
   currentAuctionPlayerId?: number;
+  espnDomAuctionValues?: Record<number, number>;
 }
 
 export interface CategoryCeiling {
