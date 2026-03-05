@@ -324,6 +324,7 @@ Recent decisions affecting v1.1 work:
 - Phase 21 added: Dynamic build archetype analysis — show how roster commitments constrain remaining draft strategy using FanGraphs projections and auction values
 - Phase 22 added: AI narrator layer — event-triggered LLM interpretation of deterministic engine signals with tactical commentary, strategy state transitions, and anchor/pivot explanations in the extension sidebar
 - Phase 23 added: Roster optimization engine — marginal-value max bid (replacing heuristic), Monte Carlo draft simulation, dynamic replacement levels, and opponent need modeling, adapted from draft engine spec to TypeScript extension
+- Phase 24 added: Feed Phase 23 optimization signals to narrator — add topTargets, simulationEV, shouldBid, maxBid, and opponentPressure to NarratorPayload for richer AI tactical advice during auction drafts
 
 ### Pending Todos
 
@@ -385,9 +386,10 @@ None yet.
 | 36 | Large circular ranking number in display serif font showing remaining-player rank | 2026-03-04 | 8e12048 | ✅ | [36-add-large-circular-ranking-number-displa](./quick/36-add-large-circular-ranking-number-displa/) |
 | 37 | Detect team count and user's team from ESPN auction pick train DOM | 2026-03-04 | bebdabb | ✅ | [37-detect-team-count-and-user-s-team-from-e](./quick/37-detect-team-count-and-user-s-team-from-e/) |
 | 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | 869f303 | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
+| 39 | Detect roster slots from ESPN players-table DOM, store in Zustand, thread into draft engine with DEFAULT_ROSTER_SLOTS fallback | 2026-03-05 | aa15127 | ✅ | [39-detect-roster-slots-from-espn-dom-player](./quick/39-detect-roster-slots-from-espn-dom-player/) |
 
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 22-01-PLAN.md: DraftNarratorAgent with typed NarratorPayload, system prompt, buildUserMessage serializer, narrate() method calling gpt-4.1-mini-2025-04-14. POST /api/draft/narrate route rate-limited to 30/min, 503 fallback on missing key. openai@6.25.0 installed.
+Stopped at: Completed quick-39: detectRosterSlotsFromPlayersTable, detectedRosterSlots in Zustand (persisted), rosterSlots on DraftEngineInput, activeSlots fallback in computeRosterOptimization
 Resume file: None
