@@ -26,9 +26,10 @@ export interface MonteCarloParams {
   availablePlayers: PoolPlayer[];
   sgpValues: number[];
   myCurrentRoster: PoolPlayer[];
+  myCurrentRosterSGP: number;         // Total SGP of players I've already drafted
   myBudget: number;
   opponentBudgets: number[];
-  rosterSlots: Record<string, number>;
+  rosterSlots: Record<string, number>;  // REMAINING slots (already reduced by my drafted players)
   nominatedPlayer?: PoolPlayer;       // If present, simulate bid vs pass scenarios
   nominatedBid?: number;
   numSimulations?: number;            // Default 200
@@ -82,6 +83,7 @@ function simulateOneDraft(
   availableIndices: Set<number>,
   myLockedPlayer: PoolPlayer | null,
   myLockedCost: number,
+  myExistingRosterSGP: number,
 ): number {
   // Work with a copy of the available set — do NOT mutate the input
   const remaining = new Set(availableIndices);
@@ -183,6 +185,9 @@ function simulateOneDraft(
     totalSGP += lockedIdx >= 0 ? (sgpValues[lockedIdx] ?? 0) : 0;
   }
 
+  // Add SGP from players already on my roster (drafted before this simulation)
+  totalSGP += myExistingRosterSGP;
+
   return totalSGP;
 }
 
@@ -210,6 +215,7 @@ export function runMonteCarlo(params: MonteCarloParams): MonteCarloResult {
     availablePlayers,
     sgpValues,
     myCurrentRoster,
+    myCurrentRosterSGP = 0,
     myBudget,
     opponentBudgets,
     rosterSlots,
@@ -260,6 +266,7 @@ export function runMonteCarlo(params: MonteCarloParams): MonteCarloResult {
         bidAvailable,
         nominatedPlayer,
         nominatedBid,
+        myCurrentRosterSGP,
       );
       bidValues.push(bidSGP);
 
@@ -276,6 +283,7 @@ export function runMonteCarlo(params: MonteCarloParams): MonteCarloResult {
         passAvailable,
         null,
         0,
+        myCurrentRosterSGP,
       );
       passValues.push(passSGP);
     } else {
@@ -289,6 +297,7 @@ export function runMonteCarlo(params: MonteCarloParams): MonteCarloResult {
         new Set(allIndices),
         null,
         0,
+        myCurrentRosterSGP,
       );
       bidValues.push(baseSGP);
       passValues.push(baseSGP);

@@ -43,6 +43,33 @@ const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
 };
 
 // ============================================================
+// findBestSlotForPositions — slot assignment for drafted players
+// ============================================================
+
+/** Same priority as roster-optimizer: dedicated first, then flex */
+const SLOT_ORDER = ["C", "SS", "2B", "3B", "1B", "OF", "CI", "MI", "UTIL", "P", "BN"];
+const FLEX_MAP: Record<string, string[]> = {
+  CI: ["1B", "3B"], MI: ["2B", "SS"],
+  UTIL: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
+  P: ["SP", "RP"], BN: ["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"],
+};
+const DEDICATED = new Set(["C", "SS", "2B", "3B", "1B", "OF", "SP", "RP"]);
+
+function findBestSlotForPositions(positions: string[], remaining: Map<string, number>): string | null {
+  const normed = positions.map(p => p.toUpperCase());
+  for (const slot of SLOT_ORDER) {
+    if ((remaining.get(slot) ?? 0) <= 0) continue;
+    if (DEDICATED.has(slot)) {
+      if (normed.includes(slot)) return slot;
+    } else {
+      const eligible = FLEX_MAP[slot];
+      if (eligible && normed.some(p => eligible.includes(p))) return slot;
+    }
+  }
+  return null;
+}
+
+// ============================================================
 // Module-level caches (two-level: SGP + bid)
 // ============================================================
 
@@ -164,14 +191,38 @@ function computeRosterOptimization(
 
     // Compute max bid for nominated player (or fallback to first player)
     const targetPlayer = nominatedPlayer ?? allPlayers[0];
-    const targetIndex = allPlayers.indexOf(targetPlayer);
+
+    // Compute remaining roster slots by subtracting my drafted players' positions
+    const remainingSlots: Record<string, number> = { ...DEFAULT_ROSTER_SLOTS };
+    for (const drafted of input.myRoster) {
+      const slotMap = new Map(Object.entries(remainingSlots).filter(([, v]) => v > 0));
+      const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
+      const slot = findBestSlotForPositions(positions, slotMap);
+      if (slot && remainingSlots[slot] > 0) {
+        remainingSlots[slot]--;
+      }
+    }
+    // Remove zero-count slots
+    for (const [slot, count] of Object.entries(remainingSlots)) {
+      if (count <= 0) delete remainingSlots[slot];
+    }
+
+    // Compute my current roster SGP by matching drafted players to FG pool
+    let myCurrentRosterSGP = 0;
+    for (const drafted of input.myRoster) {
+      const draftedNorm = normalizeName(drafted.playerName);
+      const poolIdx = allPlayers.findIndex(p => p.normalizedName === draftedNorm);
+      if (poolIdx >= 0) {
+        myCurrentRosterSGP += sgpValues[poolIdx] ?? 0;
+      }
+    }
 
     maxBidResult = computeMaxBid(
       targetPlayer,
       allPlayers,
       sgpValues,
       myBudget,
-      DEFAULT_ROSTER_SLOTS,
+      remainingSlots,
       opponentModel,
     );
 
@@ -181,16 +232,14 @@ function computeRosterOptimization(
       opponentBudgets.push(budget);
     }
 
-    // My current roster as PoolPlayer[] (from locked player perspective, empty for now)
-    const myCurrentRoster: PoolPlayer[] = [];
-
     monteCarloResult = runMonteCarlo({
       availablePlayers: allPlayers,
       sgpValues,
-      myCurrentRoster,
+      myCurrentRoster: [],
+      myCurrentRosterSGP,
       myBudget,
       opponentBudgets,
-      rosterSlots: DEFAULT_ROSTER_SLOTS,
+      rosterSlots: remainingSlots,
       nominatedPlayer,
       nominatedBid: maxBidResult.maxBid,
       numSimulations: 200,
