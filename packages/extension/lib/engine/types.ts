@@ -14,7 +14,7 @@ export interface EnhancedScarcitySignal {
   supply: number;                // Top-tier players remaining undrafted
   demand: number;                // Teams still needing this position
   totalAvailable: number;        // All undrafted at position
-  tierDropValue: number;         // VBD gap between best available and next tier
+  tierDropValue: number;         // Auction $ gap between best available and next tier
   scarcityIndex: number;         // 0-1 normalized score
   myTeamNeeds: boolean;
 }
@@ -65,6 +65,32 @@ export interface DraftEngineInput {
   currentAuctionPlayerId?: number;
 }
 
+export interface CategoryCeiling {
+  stat_key: string;
+  currentTotal: number;      // Sum from already-drafted players
+  ceilingTotal: number;      // currentTotal + greedy-fill optimal remaining
+  competitiveTarget: number; // Top-3 threshold from full player pool
+  isPunted: boolean;         // ceiling < 70% of competitive target (or > 130% for LOWER_BETTER)
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+}
+
+export interface PivotPlayer {
+  playerId: number;
+  playerName: string;
+  dollarValue: number;
+  category: string;          // The category this player most unlocks
+  ceilingLift: number;       // How much the ceiling improves if grabbed
+}
+
+export interface BuildArchetypeSignal {
+  archetypeLabel: string | null; // e.g. "Power Build", "Pitching-First", null if unclear
+  archetypeConfidence: number;   // 0.0-1.0; < 0.5 = show with low-confidence indicator
+  picksAnalyzed: number;         // Number of myRoster picks contributing
+  ceilings: CategoryCeiling[];
+  pivotPlayers: PivotPlayer[];   // Top 3 most impactful available players
+  spendingSplit: { hitting: number; pitching: number };
+}
+
 export interface DraftEngineSignals {
   inflation: InflationSignal;
   scarcity: EnhancedScarcitySignal[];
@@ -72,4 +98,5 @@ export interface DraftEngineSignals {
   budgetCurve: BudgetCurveSignal;
   alerts: DraftAlert[];
   computeTimeMs: number;
+  archetype: BuildArchetypeSignal | null;  // null when insufficient data (< 3 picks)
 }
