@@ -42,6 +42,8 @@ services:
       context: .
       dockerfile: packages/backend/Dockerfile.dev
     container_name: espn-backend
+    env_file:
+      - ./packages/backend/.env
     environment:
       NODE_ENV: development
       PORT: 3001
@@ -73,6 +75,8 @@ services:
       context: .
       dockerfile: packages/backend/Dockerfile.dev
     container_name: espn-worker
+    env_file:
+      - ./packages/backend/.env
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://espn_user:espn_password@postgres:5432/espn_fantasy

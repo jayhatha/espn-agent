@@ -369,6 +369,7 @@ None yet.
 | 35 | Parse ESPN auction values from fixedDataTable DOM — scrape live $values, merge into store, display in sidebar | 2026-03-04 | 0bca97f | ✅ | [35-parse-espn-auction-values-from-dom-table](./quick/35-parse-espn-auction-values-from-dom-table/) |
 | 36 | Large circular ranking number in display serif font showing remaining-player rank | 2026-03-04 | 8e12048 | ✅ | [36-add-large-circular-ranking-number-displa](./quick/36-add-large-circular-ranking-number-displa/) |
 | 37 | Detect team count and user's team from ESPN auction pick train DOM | 2026-03-04 | bebdabb | ✅ | [37-detect-team-count-and-user-s-team-from-e](./quick/37-detect-team-count-and-user-s-team-from-e/) |
+| 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | pending | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
 
 ## Session Continuity
 
