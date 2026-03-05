@@ -133,6 +133,7 @@ Stopped at: Completed 22-03-PLAN.md: DraftNarrator component with Ask button and
 | Phase 22 P02 | 10 | 2 tasks | 4 files |
 | Phase 22 P01 | 5 | 2 tasks | 4 files |
 | Phase 22 P03 | 5 | 2 tasks | 3 files |
+| Phase 23 P01 | 6 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -293,6 +294,12 @@ Recent decisions affecting v1.1 work:
 - [Phase 22 P01]: Rate limit 30/min for /api/draft/narrate matches /api/draft/espn limit — appropriate for real-time draft use
 - [Phase 22]: DraftNarrator uses defaultValue inputs — uncontrolled during 500ms debounce to avoid re-render churn on each keystroke
 - [Phase 22]: Ask button disabled on both isLoading and callsRemaining <= 0 — enforces 120-cap at UI layer in addition to hook
+- [Phase 23]: PoolPlayer interface moved to types.ts and shared — archetype.ts no longer has a local duplicate
+- [Phase 23]: buildFgPlayerPool and normalizeName exported from archetype.ts for Plan 03 reuse without code duplication
+- [Phase 23]: LOWER_BETTER replacement sorts ascending (best pitcher first) so replacement = Nth best, not Nth worst
+- [Phase 23]: buildSGPVectors O(n*cats): vectorize stat extraction per category, no nested player loops inside category loop
+- [Phase 23]: Locked player SGP not auto-tracked in totalSGPValue — cost/slot correctly reserved, SGP tracking is caller responsibility
+- [Phase 23]: SLOT_PRIORITY assigns dedicated positions (C/SS/2B/1B/OF) before flex slots (CI/MI/UTIL/BN/P) for greedy roster optimizer
 
 ### Roadmap Evolution
 
@@ -309,6 +316,7 @@ Recent decisions affecting v1.1 work:
 - Phase 20 added: Deterministic draft engine — inflation model, category gap projections, budget curve, strategy anchors with pivot logic, and structured alert system for extension sidebar
 - Phase 21 added: Dynamic build archetype analysis — show how roster commitments constrain remaining draft strategy using FanGraphs projections and auction values
 - Phase 22 added: AI narrator layer — event-triggered LLM interpretation of deterministic engine signals with tactical commentary, strategy state transitions, and anchor/pivot explanations in the extension sidebar
+- Phase 23 added: Roster optimization engine — marginal-value max bid (replacing heuristic), Monte Carlo draft simulation, dynamic replacement levels, and opponent need modeling, adapted from draft engine spec to TypeScript extension
 
 ### Pending Todos
 
@@ -369,7 +377,7 @@ None yet.
 | 35 | Parse ESPN auction values from fixedDataTable DOM — scrape live $values, merge into store, display in sidebar | 2026-03-04 | 0bca97f | ✅ | [35-parse-espn-auction-values-from-dom-table](./quick/35-parse-espn-auction-values-from-dom-table/) |
 | 36 | Large circular ranking number in display serif font showing remaining-player rank | 2026-03-04 | 8e12048 | ✅ | [36-add-large-circular-ranking-number-displa](./quick/36-add-large-circular-ranking-number-displa/) |
 | 37 | Detect team count and user's team from ESPN auction pick train DOM | 2026-03-04 | bebdabb | ✅ | [37-detect-team-count-and-user-s-team-from-e](./quick/37-detect-team-count-and-user-s-team-from-e/) |
-| 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | pending | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
+| 38 | Load backend .env values in Docker dev container via env_file directive | 2026-03-05 | 869f303 | ✅ | [38-use-env-values-from-backend-env-in-backe](./quick/38-use-env-values-from-backend-env-in-backe/) |
 
 ## Session Continuity
 
