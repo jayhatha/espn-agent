@@ -127,6 +127,18 @@ export interface BuildArchetypeSignal {
   spendingSplit: { hitting: number; pitching: number };
 }
 
+export interface RosterOptimizationSignal {
+  maxBid: number;
+  expectedMarketPrice: number;
+  valueSurplus: number;
+  shouldBid: boolean;
+  topTargets: TargetRecommendation[];
+  opponentPressure: Record<string, number>;
+  simulationEV: number;
+  simulationStdDev: number;
+  computeTimeMs: number;
+}
+
 export interface DraftEngineSignals {
   inflation: InflationSignal;
   scarcity: EnhancedScarcitySignal[];
@@ -135,6 +147,7 @@ export interface DraftEngineSignals {
   alerts: DraftAlert[];
   computeTimeMs: number;
   archetype: BuildArchetypeSignal | null;  // null when insufficient data (< 3 picks)
+  optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
 }
 
 // ============================================================
