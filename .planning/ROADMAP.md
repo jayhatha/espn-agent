@@ -362,3 +362,14 @@ Plans:
 - [ ] 21-01-PLAN.md — Convert FanGraphs CSVs to bundled JSON assets, create typed data module, extend engine types with BuildArchetypeSignal
 - [ ] 21-02-PLAN.md — Implement computeBuildArchetype pure function with greedy fill, archetype classification, ceiling computation (TDD), wire into engine orchestrator
 - [ ] 21-03-PLAN.md — Create BuildArchetypePanel UI component, replace Category Gaps in EngineInsights, visual verification
+
+### Phase 22: AI narrator layer — event-triggered LLM interpretation of deterministic engine signals with tactical commentary, strategy state transitions, and anchor/pivot explanations in the extension sidebar
+
+**Goal:** Add an LLM narration layer that interprets the deterministic engine's structured signals during live auction drafts, providing tactical commentary via a backend OpenAI endpoint called by the extension when meaningful thresholds are met
+**Depends on:** Phase 21
+**Plans:** 3 plans
+
+Plans:
+- [ ] 22-01-PLAN.md — Install OpenAI SDK, create DraftNarratorAgent with system prompt and gpt-4.1-mini, add POST /api/draft/narrate route
+- [ ] 22-02-PLAN.md — Create narrator Zustand store (non-persisted), NarratorPayload type, useNarrator hook with trigger/debounce/session cap, add strategy object to draft store
+- [ ] 22-03-PLAN.md — Create DraftNarrator UI component with Ask button and calls counter, StrategySetup component, wire into DraftSidebar
