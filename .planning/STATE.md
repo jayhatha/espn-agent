@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 22 - AI Narrator Layer (COMPLETE)
+**Current focus:** Phase 23 - Roster Optimization Engine (COMPLETE)
 
 ## Current Position
 
-Phase: 22 (AI Narrator Layer) - COMPLETE
+Phase: 23 (Roster Optimization Engine) - COMPLETE
 Plan: 3 of 3 complete (all plans done)
 Status: Complete
-Last activity: 2026-03-05 - Completed 22-03: DraftNarrator and StrategySetup UI components wired into DraftSidebar
+Last activity: 2026-03-05 - Completed 23-03: computeRosterOptimization wired into computeDraftEngine, SGP max bid in AuctionBudgetTracker, Top Targets in EngineInsights
 
-Progress: Phase 22: [██████████] 100% (3 of 3 plans complete)
+Progress: Phase 23: [██████████] 100% (3 of 3 plans complete)
 
 Last session: 2026-03-05
-Stopped at: Completed 22-03-PLAN.md: DraftNarrator component with Ask button and calls-remaining counter, StrategySetup collapsible anchor player config, both wired into DraftSidebar auction mode
+Stopped at: Completed 23-03-PLAN.md: computeRosterOptimization wired into computeDraftEngine step 7, RosterOptimizationSignal on DraftEngineSignals, AuctionBudgetTracker SGP max bid with BID/PASS badge, EngineInsights Top Targets section
 
 ## Performance Metrics
 
@@ -135,6 +135,7 @@ Stopped at: Completed 22-03-PLAN.md: DraftNarrator component with Ask button and
 | Phase 22 P03 | 5 | 2 tasks | 3 files |
 | Phase 23 P01 | 6 | 2 tasks | 6 files |
 | Phase 23 P02 | 23 | 3 tasks | 7 files |
+| Phase 23 P03 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -304,6 +305,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 23]: Binary search hi bound = min(budget-minSlots, ceil(dollars*3)) — caps search range proportionally to player dollar value
 - [Phase 23]: Monte Carlo uses Set<number> for available player tracking — O(1) delete vs O(n) array splice, critical for 200-sim performance
 - [Phase 23]: bidEV and passEV both equal expectedTeamValue when no nominated player provided — consistent MonteCarloResult API
+- [Phase 23]: Two-level cache: sgpCacheKey invalidates on allPicks.length change; bidCacheKey invalidates on nomination OR pick count — prevents redundant bid optimizer and Monte Carlo recomputes between renders
+- [Phase 23]: Hardcoded DEFAULT_ROSTER_SLOTS { C:1, 1B:1, 2B:1, SS:1, 3B:1, CI:1, MI:1, OF:4, UTIL:3, P:9 } per Phase 23 CONTEXT.md locked decision — dynamic detection deferred to future phase
 
 ### Roadmap Evolution
 
