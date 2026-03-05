@@ -17,11 +17,9 @@ import {
   getRankings,
   getAuctionValues,
   resolveBackendLeagueId,
-  getRankingsWithRetry,
-  getAuctionValuesWithRetry,
   throttle,
 } from "../lib/api-client";
-import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets } from "../lib/draft-config-detector";
+import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets, detectRosterSlotsFromPlayersTable } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
@@ -44,56 +42,6 @@ function normalizePlayerName(name: string): string {
     .trim();
 }
 
-/**
- * Refresh rankings and projections with cached config
- * User constraint: auto-refresh after each pick, keep stale data on failure
- * Throttled to 3s minimum between calls to prevent 429 errors
- */
-const refreshRankingsAndProjections = throttle(
-  async (espnLeagueId: string) => {
-    const state = useDraftStore.getState();
-
-    // Use cached config (don't re-detect per user constraint)
-    if (!cachedLeagueConfig) {
-      console.warn("[ESPN Draft Assistant] No league config available for refresh");
-      return;
-    }
-
-    try {
-      // Fetch with retry logic
-      const [rankings, auctionValues] = await Promise.all([
-        getRankingsWithRetry(espnLeagueId, {
-          draftFormat: state.draftFormat,
-        }),
-        state.draftFormat === "auction"
-          ? getAuctionValuesWithRetry(espnLeagueId, {
-              budget: cachedLeagueConfig?.budget || 260,
-              rosterSize: state.rosterSize,
-            })
-          : Promise.resolve([]),
-      ]);
-
-      // Update state
-      state.setRankings(rankings);
-      if (state.draftFormat === "auction") {
-        state.setAuctionValues(auctionValues);
-      }
-
-      console.log("[ESPN Draft Assistant] Rankings refreshed successfully", {
-        rankingsCount: rankings.length,
-        auctionValuesCount: auctionValues.length,
-      });
-    } catch (error) {
-      // User constraint: keep stale data on failure after retries
-      console.error(
-        "[ESPN Draft Assistant] Failed to refresh rankings after retries, keeping stale data",
-        error
-      );
-      // Don't throw - UI keeps showing stale rankings
-    }
-  },
-  3000 // 3 seconds minimum between refreshes (backend limit: 50/min = 1.2s per request, use 3s for safety)
-);
 
 export default defineContentScript({
   matches: ["https://fantasy.espn.com/baseball/draft*"],
@@ -252,6 +200,23 @@ export default defineContentScript({
       console.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
     }
 
+    // Detect roster slots from players-table DOM (more accurate than settings panel)
+    const playersTableSlots = detectRosterSlotsFromPlayersTable();
+    if (playersTableSlots) {
+      useDraftStore.getState().setDetectedRosterSlots(playersTableSlots.rosterSlots);
+    }
+
+    // Retry roster slot detection after DOM stabilizes (players-table may load late)
+    setTimeout(() => {
+      if (!useDraftStore.getState().detectedRosterSlots) {
+        const retrySlots = detectRosterSlotsFromPlayersTable();
+        if (retrySlots) {
+          useDraftStore.getState().setDetectedRosterSlots(retrySlots.rosterSlots);
+          console.log("[ESPN Draft Assistant] Roster slots detected on retry");
+        }
+      }
+    }, 3000);
+
     let reactRootInstance: ReturnType<typeof createRoot> | null = null;
     let popoutWindow: Window | null = null;
     let popoutRootInstance: ReturnType<typeof createRoot> | null = null;
@@ -343,8 +308,8 @@ export default defineContentScript({
         useDraftStore.getState().setProjectedStandings(standings);
       }
 
-      // Auto-refresh rankings after each pick (user constraint)
-      await refreshRankingsAndProjections(leagueId.toString());
+      // Rankings/auction values are static pre-draft data — no need to re-fetch per pick.
+      // The deterministic engine recomputes inflation, scarcity, etc. client-side from draft state.
     };
 
     const refreshAssistantData = throttle(

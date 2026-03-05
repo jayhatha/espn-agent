@@ -4,7 +4,7 @@ import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
-import { computeBuildArchetype, buildFgPlayerPool, normalizeName } from "./archetype";
+import { buildFgPlayerPool, normalizeName } from "./archetype";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
@@ -124,12 +124,15 @@ function computeRosterOptimization(
     };
   }
 
-  // Warn if rosterSize differs from default total (23 + 5 bench not enforced)
-  const defaultTotal = Object.values(DEFAULT_ROSTER_SLOTS).reduce((s, v) => s + v, 0);
-  if (input.rosterSize !== defaultTotal) {
+  // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
+  const activeSlots = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
+
+  // Warn if rosterSize differs from active slot total
+  const activeTotal = Object.values(activeSlots).reduce((s, v) => s + v, 0);
+  if (input.rosterSize !== activeTotal) {
     console.warn(
-      `[DraftEngine] rosterSize=${input.rosterSize} differs from default slot total=${defaultTotal}. ` +
-      `Using hardcoded roster slots per Phase 23 spec.`,
+      `[DraftEngine] rosterSize=${input.rosterSize} differs from active slot total=${activeTotal}. ` +
+      `Using ${input.rosterSlots ? "detected" : "default"} roster slots.`,
     );
   }
 
@@ -140,7 +143,7 @@ function computeRosterOptimization(
     cachedSGPVectors = buildSGPVectors(
       allPlayers,
       input.leagueCategories,
-      DEFAULT_ROSTER_SLOTS,
+      activeSlots,
       input.totalTeams,
     );
     sgpCacheKey = input.allPicks.length;
@@ -155,7 +158,7 @@ function computeRosterOptimization(
   const opponentModel = buildOpponentModel(
     input.teamRosters,
     input.allTeamBudgets,
-    DEFAULT_ROSTER_SLOTS,
+    activeSlots,
     allPlayers,
     input.allPicks,
     inflation.inflationFactor,
@@ -193,7 +196,7 @@ function computeRosterOptimization(
     const targetPlayer = nominatedPlayer ?? allPlayers[0];
 
     // Compute remaining roster slots by subtracting my drafted players' positions
-    const remainingSlots: Record<string, number> = { ...DEFAULT_ROSTER_SLOTS };
+    const remainingSlots: Record<string, number> = { ...activeSlots };
     for (const drafted of input.myRoster) {
       const slotMap = new Map(Object.entries(remainingSlots).filter(([, v]) => v > 0));
       const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
@@ -364,21 +367,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // 5. Generate alerts from all signals
   const alerts = generateAlerts(inflation, scarcity, categoryGaps, budgetCurve);
 
-  // 6. Build archetype analysis (position-aware greedy fill + classification)
-  const archetype = computeBuildArchetype(
-    input.myRoster,
-    input.remainingBudget,
-    input.allPicks,
-    fgLeaderboardHittersData,
-    fgLeaderboardPitchersData,
-    fgAuctionHittersData,
-    fgAuctionPitchersData,
-    input.leagueCategories,
-    input.rosterSize,
-    input.totalTeams,
-  );
-
-  // 7. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
+  // 6. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
     try {
@@ -400,7 +389,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     budgetCurve,
     alerts,
     computeTimeMs: Math.round(elapsed * 10) / 10,
-    archetype: archetype.picksAnalyzed >= 3 ? archetype : null,
     optimization,
   };
 }

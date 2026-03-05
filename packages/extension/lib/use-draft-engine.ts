@@ -17,8 +17,13 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     allTeamBudgets,
     leagueCategories,
     currentAuctionPlayer,
+    espnDomAuctionValues,
     draftFormat,
+    detectedRosterSlots,
   } = useDraftStore();
+
+  // Extract playerId separately — only changes on new nominations (not bid updates)
+  const currentPlayerId = currentAuctionPlayer?.playerId;
 
   return useMemo(() => {
     // Only compute for auction drafts with data
@@ -33,17 +38,15 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       remainingBudget,
       totalTeams,
       rosterSize,
+      rosterSlots: detectedRosterSlots ?? undefined,
       teamRosters,
       myTeamId,
       allTeamBudgets,
       leagueCategories,
-      currentAuctionPlayerId: currentAuctionPlayer?.playerId,
+      currentAuctionPlayerId: currentPlayerId,
+      espnDomAuctionValues,
     });
   }, [
-    // CRITICAL: Do NOT include currentAuctionPlayer in deps -- it changes every 200ms from
-    // observeCurrentAuctionPlayer. Only recompute per-pick (allPicks change) or per-roster change.
-    // The currentAuctionPlayer.playerId is read inside the useMemo but won't trigger recompute
-    // on bid changes -- only on picks.
     rankings,
     auctionValues,
     allPicks,
@@ -51,10 +54,13 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     remainingBudget,
     totalTeams,
     rosterSize,
-    teamRosters.size, // Use .size instead of Map ref to avoid stale reference issues (Pitfall #6)
+    teamRosters.size, // Use .size instead of Map ref to avoid stale reference issues
     myTeamId,
     allTeamBudgets,
     leagueCategories,
     draftFormat,
+    currentPlayerId, // Recompute on new nomination (not bid changes)
+    espnDomAuctionValues,
+    detectedRosterSlots, // Recompute when roster slots are detected for the first time
   ]);
 }
