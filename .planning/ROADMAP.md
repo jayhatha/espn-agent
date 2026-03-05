@@ -373,3 +373,14 @@ Plans:
 - [ ] 22-01-PLAN.md — Install OpenAI SDK, create DraftNarratorAgent with system prompt and gpt-4.1-mini, add POST /api/draft/narrate route
 - [ ] 22-02-PLAN.md — Create narrator Zustand store (non-persisted), NarratorPayload type, useNarrator hook with trigger/debounce/session cap, add strategy object to draft store
 - [ ] 22-03-PLAN.md — Create DraftNarrator UI component with Ask button and calls counter, StrategySetup component, wire into DraftSidebar
+
+### Phase 23: Roster optimization engine with marginal-value max bid, Monte Carlo draft simulation, dynamic replacement levels, and opponent need modeling — adapted from draft engine spec to TypeScript extension
+
+**Goal:** The extension sidebar provides a data-driven SGP-based max-bid recommendation for every nominated player in an auction draft, backed by greedy roster optimization, Monte Carlo simulation of remaining draft outcomes, and opponent need awareness — all running as pure TypeScript functions within the 100ms performance budget
+**Depends on:** Phase 22
+**Plans:** 3 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — SGP model with vectorized computation, dynamic replacement levels, and greedy knapsack roster optimizer (TDD)
+- [ ] 23-02-PLAN.md — Bid optimizer (binary-search max bid), opponent need model, and Monte Carlo draft simulation (TDD)
+- [ ] 23-03-PLAN.md — Wire all modules into computeDraftEngine orchestrator and surface max bid, targets, and bid/pass signals in sidebar UI
