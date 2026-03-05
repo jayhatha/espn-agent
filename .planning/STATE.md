@@ -129,6 +129,7 @@ Stopped at: Completed 21-02-PLAN.md: computeBuildArchetype pure function with po
 | Phase 20 P02 | 3 | 2 tasks | 5 files |
 | Phase 21 P01 | 41 | 2 tasks | 7 files |
 | Phase 21 P02 | 132 | 2 tasks | 3 files |
+| Phase 21 P03 | 2 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -277,6 +278,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 21]: Per-player z-score vs. full player pool (drafted + undrafted) for archetype classification — avoids stddev=0 when undrafted pool has uniform stats
 - [Phase 21]: computeBuildArchetype purely parameter-driven — FG data flows in from computeDraftEngine imports, keeping archetype.ts fully testable with mock data
 - [Phase 21]: archetype null when picksAnalyzed < 3 in DraftEngineSignals; archetypeLabel null when < 5 picks in classification rules
+- [Phase 21]: Build Analysis section collapsed by default (no open attr) unlike Inflation/Scarcity which are open — keeps sidebar compact during draft
+- [Phase 21]: LOWER_BETTER bar fill inverted: fill = min(1, target/current) so full bar always means on-target regardless of ERA/WHIP direction
 
 ### Roadmap Evolution
 
