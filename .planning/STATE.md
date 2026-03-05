@@ -10,14 +10,14 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 22 (AI Narrator Layer)
-Plan: 2 of 3 in current phase
+Plan: 3 of 3 in current phase (22-01 and 22-02 complete, 22-03 remaining)
 Status: In Progress
-Last activity: 2026-03-04 - Completed 22-02: Non-persisted narrator Zustand store, NarratorPayload type, useNarrator hook with 1500ms debounce/deduplication/120-call session cap, strategy object on DraftState
+Last activity: 2026-03-05 - Completed 22-01: DraftNarratorAgent (OpenAI gpt-4.1-mini), POST /api/draft/narrate route, rate-limited and 503-safe
 
-Progress: Phase 22: [███-------] 33% (1 of 3 plans complete)
+Progress: Phase 22: [██████----] 67% (2 of 3 plans complete)
 
-Last session: 2026-03-04
-Stopped at: Completed 22-02-PLAN.md: narrator-state.ts (non-persisted Zustand store), narrator-types.ts (NarratorPayload type), use-narrator.ts (hook with trigger logic, debounce, deduplication, session cap, AbortController), strategy object added to draft-state.ts
+Last session: 2026-03-05
+Stopped at: Completed 22-01-PLAN.md: DraftNarratorAgent with typed NarratorPayload, system prompt, buildUserMessage serializer, narrate() method, POST /api/draft/narrate rate-limited to 30/min with 503 fallback, openai@6.25.0 installed
 
 ## Performance Metrics
 
@@ -131,6 +131,7 @@ Stopped at: Completed 22-02-PLAN.md: narrator-state.ts (non-persisted Zustand st
 | Phase 21 P02 | 132 | 2 tasks | 3 files |
 | Phase 21 P03 | 2 | 1 tasks | 2 files |
 | Phase 22 P02 | 10 | 2 tasks | 4 files |
+| Phase 22 P01 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -285,6 +286,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 22]: getState() for sessionCallCount in debounced fireNarration callback to avoid stale closure that would bypass the 120-call cap
 - [Phase 22]: Deduplication key = sorted alert IDs + archetypeLabel + pacingStatus + triggerReason — prevents re-calling narrator for same engine state
 - [Phase 22]: Strategy object not in partialize — not persisted across sessions (anchor changes each draft by user choice)
+- [Phase 22 P01]: Per-request DraftNarratorAgent instantiation so OPENAI_API_KEY check converts to 503 (not server crash)
+- [Phase 22 P01]: MODEL_ID = gpt-4.1-mini-2025-04-14 as top-level constant to prevent model ID typo regressions
+- [Phase 22 P01]: buildUserMessage() serializes only summary fields — alerts top 3, scarcity >0.65, category gaps >0.65 — keeps prompt compact and prevents raw player array injection
+- [Phase 22 P01]: Rate limit 30/min for /api/draft/narrate matches /api/draft/espn limit — appropriate for real-time draft use
 
 ### Roadmap Evolution
 
@@ -364,6 +369,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04
-Stopped at: Completed 21-01-PLAN.md: FanGraphs JSON assets (4 files, 3154 players), typed fangraphs-data.ts module, BuildArchetypeSignal/CategoryCeiling/PivotPlayer types, archetype field on DraftEngineSignals
+Last session: 2026-03-05
+Stopped at: Completed 22-01-PLAN.md: DraftNarratorAgent with typed NarratorPayload, system prompt, buildUserMessage serializer, narrate() method calling gpt-4.1-mini-2025-04-14. POST /api/draft/narrate route rate-limited to 30/min, 503 fallback on missing key. openai@6.25.0 installed.
 Resume file: None
