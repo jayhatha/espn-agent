@@ -141,6 +141,30 @@ export interface RosterOptimizationSignal {
   computeTimeMs: number;
 }
 
+export interface TeamCategoryRanking {
+  category: string;
+  myRank: number;          // 1-based rank among all teams (1 = best)
+  totalTeams: number;
+  myTotal: number;
+  leagueMedian: number;
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+}
+
+export interface CategoryDemand {
+  category: string;
+  weakTeamCount: number;   // Teams below median (potential bidders)
+  strongTeamCount: number; // Teams above median (unlikely to bid heavily)
+  demandLevel: "high" | "medium" | "low";  // high = many weak teams = bidding wars expected
+}
+
+export interface LeagueAnalysisSignal {
+  categoryRankings: TeamCategoryRanking[];  // My rank per category vs field
+  categoryDemand: CategoryDemand[];         // Market demand per category
+  recommendations: string[];                // 2-3 strategic recommendations
+  teamsAnalyzed: number;                    // How many teams had enough data
+  computeTimeMs: number;
+}
+
 export interface DraftEngineSignals {
   inflation: InflationSignal;
   scarcity: EnhancedScarcitySignal[];
@@ -149,6 +173,7 @@ export interface DraftEngineSignals {
   alerts: DraftAlert[];
   computeTimeMs: number;
   optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
+  leagueAnalysis: LeagueAnalysisSignal | null;
 }
 
 // ============================================================
