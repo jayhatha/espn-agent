@@ -10,11 +10,14 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 ## Current Position
 
 Phase: 21 (Dynamic Build Archetype Analysis)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In Progress
-Last activity: 2026-03-04 - Completed 21-01: FanGraphs JSON assets, typed fangraphs-data.ts module, BuildArchetypeSignal types in engine/types.ts
+Last activity: 2026-03-04 - Completed 21-02: computeBuildArchetype pure function, position-aware greedy fill, archetype classification, TDD tests, wired into computeDraftEngine
 
-Progress: Phase 21: [████------] 33% (1 of 3 plans complete)
+Progress: Phase 21: [███████---] 67% (2 of 3 plans complete)
+
+Last session: 2026-03-04
+Stopped at: Completed 21-02-PLAN.md: computeBuildArchetype pure function with position-aware greedy fill, archetype classification, category ceilings, pivot players. Wired into computeDraftEngine as step 6.
 
 ## Performance Metrics
 
@@ -125,6 +128,7 @@ Progress: Phase 21: [████------] 33% (1 of 3 plans complete)
 | Phase 20 P01 | 5 | 2 tasks | 9 files |
 | Phase 20 P02 | 3 | 2 tasks | 5 files |
 | Phase 21 P01 | 41 | 2 tasks | 7 files |
+| Phase 21 P02 | 132 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -270,6 +274,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 21]: Pitcher H/BB/HR stored as HA/BBA/HRA in JSON assets to avoid collision with hitter stat keys in calculateFinalRate
 - [Phase 21]: archetype field added to DraftEngineSignals as BuildArchetypeSignal | null — null when insufficient data, implementation deferred to Plan 02
 - [Phase 21]: Static JSON imports (not fetch) for bundled FanGraphs data — offline availability required for draft use
+- [Phase 21]: Per-player z-score vs. full player pool (drafted + undrafted) for archetype classification — avoids stddev=0 when undrafted pool has uniform stats
+- [Phase 21]: computeBuildArchetype purely parameter-driven — FG data flows in from computeDraftEngine imports, keeping archetype.ts fully testable with mock data
+- [Phase 21]: archetype null when picksAnalyzed < 3 in DraftEngineSignals; archetypeLabel null when < 5 picks in classification rules
 
 ### Roadmap Evolution
 

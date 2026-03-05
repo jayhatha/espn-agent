@@ -144,7 +144,7 @@ Plans:
 | 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
 | 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
 | 20. Deterministic Draft Engine | 2/2 | Complete    | 2026-03-04 | - |
-| 21. Build Archetype Analysis | 1/3 | In Progress|  | - |
+| 21. Build Archetype Analysis | 2/3 | In Progress|  | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -356,7 +356,7 @@ Plans:
   5. Pivot players identified — specific affordable undrafted players that would unlock category ceiling improvements
   6. Build Analysis panel replaces Category Gaps section in EngineInsights, collapsed by default
   7. All engine code is pure deterministic functions within 300ms performance budget
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 21-01-PLAN.md — Convert FanGraphs CSVs to bundled JSON assets, create typed data module, extend engine types with BuildArchetypeSignal
