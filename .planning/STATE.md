@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 21 - Dynamic Build Archetype Analysis
+**Current focus:** Phase 22 - AI Narrator Layer
 
 ## Current Position
 
-Phase: 21 (Dynamic Build Archetype Analysis)
+Phase: 22 (AI Narrator Layer)
 Plan: 2 of 3 in current phase
 Status: In Progress
-Last activity: 2026-03-04 - Completed 21-02: computeBuildArchetype pure function, position-aware greedy fill, archetype classification, TDD tests, wired into computeDraftEngine
+Last activity: 2026-03-04 - Completed 22-02: Non-persisted narrator Zustand store, NarratorPayload type, useNarrator hook with 1500ms debounce/deduplication/120-call session cap, strategy object on DraftState
 
-Progress: Phase 21: [███████---] 67% (2 of 3 plans complete)
+Progress: Phase 22: [███-------] 33% (1 of 3 plans complete)
 
 Last session: 2026-03-04
-Stopped at: Completed 21-02-PLAN.md: computeBuildArchetype pure function with position-aware greedy fill, archetype classification, category ceilings, pivot players. Wired into computeDraftEngine as step 6.
+Stopped at: Completed 22-02-PLAN.md: narrator-state.ts (non-persisted Zustand store), narrator-types.ts (NarratorPayload type), use-narrator.ts (hook with trigger logic, debounce, deduplication, session cap, AbortController), strategy object added to draft-state.ts
 
 ## Performance Metrics
 
@@ -130,6 +130,7 @@ Stopped at: Completed 21-02-PLAN.md: computeBuildArchetype pure function with po
 | Phase 21 P01 | 41 | 2 tasks | 7 files |
 | Phase 21 P02 | 132 | 2 tasks | 3 files |
 | Phase 21 P03 | 2 | 1 tasks | 2 files |
+| Phase 22 P02 | 10 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -280,6 +281,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 21]: archetype null when picksAnalyzed < 3 in DraftEngineSignals; archetypeLabel null when < 5 picks in classification rules
 - [Phase 21]: Build Analysis section collapsed by default (no open attr) unlike Inflation/Scarcity which are open — keeps sidebar compact during draft
 - [Phase 21]: LOWER_BETTER bar fill inverted: fill = min(1, target/current) so full bar always means on-target regardless of ERA/WHIP direction
+- [Phase 22]: Non-persisted Zustand store for narrator — create() without persist middleware so sessionCallCount resets on page reload (per-draft-session cap)
+- [Phase 22]: getState() for sessionCallCount in debounced fireNarration callback to avoid stale closure that would bypass the 120-call cap
+- [Phase 22]: Deduplication key = sorted alert IDs + archetypeLabel + pacingStatus + triggerReason — prevents re-calling narrator for same engine state
+- [Phase 22]: Strategy object not in partialize — not persisted across sessions (anchor changes each draft by user choice)
 
 ### Roadmap Evolution
 
@@ -295,6 +300,7 @@ Recent decisions affecting v1.1 work:
 - Phase 18 added: Refactor dashboard from card-based SaaS layout into composition-driven layout inspired by high-end creative web design
 - Phase 20 added: Deterministic draft engine — inflation model, category gap projections, budget curve, strategy anchors with pivot logic, and structured alert system for extension sidebar
 - Phase 21 added: Dynamic build archetype analysis — show how roster commitments constrain remaining draft strategy using FanGraphs projections and auction values
+- Phase 22 added: AI narrator layer — event-triggered LLM interpretation of deterministic engine signals with tactical commentary, strategy state transitions, and anchor/pivot explanations in the extension sidebar
 
 ### Pending Todos
 
