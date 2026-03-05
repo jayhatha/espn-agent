@@ -11,7 +11,7 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
     return null;
   }
 
-  const { inflation, scarcity } = engineSignals;
+  const { inflation, scarcity, optimization } = engineSignals;
 
   // Inflation color: green < 5%, neutral 5-15%, warning > 15%
   const inflationPct = inflation.percentOverMarket;
@@ -28,6 +28,9 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
   const topScarcity = [...scarcity]
     .sort((a, b) => b.scarcityIndex - a.scarcityIndex)
     .slice(0, 3);
+
+  // Top 3 targets from optimization signal
+  const topTargets = optimization?.topTargets?.slice(0, 3) ?? [];
 
   return (
     <div className="border-b border-surface-tertiary">
@@ -60,6 +63,49 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
 
       {/* Build Analysis section */}
       <BuildArchetypePanel signal={engineSignals.archetype} />
+
+      {/* Top Targets section — only shown when optimization data is available */}
+      {topTargets.length > 0 && optimization != null && (
+        <details className="group">
+          <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
+            <span className="text-body-sm font-semibold text-content">Top Targets</span>
+            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
+          </summary>
+          <div className="px-3 pb-3 pt-2 bg-surface space-y-1.5">
+            {topTargets.map((target) => (
+              <div
+                key={`${target.playerName}-${target.position}`}
+                className="flex items-center justify-between text-body-xs"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-content">{target.playerName}</span>
+                  <span className="text-content-secondary">{target.position}</span>
+                </div>
+                <div className="flex items-center gap-2 text-right">
+                  <span
+                    className="text-body-xs font-semibold px-1.5 py-0.5 rounded bg-info-light text-info"
+                  >
+                    SGP: {target.sgpValue.toFixed(1)}
+                  </span>
+                  <span className="text-content-secondary">
+                    ~${target.expectedMarketPrice}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* MC Simulation summary */}
+            <div className="mt-2 pt-2 border-t border-surface-tertiary">
+              <div className="text-body-xs text-content-secondary flex items-center gap-1.5">
+                <span className="font-semibold text-content-secondary">MC Simulation</span>
+                <span>
+                  EV: {optimization.simulationEV.toFixed(1)} ± {optimization.simulationStdDev.toFixed(1)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </details>
+      )}
 
       {/* Top Scarcity section */}
       {topScarcity.length > 0 && (
