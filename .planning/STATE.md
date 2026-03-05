@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 22 - AI Narrator Layer
+**Current focus:** Phase 22 - AI Narrator Layer (COMPLETE)
 
 ## Current Position
 
-Phase: 22 (AI Narrator Layer)
-Plan: 3 of 3 in current phase (22-01 and 22-02 complete, 22-03 remaining)
-Status: In Progress
-Last activity: 2026-03-05 - Completed 22-01: DraftNarratorAgent (OpenAI gpt-4.1-mini), POST /api/draft/narrate route, rate-limited and 503-safe
+Phase: 22 (AI Narrator Layer) - COMPLETE
+Plan: 3 of 3 complete (all plans done)
+Status: Complete
+Last activity: 2026-03-05 - Completed 22-03: DraftNarrator and StrategySetup UI components wired into DraftSidebar
 
-Progress: Phase 22: [██████----] 67% (2 of 3 plans complete)
+Progress: Phase 22: [██████████] 100% (3 of 3 plans complete)
 
 Last session: 2026-03-05
-Stopped at: Completed 22-01-PLAN.md: DraftNarratorAgent with typed NarratorPayload, system prompt, buildUserMessage serializer, narrate() method, POST /api/draft/narrate rate-limited to 30/min with 503 fallback, openai@6.25.0 installed
+Stopped at: Completed 22-03-PLAN.md: DraftNarrator component with Ask button and calls-remaining counter, StrategySetup collapsible anchor player config, both wired into DraftSidebar auction mode
 
 ## Performance Metrics
 
@@ -132,6 +132,7 @@ Stopped at: Completed 22-01-PLAN.md: DraftNarratorAgent with typed NarratorPaylo
 | Phase 21 P03 | 2 | 1 tasks | 2 files |
 | Phase 22 P02 | 10 | 2 tasks | 4 files |
 | Phase 22 P01 | 5 | 2 tasks | 4 files |
+| Phase 22 P03 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -290,6 +291,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 22 P01]: MODEL_ID = gpt-4.1-mini-2025-04-14 as top-level constant to prevent model ID typo regressions
 - [Phase 22 P01]: buildUserMessage() serializes only summary fields — alerts top 3, scarcity >0.65, category gaps >0.65 — keeps prompt compact and prevents raw player array injection
 - [Phase 22 P01]: Rate limit 30/min for /api/draft/narrate matches /api/draft/espn limit — appropriate for real-time draft use
+- [Phase 22]: DraftNarrator uses defaultValue inputs — uncontrolled during 500ms debounce to avoid re-render churn on each keystroke
+- [Phase 22]: Ask button disabled on both isLoading and callsRemaining <= 0 — enforces 120-cap at UI layer in addition to hook
 
 ### Roadmap Evolution
 

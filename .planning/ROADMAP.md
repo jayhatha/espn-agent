@@ -367,7 +367,7 @@ Plans:
 
 **Goal:** Add an LLM narration layer that interprets the deterministic engine's structured signals during live auction drafts, providing tactical commentary via a backend OpenAI endpoint called by the extension when meaningful thresholds are met
 **Depends on:** Phase 21
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 22-01-PLAN.md — Install OpenAI SDK, create DraftNarratorAgent with system prompt and gpt-4.1-mini, add POST /api/draft/narrate route
