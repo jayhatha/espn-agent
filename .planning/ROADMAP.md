@@ -384,3 +384,13 @@ Plans:
 - [ ] 23-01-PLAN.md — SGP model with vectorized computation, dynamic replacement levels, and greedy knapsack roster optimizer (TDD)
 - [ ] 23-02-PLAN.md — Bid optimizer (binary-search max bid), opponent need model, and Monte Carlo draft simulation (TDD)
 - [ ] 23-03-PLAN.md — Wire all modules into computeDraftEngine orchestrator and surface max bid, targets, and bid/pass signals in sidebar UI
+
+### Phase 24: Feed Phase 23 optimization signals to narrator — add topTargets, simulationEV, shouldBid, maxBid, and opponentPressure to NarratorPayload for richer AI tactical advice during auction drafts
+
+**Goal:** Pipe Phase 23 roster optimization signals (topTargets, simulationEV, shouldBid, maxBid, opponentPressure) through the narrator pipeline so the AI advisor references SGP-based bid recommendations, Monte Carlo simulation confidence, and opponent competition in tactical commentary. Also add a nomination trigger so the narrator fires when a new player is nominated.
+**Depends on:** Phase 23
+**Requirements:** NARRATOR-OPT-01, NARRATOR-OPT-02, NARRATOR-OPT-03
+**Plans:** 1 plan
+
+Plans:
+- [ ] 24-01-PLAN.md — Add optimization fields to NarratorPayload (both sides), update payload builder with nomination trigger, update backend buildUserMessage and system prompt
