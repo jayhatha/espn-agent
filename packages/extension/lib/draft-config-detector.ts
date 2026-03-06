@@ -296,27 +296,31 @@ export function detectAllTeamBudgets(): Array<{
   teamName: string;
   remainingBudget: number;
 }> {
-  const items = document.querySelectorAll(
-    ".pick-train__content__picks-container .picklist--item",
-  );
-  if (items.length === 0) {
-    // Fallback: any picklist--item on the page
-    const fallbackItems = document.querySelectorAll(".picklist--item");
-    if (fallbackItems.length === 0) {
-      return [];
+  // Try multiple container selectors for the pick train
+  const containerSelectors = [
+    ".pick-train__content__picks-container",
+    "ul.picklist",
+    ".picklist",
+  ];
+  let items: NodeListOf<Element> | null = null;
+  for (const selector of containerSelectors) {
+    const container = document.querySelector(selector);
+    if (container) {
+      const found = container.querySelectorAll(".picklist--item");
+      if (found.length > 0) {
+        items = found;
+        break;
+      }
     }
-    return Array.from(fallbackItems).flatMap((item) => {
-      const teamNameEl = item.querySelector(".team-name");
-      const cashEl = item.querySelector(".cash");
-      if (!teamNameEl || !cashEl) return [];
-      const rawName = (teamNameEl.textContent || "").trim();
-      const cashText = (cashEl.textContent || "").trim();
-      const budgetMatch = cashText.match(/\$?(\d+)/);
-      const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 0;
-      const prefixMatch = rawName.match(/^(\d+)\.\s*(.+)$/);
-      const teamName = prefixMatch ? prefixMatch[2] : rawName;
-      return [{ teamName, remainingBudget }];
-    });
+  }
+
+  // Fallback: any picklist--item on the page
+  if (!items || items.length === 0) {
+    items = document.querySelectorAll(".picklist--item");
+  }
+
+  if (items.length === 0) {
+    return [];
   }
 
   return Array.from(items).flatMap((item) => {
@@ -338,28 +342,42 @@ export function detectAllTeamBudgets(): Array<{
  * Multiple strategies with validation to handle ESPN DOM variations
  */
 function detectTeamCount(): number | null {
-  // Strategy 0: Count .picklist--item elements in the auction pick train
-  // This is the most reliable source on auction draft pages — always visible
-  const pickTrainContainer = document.querySelector(
+  // Strategy 0: Count auction-pick elements or picklist items in the pick train
+  // Try multiple container selectors — ESPN uses different wrappers across draft versions
+  const containerSelectors = [
     ".pick-train__content__picks-container",
-  );
-  if (pickTrainContainer) {
-    const pickItems = pickTrainContainer.querySelectorAll(".picklist--item");
-    if (pickItems.length >= 2 && pickItems.length <= 20) {
-      console.log(
-        `[ESPN Draft Assistant] Team count detected from pick train: ${pickItems.length}`,
-      );
-      return pickItems.length;
+    "ul.picklist",
+    ".picklist",
+  ];
+  for (const selector of containerSelectors) {
+    const container = document.querySelector(selector);
+    if (container) {
+      const pickItems = container.querySelectorAll(".picklist--item");
+      if (pickItems.length >= 2 && pickItems.length <= 20) {
+        console.log(
+          `[ESPN Draft Assistant] Team count detected from ${selector}: ${pickItems.length}`,
+        );
+        return pickItems.length;
+      }
     }
-  } else {
-    // Fallback: any .picklist--item elements on the page (no container)
-    const anyPickItems = document.querySelectorAll(".picklist--item");
-    if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
-      console.log(
-        `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
-      );
-      return anyPickItems.length;
-    }
+  }
+
+  // Fallback: count [data-testid="auction-pick"] elements (one per team)
+  const auctionPicks = document.querySelectorAll('[data-testid="auction-pick"]');
+  if (auctionPicks.length >= 2 && auctionPicks.length <= 20) {
+    console.log(
+      `[ESPN Draft Assistant] Team count detected from auction-pick elements: ${auctionPicks.length}`,
+    );
+    return auctionPicks.length;
+  }
+
+  // Fallback: any .picklist--item elements on the page (no container)
+  const anyPickItems = document.querySelectorAll(".picklist--item");
+  if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
+    console.log(
+      `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
+    );
+    return anyPickItems.length;
   }
 
   // Strategy 1: Count unique grid columns in completed picks (most reliable)
