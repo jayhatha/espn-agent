@@ -397,9 +397,10 @@ Plans:
 
 ### Phase 25: Projected standings engine — full-season category and overall rankings for all teams during draft with draft-progress weighting and sidebar integration
 
-**Goal:** [To be planned]
+**Goal:** Project full-season roto standings for all teams during a live auction draft using replacement-level filler for remaining roster slots, draft-progress confidence weighting, and weak-category boost for top-target recommendations — surfaced in the extension sidebar as a Projected Standings section
 **Depends on:** Phase 24
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 25 to break down)
+- [ ] 25-01-PLAN.md — Add projected standings types, refactor league-analysis.ts to expose teamDraftedTotals, create projected-standings.ts pure function module
+- [ ] 25-02-PLAN.md — Wire into engine orchestrator as step 5c with weak-category boost, add Projected Standings UI section to EngineInsights sidebar
