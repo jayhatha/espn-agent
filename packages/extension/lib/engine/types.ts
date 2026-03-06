@@ -163,6 +163,32 @@ export interface LeagueAnalysisSignal {
   recommendations: string[];                // 2-3 strategic recommendations
   teamsAnalyzed: number;                    // How many teams had enough data
   computeTimeMs: number;
+  /** Exposed for projected-standings.ts — teamId -> stat_key -> total. Optional: existing consumers unaffected. */
+  teamDraftedTotals?: Map<string, Record<string, number>>;
+}
+
+// ============================================================
+// Projected Standings types (Phase 25)
+// ============================================================
+
+export interface ProjectedTeamStanding {
+  teamId: string;
+  teamName: string;
+  projectedRotoPts: number;        // Sum of category rank points (N, N-1, ..., 1)
+  projectedOverallRank: number;    // 1 = best
+  categoryRanks: Record<string, number>;  // stat_key -> rank (1-based)
+  draftedPlayersCount: number;     // How many players this team has drafted
+}
+
+export interface ProjectedStandingsSignal {
+  standings: ProjectedTeamStanding[];  // All teams, sorted by projectedRotoPts desc
+  myTeamRank: number;                  // User's projected overall rank (0 if unknown)
+  myWeakCategories: string[];          // stat_keys where user ranks in bottom 4
+  myStrongCategories: string[];        // stat_keys where user ranks in top 3
+  draftProgressWeight: number;         // 0.0-1.0 confidence weight
+  totalTeamCount: number;
+  teamsWithData: number;               // Teams with >= 1 FG-matched player
+  computeTimeMs: number;
 }
 
 export interface DraftEngineSignals {
@@ -174,6 +200,7 @@ export interface DraftEngineSignals {
   computeTimeMs: number;
   optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
   leagueAnalysis: LeagueAnalysisSignal | null;
+  projectedStandings: ProjectedStandingsSignal | null;
 }
 
 // ============================================================

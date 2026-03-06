@@ -471,5 +471,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     computeTimeMs: Math.round(elapsed * 10) / 10,
     optimization,
     leagueAnalysis,
+    projectedStandings: null,  // Computed in Plan 02 via computeProjectedStandings
   };
 }

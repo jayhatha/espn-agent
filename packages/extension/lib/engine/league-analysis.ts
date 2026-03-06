@@ -164,6 +164,7 @@ export function computeLeagueAnalysis(
       categoryDemand: [],
       recommendations: [],
       teamsAnalyzed,
+      teamDraftedTotals: new Map(),
       computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
     };
   }
@@ -327,6 +328,7 @@ export function computeLeagueAnalysis(
     categoryDemand,
     recommendations,
     teamsAnalyzed,
+    teamDraftedTotals: teamTotals,  // Exposed for projected-standings.ts
     computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
   };
 }
