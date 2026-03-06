@@ -441,8 +441,9 @@ None yet.
 | 45 | Bug fixes: skip backend for practice drafts, normalize inflation, fix nominated player matching for max bid/narrator | 2026-03-06 | 782eefe | ✅ | [45-bug-fixes-remove-espn-league-connection-](./quick/45-bug-fixes-remove-espn-league-connection-/) |
 | 46 | Fix win probability showing 100%: add formula_id to default RATE categories, fix opponent budget fallback, add roto tie-handling | 2026-03-06 | 1996647 | ✅ | [46-fix-win-probability-showing-100-with-top](./quick/46-fix-win-probability-showing-100-with-top/) |
 | 47 | Use ESPN ASV as market value (primary display), FanGraphs as over/under comparison badge | 2026-03-06 | de20c00 | ✅ | [47-use-espn-asv-as-market-value-fangraphs-as-over-under](./quick/47-use-espn-asv-as-market-value-fangraphs-as-over-under/) |
+| 48 | Fix team count detection — update totalTeams from pick train budget polling instead of one-shot page load | 2026-03-06 | 6310fa7 | ✅ | [48-fix-team-count-detection-from-pick-train](./quick/48-fix-team-count-detection-from-pick-train/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 47: ESPN ASV as primary market value with FG over/under badge
+Last activity: 2026-03-06 - Completed quick task 48: fix team count detection from pick train
 Resume file: None
