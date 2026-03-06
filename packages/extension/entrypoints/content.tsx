@@ -552,6 +552,12 @@ export default defineContentScript({
         const allBudgets = detectAllTeamBudgets();
         if (allBudgets.length > 0) {
           useDraftStore.getState().setAllTeamBudgets(allBudgets);
+          // Update totalTeams from pick train — detectTeamCount() runs once at page load
+          // before the pick train renders, so pick train is the reliable source
+          if (allBudgets.length >= 2 && allBudgets.length !== useDraftStore.getState().totalTeams) {
+            useDraftStore.setState({ totalTeams: allBudgets.length });
+            console.log(`[ESPN Draft Assistant] Team count updated from pick train: ${allBudgets.length}`);
+          }
           if (import.meta.env.DEV) {
             console.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
           }
