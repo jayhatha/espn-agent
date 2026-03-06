@@ -70,7 +70,7 @@
 **Milestone Goal:** Replace the generic Top Targets section with a position-organized shopping list that shows the best available players at each unfilled position, with max bids and market prices, prioritized by a combined scarcity + roster needs + budget fit score
 
 - [x] **Phase 26: Per-Position Target Engine** - Compute per-position top N targets with combined priority scoring, dynamic updates, multi-position eligibility (completed 2026-03-06)
-- [ ] **Phase 27: Shopping List UI** - Replace Top Targets with collapsible position groups, player rows with bid data, priority ordering
+- [x] **Phase 27: Shopping List UI** - Replace Top Targets with collapsible position groups, player rows with bid data, priority ordering (completed 2026-03-06)
 
 ## Phase Details
 
@@ -452,7 +452,7 @@ Plans:
   3. Each player row within a group shows player name, max bid, expected market price, and value surplus
   4. Position groups are ordered highest-priority first, matching the combined priority score from the engine
   5. When no unfilled roster positions remain, the Shopping List section collapses to a compact completion state rather than showing an empty list
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 27-01-PLAN.md — Create ShoppingList.tsx component and replace Top Targets section in EngineInsights with position-grouped shopping list
@@ -488,4 +488,4 @@ Plans:
 | 24. Narrator Optimization Signals | v1.4 | 1/1 | Complete | 2026-03-05 |
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
-| 27. Shopping List UI | v2.0 | 0/1 | Planned | - |
+| 27. Shopping List UI | 1/1 | Complete   | 2026-03-06 | - |

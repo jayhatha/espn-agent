@@ -23,11 +23,11 @@ Requirements for Position Shopping List milestone. Each maps to roadmap phases.
 
 ### UI — Shopping List Display (SHOP)
 
-- [ ] **SHOP-01**: Shopping list replaces the current Top Targets section in the EngineInsights sidebar
-- [ ] **SHOP-02**: Each position shown as a collapsible group with position label and priority indicator
-- [ ] **SHOP-03**: Each player row shows name, max bid, expected market price, and value surplus
-- [ ] **SHOP-04**: Position groups are ordered by combined priority score (most urgent first)
-- [ ] **SHOP-05**: Shopping list collapses gracefully when no unfilled positions remain
+- [x] **SHOP-01**: Shopping list replaces the current Top Targets section in the EngineInsights sidebar
+- [x] **SHOP-02**: Each position shown as a collapsible group with position label and priority indicator
+- [x] **SHOP-03**: Each player row shows name, max bid, expected market price, and value surplus
+- [x] **SHOP-04**: Position groups are ordered by combined priority score (most urgent first)
+- [x] **SHOP-05**: Shopping list collapses gracefully when no unfilled positions remain
 
 ## v1.1 Requirements (Completed)
 
@@ -117,11 +117,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRIO-01 | Phase 26 | Complete |
 | PRIO-02 | Phase 26 | Complete |
 | PRIO-03 | Phase 26 | Complete |
-| SHOP-01 | Phase 27 | Pending |
-| SHOP-02 | Phase 27 | Pending |
-| SHOP-03 | Phase 27 | Pending |
-| SHOP-04 | Phase 27 | Pending |
-| SHOP-05 | Phase 27 | Pending |
+| SHOP-01 | Phase 27 | Complete |
+| SHOP-02 | Phase 27 | Complete |
+| SHOP-03 | Phase 27 | Complete |
+| SHOP-04 | Phase 27 | Complete |
+| SHOP-05 | Phase 27 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 13 total

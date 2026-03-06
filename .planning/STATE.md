@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Milestone v2.0 — Position Shopping List (Phase 26: Per-Position Target Engine)
+**Current focus:** Milestone v2.0 — Shopping List UI (Phase 27: Shopping List UI)
 
 ## Current Position
 
-Phase: 26 — Per-Position Target Engine
-Plan: 02 complete — Phase 26 COMPLETE
-Status: All 2 plans in Phase 26 complete — engine ready for Phase 27 UI integration
-Last activity: 2026-03-06 — Phase 26 Plan 02 complete (shopping list wired into draft engine)
+Phase: 27 — Shopping List UI
+Plan: 01 complete — Phase 27 Plan 01 COMPLETE
+Status: Phase 27 Plan 01 complete — ShoppingList component created, Top Targets replaced in EngineInsights
+Last activity: 2026-03-06 — Phase 27 Plan 01 complete (shopping list UI integrated into sidebar)
 
-Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 next
+Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 complete
 
 ```
-[###########                             ] 25% v2.0
+[############                            ] 30% v2.0
 ```
 
 ## Performance Metrics
@@ -146,6 +146,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 next
 | Phase 25 P02 | 20 | 2 tasks | 2 files |
 | Phase 26 P01 | 4 | 2 tasks | 4 files |
 | Phase 26 P02 | 2 | 2 tasks | 2 files |
+| Phase 27-shopping-list-ui P01 | 1 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -333,6 +334,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 26]: shoppingList: null placeholders in index.ts return paths — Phase 27 wires the actual computeShoppingList call once sidebar integration is designed
 - [Phase 26]: scarcitySignals passed as parameter to computeRosterOptimization (not re-computed) — avoids calling computeEnhancedScarcity twice
 - [Phase 26]: Shopping list wrapped in try/catch returning null on failure — non-critical signal, engine must not crash if shopping list fails
+- [Phase 27-01]: Inner PositionGroupSection <details> elements collapsed by default, no group class to avoid Tailwind group-open interference at multiple nesting levels
+- [Phase 27-01]: optimization?.shoppingList ?? null prop threading handles both null optimization and null shoppingList states in EngineInsights gracefully
 
 ### Roadmap Evolution
 
