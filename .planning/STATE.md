@@ -147,6 +147,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 26 P01 | 4 | 2 tasks | 4 files |
 | Phase 26 P02 | 2 | 2 tasks | 2 files |
 | Phase 27-shopping-list-ui P01 | 1 | 2 tasks | 2 files |
+| Phase 28 P01 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -336,6 +337,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 26]: Shopping list wrapped in try/catch returning null on failure — non-critical signal, engine must not crash if shopping list fails
 - [Phase 27-01]: Inner PositionGroupSection <details> elements collapsed by default, no group class to avoid Tailwind group-open interference at multiple nesting levels
 - [Phase 27-01]: optimization?.shoppingList ?? null prop threading handles both null optimization and null shoppingList states in EngineInsights gracefully
+- [Phase 28]: Top-K=15 filter before softmax for O(n) simulation performance without quality loss
+- [Phase 28]: SimTeamState tracks both categoryTotals (counting) and componentTotals (rate) for complete standings computation
+- [Phase 28]: simulation: null placeholder in DraftEngineSignals return — Plan 02 wires actual compareDecisions computation
 
 ### Roadmap Evolution
 
@@ -357,6 +361,7 @@ Recent decisions affecting v1.1 work:
 - Phase 25 added: Projected standings engine — full-season category and overall rankings for all teams during draft with draft-progress weighting and sidebar integration
 - Phase 26 added: Per-Position Target Engine — per-position top N targets with combined priority scoring (scarcity + slots + budget fit), dynamic updates, multi-position eligibility (v2.0)
 - Phase 27 added: Shopping List UI — collapsible position groups replacing Top Targets section in EngineInsights (v2.0)
+- Phase 28 added: Forward-looking draft simulation — full draft completion Monte Carlo with standings-based decision comparison, nomination strategy, and win probability
 
 ### Pending Todos
 
