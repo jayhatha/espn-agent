@@ -3,6 +3,7 @@ import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
 import { useNarrator } from "../lib/use-narrator";
 import { useNarratorStore } from "../lib/narrator-state";
+import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
 import DraftNarrator from "./DraftNarrator";
@@ -12,7 +13,7 @@ import EngineInsights from "./EngineInsights";
 import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
-import StrategySetup from "./StrategySetup";
+
 
 export default function DraftSidebar() {
   const {
@@ -190,22 +191,39 @@ export default function DraftSidebar() {
                   currentAuctionPlayer.playerId !== undefined
                     ? espnDomAuctionValues[currentAuctionPlayer.playerId]
                     : undefined;
-                const espnDisplayValue =
-                  domEspnValue !== undefined
-                    ? domEspnValue
-                    : matchedAuction?.dollarValue;
 
-                if (espnDisplayValue === undefined && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
+                const fgValue = matchedAuction?.dollarValue;
+
+                // Compute FG vs market badge when both values exist
+                const fgBadge = (fgValue !== undefined && domEspnValue !== undefined)
+                  ? calculateFgVsMarket(fgValue, domEspnValue)
+                  : null;
+
+                if (domEspnValue === undefined && fgValue === undefined && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
                 return (
                   <div className="mt-1 space-y-0.5">
-                    {espnDisplayValue !== undefined && (
-                      <div className="text-xs text-content-secondary">
-                        ESPN Value: <span className="font-semibold">${espnDisplayValue}</span>
-                        {domEspnValue !== undefined && (
+                    {domEspnValue !== undefined ? (
+                      <div>
+                        <div className="text-xs text-content-secondary">Market Value</div>
+                        <div className="font-semibold text-sm text-content">
+                          ${domEspnValue}
                           <span className="ml-1 text-positive text-xs">(live)</span>
-                        )}
+                        </div>
+                        {fgBadge && (() => {
+                          const colors = getValueColorClasses(fgBadge.color);
+                          return (
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>
+                              {fgBadge.label}
+                            </span>
+                          );
+                        })()}
                       </div>
-                    )}
+                    ) : fgValue !== undefined ? (
+                      <div>
+                        <div className="text-xs text-content-secondary">FG Value</div>
+                        <div className="font-semibold text-sm text-content">${fgValue}</div>
+                      </div>
+                    ) : null}
                     {(matchedRanking?.tierName || matchedRanking?.externalRank) && (
                       <div className="flex items-center gap-1 justify-end">
                         {matchedRanking.tierName && (
@@ -243,8 +261,6 @@ export default function DraftSidebar() {
             )}
             <AuctionBudgetTracker engineSignals={engineSignals} />
             <EngineInsights engineSignals={engineSignals} />
-            {/* Strategy anchor/pivot config */}
-            <StrategySetup />
             <PositionScarcityAlerts />
             <AuctionRecommendations />
           </>

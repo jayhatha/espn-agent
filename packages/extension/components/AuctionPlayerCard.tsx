@@ -8,10 +8,7 @@ import {
 } from "@espn-fantasy/shared";
 import { useDraftStore } from "../lib/draft-state";
 import { calculateBudgetPacing } from "../lib/value-calculations";
-import {
-  calculateAuctionValue,
-  getValueColorClasses,
-} from "../lib/value-detection";
+import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
 
 function normalizePlayerName(name: string): string {
   return name
@@ -35,55 +32,56 @@ function formatNumber(value: unknown, digits: number): string {
 interface AuctionPlayerCardProps {
   player: AuctionValue;
   rank: number;
-  actualPrice?: number; // Actual draft price (if drafted)
+  actualPrice?: number;
 }
-
-type AuctionValueWithOptionalVbd = AuctionValue & {
-  vbdScore?: number;
-};
 
 export default function AuctionPlayerCard({
   player,
   rank,
   actualPrice,
 }: AuctionPlayerCardProps) {
-  const auctionPlayer = player as AuctionValueWithOptionalVbd;
   const { myRoster, rosterSize, rankings, espnDomAuctionValues } = useDraftStore();
 
-  // Prefer DOM-scraped ESPN value (live from the draft page table) over
-  // the backend-derived dollarValue stored on the AuctionValue object.
+  // Find player's ranking data (for external rank, tier, projected stats)
+  const normalizedName = normalizePlayerName(player.playerName);
+  const playerRanking = rankings.find((ranking) => {
+    if (ranking.playerId === player.playerId) return true;
+    return normalizePlayerName(ranking.playerName) === normalizedName;
+  });
+
+  // Display rank: external rank if available, otherwise list position
+  const displayRank = playerRanking?.externalRank ?? rank;
+
+  // Prefer DOM-scraped ESPN value (live from the draft page table)
   const espnDisplayValue =
     player.playerId && espnDomAuctionValues[player.playerId] !== undefined
       ? espnDomAuctionValues[player.playerId]
-      : player.dollarValue;
+      : null;
 
-  // Calculate value indicator
-  const valueIndicator = calculateAuctionValue(player, actualPrice ?? null);
-  const colorClasses = getValueColorClasses(valueIndicator.color);
+  // Primary dollar value is from FanGraphs auction CSV
+  const auctionDollarValue = player.dollarValue;
 
-  // Calculate if player is affordable
+  // ESPN ASV as primary market value; fall back to FG value when unavailable
+  const marketValue = espnDisplayValue ?? auctionDollarValue;
+
+  // FG comparison badge (only when ESPN ASV is available)
+  const fgIndicator = espnDisplayValue !== null
+    ? calculateFgVsMarket(auctionDollarValue, espnDisplayValue)
+    : null;
+
+  // Calculate if player is affordable (use market value for budget pacing)
   const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
-  const isAffordable = player.dollarValue <= pacing.recommendedMaxBid;
-  const isValuePick = player.dollarValue <= pacing.averageRemainingPerPlayer;
+  const isAffordable = marketValue <= pacing.recommendedMaxBid;
 
-  // Find player's projected stats from rankings
-  const normalizedPlayerName = normalizePlayerName(player.playerName);
-  const playerRanking = rankings.find((ranking) => {
-    if (ranking.playerId === player.playerId) {
-      return true;
-    }
-
-    return normalizePlayerName(ranking.playerName) === normalizedPlayerName;
-  });
   const projectedStats = playerRanking?.projectedStats || {};
 
-  const rankTextSize = rank >= 100 ? "text-xs" : "text-lg";
-  const isElite = rank <= 10;
+  const rankTextSize = displayRank >= 100 ? "text-xs" : "text-lg";
+  const isElite = displayRank <= 10;
 
   return (
     <div className="p-3 hover:bg-accent-light cursor-pointer transition-colors">
       <div className="flex items-start gap-3">
-        {/* Circular rank badge */}
+        {/* Circular rank badge — shows external rank */}
         <div
           className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-display ${rankTextSize} ${
             isElite
@@ -91,7 +89,7 @@ export default function AuctionPlayerCard({
               : "bg-surface-secondary text-content"
           }`}
         >
-          {rank}
+          {displayRank}
         </div>
 
         {/* Player info */}
@@ -107,35 +105,20 @@ export default function AuctionPlayerCard({
                   </span>
                 )}
               </div>
-              {(playerRanking?.tierName || playerRanking?.externalRank) && (
+              {(playerRanking?.tierName) && (
                 <div className="flex items-center gap-1 mt-0.5">
-                  {playerRanking.tierName && (
-                    <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
-                      {playerRanking.tierName}
-                    </span>
-                  )}
-                  {playerRanking.externalRank && (
-                    <span className="text-xs text-content-secondary">
-                      {playerRanking.rankSource || "PL"} #{playerRanking.externalRank}
+                  <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
+                    {playerRanking.tierName}
+                  </span>
+                  {playerRanking.rankSource && (
+                    <span className="text-xs text-content-tertiary">
+                      {playerRanking.rankSource}
                     </span>
                   )}
                 </div>
               )}
               {/* Value indicators */}
               <div className="flex gap-2 mt-2">
-                {valueIndicator.severity !== "fair" && (
-                  <span
-                    className={`text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
-                    title={`VBD $${player.dollarValue} vs actual ${actualPrice ? `$${actualPrice}` : "not drafted"}`}
-                  >
-                    {valueIndicator.label}
-                  </span>
-                )}
-                {!actualPrice && isValuePick && (
-                  <span className="text-xs bg-positive-light text-positive px-2 py-1 rounded">
-                    Value
-                  </span>
-                )}
                 {!actualPrice && !isAffordable && (
                   <span className="text-xs bg-negative-light text-negative px-2 py-1 rounded">
                     Over budget
@@ -145,16 +128,19 @@ export default function AuctionPlayerCard({
             </div>
             <div className="text-right shrink-0">
               <div className="text-h3 font-semibold text-content">
-                ${espnDisplayValue}
+                ${marketValue}
               </div>
-              {espnDisplayValue !== player.dollarValue && (
-                <div className="text-caption text-content-tertiary">
-                  VBD: ${player.dollarValue}
-                </div>
+              {espnDisplayValue === null && (
+                <div className="text-caption text-content-tertiary">FG</div>
               )}
-              <div className="text-caption text-content-tertiary">
-                VBD score: {formatNumber(auctionPlayer.vbdScore, 1)}
-              </div>
+              {fgIndicator && (() => {
+                const colors = getValueColorClasses(fgIndicator.color);
+                return (
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>
+                    {fgIndicator.label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
