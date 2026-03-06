@@ -22,8 +22,9 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     detectedRosterSlots,
   } = useDraftStore();
 
-  // Extract playerId separately — only changes on new nominations (not bid updates)
+  // Extract playerId and playerName separately — only changes on new nominations (not bid updates)
   const currentPlayerId = currentAuctionPlayer?.playerId;
+  const currentPlayerName = currentAuctionPlayer?.playerName;
 
   return useMemo(() => {
     // Only compute for auction drafts with data
@@ -44,6 +45,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       allTeamBudgets,
       leagueCategories,
       currentAuctionPlayerId: currentPlayerId,
+      currentAuctionPlayerName: currentPlayerName,
       espnDomAuctionValues,
     });
   }, [
@@ -60,6 +62,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     leagueCategories,
     draftFormat,
     currentPlayerId, // Recompute on new nomination (not bid changes)
+    currentPlayerName, // Name-based fallback for nominated player matching
     espnDomAuctionValues,
     detectedRosterSlots, // Recompute when roster slots are detected for the first time
   ]);

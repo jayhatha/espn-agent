@@ -22,9 +22,9 @@ import {
   fgAuctionHittersData,
   fgAuctionPitchersData,
 } from "../fangraphs-data";
-import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison } from "./types";
+import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison, DraftTargetRecommendation } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -114,7 +114,10 @@ function buildSimDraftState(
   myRemainingSlots: Record<string, number>,
   leagueAnalysis: LeagueAnalysisSignal | null,
 ): SimDraftState | null {
-  if (input.myTeamId == null || input.teamRosters.size < 3) return null;
+  if (input.myTeamId == null || input.teamRosters.size < 3) {
+    console.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
+    return null;
+  }
 
   const totalSlots = Object.values(activeSlots).reduce((s, v) => s + v, 0);
 
@@ -128,7 +131,7 @@ function buildSimDraftState(
   let myTeamIndex = -1;
 
   const teamStates: SimTeamState[] = teamIds.map((teamId, idx) => {
-    const isMyTeam = teamId === input.myTeamId;
+    const isMyTeam = teamId === input.myTeamId || teamId === "myTeam";
     if (isMyTeam) myTeamIndex = idx;
 
     // Budget
@@ -171,7 +174,10 @@ function buildSimDraftState(
     return { budget, slotsRemaining, categoryTotals, componentTotals };
   });
 
-  if (myTeamIndex === -1) return null;
+  if (myTeamIndex === -1) {
+    console.warn(`[DraftEngine] buildSimDraftState: myTeamId="${input.myTeamId}" not found in teamRosters keys: [${teamIds.join(', ')}]`);
+    return null;
+  }
 
   // Build availableIndices: players not yet drafted (not in allPicks by normalized name)
   const draftedNames = new Set<string>();
@@ -242,7 +248,7 @@ function computeRosterOptimization(
     let nominatedPlayer: PoolPlayer | undefined;
 
     if (input.currentAuctionPlayerId != null) {
-      // Try to find by matching ESPN id via auctionValues list
+      // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
       const nominated = input.auctionValues.find(
         av => av.playerId === input.currentAuctionPlayerId,
       );
@@ -250,51 +256,60 @@ function computeRosterOptimization(
         const nName = normalizeName(nominated.playerName ?? '');
         nominatedPlayer = allPlayers.find(p => p.normalizedName === nName);
       }
-    }
 
-    // Compute max bid for nominated player (or fallback to first player)
-    const targetPlayer = nominatedPlayer ?? allPlayers[0];
-
-    // Compute my current roster SGP by matching drafted players to FG pool
-    let myCurrentRosterSGP = 0;
-    for (const drafted of input.myRoster) {
-      const draftedNorm = normalizeName(drafted.playerName);
-      const poolIdx = allPlayers.findIndex(p => p.normalizedName === draftedNorm);
-      if (poolIdx >= 0) {
-        myCurrentRosterSGP += sgpValues[poolIdx] ?? 0;
+      // Strategy 2: Direct name match from DOM-observed player name
+      // Handles practice drafts where ESPN player IDs don't match FG/MLBAM IDs
+      if (!nominatedPlayer && input.currentAuctionPlayerName) {
+        const domName = normalizeName(input.currentAuctionPlayerName);
+        nominatedPlayer = allPlayers.find(p => p.normalizedName === domName);
       }
     }
 
-    maxBidResult = computeMaxBid(
-      targetPlayer,
-      allPlayers,
-      sgpValues,
-      myBudget,
-      remainingSlots,
-      opponentModel,
-      inflation.inflationFactor,
-    );
+    if (nominatedPlayer) {
+      // Compute max bid only when we have a real nominated player match
+      maxBidResult = computeMaxBid(
+        nominatedPlayer,
+        allPlayers,
+        sgpValues,
+        myBudget,
+        remainingSlots,
+        opponentModel,
+        inflation.inflationFactor,
+      );
 
-    // Opponent budgets for Monte Carlo
-    const opponentBudgets: number[] = [];
-    for (const [, budget] of opponentModel.teamBudgets) {
-      opponentBudgets.push(budget);
+      // Opponent budgets for Monte Carlo
+      const opponentBudgets: number[] = [];
+      for (const [, budget] of opponentModel.teamBudgets) {
+        opponentBudgets.push(budget);
+      }
+
+      // Compute my current roster SGP
+      let myCurrentRosterSGP = 0;
+      for (const drafted of input.myRoster) {
+        const draftedNorm = normalizeName(drafted.playerName);
+        const poolIdx = allPlayers.findIndex(p => p.normalizedName === draftedNorm);
+        if (poolIdx >= 0) {
+          myCurrentRosterSGP += sgpValues[poolIdx] ?? 0;
+        }
+      }
+
+      monteCarloResult = runMonteCarlo({
+        availablePlayers: allPlayers,
+        sgpValues,
+        myCurrentRoster: [],
+        myCurrentRosterSGP,
+        myBudget,
+        opponentBudgets,
+        rosterSlots: remainingSlots,
+        nominatedPlayer,
+        nominatedBid: maxBidResult.maxBid,
+        numSimulations: 200,
+      });
     }
 
-    monteCarloResult = runMonteCarlo({
-      availablePlayers: allPlayers,
-      sgpValues,
-      myCurrentRoster: [],
-      myCurrentRosterSGP,
-      myBudget,
-      opponentBudgets,
-      rosterSlots: remainingSlots,
-      nominatedPlayer,
-      nominatedBid: maxBidResult.maxBid,
-      numSimulations: 200,
-    });
-
-    cachedBidResult = { maxBid: maxBidResult, monteCarlo: monteCarloResult };
+    cachedBidResult = maxBidResult && monteCarloResult
+      ? { maxBid: maxBidResult, monteCarlo: monteCarloResult }
+      : null;
     bidCacheKey = newBidCacheKey;
   }
 
@@ -412,14 +427,14 @@ function computeRosterOptimization(
   console.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
 
   return {
-    maxBid: maxBidResult.maxBid,
-    expectedMarketPrice: maxBidResult.expectedMarketPrice,
-    valueSurplus: maxBidResult.valueSurplus,
-    shouldBid: monteCarloResult.shouldBid,
+    maxBid: maxBidResult?.maxBid ?? 0,
+    expectedMarketPrice: maxBidResult?.expectedMarketPrice ?? 0,
+    valueSurplus: maxBidResult?.valueSurplus ?? 0,
+    shouldBid: monteCarloResult?.shouldBid ?? false,
     topTargets,
     opponentPressure: opponentModel.competitionFactors,
-    simulationEV: monteCarloResult.expectedTeamValue,
-    simulationStdDev: monteCarloResult.valueStdDev,
+    simulationEV: monteCarloResult?.expectedTeamValue ?? 0,
+    simulationStdDev: monteCarloResult?.valueStdDev ?? 0,
     computeTimeMs: elapsed,
     shoppingList,
   };
@@ -676,18 +691,24 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   if (newSimCacheKey === simulationCacheKey && cachedSimulation !== null) {
     simulation = cachedSimulation;
   } else if (
-    optimization !== null &&
-    input.leagueCategories.length > 0 &&
-    input.teamRosters.size >= 3 &&
-    input.myTeamId != null
+    optimization === null ||
+    input.leagueCategories.length === 0 ||
+    input.teamRosters.size < 3 ||
+    input.myTeamId == null
   ) {
-    // Performance safeguard: skip simulation in early draft (< 10% picks made)
+    console.warn(
+      `[DraftEngine] Simulation skipped: optimization=${optimization != null}, categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
+    );
+  } else {
+    // Performance safeguard: skip simulation in very early draft (< 5% picks made)
     const totalPicksExpected = input.totalTeams * input.rosterSize;
     const draftProgressFraction = totalPicksExpected > 0
       ? input.allPicks.length / totalPicksExpected
       : 0;
 
-    if (draftProgressFraction >= 0.1) {
+    console.warn(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
+
+    if (draftProgressFraction >= 0.05) {
       try {
         const simT0 = performance.now();
 
@@ -700,60 +721,147 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
           leagueAnalysis,
         );
 
-        if (simState !== null) {
+        if (simState === null) {
+          console.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
+        } else {
+          console.warn(`[DraftEngine] Simulation starting: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
           const SIMS_PER_DECISION = 200;
           const TEMPERATURE = 1.0;
 
           // Baseline win probability (no decision scenario)
-          const baselineSimResults: number[][] = [];
-          for (let s = 0; s < SIMS_PER_DECISION; s++) {
-            const completed = simulateFullDraft(
-              allPlayersOpt, sgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
+          let winProbability: ReturnType<typeof aggregateOutcomes> | null = null;
+          try {
+            const baselineSimResults: number[][] = [];
+            for (let s = 0; s < SIMS_PER_DECISION; s++) {
+              const completed = simulateFullDraft(
+                allPlayersOpt, sgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
+              );
+              baselineSimResults.push(
+                computeSimStandings(completed.teamStates, input.leagueCategories),
+              );
+            }
+            winProbability = aggregateOutcomes(
+              simState.myTeamIndex, baselineSimResults, simState.teamStates.length,
             );
-            baselineSimResults.push(
-              computeSimStandings(completed.teamStates, input.leagueCategories),
-            );
+            console.warn(`[DraftEngine] Baseline sim done: expectedFinish=${winProbability.expectedFinish.toFixed(1)}, winProb=${(winProbability.winProbability*100).toFixed(0)}%`);
+          } catch (e) {
+            console.warn('[DraftEngine] Baseline simulation crashed:', e);
           }
-          const winProbability = aggregateOutcomes(
-            simState.myTeamIndex, baselineSimResults, simState.teamStates.length,
-          );
 
           // Decision comparison (bid vs pass) when a player is nominated
           let currentDecision: DecisionComparison | null = null;
-          if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
-            const nominated = input.auctionValues.find(
-              av => av.playerId === input.currentAuctionPlayerId,
-            );
-            if (nominated) {
-              const nName = normalizeName(nominated.playerName ?? '');
-              const nomIdx = allPlayersOpt.findIndex(p => p.normalizedName === nName);
+          try {
+            if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
+              let nomIdx = -1;
+
+              // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
+              const nominated = input.auctionValues.find(
+                av => av.playerId === input.currentAuctionPlayerId,
+              );
+              if (nominated) {
+                const nName = normalizeName(nominated.playerName ?? '');
+                nomIdx = allPlayersOpt.findIndex(p => p.normalizedName === nName);
+              }
+
+              // Strategy 2: Direct name match from DOM-observed player name
+              if (nomIdx < 0 && input.currentAuctionPlayerName) {
+                const domName = normalizeName(input.currentAuctionPlayerName);
+                const domIdx = allPlayersOpt.findIndex(p => p.normalizedName === domName);
+                if (domIdx >= 0) nomIdx = domIdx;
+              }
+
               if (nomIdx >= 0) {
-                const candidateActions: CandidateAction[] = [
-                  { type: "bid", label: `Bid $${optimization.maxBid}`, playerIndex: nomIdx, bidPrice: optimization.maxBid },
-                  { type: "pass", label: "Pass", playerIndex: nomIdx },
-                ];
-                currentDecision = compareDecisions(
-                  candidateActions, simState, allPlayersOpt, sgpValuesOpt,
-                  input.leagueCategories, SIMS_PER_DECISION, TEMPERATURE,
-                );
+                  const candidateActions: CandidateAction[] = [
+                    { type: "bid", label: `Bid $${optimization.maxBid}`, playerIndex: nomIdx, bidPrice: optimization.maxBid },
+                    { type: "pass", label: "Pass", playerIndex: nomIdx },
+                  ];
+                  currentDecision = compareDecisions(
+                    candidateActions, simState, allPlayersOpt, sgpValuesOpt,
+                    input.leagueCategories, SIMS_PER_DECISION, TEMPERATURE,
+                  );
               }
             }
+          } catch (e) {
+            console.warn('[DraftEngine] Decision comparison crashed:', e);
           }
 
           // Nomination strategy
           let nominationStrategy: ForwardSimulationSignal['nominationStrategy'] = null;
-          const myIdx = simState.myTeamIndex;
-          const oppStates = simState.teamStates.filter((_, i) => i !== myIdx);
-          if (oppStates.length > 0) {
-            const availableForNom = Array.from(simState.availableIndices)
-              .map(i => allPlayersOpt[i])
-              .filter((p): p is PoolPlayer => p !== undefined);
-            const availableSgps = Array.from(simState.availableIndices)
-              .map(i => sgpValuesOpt[i] ?? 0);
-            nominationStrategy = recommendNomination(
-              availableForNom, availableSgps,
-              simState.teamStates[myIdx], opponentModelOpt, oppStates, 5,
-            );
+          try {
+            const myIdx = simState.myTeamIndex;
+            const oppStates = simState.teamStates.filter((_, i) => i !== myIdx);
+            if (oppStates.length > 0) {
+              const availableForNom = Array.from(simState.availableIndices)
+                .map(i => allPlayersOpt[i])
+                .filter((p): p is PoolPlayer => p !== undefined);
+              const availableSgps = Array.from(simState.availableIndices)
+                .map(i => sgpValuesOpt[i] ?? 0);
+              nominationStrategy = recommendNomination(
+                availableForNom, availableSgps,
+                simState.teamStates[myIdx], opponentModelOpt, oppStates, 5,
+              );
+            }
+          } catch (e) {
+            console.warn('[DraftEngine] Nomination strategy crashed:', e);
+          }
+
+          // Draft Targets — simulate top shopping list candidates to rank by win probability
+          let draftTargets: DraftTargetRecommendation[] | null = null;
+          try {
+            const shoppingList = optimization?.shoppingList;
+            if (shoppingList != null && shoppingList.groups.length > 0) {
+              // Collect top candidate per position group (max 5)
+              const candidates: Array<{ name: string; pos: string; idx: number; bid: number }> = [];
+              const seen = new Set<number>();
+              for (const group of shoppingList.groups) {
+                for (const target of group.targets) {
+                  if (candidates.length >= 5) break;
+                  // Find player index in allPlayersOpt
+                  const pIdx = allPlayersOpt.findIndex(
+                    p => p.normalizedName === normalizeName(target.playerName),
+                  );
+                  if (pIdx >= 0 && !seen.has(pIdx)) {
+                    seen.add(pIdx);
+                    candidates.push({
+                      name: target.playerName,
+                      pos: group.position,
+                      idx: pIdx,
+                      bid: target.maxBid,
+                    });
+                  }
+                }
+                if (candidates.length >= 5) break;
+              }
+
+              if (candidates.length > 0) {
+                const targetActions: CandidateAction[] = candidates.map(c => ({
+                  type: "bid" as const,
+                  label: c.name,
+                  playerIndex: c.idx,
+                  bidPrice: c.bid,
+                }));
+
+                const SIMS_PER_TARGET = 100;
+                const targetComparison = compareDecisions(
+                  targetActions, simState, allPlayersOpt, sgpValuesOpt,
+                  input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
+                );
+
+                draftTargets = targetComparison.decisions
+                  .map((d, i) => ({
+                    playerName: candidates[i].name,
+                    position: candidates[i].pos,
+                    playerIndex: candidates[i].idx,
+                    bidPrice: candidates[i].bid,
+                    expectedFinish: d.outcome.expectedFinish,
+                    winProbability: d.outcome.winProbability,
+                    top3Probability: d.outcome.top3Probability,
+                  }))
+                  .sort((a, b) => b.winProbability - a.winProbability);
+              }
+            }
+          } catch (e) {
+            console.warn('[DraftEngine] Draft targets crashed:', e);
           }
 
           const simElapsed = performance.now() - simT0;
@@ -766,6 +874,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
             currentDecision,
             winProbability,
             nominationStrategy,
+            draftTargets,
             computeTimeMs: Math.round(simElapsed * 10) / 10,
           };
         }

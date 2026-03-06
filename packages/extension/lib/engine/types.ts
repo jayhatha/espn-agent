@@ -100,6 +100,7 @@ export interface DraftEngineInput {
   allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>;
   leagueCategories: Category[];
   currentAuctionPlayerId?: number;
+  currentAuctionPlayerName?: string;
   espnDomAuctionValues?: Record<number, number>;
 }
 
@@ -329,9 +330,20 @@ export interface NominationRecommendation {
   trapScore: number;            // 0-1, higher = better trap nomination
 }
 
+export interface DraftTargetRecommendation {
+  playerName: string;
+  position: string;
+  playerIndex: number;
+  bidPrice: number;
+  expectedFinish: number;
+  winProbability: number;
+  top3Probability: number;
+}
+
 export interface ForwardSimulationSignal {
   currentDecision: DecisionComparison | null;  // Bid vs pass comparison when player nominated
   winProbability: SimulationOutcome | null;     // Current baseline win probability
   nominationStrategy: NominationRecommendation[] | null;  // Top 3-5 nominations
+  draftTargets: DraftTargetRecommendation[] | null;  // Top candidates ranked by sim win probability
   computeTimeMs: number;
 }
