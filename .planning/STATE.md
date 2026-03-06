@@ -10,14 +10,14 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 26 — Per-Position Target Engine
-Plan: Not started
-Status: Roadmap created, ready to plan Phase 26
-Last activity: 2026-03-05 — v2.0 roadmap created (Phases 26-27)
+Plan: 01 complete, ready for Plan 02 (if exists)
+Status: Plan 26-01 complete — computeShoppingList + types + 18 tests
+Last activity: 2026-03-06 — Phase 26 Plan 01 complete (shopping list computation engine)
 
-Progress: v2.0 Phase 26-27 | 0/2 phases started
+Progress: v2.0 Phase 26-27 | 1 plan complete in Phase 26
 
 ```
-[                                        ] 0% v2.0
+[###########                             ] 25% v2.0
 ```
 
 ## Performance Metrics
@@ -144,6 +144,7 @@ Progress: v2.0 Phase 26-27 | 0/2 phases started
 | Phase quick-44 P01 | 2 | 1 tasks | 1 files |
 | Phase 25 P01 | 7 | 2 tasks | 4 files |
 | Phase 25 P02 | 20 | 2 tasks | 2 files |
+| Phase 26 P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -326,6 +327,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 25]: projectedStandings passed as parameter to computeRosterOptimization (not re-computed inside) — avoids double computation, keeps cache logic centralized
 - [Phase 25]: Weak-category boost multiplicative on top of positional need boost (30% per weak category, capped at 2x) — independent signals that compose without swamping each other
 - [Phase 25]: isMyTeam detection uses projectedOverallRank comparison (not teamId) in EngineInsights JSX — avoids threading myTeamId into JSX while ranks are unique
+- [Phase 26]: computeShoppingList uses quick heuristic (not binary search computeMaxBid) for max bid — per-target pricing at scale must be O(n), not O(n*log) per player
+- [Phase 26]: needByPosition drives position groups — positions with 0 unfilled slots never appear in output, enforcing PRIO-02 at the input boundary
+- [Phase 26]: shoppingList: null placeholders in index.ts return paths — Phase 27 wires the actual computeShoppingList call once sidebar integration is designed
 
 ### Roadmap Evolution
 

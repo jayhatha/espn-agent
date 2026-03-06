@@ -435,7 +435,7 @@ Plans:
   4. Positions with zero unfilled roster slots are excluded from the output entirely
   5. Multi-position eligible players (e.g., 1B/3B) appear as candidates under each position they qualify for
   6. Shopping list recomputes correctly after each pick — filled positions drop off, scarcity updates propagate, and position ordering re-sorts
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 26-01-PLAN.md — Shopping list types, computeShoppingList pure function with priority scoring and multi-position eligibility (TDD)
@@ -487,5 +487,5 @@ Plans:
 | 23. Roster Optimization Engine | v1.4 | 3/3 | Complete | 2026-03-05 |
 | 24. Narrator Optimization Signals | v1.4 | 1/1 | Complete | 2026-03-05 |
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
-| 26. Per-Position Target Engine | v2.0 | 0/2 | Planning | - |
+| 26. Per-Position Target Engine | 1/2 | In Progress|  | - |
 | 27. Shopping List UI | v2.0 | 0/TBD | Not started | - |
