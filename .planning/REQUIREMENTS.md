@@ -9,17 +9,17 @@ Requirements for Position Shopping List milestone. Each maps to roadmap phases.
 
 ### Engine — Position Targets (TARG)
 
-- [ ] **TARG-01**: Engine computes top N available players per unfilled roster position, ranked by adjusted SGP value
-- [ ] **TARG-02**: Each target includes max bid estimate and expected market price (opponent model)
-- [ ] **TARG-03**: Positions are ordered by a combined priority score blending scarcity urgency, empty roster slot count, and budget fit
-- [ ] **TARG-04**: Position targets update dynamically as players are drafted and roster fills
-- [ ] **TARG-05**: Multi-position eligible players appear under each position they qualify for
+- [x] **TARG-01**: Engine computes top N available players per unfilled roster position, ranked by adjusted SGP value
+- [x] **TARG-02**: Each target includes max bid estimate and expected market price (opponent model)
+- [x] **TARG-03**: Positions are ordered by a combined priority score blending scarcity urgency, empty roster slot count, and budget fit
+- [x] **TARG-04**: Position targets update dynamically as players are drafted and roster fills
+- [x] **TARG-05**: Multi-position eligible players appear under each position they qualify for
 
 ### Engine — Priority Scoring (PRIO)
 
-- [ ] **PRIO-01**: Combined position priority score weights scarcity index, number of empty slots at that position, and remaining budget relative to target prices
-- [ ] **PRIO-02**: Positions with zero unfilled slots are excluded from the shopping list
-- [ ] **PRIO-03**: Priority re-sorts after each pick as scarcity and roster state change
+- [x] **PRIO-01**: Combined position priority score weights scarcity index, number of empty slots at that position, and remaining budget relative to target prices
+- [x] **PRIO-02**: Positions with zero unfilled slots are excluded from the shopping list
+- [x] **PRIO-03**: Priority re-sorts after each pick as scarcity and roster state change
 
 ### UI — Shopping List Display (SHOP)
 
@@ -109,14 +109,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIME-01 | Phase 7 | Complete |
 | TIME-02 | Phase 8 | Complete |
 | TIME-03 | Phase 8 | Complete |
-| TARG-01 | Phase 26 | Pending |
-| TARG-02 | Phase 26 | Pending |
-| TARG-03 | Phase 26 | Pending |
-| TARG-04 | Phase 26 | Pending |
-| TARG-05 | Phase 26 | Pending |
-| PRIO-01 | Phase 26 | Pending |
-| PRIO-02 | Phase 26 | Pending |
-| PRIO-03 | Phase 26 | Pending |
+| TARG-01 | Phase 26 | Complete |
+| TARG-02 | Phase 26 | Complete |
+| TARG-03 | Phase 26 | Complete |
+| TARG-04 | Phase 26 | Complete |
+| TARG-05 | Phase 26 | Complete |
+| PRIO-01 | Phase 26 | Complete |
+| PRIO-02 | Phase 26 | Complete |
+| PRIO-03 | Phase 26 | Complete |
 | SHOP-01 | Phase 27 | Pending |
 | SHOP-02 | Phase 27 | Pending |
 | SHOP-03 | Phase 27 | Pending |

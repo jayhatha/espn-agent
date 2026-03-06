@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 26 — Per-Position Target Engine
-Plan: 01 complete, ready for Plan 02 (if exists)
-Status: Plan 26-01 complete — computeShoppingList + types + 18 tests
-Last activity: 2026-03-06 — Phase 26 Plan 01 complete (shopping list computation engine)
+Plan: 02 complete — Phase 26 COMPLETE
+Status: All 2 plans in Phase 26 complete — engine ready for Phase 27 UI integration
+Last activity: 2026-03-06 — Phase 26 Plan 02 complete (shopping list wired into draft engine)
 
-Progress: v2.0 Phase 26-27 | 1 plan complete in Phase 26
+Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 next
 
 ```
 [###########                             ] 25% v2.0
@@ -145,6 +145,7 @@ Progress: v2.0 Phase 26-27 | 1 plan complete in Phase 26
 | Phase 25 P01 | 7 | 2 tasks | 4 files |
 | Phase 25 P02 | 20 | 2 tasks | 2 files |
 | Phase 26 P01 | 4 | 2 tasks | 4 files |
+| Phase 26 P02 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -330,6 +331,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 26]: computeShoppingList uses quick heuristic (not binary search computeMaxBid) for max bid — per-target pricing at scale must be O(n), not O(n*log) per player
 - [Phase 26]: needByPosition drives position groups — positions with 0 unfilled slots never appear in output, enforcing PRIO-02 at the input boundary
 - [Phase 26]: shoppingList: null placeholders in index.ts return paths — Phase 27 wires the actual computeShoppingList call once sidebar integration is designed
+- [Phase 26]: scarcitySignals passed as parameter to computeRosterOptimization (not re-computed) — avoids calling computeEnhancedScarcity twice
+- [Phase 26]: Shopping list wrapped in try/catch returning null on failure — non-critical signal, engine must not crash if shopping list fails
 
 ### Roadmap Evolution
 
