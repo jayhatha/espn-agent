@@ -160,12 +160,12 @@ export default defineContentScript({
           { category_id: "HR", stat_key: "HR", type: "COUNTING", direction: "HIGHER_BETTER", name: "Home Runs" },
           { category_id: "RBI", stat_key: "RBI", type: "COUNTING", direction: "HIGHER_BETTER", name: "RBI" },
           { category_id: "SB", stat_key: "SB", type: "COUNTING", direction: "HIGHER_BETTER", name: "Stolen Bases" },
-          { category_id: "AVG", stat_key: "AVG", type: "RATE", direction: "HIGHER_BETTER", name: "Batting Average" },
+          { category_id: "AVG", stat_key: "AVG", type: "RATE", direction: "HIGHER_BETTER", name: "Batting Average", formula_id: "avg", required_components: ["AB", "H"] },
           { category_id: "W", stat_key: "W", type: "COUNTING", direction: "HIGHER_BETTER", name: "Wins" },
           { category_id: "SV", stat_key: "SV", type: "COUNTING", direction: "HIGHER_BETTER", name: "Saves" },
           { category_id: "K", stat_key: "K", type: "COUNTING", direction: "HIGHER_BETTER", name: "Strikeouts" },
-          { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA" },
-          { category_id: "WHIP", stat_key: "WHIP", type: "RATE", direction: "LOWER_BETTER", name: "WHIP" },
+          { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA", formula_id: "era", required_components: ["ER", "IP"] },
+          { category_id: "WHIP", stat_key: "WHIP", type: "RATE", direction: "LOWER_BETTER", name: "WHIP", formula_id: "whip", required_components: ["IP", "H", "BB"] },
         ],
         rosterSlots: {
           "C": 1,
@@ -204,6 +204,10 @@ export default defineContentScript({
       rosterSize: totalRosterSize,
       myTeamId: teamId ?? "user",
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
+    });
+    console.log("[ESPN Draft Assistant] Draft state initialized (roster cleared)", {
+      myRoster: useDraftStore.getState().myRoster.length,
+      allPicks: useDraftStore.getState().allPicks.length,
     });
     // Store league categories for the deterministic draft engine
     if (cachedLeagueConfig) {
