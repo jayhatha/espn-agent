@@ -5,19 +5,19 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 24 - Feed Phase 23 Optimization Signals to Narrator (COMPLETE)
+**Current focus:** Phase 25 - Projected Standings Engine (COMPLETE)
 
 ## Current Position
 
-Phase: 24 (Feed Phase 23 Optimization Signals to Narrator) - COMPLETE
-Plan: 1 of 1 complete (all plans done)
+Phase: 25 (Projected Standings Engine) - COMPLETE
+Plan: 2 of 2 complete (all plans done)
 Status: Complete
-Last activity: 2026-03-06 - Completed quick-44: fix roster count hydration race condition
+Last activity: 2026-03-06 - Completed 25-02: projected standings wired as step 5c, weak-category boost, sidebar section
 
-Progress: Phase 24: [██████████] 100% (1 of 1 plans complete)
+Progress: Phase 25: [██████████] 100% (2 of 2 plans complete)
 
-Last session: 2026-03-05
-Stopped at: Completed 24-01-PLAN.md: optimization fields in NarratorPayload, nomination trigger, backend OPTIMIZATION prompt section
+Last session: 2026-03-06
+Stopped at: Completed 25-02-PLAN.md: projected standings wired as step 5c in engine orchestrator, weak-category boost for top targets, sidebar Projected Standings section in EngineInsights
 
 ## Performance Metrics
 
@@ -142,6 +142,7 @@ Stopped at: Completed 24-01-PLAN.md: optimization fields in NarratorPayload, nom
 | Phase quick-43 P01 | 2 | 1 tasks | 1 files |
 | Phase quick-44 P01 | 2 | 1 tasks | 1 files |
 | Phase 25 P01 | 7 | 2 tasks | 4 files |
+| Phase 25 P02 | 20 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -321,6 +322,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 25]: Median undrafted pool stats for replacement level — outlier-resistant filler prevents elite players skewing projections
 - [Phase 25]: teamDraftedTotals optional on LeagueAnalysisSignal — backwards-compatible, existing consumers unaffected
 - [Phase 25]: Minimum 3 teams guard in computeProjectedStandings — degenerate standings rankings require at least 3 data points
+- [Phase 25]: projectedStandings passed as parameter to computeRosterOptimization (not re-computed inside) — avoids double computation, keeps cache logic centralized
+- [Phase 25]: Weak-category boost multiplicative on top of positional need boost (30% per weak category, capped at 2x) — independent signals that compose without swamping each other
+- [Phase 25]: isMyTeam detection uses projectedOverallRank comparison (not teamId) in EngineInsights JSX — avoids threading myTeamId into JSX while ranks are unique
 
 ### Roadmap Evolution
 
