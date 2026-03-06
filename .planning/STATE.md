@@ -152,6 +152,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 28 P03 | 1 | 1 tasks | 1 files |
 | Phase quick-45 P01 | 3 | 2 tasks | 5 files |
 | Phase quick-46 PP01 | 2 | 2 tasks | 3 files |
+| Phase quick-47 PP01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -355,6 +356,7 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-46]: formula_id added inline to content.tsx fallback instead of importing getDefault5x5Categories -- avoids DOM dependency complications
 - [Phase quick-46]: Budget estimation derives initial budget from user remainingBudget+mySpent then subtracts opponent known spend from allPicks
 - [Phase quick-46]: Standard roto tie-handling: tied teams share averaged points across tied positions instead of arbitrary sort-order assignment
+- [Phase quick-47]: ESPN ASV shown as primary dollar number; FG value demoted to colored comparison badge with graceful FG label fallback
 
 ### Roadmap Evolution
 
@@ -438,8 +440,9 @@ None yet.
 | 44 | Fix roster count not resetting on draft page reload — await Zustand persist hydration before initializeDraft | 2026-03-06 | 0a9dd98 | ✅ | [44-fix-roster-count-not-resetting-on-draft-](./quick/44-fix-roster-count-not-resetting-on-draft-/) |
 | 45 | Bug fixes: skip backend for practice drafts, normalize inflation, fix nominated player matching for max bid/narrator | 2026-03-06 | 782eefe | ✅ | [45-bug-fixes-remove-espn-league-connection-](./quick/45-bug-fixes-remove-espn-league-connection-/) |
 | 46 | Fix win probability showing 100%: add formula_id to default RATE categories, fix opponent budget fallback, add roto tie-handling | 2026-03-06 | 1996647 | ✅ | [46-fix-win-probability-showing-100-with-top](./quick/46-fix-win-probability-showing-100-with-top/) |
+| 47 | Use ESPN ASV as market value (primary display), FanGraphs as over/under comparison badge | 2026-03-06 | de20c00 | ✅ | [47-use-espn-asv-as-market-value-fangraphs-as-over-under](./quick/47-use-espn-asv-as-market-value-fangraphs-as-over-under/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 46: fix win probability (formula_id, opponent budget, tie-handling)
+Last activity: 2026-03-06 - Completed quick task 47: ESPN ASV as primary market value with FG over/under badge
 Resume file: None
