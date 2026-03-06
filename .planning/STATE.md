@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 Phase: 24 (Feed Phase 23 Optimization Signals to Narrator) - COMPLETE
 Plan: 1 of 1 complete (all plans done)
 Status: Complete
-Last activity: 2026-03-05 - Completed quick-43: positional need weighting in top targets
+Last activity: 2026-03-06 - Completed quick-44: fix roster count hydration race condition
 
 Progress: Phase 24: [██████████] 100% (1 of 1 plans complete)
 
@@ -401,6 +401,7 @@ None yet.
 | 41 | League-wide category analysis using FanGraphs projections: per-team stat totals, category rankings, demand signals, strategic recommendations in sidebar | 2026-03-05 | 9bdf829 | ✅ | [41-use-projections-to-evaluate-relative-tea](./quick/41-use-projections-to-evaluate-relative-tea/) |
 | 42 | Fix inflated max bid recommendations for low-value players by capping to 2x player dollar value | 2026-03-05 | 64364f1 | ✅ | [42-fix-inflated-max-bid-recommendations-for](./quick/42-fix-inflated-max-bid-recommendations-for/) |
 | 43 | Top targets positional need weighting — boost players at positions with empty roster slots (50% SGP boost per empty slot) | 2026-03-05 | be22ca7 | ✅ | [43-top-targets-should-weight-positional-nee](./quick/43-top-targets-should-weight-positional-nee/) |
+| 44 | Fix roster count not resetting on draft page reload — await Zustand persist hydration before initializeDraft | 2026-03-06 | 0a9dd98 | ✅ | [44-fix-roster-count-not-resetting-on-draft-](./quick/44-fix-roster-count-not-resetting-on-draft-/) |
 
 ## Session Continuity
 
