@@ -67,6 +67,57 @@ export function detectRosterSlotsFromPlayersTable(): {
   return { rosterSlots, benchCount };
 }
 
+/**
+ * Detect roster size and position list from ESPN Position Tracker DOM.
+ *
+ * DOM structure:
+ *   .roster-limits
+ *     div > "Position Tracker" | "X/N Players"   ← N is total roster size
+ *     div > [position divs: "C<span>0</span>", "1B<span>1</span>", ...]
+ *
+ * The span values are FILLED counts (not slot limits), but the "X/N Players"
+ * header gives us the total roster size and the position names tell us which
+ * positions this league uses.
+ */
+export function detectRosterSizeFromPositionTracker(): {
+  rosterSize: number;
+  positions: string[];
+} | null {
+  const container = document.querySelector(".roster-limits");
+  if (!container) {
+    return null;
+  }
+
+  // Parse "X/N Players" from text content
+  const text = container.textContent || "";
+  const match = text.match(/(\d+)\s*\/\s*(\d+)\s*Players/i);
+  if (!match) {
+    return null;
+  }
+
+  const rosterSize = parseInt(match[2], 10);
+  if (!rosterSize || rosterSize < 10 || rosterSize > 50) {
+    return null; // Sanity check
+  }
+
+  // Extract position names from child divs (e.g., "C", "1B", "OF", "SP")
+  const positions: string[] = [];
+  const positionDivs = container.querySelectorAll(".dib");
+  positionDivs.forEach((div) => {
+    // Text content is like "C0" or "OF3" — position name is before the span
+    const posText = div.childNodes[0]?.textContent?.trim();
+    if (posText && /^[A-Z0-9/]+$/i.test(posText)) {
+      positions.push(posText.toUpperCase());
+    }
+  });
+
+  console.log(
+    `[ESPN Draft Assistant] Position Tracker: rosterSize=${rosterSize}, positions=[${positions.join(", ")}]`,
+  );
+
+  return { rosterSize, positions };
+}
+
 export interface DetectionResult {
   config: (DraftConfiguration & { budget?: number }) | null;
   confidence: "high" | "low" | "failed";

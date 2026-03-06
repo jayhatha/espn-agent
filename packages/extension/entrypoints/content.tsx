@@ -19,7 +19,7 @@ import {
   resolveBackendLeagueId,
   throttle,
 } from "../lib/api-client";
-import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets, detectRosterSlotsFromPlayersTable } from "../lib/draft-config-detector";
+import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets, detectRosterSlotsFromPlayersTable, detectRosterSizeFromPositionTracker } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
@@ -229,6 +229,12 @@ export default defineContentScript({
       useDraftStore.getState().setDetectedRosterSlots(playersTableSlots.rosterSlots);
     }
 
+    // Detect roster size from Position Tracker DOM (e.g., "10/28 Players")
+    const positionTracker = detectRosterSizeFromPositionTracker();
+    if (positionTracker) {
+      useDraftStore.setState({ rosterSize: positionTracker.rosterSize });
+    }
+
     // Retry roster slot detection after DOM stabilizes (players-table may load late)
     setTimeout(() => {
       if (!useDraftStore.getState().detectedRosterSlots) {
@@ -236,6 +242,13 @@ export default defineContentScript({
         if (retrySlots) {
           useDraftStore.getState().setDetectedRosterSlots(retrySlots.rosterSlots);
           console.log("[ESPN Draft Assistant] Roster slots detected on retry");
+        }
+      }
+      // Also retry position tracker detection
+      if (!positionTracker) {
+        const retryTracker = detectRosterSizeFromPositionTracker();
+        if (retryTracker) {
+          useDraftStore.setState({ rosterSize: retryTracker.rosterSize });
         }
       }
     }, 3000);
@@ -562,6 +575,12 @@ export default defineContentScript({
           if (import.meta.env.DEV) {
             console.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
           }
+        }
+        // Update rosterSize from Position Tracker if not yet detected
+        const tracker = detectRosterSizeFromPositionTracker();
+        if (tracker && tracker.rosterSize !== useDraftStore.getState().rosterSize) {
+          useDraftStore.setState({ rosterSize: tracker.rosterSize });
+          console.log(`[ESPN Draft Assistant] Roster size updated from Position Tracker: ${tracker.rosterSize}`);
         }
       }, 5_000);
       console.log("[ESPN Draft Assistant] Started pick train budget polling (5s interval)");
