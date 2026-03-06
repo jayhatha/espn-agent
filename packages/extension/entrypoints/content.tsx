@@ -121,6 +121,25 @@ export default defineContentScript({
     const detection = detectLeagueConfig();
     configDetectionWarnings = detection.warnings;
 
+    // Wait for Zustand persist to finish hydrating from chrome.storage.local
+    // before touching store state. Without this, initializeDraft() clears
+    // myRoster/allPicks but the async merge() overwrites with stale data.
+    const waitForHydration = (): Promise<void> => {
+      return new Promise<void>((resolve) => {
+        if (useDraftStore.persist.hasHydrated()) {
+          resolve();
+          return;
+        }
+        const unsub = useDraftStore.persist.onFinishHydration(() => {
+          unsub();
+          resolve();
+        });
+      });
+    };
+
+    await waitForHydration();
+    console.log("[ESPN Draft Assistant] Store hydration complete");
+
     // Store warnings for UI display
     useDraftStore.getState().setConfigWarnings(detection.warnings);
 
