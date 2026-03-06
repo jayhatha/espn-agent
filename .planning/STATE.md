@@ -140,6 +140,7 @@ Stopped at: Completed 24-01-PLAN.md: optimization fields in NarratorPayload, nom
 | Phase 24 P01 | 4 | 2 tasks | 3 files |
 | Phase quick-42 P01 | 2 | 2 tasks | 4 files |
 | Phase quick-43 P01 | 2 | 1 tasks | 1 files |
+| Phase quick-44 P01 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -315,6 +316,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 24]: opponentPressure Record sorted descending, sliced to top 3 before crossing extension-to-backend boundary
 - [Phase 24]: Nomination trigger fires first in useEffect priority order so every new player gets immediate narration regardless of alert state
 - [Phase 24]: buildDedupeKey includes player name and shouldBid to prevent deduplication suppressing nomination-triggered calls
+- [Phase quick-44]: Zustand persist hydration gate: always await persist.hasHydrated()/onFinishHydration() before first getState() in async content scripts
 
 ### Roadmap Evolution
 
