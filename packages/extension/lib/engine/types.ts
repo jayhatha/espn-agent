@@ -139,6 +139,7 @@ export interface RosterOptimizationSignal {
   simulationEV: number;
   simulationStdDev: number;
   computeTimeMs: number;
+  shoppingList: ShoppingListSignal | null;
 }
 
 export interface TeamCategoryRanking {
@@ -165,6 +166,8 @@ export interface LeagueAnalysisSignal {
   computeTimeMs: number;
   /** Exposed for projected-standings.ts — teamId -> stat_key -> total. Optional: existing consumers unaffected. */
   teamDraftedTotals?: Map<string, Record<string, number>>;
+  /** Per-team summed components (H, AB, IP, ER, etc.) for rate stat recomposition in projected-standings. */
+  teamDraftedComponents?: Map<string, Record<string, number>>;
 }
 
 // ============================================================
@@ -177,6 +180,7 @@ export interface ProjectedTeamStanding {
   projectedRotoPts: number;        // Sum of category rank points (N, N-1, ..., 1)
   projectedOverallRank: number;    // 1 = best
   categoryRanks: Record<string, number>;  // stat_key -> rank (1-based)
+  categoryValues: Record<string, number>; // stat_key -> projected total value
   draftedPlayersCount: number;     // How many players this team has drafted
 }
 
@@ -230,6 +234,37 @@ export interface TargetRecommendation {
   dollarValue: number;
   maxBid: number;
   expectedMarketPrice: number;
+}
+
+/** A single player target within a position group */
+export interface PositionTarget {
+  playerName: string;
+  normalizedName: string;
+  positions: string[];        // All eligible positions (e.g., ["1B", "3B"])
+  sgpValue: number;           // Raw SGP
+  adjustedSgp: number;        // SGP with positional need + weak category boosts
+  dollarValue: number;        // FanGraphs auction dollar value
+  maxBid: number;             // Estimated max bid (SGP-share heuristic, NOT binary search)
+  expectedMarketPrice: number;// Opponent model estimate
+  valueSurplus: number;       // maxBid - expectedMarketPrice
+  isPitcher: boolean;
+}
+
+/** A position group in the shopping list */
+export interface PositionGroup {
+  position: string;           // e.g., "SS", "OF", "SP"
+  priorityScore: number;      // Combined priority (0-1 scale, higher = more urgent)
+  unfilledSlots: number;      // How many slots at this position are unfilled
+  scarcityIndex: number;      // From EnhancedScarcitySignal (0 if not found)
+  budgetFit: number;          // Fraction of targets affordable (0-1)
+  targets: PositionTarget[];  // Top N players, sorted by adjustedSgp descending
+}
+
+/** The complete shopping list signal */
+export interface ShoppingListSignal {
+  positionGroups: PositionGroup[];  // Sorted by priorityScore descending
+  totalTargets: number;             // Sum of all targets across groups
+  computeTimeMs: number;
 }
 
 export interface MonteCarloResult {

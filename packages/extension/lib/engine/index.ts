@@ -127,6 +127,7 @@ function computeRosterOptimization(
       simulationEV: 0,
       simulationStdDev: 0,
       computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
+      shoppingList: null,
     };
   }
 
@@ -258,6 +259,7 @@ function computeRosterOptimization(
       myBudget,
       remainingSlots,
       opponentModel,
+      inflation.inflationFactor,
     );
 
     // Opponent budgets for Monte Carlo
@@ -381,6 +383,7 @@ function computeRosterOptimization(
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
     computeTimeMs: elapsed,
+    shoppingList: null,
   };
 }
 
@@ -500,6 +503,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
           undraftedPlayers,
           input.rosterSize,
           input.totalTeams,
+          leagueAnalysis.teamDraftedComponents ?? new Map(),
         );
         projectedStandingsCacheKey = input.allPicks.length;
       }
