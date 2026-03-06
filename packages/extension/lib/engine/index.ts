@@ -1,4 +1,4 @@
-import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal } from "./types";
+import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal, ShoppingListSignal } from "./types";
 import { computeInflation } from "./inflation";
 import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
@@ -12,15 +12,16 @@ import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { runMonteCarlo } from "./monte-carlo";
+import { computeShoppingList } from "./shopping-list";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
   fgAuctionHittersData,
   fgAuctionPitchersData,
 } from "../fangraphs-data";
-import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal } from "./types";
+import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -92,6 +93,7 @@ function computeRosterOptimization(
   input: DraftEngineInput,
   inflation: { inflationFactor: number },
   projectedStandings: ProjectedStandingsSignal | null,
+  scarcitySignals: EnhancedScarcitySignal[],
 ): RosterOptimizationSignal {
   const t0 = performance.now();
 
@@ -370,6 +372,31 @@ function computeRosterOptimization(
     };
   });
 
+  // ----------------------------------------------------------------
+  // Per-position shopping list (Phase 26)
+  // ----------------------------------------------------------------
+  let shoppingList: ShoppingListSignal | null = null;
+  try {
+    const slT0 = performance.now();
+    shoppingList = computeShoppingList({
+      allPlayers,
+      sgpValues,
+      needByPosition,
+      remainingSlots,
+      scarcitySignals,
+      opponentModel,
+      myBudget,
+      weakCategories,
+      topN: 3,
+    });
+    const slElapsed = performance.now() - slT0;
+    if (slElapsed > 10) {
+      console.debug(`[DraftEngine] Shopping list: ${slElapsed.toFixed(1)}ms`);
+    }
+  } catch (e) {
+    console.warn("[DraftEngine] Shopping list computation failed:", e);
+  }
+
   const elapsed = Math.round((performance.now() - t0) * 10) / 10;
   console.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
 
@@ -383,7 +410,7 @@ function computeRosterOptimization(
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
     computeTimeMs: elapsed,
-    shoppingList: null,
+    shoppingList,
   };
 }
 
@@ -517,7 +544,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
     try {
-      optimization = computeRosterOptimization(input, inflation, projectedStandings);
+      optimization = computeRosterOptimization(input, inflation, projectedStandings, scarcity);
     } catch (e) {
       console.warn("[DraftEngine] Roster optimization failed:", e);
     }
