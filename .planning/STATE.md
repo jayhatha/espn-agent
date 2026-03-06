@@ -432,9 +432,9 @@ None yet.
 | 42 | Fix inflated max bid recommendations for low-value players by capping to 2x player dollar value | 2026-03-05 | 64364f1 | ✅ | [42-fix-inflated-max-bid-recommendations-for](./quick/42-fix-inflated-max-bid-recommendations-for/) |
 | 43 | Top targets positional need weighting — boost players at positions with empty roster slots (50% SGP boost per empty slot) | 2026-03-05 | be22ca7 | ✅ | [43-top-targets-should-weight-positional-nee](./quick/43-top-targets-should-weight-positional-nee/) |
 | 44 | Fix roster count not resetting on draft page reload — await Zustand persist hydration before initializeDraft | 2026-03-06 | 0a9dd98 | ✅ | [44-fix-roster-count-not-resetting-on-draft-](./quick/44-fix-roster-count-not-resetting-on-draft-/) |
+| 45 | Bug fixes: skip backend for practice drafts, normalize inflation, fix nominated player matching for max bid/narrator | 2026-03-06 | 782eefe | ✅ | [45-bug-fixes-remove-espn-league-connection-](./quick/45-bug-fixes-remove-espn-league-connection-/) |
 
 ## Session Continuity
 
-Last session: 2026-03-05
-Stopped at: v2.0 roadmap created — Phases 26-27 defined
+Last activity: 2026-03-06 - Completed quick task 45: bug fixes (practice draft, inflation, player matching)
 Resume file: None
