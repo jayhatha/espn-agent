@@ -1,5 +1,6 @@
 import React from "react";
 import type { DraftEngineSignals } from "../lib/engine";
+import ShoppingList from "./ShoppingList";
 
 interface EngineInsightsProps {
   engineSignals: DraftEngineSignals | null;
@@ -27,9 +28,6 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
   const topScarcity = [...scarcity]
     .sort((a, b) => b.scarcityIndex - a.scarcityIndex)
     .slice(0, 3);
-
-  // Top 3 targets from optimization signal
-  const topTargets = optimization?.topTargets?.slice(0, 3) ?? [];
 
   return (
     <div className="border-b border-surface-tertiary">
@@ -60,48 +58,8 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
         </div>
       </details>
 
-      {/* Top Targets section — only shown when optimization data is available */}
-      {topTargets.length > 0 && optimization != null && (
-        <details className="group">
-          <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
-            <span className="text-body-sm font-semibold text-content">Top Targets</span>
-            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
-          </summary>
-          <div className="px-3 pb-3 pt-2 bg-surface space-y-1.5">
-            {topTargets.map((target) => (
-              <div
-                key={`${target.playerName}-${target.position}`}
-                className="flex items-center justify-between text-body-xs"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-content">{target.playerName}</span>
-                  <span className="text-content-secondary">{target.position}</span>
-                </div>
-                <div className="flex items-center gap-2 text-right">
-                  <span
-                    className="text-body-xs font-semibold px-1.5 py-0.5 rounded bg-info-light text-info"
-                  >
-                    SGP: {target.sgpValue.toFixed(1)}
-                  </span>
-                  <span className="text-content-secondary">
-                    ~${target.expectedMarketPrice}
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {/* MC Simulation summary */}
-            <div className="mt-2 pt-2 border-t border-surface-tertiary">
-              <div className="text-body-xs text-content-secondary flex items-center gap-1.5">
-                <span className="font-semibold text-content-secondary">MC Simulation</span>
-                <span>
-                  EV: {optimization.simulationEV.toFixed(1)} ± {optimization.simulationStdDev.toFixed(1)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </details>
-      )}
+      {/* Shopping List section — replaces Top Targets */}
+      <ShoppingList shoppingList={optimization?.shoppingList ?? null} />
 
       {/* Top Scarcity section */}
       {topScarcity.length > 0 && (
@@ -301,7 +259,7 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
               })}
             </div>
 
-            {/* My category ranks — only shown when user's team is in standings */}
+            {/* My category ranks with projected values — only shown when user's team is in standings */}
             {projectedStandings.myTeamRank > 0 && (() => {
               const myStanding = projectedStandings.standings.find(
                 s => s.projectedOverallRank === projectedStandings.myTeamRank,
@@ -311,9 +269,11 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
               const categoryEntries = Object.entries(myStanding.categoryRanks);
               if (categoryEntries.length === 0) return null;
 
+              const RATE_STATS = new Set(["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]);
+
               return (
                 <div className="border-t border-surface-tertiary mt-2 pt-2">
-                  <div className="text-body-xs font-semibold text-content mb-1">My Category Ranks</div>
+                  <div className="text-body-xs font-semibold text-content mb-1">My Projected Categories</div>
                   <div className="space-y-1">
                     {categoryEntries.map(([statKey, rank]) => {
                       const isTop3 = rank <= 3;
@@ -323,15 +283,24 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
                         : isBottom3
                         ? "text-negative"
                         : "text-content-secondary";
+                      const value = myStanding.categoryValues?.[statKey];
+                      const isRate = RATE_STATS.has(statKey);
+                      const displayValue = value != null
+                        ? isRate ? value.toFixed(3) : Math.round(value).toString()
+                        : "—";
+
                       return (
                         <div
                           key={statKey}
                           className="flex items-center justify-between text-body-xs"
                         >
                           <span className="text-content">{statKey}</span>
-                          <span className={`font-semibold ${rankColorClass}`}>
-                            {rank}/{totalTeams}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-content-secondary">{displayValue}</span>
+                            <span className={`font-semibold ${rankColorClass}`}>
+                              {rank}/{totalTeams}
+                            </span>
+                          </div>
                         </div>
                       );
                     })}
