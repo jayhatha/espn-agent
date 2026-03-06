@@ -565,5 +565,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     optimization,
     leagueAnalysis,
     projectedStandings,
+    simulation: null,  // Phase 28 Plan 02 wires the forward-looking simulation signal
   };
 }

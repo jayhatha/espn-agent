@@ -123,14 +123,16 @@ function buildSimDraftState(
 // ============================================================
 
 describe("simulateFullDraft — completes all rosters", () => {
-  it("fills all roster slots for 12 teams with 200 player pool", () => {
-    const players = makePlayerPool(200);
-    const sgpValues = players.map((_, i) => Math.max(0.01, 10 - i * 0.05));
-    const state = buildSimDraftState(200, 12, 0, 260, FULL_ROSTER_SLOTS);
+  it("fills all roster slots for 12 teams with sufficiently large player pool", () => {
+    // Pool must significantly exceed total slots: 12 teams * 23 slots = 276 players minimum
+    // Use 400 to ensure enough position-eligible players exist for every slot type
+    const players = makePlayerPool(400);
+    const sgpValues = players.map((_, i) => Math.max(0.01, 10 - i * 0.025));
+    const state = buildSimDraftState(400, 12, 0, 260, FULL_ROSTER_SLOTS);
 
     const completed = simulateFullDraft(players, sgpValues, COUNTING_CATEGORIES, state, 1.0);
 
-    // Every team should have 0 slots remaining
+    // Every team should have 0 slots remaining (pool has enough players for all positions)
     for (const team of completed.teamStates) {
       const remaining = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
       expect(remaining).toBe(0);
@@ -138,9 +140,9 @@ describe("simulateFullDraft — completes all rosters", () => {
   });
 
   it("does not go negative budget for any team", () => {
-    const players = makePlayerPool(200);
-    const sgpValues = players.map((_, i) => Math.max(0.01, 10 - i * 0.05));
-    const state = buildSimDraftState(200, 12, 0, 260, FULL_ROSTER_SLOTS);
+    const players = makePlayerPool(400);
+    const sgpValues = players.map((_, i) => Math.max(0.01, 10 - i * 0.025));
+    const state = buildSimDraftState(400, 12, 0, 260, FULL_ROSTER_SLOTS);
 
     const completed = simulateFullDraft(players, sgpValues, COUNTING_CATEGORIES, state, 1.0);
 

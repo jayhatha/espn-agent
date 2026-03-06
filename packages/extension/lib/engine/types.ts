@@ -205,6 +205,7 @@ export interface DraftEngineSignals {
   optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
   leagueAnalysis: LeagueAnalysisSignal | null;
   projectedStandings: ProjectedStandingsSignal | null;
+  simulation: ForwardSimulationSignal | null;  // null when insufficient data or too early
 }
 
 // ============================================================
@@ -274,5 +275,63 @@ export interface MonteCarloResult {
   passEV: number;          // EV if we pass
   shouldBid: boolean;      // bidEV > passEV
   simCount: number;
+  computeTimeMs: number;
+}
+
+// ============================================================
+// Phase 28: Forward-Looking Draft Simulation types
+// ============================================================
+
+export interface SimTeamState {
+  budget: number;
+  slotsRemaining: Record<string, number>;  // Mutable copy of roster slots
+  categoryTotals: Record<string, number>;  // Running stat totals for counting stats
+  componentTotals: Record<string, number>; // Running components for rate stats (H, AB, IP, ER, etc.)
+}
+
+export interface SimDraftState {
+  availableIndices: Set<number>;     // O(1) delete per Phase 23 decision
+  teamStates: SimTeamState[];        // One per team
+  myTeamIndex: number;               // Which team is "me"
+}
+
+export interface SimulationOutcome {
+  expectedFinish: number;       // Average final roto rank (1 = first)
+  winProbability: number;       // Fraction of sims finishing 1st
+  top3Probability: number;      // Fraction finishing top 3
+  top6Probability: number;      // Fraction finishing top 6
+  expectedRotoPts: number;      // Average roto points
+  stdDevRotoPts: number;        // Standard deviation of roto points
+  simCount: number;
+}
+
+export interface CandidateAction {
+  type: "bid" | "pass";
+  label: string;                // e.g., "Bid $25 on Soto", "Pass"
+  playerIndex?: number;         // Index into PoolPlayer[] for bid actions
+  bidPrice?: number;            // Price for bid actions
+}
+
+export interface DecisionComparison {
+  decisions: Array<{
+    label: string;
+    outcome: SimulationOutcome;
+  }>;
+  recommendedAction: string;    // Label of best decision (highest win probability)
+  computeTimeMs: number;
+}
+
+export interface NominationRecommendation {
+  playerIndex: number;
+  playerName: string;
+  reason: string;
+  expectedDrain: number;        // Estimated budget drain on opponents
+  trapScore: number;            // 0-1, higher = better trap nomination
+}
+
+export interface ForwardSimulationSignal {
+  currentDecision: DecisionComparison | null;  // Bid vs pass comparison when player nominated
+  winProbability: SimulationOutcome | null;     // Current baseline win probability
+  nominationStrategy: NominationRecommendation[] | null;  // Top 3-5 nominations
   computeTimeMs: number;
 }
