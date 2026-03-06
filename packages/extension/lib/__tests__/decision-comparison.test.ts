@@ -110,7 +110,6 @@ describe("aggregateOutcomes", () => {
       [20, 25, 30],  // sim 9: team 2 first
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 3);
 
     expect(outcome.winProbability).toBeCloseTo(0.3, 2);
@@ -133,7 +132,6 @@ describe("aggregateOutcomes", () => {
       [20, 30, 25],
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 3);
 
     expect(outcome.expectedFinish).toBeCloseTo(2.2, 1);
@@ -148,7 +146,6 @@ describe("aggregateOutcomes", () => {
       [10, 30, 20, 40], // rank 4
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 4);
 
     expect(outcome.top3Probability).toBeCloseTo(0.75, 2);
@@ -160,7 +157,6 @@ describe("aggregateOutcomes", () => {
       [25, 25, 10], // myTeam (0) ties with team 1
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 3);
 
     // Team 0 has 25 pts. Team 1 also has 25 pts. Team 2 has 10 pts.
@@ -177,7 +173,6 @@ describe("aggregateOutcomes", () => {
       [30, 5, 3],
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 3);
 
     expect(outcome.expectedRotoPts).toBeCloseTo(20, 1); // (10+20+30)/3 = 20
@@ -190,7 +185,6 @@ describe("aggregateOutcomes", () => {
       [15, 25, 10],
     ];
 
-    const { aggregateOutcomes } = require("../engine/decision-comparison");
     const outcome = aggregateOutcomes(0, allSimRotoPts, 3);
 
     expect(outcome.stdDevRotoPts).toBeGreaterThan(0);
