@@ -5,14 +5,20 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Milestone v2.0 — Position Shopping List (defining requirements)
+**Current focus:** Milestone v2.0 — Position Shopping List (Phase 26: Per-Position Target Engine)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-05 — Milestone v2.0 started
+Phase: 26 — Per-Position Target Engine
+Plan: Not started
+Status: Roadmap created, ready to plan Phase 26
+Last activity: 2026-03-05 — v2.0 roadmap created (Phases 26-27)
+
+Progress: v2.0 Phase 26-27 | 0/2 phases started
+
+```
+[                                        ] 0% v2.0
+```
 
 ## Performance Metrics
 
@@ -339,6 +345,8 @@ Recent decisions affecting v1.1 work:
 - Phase 23 added: Roster optimization engine — marginal-value max bid (replacing heuristic), Monte Carlo draft simulation, dynamic replacement levels, and opponent need modeling, adapted from draft engine spec to TypeScript extension
 - Phase 24 added: Feed Phase 23 optimization signals to narrator — add topTargets, simulationEV, shouldBid, maxBid, and opponentPressure to NarratorPayload for richer AI tactical advice during auction drafts
 - Phase 25 added: Projected standings engine — full-season category and overall rankings for all teams during draft with draft-progress weighting and sidebar integration
+- Phase 26 added: Per-Position Target Engine — per-position top N targets with combined priority scoring (scarcity + slots + budget fit), dynamic updates, multi-position eligibility (v2.0)
+- Phase 27 added: Shopping List UI — collapsible position groups replacing Top Targets section in EngineInsights (v2.0)
 
 ### Pending Todos
 
@@ -346,19 +354,12 @@ None yet.
 
 ### Blockers/Concerns
 
-**Phase 6 readiness:**
-- Existing TradeRecommendationAgent.simulateTradeImpact() already handles N-for-N trades correctly (lines 634-653)
-- Need to add genetic algorithm candidate generation to prevent combinatorial explosion
-- Integration tests required to prevent component math regression
-
-**Phase 7 readiness:**
-- ESPN historical data retention unclear — may only support current + prior season
-- Need to validate 2024 vs 2025 response schema compatibility
-- Rate limiting critical — 2-second throttle required to avoid IP ban
-
-**Phase 9 readiness:**
-- Depends on Phase 6 (multi-player simulation) + Phase 7 (historical snapshots)
-- Projection accuracy metrics need user research (MAE/RMSE vs simple indicator)
+**Phase 26 context:**
+- Existing `computeRosterOptimization()` in `packages/extension/lib/engine/index.ts` produces flat top-5 targets — Phase 26 extends this into per-position groups
+- Existing `TargetRecommendation` type needs extension with `position` grouping key and per-position top-N structure
+- `computeEnhancedScarcity()` returns per-position scarcity indices — these feed directly into the PRIO-01 combined priority score
+- `computeMaxBid()` binary-search optimizer already exists and must be reused (not duplicated) for TARG-02
+- Multi-position eligibility (TARG-05) requires knowing each player's full `eligiblePositions` list from the FanGraphs bundled data or draft state
 
 ### Quick Tasks Completed
 
@@ -409,5 +410,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed quick-43: positional need weighting in top targets, plus quick-42 max bid 2x cap
+Stopped at: v2.0 roadmap created — Phases 26-27 defined
 Resume file: None

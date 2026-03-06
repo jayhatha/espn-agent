@@ -109,25 +109,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIME-01 | Phase 7 | Complete |
 | TIME-02 | Phase 8 | Complete |
 | TIME-03 | Phase 8 | Complete |
-| TARG-01 | — | Pending |
-| TARG-02 | — | Pending |
-| TARG-03 | — | Pending |
-| TARG-04 | — | Pending |
-| TARG-05 | — | Pending |
-| PRIO-01 | — | Pending |
-| PRIO-02 | — | Pending |
-| PRIO-03 | — | Pending |
-| SHOP-01 | — | Pending |
-| SHOP-02 | — | Pending |
-| SHOP-03 | — | Pending |
-| SHOP-04 | — | Pending |
-| SHOP-05 | — | Pending |
+| TARG-01 | Phase 26 | Pending |
+| TARG-02 | Phase 26 | Pending |
+| TARG-03 | Phase 26 | Pending |
+| TARG-04 | Phase 26 | Pending |
+| TARG-05 | Phase 26 | Pending |
+| PRIO-01 | Phase 26 | Pending |
+| PRIO-02 | Phase 26 | Pending |
+| PRIO-03 | Phase 26 | Pending |
+| SHOP-01 | Phase 27 | Pending |
+| SHOP-02 | Phase 27 | Pending |
+| SHOP-03 | Phase 27 | Pending |
+| SHOP-04 | Phase 27 | Pending |
+| SHOP-05 | Phase 27 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-03-05 after milestone pivot to Position Shopping List*
+*Last updated: 2026-03-05 after v2.0 roadmap creation (Phases 26-27)*

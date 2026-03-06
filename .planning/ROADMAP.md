@@ -3,7 +3,11 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-5 (shipped 2026-02-21)
-- 🚧 **v1.1 Trades & History** — Phases 6-9 (in progress)
+- ✅ **v1.1 Trades & History** — Phases 6-9 (shipped 2026-02-23)
+- ✅ **v1.2 Draft Assistant** — Phases 10-16 (shipped 2026-03-03)
+- ✅ **v1.3 Site Redesign** — Phases 17-18 (shipped 2026-03-03)
+- ✅ **v1.4 Draft Engine** — Phases 20-25 (shipped 2026-03-05)
+- 📋 **v2.0 Position Shopping List** — Phases 26-27 (planned)
 
 ## Phases
 
@@ -18,14 +22,55 @@
 
 </details>
 
-### 🚧 v1.1 Trades & History (In Progress)
-
-**Milestone Goal:** Enable multi-player trade evaluation and historical season analysis with data backfill
+<details>
+<summary>✅ v1.1 Trades & History (Phases 6-9) — SHIPPED 2026-02-23</summary>
 
 - [x] **Phase 6: Multi-Player Trade Foundation** - N-for-M trade evaluation with roster validation (2/2 plans) — completed 2026-02-21
 - [x] **Phase 7: Historical Backfill & Timeline** - ESPN historical data and week-by-week standings (2/2 plans) — completed 2026-02-21
 - [x] **Phase 8: Season Replay & Annotations** - Transaction markers and date range selection (completed 2026-02-21)
 - [x] **Phase 9: Transaction Impact Analysis (Roto WPA)** - Per-move roto-points impact with counterfactual analysis (completed 2026-02-22)
+
+</details>
+
+<details>
+<summary>✅ v1.2 Draft Assistant (Phases 10-16) — SHIPPED 2026-03-03</summary>
+
+- [x] **Phase 10: ESPN Live Draft Assistant** - Chrome extension overlay with sidebar, pick detection, snake/auction support (6/6 plans) — completed 2026-02-25
+- [x] **Phase 11: Draft Assistant Enhancements** - Player pool sync, value detection, league-agnostic projections (5/5 plans) — completed 2026-02-25
+- [x] **Phase 12: Address Codebase Concerns** - Bugs, debt, fragile selectors, free agents, fuzzy matching (5/5 plans) — completed 2026-02-26
+- [x] **Phase 13: Clean Up Tech Debt** - Zod validation, DLQ, type safety, shared components, LRU cache, tests (6/6 plans) — completed 2026-02-26
+- [x] **Phase 14: ESPN Auction Values Bug Fix** - Pagination limit increase, diagnostic logging (1/1 plans) — completed 2026-02-28
+- [x] **Phase 15: Fix Empty SGP Categories** - formula_id for RATE stats, admin page enum values (1/1 plans) — completed 2026-03-03
+- [x] **Phase 16: ESPN Auction Pagination Fix** - x-fantasy-filter to headers, offset-based pagination (1/1 plans) — completed 2026-03-03
+
+</details>
+
+<details>
+<summary>✅ v1.3 Site Redesign (Phases 17-18) — SHIPPED 2026-03-03</summary>
+
+- [x] **Phase 17: Site Redesign** - Typography-driven design system, 18 routes migrated, WCAG AA (9/9 plans) — completed 2026-03-03
+- [x] **Phase 18: Dashboard Compositional Layout** - Editorial composition, DM Serif Display, section alternation (2/2 plans) — completed 2026-03-03
+
+</details>
+
+<details>
+<summary>✅ v1.4 Draft Engine (Phases 20-25) — SHIPPED 2026-03-05</summary>
+
+- [x] **Phase 20: Deterministic Draft Engine** - Inflation, scarcity, category gap, budget curve, alert system (2/2 plans) — completed 2026-03-04
+- [x] **Phase 21: Build Archetype Analysis** - FanGraphs bundle, greedy fill, archetype classifier, pivot players (3/3 plans) — completed 2026-03-05
+- [x] **Phase 22: AI Narrator Layer** - Event-triggered LLM interpretation, GPT-4.1-mini, strategy state (3/3 plans) — completed 2026-03-05
+- [x] **Phase 23: Roster Optimization Engine** - SGP max bid, Monte Carlo simulation, opponent modeling (3/3 plans) — completed 2026-03-05
+- [x] **Phase 24: Narrator Optimization Signals** - topTargets, simulationEV, shouldBid, opponentPressure (1/1 plans) — completed 2026-03-05
+- [x] **Phase 25: Projected Standings Engine** - Full-season category/overall rankings during draft with sidebar integration (2/2 plans) — completed 2026-03-05
+
+</details>
+
+### 📋 v2.0 Position Shopping List (Planned)
+
+**Milestone Goal:** Replace the generic Top Targets section with a position-organized shopping list that shows the best available players at each unfilled position, with max bids and market prices, prioritized by a combined scarcity + roster needs + budget fit score
+
+- [ ] **Phase 26: Per-Position Target Engine** - Compute per-position top N targets with combined priority scoring, dynamic updates, multi-position eligibility
+- [ ] **Phase 27: Shopping List UI** - Replace Top Targets with collapsible position groups, player rows with bid data, priority ordering
 
 ## Phase Details
 
@@ -118,33 +163,6 @@ Plans:
 Plans:
 - [ ] 09-01-PLAN.md — Shapley value computation, SGP category normalization, replacement-level baselines, DB migration
 - [ ] 09-02-PLAN.md — Bootstrap confidence intervals, API updates, frontend confidence/SGP/replacement-level UI
-
-## Progress
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Foundation & Critical Fixes | v1.0 | 6/6 | Complete | 2026-02-19 |
-| 2. Authentication & Onboarding | v1.0 | 3/3 | Complete | 2026-02-19 |
-| 3. Core Dashboard & Recommendations | v1.0 | 3/3 | Complete | 2026-02-20 |
-| 4. Advanced Features & Polish | v1.0 | 4/4 | Complete | 2026-02-20 |
-| 5. Admin UI | v1.0 | 2/2 | Complete | 2026-02-21 |
-| 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
-| 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
-| 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
-| 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
-| 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
-| 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
-| 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
-| 11. Draft Assistant Enhancements | v1.2 | 5/5 | Complete | 2026-02-25 |
-| 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
-| 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
-| 14. ESPN Auction Values Bug Fix | v1.2 | Complete    | 2026-02-28 | - |
-| 15. Fix Empty SGP Categories | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
-| 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
-| 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
-| 20. Deterministic Draft Engine | 2/2 | Complete    | 2026-03-04 | - |
-| 21. Build Archetype Analysis | 3/3 | Complete   | 2026-03-05 | - |
 
 ### Phase 10: ESPN Live Draft Assistant
 
@@ -404,3 +422,69 @@ Plans:
 Plans:
 - [ ] 25-01-PLAN.md — Add projected standings types, refactor league-analysis.ts to expose teamDraftedTotals, create projected-standings.ts pure function module
 - [ ] 25-02-PLAN.md — Wire into engine orchestrator as step 5c with weak-category boost, add Projected Standings UI section to EngineInsights sidebar
+
+### Phase 26: Per-Position Target Engine
+
+**Goal:** The draft engine computes a position-organized shopping list — per-position top N targets ranked by adjusted SGP value, with max bids and expected market prices, ordered by a combined priority score blending scarcity urgency, empty roster slot count, and budget fit — updating dynamically after every pick
+**Depends on:** Phase 25
+**Requirements:** TARG-01, TARG-02, TARG-03, TARG-04, TARG-05, PRIO-01, PRIO-02, PRIO-03
+**Success Criteria** (what must be TRUE):
+  1. Engine produces a shopping list keyed by position, each entry containing top N available players sorted by adjusted SGP value
+  2. Each player entry includes max bid (binary search optimizer) and expected market price (opponent model), alongside a value surplus (max bid minus expected market price)
+  3. Positions are ordered by a combined priority score that weights scarcity index, number of unfilled roster slots at that position, and remaining budget relative to target prices
+  4. Positions with zero unfilled roster slots are excluded from the output entirely
+  5. Multi-position eligible players (e.g., 1B/3B) appear as candidates under each position they qualify for
+  6. Shopping list recomputes correctly after each pick — filled positions drop off, scarcity updates propagate, and position ordering re-sorts
+**Plans:** TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 26 to break down)
+
+### Phase 27: Shopping List UI
+
+**Goal:** The extension sidebar displays a position-organized shopping list replacing the Top Targets section, with collapsible position groups ordered by priority score, player rows showing name and bid data, and graceful collapse when the roster is complete
+**Depends on:** Phase 26
+**Requirements:** SHOP-01, SHOP-02, SHOP-03, SHOP-04, SHOP-05
+**Success Criteria** (what must be TRUE):
+  1. Top Targets section in EngineInsights is replaced by a Shopping List section backed by the Phase 26 engine output
+  2. Each position renders as a collapsible group with a position label and a visual priority indicator (e.g., urgency badge or score)
+  3. Each player row within a group shows player name, max bid, expected market price, and value surplus
+  4. Position groups are ordered highest-priority first, matching the combined priority score from the engine
+  5. When no unfilled roster positions remain, the Shopping List section collapses to a compact completion state rather than showing an empty list
+**Plans:** TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 27 to break down)
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation & Critical Fixes | v1.0 | 6/6 | Complete | 2026-02-19 |
+| 2. Authentication & Onboarding | v1.0 | 3/3 | Complete | 2026-02-19 |
+| 3. Core Dashboard & Recommendations | v1.0 | 3/3 | Complete | 2026-02-20 |
+| 4. Advanced Features & Polish | v1.0 | 4/4 | Complete | 2026-02-20 |
+| 5. Admin UI | v1.0 | 2/2 | Complete | 2026-02-21 |
+| 6. Multi-Player Trade Foundation | v1.1 | 2/2 | Complete | 2026-02-21 |
+| 7. Historical Backfill & Timeline | v1.1 | 2/2 | Complete | 2026-02-21 |
+| 7.1 Historical Stats Accumulation | v1.1 | 0/2 | Planning | - |
+| 7.2 Fix Standings Values | v1.1 | 1/1 | Complete | 2026-02-22 |
+| 8. Season Replay & Annotations | v1.1 | 1/1 | Complete | 2026-02-21 |
+| 9. Transaction Impact (Roto WPA) | v1.1 | 2/2 | Complete | 2026-02-23 |
+| 10. ESPN Live Draft Assistant | v1.2 | 6/6 | Complete | 2026-02-25 |
+| 11. Draft Assistant Enhancements | v1.2 | 5/5 | Complete | 2026-02-25 |
+| 12. Address Codebase Concerns | v1.2 | 5/5 | Complete | 2026-02-26 |
+| 13. Clean Up Tech Debt | v1.2 | 6/6 | Complete | 2026-02-26 |
+| 14. ESPN Auction Values Bug Fix | v1.2 | Complete    | 2026-02-28 | - |
+| 15. Fix Empty SGP Categories | v1.2 | 1/1 | Complete | 2026-03-03 |
+| 16. ESPN Auction Pagination Fix | v1.2 | 1/1 | Complete | 2026-03-03 |
+| 17. Site Redesign | v1.3 | 9/9 | Complete | 2026-03-03 |
+| 18. Dashboard Compositional Layout | v1.3 | Complete    | 2026-03-03 | 2026-03-03 |
+| 20. Deterministic Draft Engine | v1.4 | 2/2 | Complete    | 2026-03-04 |
+| 21. Build Archetype Analysis | v1.4 | 3/3 | Complete   | 2026-03-05 |
+| 22. AI Narrator Layer | v1.4 | 3/3 | Complete | 2026-03-05 |
+| 23. Roster Optimization Engine | v1.4 | 3/3 | Complete | 2026-03-05 |
+| 24. Narrator Optimization Signals | v1.4 | 1/1 | Complete | 2026-03-05 |
+| 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
+| 26. Per-Position Target Engine | v2.0 | 0/TBD | Not started | - |
+| 27. Shopping List UI | v2.0 | 0/TBD | Not started | - |
