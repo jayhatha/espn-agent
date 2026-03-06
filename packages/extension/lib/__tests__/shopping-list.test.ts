@@ -541,3 +541,126 @@ describe("computeShoppingList — computeTimeMs", () => {
     expect(result.computeTimeMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+// ============================================================
+// Test 13: Dynamic update — filled positions drop off (TARG-04)
+// ============================================================
+
+describe("computeShoppingList — dynamic roster fill (TARG-04)", () => {
+  it("shopping list updates when roster fills a position", () => {
+    const players: PoolPlayer[] = [
+      makeHitter("SS1", { HR: 15 }, 18, ["SS"]),
+      makeHitter("OF1", { HR: 25 }, 30, ["OF"]),
+      makeHitter("OF2", { HR: 20 }, 22, ["OF"]),
+      makeHitter("OF3", { HR: 18 }, 18, ["OF"]),
+      makeHitter("1B1", { HR: 28 }, 35, ["1B"]),
+    ];
+    const sgpValues = [3.0, 5.0, 4.0, 3.5, 6.0];
+
+    // Step 1: SS, OF, 1B all needed — all three groups should appear
+    const step1 = computeShoppingList({
+      allPlayers: players,
+      sgpValues,
+      needByPosition: { SS: 1, OF: 3, "1B": 1 },
+      remainingSlots: { SS: 1, OF: 3, "1B": 1 },
+      scarcitySignals: [],
+      opponentModel: makeOpponentModel(),
+      myBudget: 100,
+      weakCategories: new Set(),
+    });
+
+    const positionsStep1 = step1.positionGroups.map(g => g.position);
+    expect(positionsStep1).toContain("SS");
+    expect(positionsStep1).toContain("OF");
+    expect(positionsStep1).toContain("1B");
+
+    // Step 2: Simulate SS slot filled — remove SS from needByPosition
+    const step2 = computeShoppingList({
+      allPlayers: players,
+      sgpValues,
+      needByPosition: { OF: 3, "1B": 1 },  // SS filled — not in needByPosition
+      remainingSlots: { OF: 3, "1B": 1 },
+      scarcitySignals: [],
+      opponentModel: makeOpponentModel(),
+      myBudget: 100,
+      weakCategories: new Set(),
+    });
+
+    const positionsStep2 = step2.positionGroups.map(g => g.position);
+    // SS dropped off
+    expect(positionsStep2).not.toContain("SS");
+    // OF and 1B still present
+    expect(positionsStep2).toContain("OF");
+    expect(positionsStep2).toContain("1B");
+  });
+});
+
+// ============================================================
+// Test 14: Dynamic update — priority re-sorts when scarcity changes (PRIO-03)
+// ============================================================
+
+describe("computeShoppingList — priority re-sorts on scarcity change (PRIO-03)", () => {
+  it("OF ranks above SS when OF scarcity is higher, SS ranks above OF when SS scarcity is higher", () => {
+    const players: PoolPlayer[] = [
+      makeHitter("SS1", { HR: 15 }, 18, ["SS"]),
+      makeHitter("SS2", { HR: 10 }, 12, ["SS"]),
+      makeHitter("SS3", { HR: 8 }, 10, ["SS"]),
+      makeHitter("OF1", { HR: 25 }, 30, ["OF"]),
+      makeHitter("OF2", { HR: 20 }, 22, ["OF"]),
+      makeHitter("OF3", { HR: 15 }, 18, ["OF"]),
+    ];
+    const sgpValues = [3.0, 2.0, 1.5, 5.0, 4.0, 3.5];
+    const needByPosition = { SS: 1, OF: 1 };
+    const remainingSlots = { SS: 1, OF: 1 };
+    const opponentModel = makeOpponentModel(200);  // large budget — budgetFit ~ 1 for both
+    const myBudget = 200;
+
+    // State A: SS scarcity=0.2, OF scarcity=0.8 → OF should have higher priority
+    const stateA = computeShoppingList({
+      allPlayers: players,
+      sgpValues,
+      needByPosition,
+      remainingSlots,
+      scarcitySignals: [
+        makeScarcitySignal("SS", 0.2),
+        makeScarcitySignal("OF", 0.8),
+      ],
+      opponentModel,
+      myBudget,
+      weakCategories: new Set(),
+    });
+
+    const ssA = stateA.positionGroups.find(g => g.position === "SS")!;
+    const ofA = stateA.positionGroups.find(g => g.position === "OF")!;
+    expect(ssA).toBeDefined();
+    expect(ofA).toBeDefined();
+    // OF has higher scarcity → higher priority
+    expect(ofA.priorityScore).toBeGreaterThan(ssA.priorityScore);
+    // OF group comes first
+    expect(stateA.positionGroups[0].position).toBe("OF");
+
+    // State B: SS scarcity=0.9, OF scarcity=0.3 → SS should now have higher priority
+    const stateB = computeShoppingList({
+      allPlayers: players,
+      sgpValues,
+      needByPosition,
+      remainingSlots,
+      scarcitySignals: [
+        makeScarcitySignal("SS", 0.9),
+        makeScarcitySignal("OF", 0.3),
+      ],
+      opponentModel,
+      myBudget,
+      weakCategories: new Set(),
+    });
+
+    const ssB = stateB.positionGroups.find(g => g.position === "SS")!;
+    const ofB = stateB.positionGroups.find(g => g.position === "OF")!;
+    expect(ssB).toBeDefined();
+    expect(ofB).toBeDefined();
+    // SS now has higher scarcity → higher priority
+    expect(ssB.priorityScore).toBeGreaterThan(ofB.priorityScore);
+    // SS group comes first
+    expect(stateB.positionGroups[0].position).toBe("SS");
+  });
+});
