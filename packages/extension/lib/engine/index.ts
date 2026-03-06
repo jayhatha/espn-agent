@@ -135,9 +135,19 @@ function buildSimDraftState(
     if (isMyTeam) myTeamIndex = idx;
 
     // Budget
-    const budget = isMyTeam
-      ? input.remainingBudget
-      : (opponentModel.teamBudgets.get(teamId) ?? input.remainingBudget);
+    const budget = (() => {
+      if (isMyTeam) return input.remainingBudget;
+      const knownBudget = opponentModel.teamBudgets.get(teamId);
+      if (knownBudget != null) return knownBudget;
+      // Estimate: derive initial budget from user's own data, then subtract opponent's known spend
+      const mySpent = input.myRoster.reduce((s, p) => s + (p.cost ?? 0), 0);
+      const estimatedInitialBudget = input.remainingBudget + mySpent;
+      const initialBudget = estimatedInitialBudget > 0 ? estimatedInitialBudget : 260;
+      const teamSpent = input.allPicks
+        .filter(p => p.teamId === teamId)
+        .reduce((s, p) => s + (p.cost ?? 0), 0);
+      return Math.max(1, initialBudget - teamSpent);
+    })();
 
     // slotsRemaining
     let slotsRemaining: Record<string, number>;

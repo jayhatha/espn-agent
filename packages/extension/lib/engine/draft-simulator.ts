@@ -305,8 +305,23 @@ export function computeSimStandings(
     }
 
     // Assign roto points: rank 1 → N pts, rank N → 1 pt
-    for (let i = 0; i < teamValues.length; i++) {
-      rotoPts[teamValues[i].teamIdx] += n - i;
+    // Tie-aware: tied teams share the average of the positions they span
+    let i = 0;
+    while (i < teamValues.length) {
+      let j = i;
+      while (j < teamValues.length && teamValues[j].value === teamValues[i].value) {
+        j++;
+      }
+      // Average the roto points across the tied group
+      let totalPts = 0;
+      for (let k = i; k < j; k++) {
+        totalPts += n - k;
+      }
+      const avgPts = totalPts / (j - i);
+      for (let k = i; k < j; k++) {
+        rotoPts[teamValues[k].teamIdx] += avgPts;
+      }
+      i = j;
     }
   }
 
