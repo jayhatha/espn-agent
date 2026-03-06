@@ -488,4 +488,4 @@ Plans:
 | 24. Narrator Optimization Signals | v1.4 | 1/1 | Complete | 2026-03-05 |
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
-| 27. Shopping List UI | 1/1 | Complete   | 2026-03-06 | - |
+| 27. Shopping List UI | 1/1 | Complete    | 2026-03-06 | - |
