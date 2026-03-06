@@ -457,6 +457,27 @@ Plans:
 Plans:
 - [ ] 27-01-PLAN.md — Create ShoppingList.tsx component and replace Top Targets section in EngineInsights with position-grouped shopping list
 
+### Phase 28: Forward-looking draft simulation — full draft completion Monte Carlo with standings-based decision comparison, nomination strategy, and win probability
+
+**Goal:** Evolve the single-pick Monte Carlo engine into a full draft completion simulator that evaluates decisions by their impact on projected roto standings, produces win probability distributions, and recommends trap nominations to drain opponent budgets — all running as pure client-side TypeScript functions within a 1-second performance budget in the Chrome extension sidebar
+**Depends on:** Phase 27
+**Requirements:** SIM-01, SIM-02, SIM-03, SIM-04, SIM-05, SIM-06, SIM-07, SIM-08
+**Success Criteria** (what must be TRUE):
+  1. Full draft completion simulation runs 300 iterations of all remaining picks using softmax-weighted selection per team
+  2. Decisions evaluated by simulated standings impact (expected finish, win probability, top-3%) not raw SGP
+  3. Bid vs pass comparison produces empirical outcome distributions for each candidate action
+  4. Nomination strategy identifies trap nominations that drain opponent budgets without benefiting the user
+  5. Win probability, decision comparison, and nomination strategy displayed in sidebar
+  6. Simulation results cached and invalidated on pick count + nomination change
+  7. All simulation code is pure functions (no Zustand, no DOM) running under 1 second
+  8. Rate stats in standings use component-based math via calculateFinalRate (never averaged)
+**Plans:** 3 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Core simulation engine: types, draft-simulator.ts with softmax selection and standings computation, decision-comparison.ts with bid vs pass evaluation (TDD)
+- [ ] 28-02-PLAN.md — Nomination strategy heuristics and orchestrator wiring into computeDraftEngine with caching
+- [ ] 28-03-PLAN.md — Sidebar UI: Win Probability section with probability bars, bid vs pass comparison, Nomination Strategy section
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -489,3 +510,4 @@ Plans:
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
 | 27. Shopping List UI | 1/1 | Complete    | 2026-03-06 | - |
+| 28. Forward-Looking Draft Simulation | 0/3 | Planning | - | - |
