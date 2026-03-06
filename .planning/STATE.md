@@ -150,6 +150,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 28 P01 | 8 | 2 tasks | 6 files |
 | Phase 28 P02 | 5 | 2 tasks | 3 files |
 | Phase 28 P03 | 1 | 1 tasks | 1 files |
+| Phase quick-45 P01 | 3 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -347,6 +348,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 28]: Win Probability section placed between Inflation and Shopping List for prime positioning as most impactful new signal
 - [Phase 28]: Decision Comparison embedded inside Win Probability collapsible (not standalone) — keeps bid/pass context adjacent to baseline probability
 - [Phase 28]: Nomination Strategy collapsed by default at bottom of sidebar — informational, not urgently actionable during nomination
+- [Phase quick-45]: Normalize FG dollar pool to league budget rather than adjusting individual player values
+- [Phase quick-45]: Remove allPlayers[0] fallback entirely -- return safe defaults (maxBid=0, shouldBid=false) when no nominated player match
+- [Phase quick-45]: Two-strategy nominated player matching: auctionValues ID lookup primary, DOM player name fallback secondary
 
 ### Roadmap Evolution
 
