@@ -242,6 +242,19 @@ function computeRosterOptimization(
   const activeTotal = Object.values(activeSlots).reduce((s, v) => s + v, 0);
   const myBudget = input.remainingBudget;
 
+  // Build normalizedName → ASV lookup for market price override.
+  // When ESPN ASV is available, use it directly as expected market price
+  // instead of the SGP-based estimateMarketPrice() computation.
+  const nameToAsv = new Map<string, number>();
+  if (input.espnDomAuctionValues) {
+    for (const av of input.auctionValues) {
+      const asv = input.espnDomAuctionValues[av.playerId];
+      if (asv != null && asv > 0) {
+        nameToAsv.set(normalizeName(av.playerName), asv);
+      }
+    }
+  }
+
   // ----------------------------------------------------------------
   // Bid cache: rebuild only when nomination OR pick count changes
   // ----------------------------------------------------------------
@@ -277,6 +290,7 @@ function computeRosterOptimization(
 
     if (nominatedPlayer) {
       // Compute max bid only when we have a real nominated player match
+      const nominatedAsv = nameToAsv.get(nominatedPlayer.normalizedName);
       maxBidResult = computeMaxBid(
         nominatedPlayer,
         allPlayers,
@@ -285,6 +299,7 @@ function computeRosterOptimization(
         remainingSlots,
         opponentModel,
         inflation.inflationFactor,
+        nominatedAsv,
       );
 
       // Opponent budgets for Monte Carlo
@@ -389,13 +404,17 @@ function computeRosterOptimization(
       player.positions,
       opponentModel.competitionFactors,
     );
-    const expectedPrice = Math.max(1, estimateMarketPrice(
-      sgp,
-      totalSGP,
-      totalBudget,
-      competitionFactor,
-      player.dollars,
-    ));
+    // Use ESPN ASV as expected market price when available; fall back to SGP-based estimate
+    const asvPrice = nameToAsv.get(player.normalizedName);
+    const expectedPrice = asvPrice != null
+      ? Math.max(1, Math.round(asvPrice))
+      : Math.max(1, estimateMarketPrice(
+          sgp,
+          totalSGP,
+          totalBudget,
+          competitionFactor,
+          player.dollars,
+        ));
 
     return {
       playerId: index,
@@ -424,6 +443,7 @@ function computeRosterOptimization(
       myBudget,
       weakCategories,
       topN: 3,
+      nameToAsv,
     });
     const slElapsed = performance.now() - slT0;
     if (slElapsed > 10) {

@@ -517,7 +517,8 @@ export default defineContentScript({
         if (scraped.size > 0) {
           const valuesRecord: Record<number, number> = {};
           scraped.forEach((entry, playerId) => {
-            valuesRecord[playerId] = entry.espnValue;
+            // Prefer ASV (Average Salary = league-wide market price) over $ column
+            valuesRecord[playerId] = entry.asvValue ?? entry.espnValue;
           });
           useDraftStore.getState().setEspnDomAuctionValues(valuesRecord);
         }

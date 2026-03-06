@@ -43,6 +43,9 @@ export function computeMaxBid(
   budget: number,
   rosterSlots: Record<string, number>,
   opponentModel: OpponentModel,
+  inflationFactor: number = 1.0,
+  /** ESPN Average Salary override — when available, used directly as expected market price */
+  asvMarketPrice?: number,
 ): BidOptimizerResult {
   // ------------------------------------------------------------------
   // Step 1: Find nominated player's index in the available pool
@@ -51,19 +54,23 @@ export function computeMaxBid(
 
   // If player is not in the pool, can't compute a meaningful bid
   if (nominatedIndex === -1) {
-    const competitionFactor = computePositionCompetition(
-      nominatedPlayer.positions,
-      opponentModel.competitionFactors,
-    );
-    const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
-    const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
-    const marketPrice = estimateMarketPrice(
-      sgpValues[0] ?? 0,
-      totalSGP,
-      totalBudget,
-      competitionFactor,
-      nominatedPlayer.dollars,
-    );
+    const marketPrice = asvMarketPrice != null
+      ? Math.max(1, Math.round(asvMarketPrice))
+      : (() => {
+          const competitionFactor = computePositionCompetition(
+            nominatedPlayer.positions,
+            opponentModel.competitionFactors,
+          );
+          const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
+          const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
+          return estimateMarketPrice(
+            sgpValues[0] ?? 0,
+            totalSGP,
+            totalBudget,
+            competitionFactor,
+            nominatedPlayer.dollars,
+          );
+        })();
     return {
       maxBid: 1,
       valueSurplus: 1 - marketPrice,
@@ -90,10 +97,11 @@ export function computeMaxBid(
   // ------------------------------------------------------------------
   // Step 3: Compute upper bound for binary search
   // ------------------------------------------------------------------
-  // Upper bound: player's dollar value * 3, capped at budget minus 1 reserve per unfilled slot
+  // Upper bound: inflation-adjusted dollar value * 1.5, capped at budget minus reserves
   const totalSlots = Object.values(rosterSlots).reduce((s, v) => s + v, 0);
   const minReserves = Math.max(0, totalSlots - 1); // at least $1 per other slot
-  const maxReasonableBid = Math.max(1, Math.ceil(nominatedPlayer.dollars * 3));
+  const inflatedValue = nominatedPlayer.dollars * Math.max(1, inflationFactor);
+  const maxReasonableBid = Math.max(1, Math.ceil(inflatedValue * 1.5));
   const hi_initial = Math.min(Math.max(1, budget - minReserves), maxReasonableBid);
 
   // ------------------------------------------------------------------
@@ -122,19 +130,23 @@ export function computeMaxBid(
 
   // Quick check: if the player at price=1 doesn't improve on baseline, maxBid=1
   if (!checkAtPrice(1)) {
-    const competitionFactor = computePositionCompetition(
-      nominatedPlayer.positions,
-      opponentModel.competitionFactors,
-    );
-    const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
-    const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
-    const marketPrice = estimateMarketPrice(
-      sgpValues[nominatedIndex],
-      totalSGP,
-      totalBudget,
-      competitionFactor,
-      nominatedPlayer.dollars,
-    );
+    const marketPrice = asvMarketPrice != null
+      ? Math.max(1, Math.round(asvMarketPrice))
+      : (() => {
+          const competitionFactor = computePositionCompetition(
+            nominatedPlayer.positions,
+            opponentModel.competitionFactors,
+          );
+          const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
+          const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
+          return estimateMarketPrice(
+            sgpValues[nominatedIndex],
+            totalSGP,
+            totalBudget,
+            competitionFactor,
+            nominatedPlayer.dollars,
+          );
+        })();
     return {
       maxBid: 1,
       valueSurplus: 1 - marketPrice,
@@ -172,17 +184,22 @@ export function computeMaxBid(
 
   // ------------------------------------------------------------------
   // Step 6: Compute expected market price from opponent model
+  // Use ESPN ASV directly when available; fall back to SGP-based estimate
   // ------------------------------------------------------------------
-  const competitionFactor = computePositionCompetition(
-    nominatedPlayer.positions,
-    opponentModel.competitionFactors,
-  );
-  const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
-  const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
-  const expectedMarketPrice = Math.max(
-    1,
-    estimateMarketPrice(sgpValues[nominatedIndex], totalSGP, totalBudget, competitionFactor, nominatedPlayer.dollars),
-  );
+  const expectedMarketPrice = asvMarketPrice != null
+    ? Math.max(1, Math.round(asvMarketPrice))
+    : (() => {
+        const competitionFactor = computePositionCompetition(
+          nominatedPlayer.positions,
+          opponentModel.competitionFactors,
+        );
+        const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
+        const totalBudget = Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, budget);
+        return Math.max(
+          1,
+          estimateMarketPrice(sgpValues[nominatedIndex], totalSGP, totalBudget, competitionFactor, nominatedPlayer.dollars),
+        );
+      })();
 
   return {
     maxBid,

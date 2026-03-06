@@ -104,6 +104,8 @@ export function computeShoppingList(params: {
   myBudget: number;
   weakCategories: Set<string>;
   topN?: number;
+  /** ESPN ASV lookup by normalizedName — used directly as expected market price when available */
+  nameToAsv?: Map<string, number>;
 }): ShoppingListSignal {
   const t0 = performance.now();
 
@@ -129,6 +131,8 @@ export function computeShoppingList(params: {
   const totalSGP = sgpValues.reduce((s, v) => s + v, 0);
   const totalBudget =
     Array.from(opponentModel.teamBudgets.values()).reduce((s, v) => s + v, myBudget);
+  // SGP-to-dollar conversion: how many dollars each unit of SGP is worth
+  const sgpToDollar = totalSGP > 0 ? totalBudget / totalSGP : 1;
 
   // ----------------------------------------------------------------
   // Step a: Determine which positions to build groups for
@@ -223,30 +227,49 @@ export function computeShoppingList(params: {
     // Skip positions with no candidates
     if (candidates.length === 0) continue;
 
-    // Sort candidates by adjustedSgp descending
-    candidates.sort((a, b) => b.adjustedSgp - a.adjustedSgp);
+    // ---- Step 1: Price ALL candidates upfront so we can filter by real cost ----
+    const pricedCandidates = candidates.map(c => {
+      // Use ESPN ASV as expected market price when available
+      const asvPrice = params.nameToAsv?.get(c.player.normalizedName);
+      const expectedMarketPrice = asvPrice != null
+        ? Math.max(1, Math.round(asvPrice))
+        : (() => {
+            const competitionFactor = computePositionCompetition(
+              c.player.positions,
+              opponentModel.competitionFactors,
+            );
+            return Math.max(
+              1,
+              estimateMarketPrice(c.sgp, totalSGP, totalBudget, competitionFactor, c.player.dollars),
+            );
+          })();
+      const sgpBasedBid = Math.max(1, Math.ceil(c.adjustedSgp * sgpToDollar));
+      const maxBid = Math.min(myBudget, sgpBasedBid);
+      return { ...c, expectedMarketPrice, maxBid };
+    });
+
+    // ---- Step 2: Split into affordable (can win at auction) vs unaffordable ----
+    const affordable = pricedCandidates.filter(c => c.expectedMarketPrice <= myBudget);
+    const unaffordable = pricedCandidates.filter(c => c.expectedMarketPrice > myBudget);
+
+    // ---- Step 3: Rank affordable by SGP efficiency, fill remainder from cheapest unaffordable ----
+    // Affordable players sorted by value efficiency (best bang for remaining budget)
+    affordable.sort((a, b) => {
+      const effA = a.adjustedSgp / Math.max(1, a.expectedMarketPrice);
+      const effB = b.adjustedSgp / Math.max(1, b.expectedMarketPrice);
+      return effB - effA;
+    });
+    // Unaffordable sorted by cheapest first (closest to budget)
+    unaffordable.sort((a, b) => a.expectedMarketPrice - b.expectedMarketPrice);
+
+    // Prefer affordable players; pad with cheapest unaffordable if not enough
+    const ranked = [...affordable, ...unaffordable];
 
     // Take top N
-    const topCandidates = candidates.slice(0, topN);
+    const topCandidates = ranked.slice(0, topN);
 
-    // Build targets with pricing
-    const targets: PositionTarget[] = topCandidates.map(({ player, sgp, adjustedSgp }) => {
-      const competitionFactor = computePositionCompetition(
-        player.positions,
-        opponentModel.competitionFactors,
-      );
-      const expectedMarketPrice = Math.max(
-        1,
-        estimateMarketPrice(sgp, totalSGP, totalBudget, competitionFactor, player.dollars),
-      );
-
-      // Quick max bid heuristic (NOT binary search computeMaxBid)
-      const maxBid = Math.min(
-        myBudget,
-        expectedMarketPrice,
-        Math.max(1, Math.ceil(player.dollars * 2.0)),
-      );
-
+    // Build targets
+    const targets: PositionTarget[] = topCandidates.map(({ player, sgp, adjustedSgp, expectedMarketPrice, maxBid }) => {
       const valueSurplus = maxBid - expectedMarketPrice;
 
       return {
@@ -263,9 +286,8 @@ export function computeShoppingList(params: {
       };
     });
 
-    // Compute budget fit: fraction of targets where dollarValue <= myBudget * 0.4
-    const budgetThreshold = myBudget * 0.4;
-    const affordableCount = targets.filter(t => t.dollarValue <= budgetThreshold).length;
+    // Compute budget fit: fraction of targets you can actually win
+    const affordableCount = targets.filter(t => t.expectedMarketPrice <= myBudget).length;
 
     // Unfileld slots for this position (use needByPosition, or P slot count if "P" group)
     const unfilledSlots =

@@ -1049,6 +1049,8 @@ export interface ESPNAuctionTableEntry {
   espnValue: number;
   position: string;
   team: string;
+  /** ESPN Average Salary — league-wide average sale price across all ESPN leagues */
+  asvValue: number | null;
 }
 
 /**
@@ -1153,7 +1155,28 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
       const teamEl = row.querySelector(".playerinfo__playerteam");
       const team = teamEl?.textContent?.trim() || "";
 
-      result.set(playerId, { playerId, playerName, espnValue, position, team });
+      // ASV (Average Salary) from the last cell in the scrollable cell group.
+      // DOM layout: fixed group (z-index:2) | scrollable group (z-index:0)
+      // ASV is always the rightmost column in the scrollable group.
+      let asvValue: number | null = null;
+      const cellGroupWrappers = row.querySelectorAll(
+        ".fixedDataTableCellGroupLayout_cellGroupWrapper",
+      );
+      // Second wrapper is the scrollable columns (first is fixed: $, Player, Action)
+      if (cellGroupWrappers.length >= 2) {
+        const scrollableCells = cellGroupWrappers[1].querySelectorAll(
+          ".public_fixedDataTableCell_cellContent",
+        );
+        if (scrollableCells.length > 0) {
+          const lastCellText = scrollableCells[scrollableCells.length - 1]?.textContent?.trim() || "";
+          const asvMatch = lastCellText.match(/^\$(\d+(?:\.\d+)?)/);
+          if (asvMatch) {
+            asvValue = parseFloat(asvMatch[1]);
+          }
+        }
+      }
+
+      result.set(playerId, { playerId, playerName, espnValue, position, team, asvValue });
     } catch (err) {
       // Don't let a single row failure abort the rest
       console.warn(
