@@ -1,663 +1,615 @@
-# Architecture Patterns: Multi-Player Trades & Historical Analysis
+# Architecture Patterns: Mastra AI Agent Integration
 
-**Domain:** Fantasy Baseball Trade Analysis & Season Retrospectives
-**Researched:** 2026-02-20
-**Confidence:** HIGH
+**Domain:** AI agent framework integration with existing Fastify + Chrome extension
+**Researched:** 2026-03-05
+**Confidence:** HIGH (core patterns) / MEDIUM (streaming specifics — SSE event format varies)
 
 ---
 
 ## Executive Summary
 
-This milestone extends existing TradeRecommendationAgent and adds historical backfill to enable:
-1. **Multi-player trade evaluation** (2-for-2, 3-for-1, N-for-M)
-2. **Season replay timeline** (visualize how trades/waivers affected standings)
-3. **Trade retrospectives** ("Did this trade help me?" analysis)
-4. **Historical data backfill** (fetch past scoring periods from ESPN)
+This document covers how Mastra integrates with the existing ESPN Fantasy Baseball backend and Chrome extension. The key architectural insight is that Mastra's `Agent` class from `@mastra/core` is framework-agnostic — you instantiate it like a service class and call `agent.stream()` or `agent.generate()` from any HTTP framework. The `@mastra/fastify` adapter is a convenience wrapper that auto-registers Mastra's built-in REST endpoints, but it requires Fastify v5 (the existing app uses Fastify v4), making direct integration the right path.
 
-**Key architectural insight:** All features leverage existing snapshot infrastructure. No new data model needed — only extensions to agents, new views on existing tables, and backfill jobs.
+**Integration strategy: Use `@mastra/core` Agent class directly inside existing Fastify v4 routes.** Replace `DraftNarratorAgent` (which manually calls OpenAI) with a Mastra `Agent` that has tools, memory, and streaming support. The existing `POST /api/draft/narrate` route becomes the integration point — it calls `mastraAgent.stream()` and pipes chunks to the response.
 
 ---
 
-## Integration Points with Existing Architecture
+## Critical Constraint: Fastify v4 vs @mastra/fastify
 
-### Component Modification Matrix
+The `@mastra/fastify` adapter package specifies peer dependency `fastify: "^5.0.0"` (confirmed via npm). The existing backend uses Fastify v4. Fastify v5 has breaking changes (schema validation requirements, logger API, redirect arg order, decorator restrictions) that would require systematic updates across all 12 route files.
 
-| Component | Status | Modification Type | Why |
-|-----------|--------|------------------|-----|
-| **TradeRecommendationAgent** | EXTEND | Add multi-player simulation | Currently hardcoded 1-for-1; needs N-for-M logic |
-| **SnapshotOrchestratorAgent** | EXTEND | Add historical backfill mode | Currently only fetches current scoring period |
-| **ESPNAdapter** | EXTEND | Add `scoringPeriodId` parameter | Adapter supports it, orchestrator doesn't use it |
-| **StandingsProjectionAgent** | NO CHANGE | Use as-is | Already computes projected standings from any snapshot |
-| **Database schema** | NO CHANGE | Use existing tables | All data fits current snapshot + transaction tables |
-| **API routes** | NEW | Add retrospective endpoints | New routes querying existing data with time filters |
-| **Frontend components** | NEW | Timeline visualizations | New components consuming existing timeseries endpoints |
+**Decision: Do not use `@mastra/fastify` adapter. Use `@mastra/core` directly.**
 
-**Critical insight:** 90% of needed data already exists. This is a *views and simulation* milestone, not a *data model* milestone.
+The `Agent` class from `@mastra/core/agent` has no dependency on Fastify. You can call `agent.stream()` from a Fastify v4 route handler the same way you call any async function. The adapter only adds value for auto-generated REST endpoints that expose agents to external callers — not needed here since we control the route contract.
 
 ---
 
-## 1. Multi-Player Trade Evaluation Architecture
+## Architecture Overview
 
-### Current State (1-for-1 Trades)
-
-```typescript
-// TradeRecommendationAgent.simulateTradeImpact (line 540-776)
-// Current flow:
-1. Start with projected final season totals (from team_daily_projected_category)
-2. Subtract ROS projections for 1 player being traded away
-3. Add ROS projections for 1 player being acquired
-4. Re-rank all teams to calculate new standings
-```
-
-**Limitation:** Hardcoded to single player in `givePlayers[0]` and `receivePlayers[0]`.
-
-### Extended Architecture (N-for-M Trades)
-
-**No algorithm changes needed.** The existing simulation loop already iterates over `givePlayers[]` and `receivePlayers[]` arrays (lines 634-642, 644-652). The current 1-for-1 limitation is only in the `generateTradeCandidates` function (line 338-350), which constructs single-player trades.
-
-#### Integration Changes
-
-**1. Extend `ProposedTrade` interface** (already supports arrays):
-```typescript
-// packages/backend/src/agents/trade-recommendation.ts:22-30
-export interface ProposedTrade {
-  givePlayers: TradePlayer[];      // ✓ Already array
-  receivePlayers: TradePlayer[];   // ✓ Already array
-}
-```
-
-**2. Add multi-player candidate generation**:
-```typescript
-// NEW method in TradeRecommendationAgent
-async generateMultiPlayerCandidates(
-  leagueId: number,
-  teamId: number,
-  snapshotDate: string,
-  tradeStructure: { give: number; receive: number }, // e.g., {give: 2, receive: 2}
-  maxCandidates: number = 10
-): Promise<TradeCandidate[]>
-```
-
-**Strategy:** Use genetic algorithm approach from research ([arXiv:2511.17535](https://www.arxiv.org/pdf/2511.17535)) to avoid combinatorial explosion:
+### Current Flow (No Streaming, No Memory, No Tools)
 
 ```
-For 2-for-2 trades with 15-player rosters:
-- Brute force: C(15,2) × C(15,2) = 105 × 105 = 11,025 combinations
-- Genetic algorithm: ~500-1000 evaluations (95% reduction)
+Chrome Extension
+  useNarrator hook fires trigger
+    ↓
+  POST /api/draft/narrate
+  body: NarratorPayload (structured signals)
+    ↓
+  Fastify route handler
+    ↓
+  DraftNarratorAgent.narrate(payload)
+    → Manually builds prompt string
+    → Calls OpenAI chat.completions.create (non-streaming)
+    → Returns { narration: string }
+    ↓
+  Extension receives JSON, calls setNarration(data.narration)
+  UI shows full text instantly
 ```
 
-**Algorithm sketch:**
-```typescript
-// Initial population: Random N-for-M trade combinations
-// Fitness function: deltaOverallPoints from simulateTradeImpact
-// Crossover: Swap players between candidate trades
-// Mutation: Replace one player with random roster player
-// Termination: 500 evaluations or convergence
-```
-
-**3. API endpoint extension**:
-```typescript
-// NEW route in packages/backend/src/api/recommendations.ts
-GET /api/leagues/:id/teams/:teamId/trades/recommendations
-  ?tradeSize=2x2  // "1x1", "2x2", "3x1", etc.
-  &maxCandidates=10
-```
-
-#### Data Flow (Multi-Player)
+### Target Flow (Mastra Agent with Streaming + Tools + Memory)
 
 ```
-Frontend Trade Builder
-  ↓
-POST /api/leagues/:id/teams/:teamId/trades/impact
-  body: { givePlayers: [p1, p2], receivePlayers: [p3, p4] }
-  ↓
-TradeRecommendationAgent.analyzeTradeImpact(...)
-  ↓
-simulateTradeImpact(...) [UNCHANGED — already handles arrays]
-  → Loop over givePlayers[] (subtract ROS projections)
-  → Loop over receivePlayers[] (add ROS projections)
-  → Re-rank teams → Calculate category impacts
-  ↓
-Return TradeImpactAnalysis { deltaOverallPoints, categoryImpacts }
-```
+Chrome Extension
+  useNarrator hook fires trigger
+    ↓
+  POST /api/draft/narrate (MODIFIED: accepts SSE response)
+  body: NarratorPayload
+    ↓
+  Fastify route handler
+    → Sets Content-Type: text/event-stream
+    → reply.raw.writeHead(200, SSE headers)
+    → Builds message array from NarratorPayload
+    ↓
+  mastraAgent.stream(messages, { memory: { resource, thread } })
+    → Agent decides to call tools if needed:
+        getPlayerProjection(playerName)    ← looks up FanGraphs data
+        getAuctionComps(playerName)        ← gets market comparables
+    → LLM streams token chunks
+    ↓
+  for await (const chunk of stream.textStream)
+    → reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`)
+    ↓
+  on finish: reply.raw.write("data: [DONE]\n\n") + reply.raw.end()
 
-**No changes to `simulateTradeImpact` method.** It already works for N-for-M trades.
-
-#### Complexity Considerations
-
-| Trade Size | Combinations (15-player roster) | Strategy | Est. Runtime |
-|------------|--------------------------------|----------|--------------|
-| 1-for-1 | 225 | Brute force (current) | ~5s |
-| 2-for-2 | 11,025 | Genetic algorithm | ~15s |
-| 3-for-1 | 6,825 | Genetic algorithm | ~12s |
-| 3-for-3 | ~455k | Genetic + early termination | ~30s |
-
-**Risk mitigation:**
-- Cap at 3-for-3 trades (UI constraint)
-- Background job for large searches (BullMQ)
-- Cache candidate trades per snapshot (Redis)
-
----
-
-## 2. Historical Data Backfill Architecture
-
-### ESPN API Historical Access Pattern
-
-**ESPN API supports historical data via `scoringPeriodId` parameter:**
-
-```typescript
-// ESPNAdapter.fetchLeague already accepts scoringPeriodId (line 24)
-interface ESPNFetchOptions {
-  scoringPeriodId?: number;  // ✓ Supported but unused
-}
-```
-
-**Endpoint pattern:**
-```
-GET /seasons/2025/segments/0/leagues/123456?scoringPeriodId=42
-  → Returns league state as of scoring period 42
-```
-
-**Scoring period mapping** (baseball):
-- Period 0: Preseason (before games)
-- Period 1-26: Weekly scoring periods (Apr-Sep)
-- Period 27+: Postseason
-
-**Data availability:** ESPN retains historical data for current + prior season ([source: GitHub discussion #525](https://github.com/cwendt94/espn-api/discussions/525)). Older seasons may be deleted by ESPN.
-
-### Backfill Agent Architecture
-
-**NEW: HistoricalBackfillAgent**
-
-```typescript
-// packages/backend/src/agents/historical-backfill.ts
-
-export class HistoricalBackfillAgent {
-  constructor(
-    private db: Kysely<Database>,
-    private espnAdapter: ESPNAdapter,
-    private snapshotOrchestrator: SnapshotOrchestratorAgent,
-    private logger?: Logger
-  ) {}
-
-  /**
-   * Backfill historical snapshots for a league
-   * Fetches ESPN data for each scoring period and runs snapshot pipeline
-   */
-  async backfillLeague(
-    leagueId: number,
-    startPeriod: number,
-    endPeriod: number,
-    options: { dryRun?: boolean; skipExisting?: boolean }
-  ): Promise<BackfillReport>
-}
-```
-
-#### Data Flow (Backfill)
-
-```
-User triggers backfill via admin UI
-  ↓
-POST /api/admin/leagues/:id/backfill
-  body: { startDate: "2025-04-01", endDate: "2025-09-30" }
-  ↓
-Queue BullMQ job: historical-backfill
-  ↓
-HistoricalBackfillAgent.backfillLeague(...)
-  ↓
-For each scoring period (start → end):
-  1. Determine snapshot date (Monday of scoring period)
-  2. Check if snapshot exists (skipExisting: true)
-  3. Fetch ESPN data with scoringPeriodId parameter
-  4. Run SnapshotOrchestratorAgent (reuse existing pipeline!)
-     → Archive raw payload
-     → Normalize data
-     → Write snapshot tables
-     → Compute projections (if ROS projections available)
-     → Fetch transactions (if available)
-  5. Sleep 2s between requests (rate limiting)
-  ↓
-Return BackfillReport { processed, skipped, failed, snapshots }
-```
-
-**Key insight:** Reuse `SnapshotOrchestratorAgent.executeSnapshot()` with `forceFresh: true`. No new snapshot logic needed.
-
-#### Projection Handling for Historical Snapshots
-
-**Problem:** ROS projections from 2025-04-01 won't exist in 2026.
-
-**Solution:** Mark historical snapshots as degraded:
-
-```typescript
-// SnapshotOrchestratorAgent (line 124-137)
-// Already has degraded_reasons tracking!
-
-if (!projectionsRun || projectionsRun.as_of_date !== snapshotDate) {
-  isDegraded = true;
-  degradedReasons.push("projections_missing");
-}
-```
-
-**Historical snapshots will:**
-- ✓ Have current standings (from ESPN data)
-- ✓ Have transactions (from mTransactions2 view)
-- ✓ Have roster snapshots
-- ✗ NOT have projected standings (degraded)
-
-**Trade retrospective will use actual results, not projections.**
-
-#### API Endpoints (Backfill)
-
-```typescript
-// NEW routes in packages/backend/src/api/admin.ts
-
-POST /api/admin/leagues/:id/backfill
-  body: { startDate: string; endDate: string; skipExisting?: boolean }
-  → Queue backfill job → Return jobId
-
-GET /api/admin/jobs/:jobId/status
-  → Return { status, progress, report }
+Chrome Extension
+  useNarrator receives SSE stream
+    → Processes tokens as they arrive
+    → setNarration accumulates partial text
+    → UI shows text as it streams
 ```
 
 ---
 
-## 3. Season Replay Timeline Architecture
+## Component Map: New vs Modified
 
-### Existing Data (No Changes Needed)
+### New Files
 
-All data already exists in current schema:
+| File | Purpose |
+|------|---------|
+| `packages/backend/src/mastra/index.ts` | Mastra instance (agent registry, memory config) |
+| `packages/backend/src/mastra/agents/draft-narrator-agent.ts` | Mastra Agent definition with tools |
+| `packages/backend/src/mastra/tools/player-projection-tool.ts` | Tool: look up FanGraphs projection for player |
+| `packages/backend/src/mastra/tools/auction-comp-tool.ts` | Tool: get market comps for player at current inflation |
+| `packages/backend/src/mastra/tools/draft-state-tool.ts` | Tool: query backend DB for current roster state |
 
-| Data Type | Table | Available? |
-|-----------|-------|-----------|
-| Daily standings | `team_daily_overall` | ✓ (from league connect date) |
-| Category ranks | `team_daily_category_ranks` | ✓ |
-| Roster snapshots | `team_roster_snapshot` | ✓ |
-| Transactions | `league_transaction_event` | ✓ |
-| Projected standings | `team_daily_projected_overall` | ✓ (if projections uploaded) |
+### Modified Files
 
-### Timeline Visualization Strategy
+| File | Change | Why |
+|------|--------|-----|
+| `packages/backend/src/api/draft.ts` | Replace `DraftNarratorAgent` call with `mastraAgent.stream()`, add SSE headers to `/api/draft/narrate` | Replace non-streaming JSON with streaming SSE |
+| `packages/extension/lib/use-narrator.ts` | Change `response.json()` to SSE stream reader | Consume streaming response instead of full JSON |
+| `packages/backend/package.json` | Add `@mastra/core`, `@mastra/memory`, `@mastra/pg` | New deps |
 
-**Frontend component architecture:**
+### No-Change Files
 
-```typescript
-// NEW: packages/frontend/src/components/SeasonTimeline.tsx
-
-<SeasonTimeline leagueId={123} teamId={456} />
-  ↓
-Fetch parallel:
-  - /api/leagues/123/timeseries/overall?teamIds=456
-  - /api/leagues/123/timeseries/annotations?teamIds=456
-  - /api/leagues/123/timeseries/projected-overall?teamIds=456
-  ↓
-Merge data:
-  - X-axis: snapshot_date (time)
-  - Y-axis: overall_rank or overall_points
-  - Annotations: transaction_event markers
-  ↓
-Render Recharts LineChart with:
-  - Line 1: Actual standings (team_daily_overall)
-  - Line 2: Projected standings (team_daily_projected_overall)
-  - Annotations: Vertical lines for trades/adds/drops
-```
-
-**Existing API endpoints already support this** (packages/backend/src/api/timeseries.ts):
-- ✓ `GET /api/leagues/:id/timeseries/overall` (line 20-62)
-- ✓ `GET /api/leagues/:id/timeseries/annotations` (line 292-328)
-- ✓ `GET /api/leagues/:id/timeseries/projected-overall` (line 109-145)
-
-**No new backend code needed.** Only frontend visualization.
-
-#### Enhanced Timeline Features
-
-**NEW endpoint for trade impact correlation:**
-
-```typescript
-// NEW route in packages/backend/src/api/timeseries.ts
-
-GET /api/leagues/:id/teams/:teamId/timeline/impact-analysis
-  ?from=2025-04-01&to=2025-09-30
-  ↓
-For each transaction in date range:
-  1. Get standings snapshot BEFORE transaction (event_date - 1 day)
-  2. Get standings snapshot AFTER transaction (event_date + 7 days)
-  3. Calculate delta: overall_rank, category_ranks
-  4. Return { transaction, beforeRank, afterRank, deltaRank, deltaPoints }
-```
-
-**Data structure:**
-```typescript
-interface TransactionImpactTimeline {
-  transactions: Array<{
-    eventTime: Date;
-    eventType: "add" | "drop" | "trade" | "waiver";
-    playersAdded: number[];
-    playersDropped: number[];
-    beforeStandings: { rank: number; points: number };
-    afterStandings: { rank: number; points: number };
-    deltaRank: number;
-    deltaPoints: number;
-    significance: "major" | "minor" | "negligible";
-  }>;
-}
-```
+| File | Why untouched |
+|------|--------------|
+| `packages/backend/src/agents/draft-narrator.ts` | Deprecated by Mastra agent — keep for reference, delete when stable |
+| `packages/backend/src/index.ts` | Server setup unchanged — no adapter needed |
+| `packages/extension/lib/engine/` | All deterministic engine logic unchanged |
+| `packages/shared/src/` | NarratorPayload type stays as-is |
 
 ---
 
-## 4. Trade Retrospective Architecture
+## Folder Structure
 
-### Analysis Pattern
-
-**Question:** "Did trading Player A for Player B in Week 8 help my season?"
-
-**Data sources:**
-1. Transaction event (what was traded, when)
-2. Snapshot BEFORE trade (standings, roster)
-3. Snapshot AFTER trade (actual outcome)
-4. Player projections AS OF trade date (expected outcome)
-
-**Comparison:**
-```
-Actual path:    Standings before → Execute trade → Actual standings after
-Counterfactual: Standings before → No trade      → Projected standings after
-Delta:          Actual - Counterfactual = Trade impact
-```
-
-### Implementation
-
-**NEW: TradeRetrospectiveAgent**
-
-```typescript
-// packages/backend/src/agents/trade-retrospective.ts
-
-export class TradeRetrospectiveAgent {
-  constructor(
-    private db: Kysely<Database>,
-    private tradeAgent: TradeRecommendationAgent,
-    private logger?: Logger
-  ) {}
-
-  /**
-   * Analyze actual impact of a past trade
-   */
-  async analyzeHistoricalTrade(
-    leagueId: number,
-    transactionId: number
-  ): Promise<TradeRetrospectiveAnalysis>
-}
-```
-
-#### Analysis Flow
+Mastra agent definitions live inside the existing backend package, not a separate package:
 
 ```
-TradeRetrospectiveAgent.analyzeHistoricalTrade(leagueId, txnId)
-  ↓
-1. Fetch transaction from league_transaction_event
-   → Extract: event_date, team_id, counterparty_team_id, players_added, players_dropped
-  ↓
-2. Get snapshot BEFORE trade (event_date - 1 day)
-   → team_daily_overall: beforeRank, beforePoints
-   → team_roster_snapshot: rosterBefore
-  ↓
-3. Get snapshot AFTER trade (event_date + 14 days)
-   → team_daily_overall: actualAfterRank, actualAfterPoints
-  ↓
-4. Simulate counterfactual (what if trade DIDN'T happen?)
-   → Use TradeRecommendationAgent.simulateTradeImpact()
-   → Reverse the trade: give = receivedPlayers, receive = tradedAwayPlayers
-   → Expected outcome: projectedAfterRank, projectedAfterPoints
-  ↓
-5. Calculate impact
-   → actualDelta = actualAfterPoints - beforePoints
-   → expectedDelta = projectedAfterPoints - beforePoints
-   → surpriseFactor = actualDelta - expectedDelta
-  ↓
-Return TradeRetrospectiveAnalysis {
-  transaction,
-  before: { rank, points },
-  actual: { rank, points, delta },
-  expected: { rank, points, delta },
-  verdict: "helped" | "hurt" | "neutral",
-  surpriseFactor,
-  explanation: "Trading X for Y gained you 3.2 points vs projected 1.5"
-}
+packages/backend/src/
+  mastra/
+    index.ts                        ← Mastra instance, registers agents
+    agents/
+      draft-narrator-agent.ts       ← Agent definition with tools + memory
+    tools/
+      player-projection-tool.ts     ← createTool() for FanGraphs lookups
+      auction-comp-tool.ts          ← createTool() for market comps
+      draft-state-tool.ts           ← createTool() for DB queries
+  api/
+    draft.ts                        ← MODIFIED: uses mastraAgent.stream()
+  agents/
+    draft-narrator.ts               ← OLD: kept temporarily, delete later
 ```
 
-### API Endpoints (Retrospective)
-
-```typescript
-// NEW routes in packages/backend/src/api/trades.ts
-
-GET /api/leagues/:id/teams/:teamId/trades/history
-  → List all trades for team with actual impact
-
-GET /api/leagues/:id/teams/:teamId/trades/:transactionId/retrospective
-  → Detailed analysis of one trade (actual vs expected)
-
-GET /api/leagues/:id/teams/:teamId/trades/performance
-  → Aggregate: How well did your trades perform this season?
-    → { totalTrades, avgActualDelta, avgExpectedDelta, winRate }
-```
+This colocation approach avoids monorepo compilation issues. Mastra docs confirm workspace packages with uncompiled TypeScript cause `ERR_UNKNOWN_FILE_EXTENSION` errors. Co-locating within the existing compiled package eliminates this.
 
 ---
 
-## Build Order & Dependencies
+## Component Definitions
 
-### Recommended Phasing
-
-**Phase 1: Multi-Player Trade Evaluation (8-12 days)**
-- Extend `TradeRecommendationAgent` with genetic algorithm candidate generation
-- Add API endpoints for N-for-M trade structures
-- Frontend: Multi-select player picker in trade builder
-- **Dependency:** None (pure extension of existing agent)
-
-**Phase 2: Historical Backfill (5-8 days)**
-- Build `HistoricalBackfillAgent`
-- Add admin API endpoints + BullMQ job
-- Wire `scoringPeriodId` parameter through ESPN adapter
-- Frontend: Admin backfill UI with progress tracking
-- **Dependency:** None (isolated from other features)
-
-**Phase 3: Season Timeline Visualization (3-5 days)**
-- Frontend: `SeasonTimeline` component using Recharts
-- Add transaction impact correlation endpoint
-- Frontend: Transaction annotation tooltips
-- **Dependency:** Phase 2 (historical snapshots) for full timeline; works with partial data
-
-**Phase 4: Trade Retrospective (6-10 days)**
-- Build `TradeRetrospectiveAgent`
-- Add retrospective API endpoints
-- Frontend: Trade history view with impact cards
-- **Dependency:** Phase 1 (multi-player simulation), Phase 2 (historical data), Phase 3 (timeline visualization for context)
-
-**Total timeline:** 22-35 days (sequential). Can parallelize Phase 1 + Phase 2 to reduce to 20-28 days.
-
----
-
-## Component Extension Details
-
-### 1. ESPNAdapter Extensions
-
-**File:** `packages/backend/src/adapters/espn.ts`
-
-**Change:** Use existing `scoringPeriodId` parameter in backfill mode
+### Mastra Instance (`packages/backend/src/mastra/index.ts`)
 
 ```typescript
-// Line 256: fetchLeague() already accepts scoringPeriodId
-// No code changes needed — just use it in SnapshotOrchestrator
-```
+import { Mastra } from "@mastra/core";
+import { Memory } from "@mastra/memory";
+import { PostgresStore } from "@mastra/pg";
+import { draftNarratorAgent } from "./agents/draft-narrator-agent.js";
 
-**Verification:**
-```typescript
-// Test that scoringPeriodId parameter works
-const historicalData = await espnAdapter.fetchLeague({
-  leagueId: 123,
-  season: 2025,
-  scoringPeriodId: 42, // Week 42 of 2025 season
-  auth: cookies
+export const mastra = new Mastra({
+  agents: { draftNarratorAgent },
+  storage: new PostgresStore({
+    connectionString: process.env.DATABASE_URL!,
+  }),
 });
-// Expect: data from that specific week, not current week
-```
 
-### 2. SnapshotOrchestratorAgent Extensions
-
-**File:** `packages/backend/src/agents/snapshot-orchestrator.ts`
-
-**Change:** Add optional `scoringPeriodId` to `SnapshotJobOptions`
-
-```typescript
-// Line 17: Extend interface
-export interface SnapshotJobOptions {
-  leagueId: number;
-  snapshotDate: string;
-  espnAuth?: ESPNAuthCookies;
-  forceFresh?: boolean;
-  scoringPeriodId?: number; // NEW: For historical backfill
-}
-
-// Line 71: Pass scoringPeriodId to adapter
-const espnData = await this.espnAdapter.fetchLeague({
-  leagueId: league.espn_league_id,
-  season: league.season,
-  auth: espnAuth,
-  scoringPeriodId: scoringPeriodId, // NEW
-  views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
-  // ...
+export const draftMemory = new Memory({
+  storage: new PostgresStore({
+    connectionString: process.env.DATABASE_URL!,
+  }),
+  options: {
+    lastMessages: 10, // keep 10-message window per draft session
+  },
 });
 ```
 
-**No other changes needed.** Rest of pipeline works as-is.
+**Why PostgreSQL for memory:** The existing app already uses PostgreSQL (same `DATABASE_URL`). `@mastra/pg` (v1.7.2 as of March 2026) stores message history in Mastra-managed tables separate from the app's Kysely schema. No schema conflict.
 
-### 3. TradeRecommendationAgent Extensions
+**Why not Redis for memory:** Redis is used for rate limiting and caching but not for conversational memory. PostgreSQL is more appropriate for structured thread history that needs durability.
 
-**File:** `packages/backend/src/agents/trade-recommendation.ts`
+---
 
-**New method:**
+### Draft Narrator Agent (`packages/backend/src/mastra/agents/draft-narrator-agent.ts`)
+
 ```typescript
-// Add after generateTradeCandidates() (line 408)
+import { Agent } from "@mastra/core/agent";
+import { draftMemory } from "../index.js";
+import { playerProjectionTool } from "../tools/player-projection-tool.js";
+import { auctionCompTool } from "../tools/auction-comp-tool.js";
 
-/**
- * Generate multi-player trade candidates using genetic algorithm
- */
-async generateMultiPlayerCandidates(
-  leagueId: number,
-  teamId: number,
-  snapshotDate: string,
-  tradeStructure: { give: number; receive: number },
-  maxCandidates: number = 10,
-  maxGenerations: number = 50
-): Promise<TradeCandidate[]> {
-  // Genetic algorithm implementation
-  // 1. Initial population: Random N-for-M combinations
-  // 2. Fitness: Call existing analyzeTradeImpact() (works for N-for-M!)
-  // 3. Selection: Tournament selection (top 20%)
-  // 4. Crossover: Swap players between trades
-  // 5. Mutation: Replace one player (10% chance)
-  // 6. Termination: maxGenerations or convergence
-  // Return top candidates by fitness (deltaOverallPoints)
+const SYSTEM_PROMPT = `You are a tactical fantasy baseball auction draft advisor...
+[same prompt as current DraftNarratorAgent system prompt]`;
+
+export const draftNarratorAgent = new Agent({
+  id: "draft-narrator",
+  name: "Draft Narrator",
+  instructions: SYSTEM_PROMPT,
+  model: "openai/gpt-4.1-mini-2025-04-14",
+  tools: { playerProjectionTool, auctionCompTool },
+  memory: draftMemory,
+});
+```
+
+**Why same model as existing:** No regression risk. The existing `MODEL_ID = "gpt-4.1-mini-2025-04-14"` continues.
+
+**Why these two tools first:** They cover the most actionable questions the LLM can't answer from the NarratorPayload alone. Player projection gives it FanGraphs context. Auction comp gives it market pricing context. Both have finite, fast DB queries behind them.
+
+---
+
+### Tool: Player Projection (`packages/backend/src/mastra/tools/player-projection-tool.ts`)
+
+```typescript
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { getDb } from "../../db/connection.js";
+
+export const playerProjectionTool = createTool({
+  id: "get-player-projection",
+  description: "Look up FanGraphs ROS projections for a player by name",
+  inputSchema: z.object({
+    playerName: z.string().describe("Player full name, e.g. 'Shohei Ohtani'"),
+  }),
+  outputSchema: z.object({
+    found: z.boolean(),
+    playerName: z.string().optional(),
+    projectedStats: z.record(z.number()).optional(),
+    note: z.string().optional(),
+  }),
+  execute: async ({ playerName }) => {
+    const db = getDb();
+    const projection = await db
+      .selectFrom("player_projection as pp")
+      .innerJoin("player as p", "p.id", "pp.player_id")
+      .select(["p.name", "pp.projected_stats"])
+      .where("p.name", "ilike", `%${playerName}%`)
+      .orderBy("pp.created_at", "desc")
+      .executeTakeFirst();
+
+    if (!projection) {
+      return { found: false, note: "No FanGraphs projection found" };
+    }
+    return {
+      found: true,
+      playerName: projection.name,
+      projectedStats: projection.projected_stats as Record<string, number>,
+    };
+  },
+});
+```
+
+**Why `getDb()` inside tool:** The tool is called during agent execution inside a Fastify request. `getDb()` returns the existing singleton Kysely instance. Tools are synchronous closures that close over the module scope — using the existing DB connection pattern avoids creating new DB pools.
+
+---
+
+### Modified Fastify Route (`packages/backend/src/api/draft.ts` — narrate endpoint)
+
+```typescript
+// POST /api/draft/narrate — MODIFIED for streaming
+app.post<{ Body: NarratorPayload }>(
+  "/api/draft/narrate",
+  { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+  async (request, reply) => {
+    const payload = request.body as NarratorPayload;
+
+    if (!payload.alerts?.length && !payload.currentAuctionPlayer) {
+      return reply.code(400).send({ error: "No meaningful signals provided" });
+    }
+
+    // SSE headers — must set before writing to reply.raw
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "https://fantasy.espn.com",
+    });
+
+    try {
+      const agent = mastra.getAgent("draftNarratorAgent");
+
+      // Convert NarratorPayload to message string (same logic as buildUserMessage)
+      const userMessage = buildUserMessage(payload);
+
+      // Thread = draft session; resource = "extension" (no user identity in extension)
+      const stream = await agent.stream(
+        [{ role: "user", content: userMessage }],
+        {
+          memory: {
+            resource: "extension",
+            thread: `draft-session-${Date.now()}`, // or persistent per-session ID
+          },
+        }
+      );
+
+      for await (const chunk of stream.textStream) {
+        reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+      }
+
+      reply.raw.write("data: [DONE]\n\n");
+    } catch (error) {
+      request.log.error({ err: error }, "[DraftNarrator] Streaming failed");
+      // SSE error event before ending
+      reply.raw.write(`data: ${JSON.stringify({ error: "narration failed" })}\n\n`);
+    } finally {
+      reply.raw.end();
+    }
+  }
+);
+```
+
+**Why `reply.raw` instead of Fastify's reply API:** Fastify's reply serialization closes the response after `reply.send()`. For streaming, you must bypass Fastify's response lifecycle and write directly to the underlying Node.js `ServerResponse`. This is documented in the Fastify community and confirmed by existing patterns.
+
+**Why not `@fastify/sse`:** The `@fastify/sse` plugin adds `reply.sse()` convenience but imposes its own event format and lifecycle management. Using `reply.raw` directly gives full control over the SSE wire format, which must match what the extension client expects.
+
+---
+
+### Modified Extension Hook (`packages/extension/lib/use-narrator.ts`)
+
+The `fireNarration` function needs to change from `response.json()` to SSE stream reading:
+
+```typescript
+// BEFORE (in fireNarration):
+const response = await fetch(`${baseUrl}/api/draft/narrate`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+  signal: abortControllerRef.current.signal,
+});
+const data = await response.json();
+setNarration(data.narration ?? "");
+
+// AFTER (streaming SSE):
+const response = await fetch(`${baseUrl}/api/draft/narrate`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+  signal: abortControllerRef.current.signal,
+});
+
+if (!response.ok || !response.body) {
+  throw new Error(`HTTP ${response.status}`);
+}
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let accumulated = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const text = decoder.decode(value, { stream: true });
+  const lines = text.split("\n");
+  for (const line of lines) {
+    if (!line.startsWith("data: ")) continue;
+    const data = line.slice(6).trim();
+    if (data === "[DONE]") break;
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed.text) {
+        accumulated += parsed.text;
+        setNarration(accumulated); // Update UI progressively
+      }
+    } catch {
+      // Ignore malformed SSE lines
+    }
+  }
 }
 ```
 
-**Critical:** `simulateTradeImpact()` method (line 540-776) **already supports N-for-M** via loops over `givePlayers[]` and `receivePlayers[]`. No changes needed there.
+**Why `fetch` + `ReadableStream` instead of `EventSource`:** `EventSource` only supports GET requests. The narrator sends a POST with a body (NarratorPayload). Chrome extension content scripts support `fetch` with `response.body.getReader()` — this is the standard pattern for POST-based SSE in extensions.
+
+**Why progressive `setNarration`:** Each chunk updates the UI immediately. The user sees text appearing word by word rather than waiting for the full response. This is the primary UX benefit of streaming.
 
 ---
 
-## Data Model Impact
+## Memory Architecture
 
-### Schema Changes: NONE
+### Thread and Resource Strategy
 
-All features use existing tables:
-- ✓ `league_daily_snapshot` (historical snapshots)
-- ✓ `team_daily_overall` (standings timeline)
-- ✓ `team_daily_category_ranks` (category timeline)
-- ✓ `team_roster_snapshot` (roster changes)
-- ✓ `league_transaction_event` (trade/waiver annotations)
-- ✓ `team_daily_projected_overall` (projected timeline)
+Mastra memory organizes history by `resource` (the owner entity) and `thread` (the conversation session).
 
-**Only addition:** Index optimization for timeline queries
+For the draft narrator use case:
 
-```sql
--- NEW index for efficient timeline queries
-CREATE INDEX idx_team_daily_overall_timeline
-  ON team_daily_overall(league_id, team_id, snapshot_date);
+| Concept | Value | Rationale |
+|---------|-------|-----------|
+| `resource` | `"extension"` | All draft sessions are from one Chrome extension. No per-user identity in extension context. |
+| `thread` | `draft-${leagueId}-${dateStamp}` | One thread per draft session per day per league. Keeps history scoped to one draft. |
 
-CREATE INDEX idx_transaction_event_timeline
-  ON league_transaction_event(league_id, team_id, event_date);
+**Thread lifecycle:** A draft session is typically 2-3 hours. Using `draft-${leagueId}-${date}` as the thread ID means all narrator calls in one draft share context. The agent's last 10 messages (configured `lastMessages: 10`) give it enough context to avoid repeating advice already given.
+
+**What gets stored:** Mastra automatically stores both user messages (the formatted NarratorPayload text) and agent responses. This means the agent remembers it already said "Ohtani is overpriced" earlier in the draft.
+
+### PostgreSQL Memory Tables
+
+`@mastra/pg` creates its own tables in the same PostgreSQL database. These tables do not conflict with the existing Kysely schema:
+
+```
+mastra_messages        ← message history per thread
+mastra_threads         ← thread metadata
+mastra_resources       ← resource registry
+```
+
+**No migration needed in Kysely.** The PostgresStore initializes its own tables on first use. They should be excluded from the Kysely schema file (`packages/backend/src/db/schema.ts`).
+
+---
+
+## Data Flow Diagram
+
+### Full Request Flow: Extension → Backend → Mastra Agent → Tools → Response
+
+```
+1. TRIGGER (Chrome extension)
+   ─────────────────────────────
+   useNarrator detects: new nomination OR alert severity > 0.65 OR pacing change
+   Debounce: 1500ms window clusters rapid events
+   buildNarratorPayload(signals, triggerReason, context) → NarratorPayload
+
+2. HTTP REQUEST
+   ─────────────────────────────
+   POST /api/draft/narrate
+   Headers: Content-Type: application/json
+   Body: NarratorPayload (structured signals, no raw arrays)
+
+3. FASTIFY ROUTE HANDLER (draft.ts)
+   ─────────────────────────────
+   Validates payload (alerts present OR currentAuctionPlayer present)
+   Sets SSE headers via reply.raw.writeHead(200, {...})
+   Calls buildUserMessage(payload) → string (same as current DraftNarratorAgent)
+   Calls mastra.getAgent("draftNarratorAgent")
+
+4. MASTRA AGENT EXECUTION
+   ─────────────────────────────
+   agent.stream(messages, { memory: { resource, thread } })
+   ├── Memory lookup: fetch last 10 messages for this thread
+   ├── LLM decides: do I need tool data?
+   │   ├── YES: calls playerProjectionTool({ playerName: "Shohei Ohtani" })
+   │   │   └── Tool queries PostgreSQL player_projection table via getDb()
+   │   │   └── Returns { projectedStats: { HR: 42, R: 95, ... } }
+   │   └── NO: proceeds directly to generation
+   └── LLM generates streaming response
+
+5. STREAMING OUTPUT
+   ─────────────────────────────
+   for await (chunk of stream.textStream)
+     reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`)
+   reply.raw.write("data: [DONE]\n\n")
+   reply.raw.end()
+
+6. EXTENSION RECEIVES STREAM
+   ─────────────────────────────
+   response.body.getReader() reads chunks
+   Each "data: {...}" line parsed
+   accumulated += chunk.text
+   setNarration(accumulated) called on each chunk → progressive UI update
+   [DONE] sentinel ends read loop
 ```
 
 ---
 
-## Performance Considerations
+## Streaming Event Format
 
-### Multi-Player Trade Candidate Search
+**SSE wire format used by the narrate endpoint:**
 
-| Concern | Mitigation |
-|---------|-----------|
-| Combinatorial explosion | Genetic algorithm (95% reduction in evaluations) |
-| Long response times | Queue as BullMQ job; return jobId; poll for results |
-| Cache invalidation | Cache per (leagueId, snapshotDate, tradeStructure) → Invalidate on new snapshot |
+```
+data: {"text":"At "}\n\n
+data: {"text":"$45 "}\n\n
+data: {"text":"Ohtani "}\n\n
+data: {"text":"is overpriced"}\n\n
+data: [DONE]\n\n
+```
 
-### Historical Backfill
+**Error event:**
 
-| Concern | Mitigation |
-|---------|-----------|
-| ESPN rate limits | Sleep 2s between requests; retry with exponential backoff |
-| Large data volume | Process in chunks (5 periods at a time); checkpoint progress |
-| Database load | Batch inserts (10 snapshots per transaction); VACUUM after backfill |
+```
+data: {"error":"narration failed"}\n\n
+```
 
-### Timeline Queries
-
-| Concern | Mitigation |
-|---------|-----------|
-| Full table scan | Add composite index on (league_id, team_id, snapshot_date) |
-| Large result sets | Paginate timeline (default: 30 days; max: 180 days) |
-| Join overhead | Denormalize transaction metadata in annotations response |
+**Why not use Mastra's built-in SSE format:** Mastra's built-in event format emits typed events (text-delta, tool-call, tool-result, etc.). For the narrator use case, the extension only needs text chunks plus a done signal. Using a minimal format reduces extension parsing complexity and avoids coupling to Mastra's internal event schema.
 
 ---
 
-## Risk Assessment
+## Tool Execution Pattern
 
-### High Risk
+### How the Agent Decides to Call Tools
 
-**ESPN historical data availability**
-- Risk: ESPN may not retain data older than current season
-- Mitigation: Document supported date ranges; graceful degradation if data missing
-- Confidence: MEDIUM ([ESPN deletes old data per GitHub discussion](https://github.com/cwendt94/espn-api/discussions/525))
+Mastra agents use the LLM's function-calling capability. The LLM sees tool descriptions and decides when they add value. For the draft narrator:
 
-### Medium Risk
+- **`get-player-projection`** — agent calls this when a player is nominated and the NarratorPayload has limited stat context, or when it wants to verify a claim before making a recommendation
+- **`get-auction-comp`** — agent calls this when the current bid is near a player's estimated value and it needs market context
 
-**Multi-player trade performance**
-- Risk: 3-for-3 trades may timeout (>30s)
-- Mitigation: Background jobs; cache results; cap at 3-for-3 max
-- Confidence: HIGH (genetic algorithm tested in [arXiv paper](https://www.arxiv.org/pdf/2511.17535))
+Tool calls happen before the streaming text response begins. The agent resolves all tools first, then streams the final response.
 
-### Low Risk
+**Implication:** First token latency is higher when tools fire (one extra DB roundtrip). When no tools fire, first token latency is similar to the current non-streaming implementation (~300-500ms).
 
-**Timeline visualization accuracy**
-- Risk: Snapshot gaps (missed days) create jagged charts
-- Mitigation: Linear interpolation; "data missing" annotations
-- Confidence: HIGH (time-series visualization is well-understood)
+### Tool Lifecycle in a Fastify Route
 
----
+```
+Fastify route handler
+  └── agent.stream() called
+      ├── Mastra internally calls tool execute() functions
+      │   └── These call getDb() → Kysely query → PostgreSQL
+      └── After all tools resolve, LLM streams text
+Fastify route handler still alive (async generator pattern)
+  └── for await iterates textStream chunks
+      └── reply.raw.write() for each chunk
+```
 
-## Sources & References
-
-**ESPN API Patterns:**
-- [ESPN Fantasy API v3 Guide](https://stmorse.github.io/journal/espn-fantasy-v3.html) — scoringPeriodId usage
-- [ESPN API Endpoints (GitHub Gist)](https://gist.github.com/nntrn/ee26cb2a0716de0947a0a4e9a157bc1c) — historical access patterns
-- [espn-api Python library](https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/league.py) — scoring period mapping
-- [GitHub Discussion #525](https://github.com/cwendt94/espn-api/discussions/525) — historical data availability
-
-**Multi-Player Trade Algorithms:**
-- [Genetic Algorithm for Fantasy Football Trades (arXiv:2511.17535)](https://www.arxiv.org/pdf/2511.17535) — evolutionary approach to multi-player trade generation
-- [Fantasy Football Trade Analyzer](https://www.rototrade.com/fantasy-football-trade-analyzer) — 3-team+ trade evaluation
-- [KeepTradeCut Trade Calculator](https://keeptradecut.com/trade-calculator) — dynasty trade valuations
-
-**Timeline Visualization:**
-- [Yahoo Fantasy History Guide](https://help.yahoo.com/kb/SLN22671.html) — historical standings visualization
-- [League Legacy ESPN Tools](https://leagulegacy.io/services/espn) — season replay features
+The Fastify route handler remains open (streaming) while the agent executes. The `for await` loop drives the event loop — Node.js does not need any special configuration for this pattern.
 
 ---
 
-**Last Updated:** 2026-02-20
-**Confidence Level:** HIGH (90%)
-**Next Steps:** Detailed agent implementation specs + API contract definitions
+## Scalability Considerations
+
+| Concern | At current load (1 draft session) | At 100 concurrent sessions | Mitigation |
+|---------|-----------------------------------|---------------------------|------------|
+| SSE connections held open | 1 persistent connection per narrator call (~15-30s) | 100 simultaneous open HTTP connections | Nginx/reverse proxy keep-alive tuning; each connection is lightweight |
+| PostgreSQL memory tables | Minimal (10 messages per thread) | 100 active threads | Thread cleanup job: delete threads older than 24h |
+| Tool DB queries | 1-2 queries per agent invocation | 100-200 queries/min | Kysely query already uses indexed lookups; acceptable |
+| LLM API cost | Same as current | Same rate, higher volume | Session cap (120 calls/draft) already enforced in useNarrator |
+
+---
+
+## Build Order (Integration Steps)
+
+Dependencies flow strictly top-to-bottom. Each step produces a testable artifact.
+
+### Step 1: Install Packages and Create Mastra Instance
+**Files:** `packages/backend/package.json`, `packages/backend/src/mastra/index.ts`
+**Action:** `pnpm add @mastra/core @mastra/memory @mastra/pg` in backend package. Create `mastra/index.ts` with PostgresStore using existing `DATABASE_URL`.
+**Test:** Import `mastra` in a test file, verify no runtime errors.
+**Dependency:** None.
+
+### Step 2: Define Tools
+**Files:** `packages/backend/src/mastra/tools/player-projection-tool.ts`, `auction-comp-tool.ts`
+**Action:** Implement `createTool()` with `inputSchema`, `outputSchema`, `execute`. Each tool queries existing Kysely DB.
+**Test:** Call `tool.execute({ playerName: "Aaron Judge" })` directly in a unit test — verify returns projection data.
+**Dependency:** Step 1 (need `getDb()` available).
+
+### Step 3: Define Mastra Agent
+**Files:** `packages/backend/src/mastra/agents/draft-narrator-agent.ts`
+**Action:** `new Agent({ id, instructions, model, tools, memory })`. Register in `mastra/index.ts`.
+**Test:** Call `agent.generate("test message")` in isolation — verify text response. Call with tool trigger input — verify tool fires.
+**Dependency:** Steps 1 and 2.
+
+### Step 4: Modify Fastify Route to SSE Streaming
+**Files:** `packages/backend/src/api/draft.ts`
+**Action:** Replace `DraftNarratorAgent` with `mastra.getAgent(...)`. Add SSE headers. Add `for await` streaming loop over `stream.textStream`. Keep `buildUserMessage()` function unchanged.
+**Test:** `curl -N -X POST http://localhost:3001/api/draft/narrate -d '{...}'` — verify SSE chunks arrive progressively.
+**Dependency:** Step 3.
+
+### Step 5: Update Extension SSE Consumer
+**Files:** `packages/extension/lib/use-narrator.ts`
+**Action:** Change `response.json()` to `response.body.getReader()`. Parse `data: {...}` lines. Call `setNarration(accumulated)` on each chunk.
+**Test:** In dev with real ESPN draft page — verify text appears progressively in DraftSidebar.
+**Dependency:** Step 4.
+
+### Step 6: Memory Thread Persistence (Optional, Deferred)
+**Files:** `packages/extension/lib/draft-state.ts` (or equivalent)
+**Action:** Generate a stable `threadId` at draft session start. Pass it in the POST body alongside `NarratorPayload`. Backend uses it for memory scoping.
+**Test:** Two narrator calls in same session — verify agent references context from first call.
+**Dependency:** Step 5.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Using @mastra/fastify Adapter
+**What:** Installing `@mastra/fastify` and calling `new MastraServer({ app, mastra }).init()`
+**Why bad:** Requires Fastify v5. Upgrading from v4 requires schema validation changes on all 12 route files, logger API change, redirect argument order reversal, decorator restriction updates. 1-2 days of migration risk for zero feature benefit.
+**Instead:** Use `@mastra/core` Agent class directly. Call `agent.stream()` from existing Fastify v4 route handlers.
+
+### Anti-Pattern 2: Defining Mastra Tools in a Separate Workspace Package
+**What:** Creating `packages/mastra-tools/` with TypeScript tool definitions, importing via `workspace:^`
+**Why bad:** Mastra transpiles workspace packages at build time. Uncompiled TypeScript causes `ERR_UNKNOWN_FILE_EXTENSION` errors. Pre-compiling the tools package adds a build step dependency.
+**Instead:** Co-locate tools inside `packages/backend/src/mastra/tools/`. They're compiled together with the backend.
+
+### Anti-Pattern 3: Using EventSource for POST-Based SSE
+**What:** `const es = new EventSource("/api/draft/narrate")` in extension
+**Why bad:** `EventSource` only supports GET requests with no body. NarratorPayload cannot be sent.
+**Instead:** Use `fetch()` with `response.body.getReader()` to read SSE chunks from a POST response. Chrome extensions fully support this pattern.
+
+### Anti-Pattern 4: Calling `reply.send()` Before SSE Completes
+**What:** Using `return reply.send(...)` in the route handler while the stream is ongoing
+**Why bad:** Fastify's `reply.send()` finalizes and closes the response. Calling it while `reply.raw` is still open corrupts the stream.
+**Instead:** Use only `reply.raw.writeHead()`, `reply.raw.write()`, and `reply.raw.end()` in streaming routes. Do not call `reply.send()` or `return reply.*` after streaming begins.
+
+### Anti-Pattern 5: One Memory Thread Per Request
+**What:** Generating a new `threadId` for every narrator call (e.g., `draft-session-${Date.now()}`)
+**Why bad:** Each call starts with no context. The agent can't recall it already advised on a player earlier in the draft. Memory becomes useless.
+**Instead:** Generate the `threadId` once at draft session start (when the extension loads on the ESPN draft page) and reuse it for all narrator calls in that session. Pass it in the request body.
+
+### Anti-Pattern 6: Awaiting `stream.text` Instead of Iterating `textStream`
+**What:** `const text = await stream.text` then sending as JSON response
+**Why bad:** This defeats streaming — waits for the full response before sending anything. Identical behavior to the current non-streaming implementation.
+**Instead:** Use `for await (const chunk of stream.textStream)` and write each chunk immediately.
+
+---
+
+## Dependency Versions (Verified via npm, March 2026)
+
+| Package | Latest Version | Peer Deps |
+|---------|---------------|-----------|
+| `@mastra/core` | 1.10.0 | none framework-specific |
+| `@mastra/memory` | 1.6.1 | `@mastra/core >= 1.0.0` |
+| `@mastra/pg` | 1.7.2 | `@mastra/core >= 1.0.0` |
+| `@mastra/fastify` | 1.1.9 | `fastify: ^5.0.0` ← incompatible with existing v4 |
+
+---
+
+## Sources
+
+- [Mastra Server Adapters Documentation](https://mastra.ai/docs/server/server-adapters) — adapter architecture, init() lifecycle
+- [Mastra Blog: Announcing Server Adapters](https://mastra.ai/blog/mastra-server-adapters) — Fastify adapter pattern, route registration
+- [Mastra Agent.stream() Reference](https://mastra.ai/reference/streaming/agents/stream) — textStream, fullStream, callbacks
+- [Mastra Streaming Events Documentation](https://mastra.ai/docs/streaming/events) — event types, Fastify SSE example
+- [Mastra Memory Documentation](https://mastra.ai/docs/agents/agent-memory) — thread/resource concepts, PostgreSQL storage
+- [Mastra PostgreSQL Storage Reference](https://mastra.ai/docs/memory/storage/memory-with-pg) — PostgresStore configuration
+- [Mastra createTool() Reference](https://mastra.ai/reference/tools/create-tool) — tool definition API with Zod schemas
+- [Mastra Deployment: Monorepo](https://mastra.ai/docs/deployment/monorepo) — workspace package TypeScript gotcha
+- [Fastify v5 Migration Guide](https://fastify.dev/docs/latest/Guides/Migration-Guide-V5/) — breaking changes from v4
+- [DeepWiki: Mastra Streaming Architecture](https://deepwiki.com/mastra-ai/mastra/9.6-streaming-architecture-and-sse) — SSE implementation internals
+- [npm: @mastra/fastify](https://www.npmjs.com/package/@mastra/fastify) — peer dependency `fastify: ^5.0.0` (confirmed via npm CLI)
+
+---
+
+**Last Updated:** 2026-03-05
+**Confidence Level:** HIGH for integration strategy and component boundaries; MEDIUM for SSE event format details (Mastra's internal format may evolve; using minimal custom format mitigates this)

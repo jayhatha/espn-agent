@@ -1,1455 +1,458 @@
-# Domain Pitfalls: Multi-Player Trade Evaluation & Historical Analysis
+# Pitfalls Research: Adding Mastra Agent to ESPN Fantasy Baseball Draft Assistant
 
-**Domain:** Fantasy Baseball - Multi-Player Trades & Historical Replay
-**Researched:** 2026-02-20
-**Context:** Adding N-for-N trade evaluation and historical analysis to existing ESPN Fantasy Baseball app
+**Domain:** AI Agent Integration — Mastra + Fastify + Chrome Extension (Real-Time Auction Draft)
+**Researched:** 2026-03-05
+**Confidence:** HIGH (Mastra v1 docs + official release notes + GitHub issues), MEDIUM (cost estimates based on measured latency + pricing, not direct billing data)
 
 ---
 
 ## Critical Context
 
-This document focuses on pitfalls when ADDING multi-player trade evaluation and historical analysis features to the existing system. For general pitfalls (auth, API stability, security), see the base PITFALLS.md.
+This document covers pitfalls specific to **adding Mastra to an existing system** — not building Mastra from scratch. The existing narrator is a single `new OpenAI()` call wrapped in a Fastify route. Mastra replaces or wraps that. The user constraint is hard: auction picks happen every 30–60 seconds, latency budget is under 3 seconds, and the user pays per-call.
 
-**Existing System Patterns:**
-- Rate stats use component math (H/AB for AVG, never average rates)
-- ESPN API is undocumented, read-only, cookie-based auth
-- Projections are rest-of-season (not retroactive)
-- 10-14 team roto category leagues
-- Current trade analysis is 1-for-1 only
-- Daily snapshot pipeline with degraded state handling
-
----
-
-## Table of Contents
-
-### Multi-Player Trade Evaluation
-1. [Roster Slot Constraint Violations](#pitfall-1-roster-slot-constraint-violations)
-2. [Component Math Errors in Multi-Player Rate Stats](#pitfall-2-component-math-errors-in-multi-player-rate-stats)
-3. [Positional Scarcity Ignored in N-for-N](#pitfall-3-positional-scarcity-ignored-in-n-for-n)
-4. [VBD/SGP Baseline Shifts from Roster Changes](#pitfall-4-vbdsgp-baseline-shifts-from-roster-changes)
-5. [Simulation Explosion (Combinatorial Complexity)](#pitfall-5-simulation-explosion-combinatorial-complexity)
-6. [Replacement Player Selection Errors](#pitfall-6-replacement-player-selection-errors)
-
-### Historical Analysis
-7. [ESPN Historical Data Deletion](#pitfall-7-espn-historical-data-deletion)
-8. [Transaction Deduplication Failures](#pitfall-8-transaction-deduplication-failures)
-9. [Snapshot Gaps in Time Series](#pitfall-9-snapshot-gaps-in-time-series)
-10. [Retroactive Projection Fallacy](#pitfall-10-retroactive-projection-fallacy)
-11. [Rate Stat Interpolation Errors](#pitfall-11-rate-stat-interpolation-errors)
-12. [Trade Retrospective Attribution](#pitfall-12-trade-retrospective-attribution)
-13. [Settings Changes Mid-Season](#pitfall-13-settings-changes-mid-season)
-14. [Backfill Rate Limiting](#pitfall-14-backfill-rate-limiting)
+**Existing system facts that affect every pitfall:**
+- Current narrator: `DraftNarratorAgent` — raw OpenAI SDK, per-request instantiation, no memory, 120-call session cap
+- Extension: Chrome MV3, fetches `POST /api/draft/narrate`, `AbortController` for in-flight cancel
+- Backend: Fastify 4, existing `/api/*` routes, PostgreSQL via Kysely, Node.js
+- Model: `gpt-4.1-mini-2025-04-14`, `max_tokens: 200`, `temperature: 0.4`
+- Latency baseline: 0.47s TTFT + ~2.5s for 200 tokens = ~3s total at p50 (measured, OpenAI API)
 
 ---
 
-## Multi-Player Trade Evaluation
+## Critical Pitfalls
 
-### Pitfall 1: Roster Slot Constraint Violations
+### Pitfall 1: maxSteps Default of 1 Silently Disables Tool Calling
 
-**What goes wrong:** N-for-N trade simulation shows "gain +2.5 points" but trade is actually illegal because team would have 4 catchers (league max: 2) or 16 total players (league max: 15).
+**What goes wrong:**
+You register tools on the Mastra agent, call `agent.generate()`, and the tools are never invoked. The agent produces a text response that ignores all the tools entirely. No error is thrown. You spend hours debugging prompt engineering when the issue is a single missing parameter.
 
 **Why it happens:**
-- Current `TradeRecommendationAgent.simulateTradeImpact()` only looks at category totals, not roster slots
-- ESPN API allows unbalanced trades (3-for-1) but enforces position limits
-- Utility/bench slot accounting is complex (IF/OF/UTIL overlaps)
+Mastra's `maxSteps` defaults to `1`. One step means: one LLM call, no iteration. Tool calling requires at least `maxSteps: 2` — one step to decide to call a tool, one step to process the result and generate a final response. Developers coming from the raw OpenAI SDK (where you manually parse `tool_calls` and loop) don't realize Mastra controls the loop and the default opt-out is this low.
 
-**Consequences:**
-- Users attempt trades that ESPN rejects with "roster limit error"
-- False positives in trade recommendations
-- User trust erodes ("app doesn't understand my league rules")
+**How to avoid:**
+Always set `maxSteps` explicitly. For a narrator with 2–3 tools: `maxSteps: 4` (tool call → tool result → optional second tool → final answer). For a narrator that should answer in one pass without tools, set `maxSteps: 1` intentionally and document why.
 
-**Prevention:**
+```typescript
+// Wrong — tools registered but never called
+const narrator = new Agent({ tools: { getScarcityData, getBudgetStatus } });
+await narrator.generate(messages); // maxSteps = 1, tools ignored
 
-1. **Parse roster slot rules from `league_settings_version.settings_json.roster_slots`:**
-   ```typescript
-   interface RosterSlots {
-     C: number;      // Catcher slots
-     "1B": number;   // First base slots
-     MI: number;     // Middle infield (2B/SS)
-     CI: number;     // Corner infield (1B/3B)
-     OF: number;     // Outfield
-     UTIL: number;   // Utility (any position)
-     P: number;      // Pitcher slots
-     SP: number;     // Starting pitcher
-     RP: number;     // Relief pitcher
-     BENCH: number;  // Bench slots
-   }
-   ```
+// Correct
+await narrator.generate(messages, { maxSteps: 4 });
+```
 
-2. **Validate trade legality BEFORE simulation:**
-   ```typescript
-   async validateTradeRosterConstraints(
-     currentRoster: Player[],
-     trade: ProposedTrade,
-     rosterSlots: RosterSlots
-   ): Promise<{ valid: boolean; violations: string[] }> {
-     // Simulate post-trade roster
-     const postTradeRoster = currentRoster
-       .filter(p => !trade.givePlayers.includes(p.playerId))
-       .concat(trade.receivePlayers);
+**Warning signs:**
+- Agent responds but never calls tools you registered
+- Tool execution callbacks (`onStepFinish`) never fire
+- Response ignores data that tools would have provided
 
-     // Check total roster size
-     if (postTradeRoster.length > totalRosterSize) {
-       return { valid: false, violations: ["Roster size exceeded"] };
-     }
-
-     // Check position-specific limits
-     // Handle multi-position eligibility (player can be C/1B)
-     // Account for flex slots (UTIL can be filled by any hitter)
-   }
-   ```
-
-3. **Add constraint violations to trade impact response:**
-   ```typescript
-   interface TradeImpactAnalysis {
-     // ... existing fields
-     isLegal: boolean;
-     rosterViolations: string[];  // e.g., ["Too many catchers: 4 (max 2)"]
-     recommendedDrops?: Player[];  // If 3-for-1, suggest which bench player to drop
-   }
-   ```
-
-**Detection:**
-- Unit test with league having `C: 2, BENCH: 3` and simulate 3-for-1 trade acquiring 2 catchers
-- User reports "ESPN rejected trade but app said it was good"
-- Trade recommendations include trades that exceed roster size
-
-**Phase Mapping:**
-- **Phase 1 (Multi-Player Foundation):** Roster constraint validation, illegal trade filtering
-- **Phase 1:** Add `recommendedDrops` for unbalanced trades (3-for-2 requires dropping 1)
-
-**Sources:**
-- [Yahoo Fantasy uneven trade error message](https://help.yahoo.com/kb/uneven-trade-error-message-fantasy-sports-sln6976.html)
-- [CBS Fantasy Baseball roster rules](https://www.cbssports.com/fantasy/baseball/games/free/rules)
+**Phase to address:** Mastra integration bootstrap phase — set `maxSteps` in the agent definition, not at call time, so it can't be omitted.
 
 ---
 
-### Pitfall 2: Component Math Errors in Multi-Player Rate Stats
+### Pitfall 2: Fastify Route Prefix Collision with Existing `/api` Routes
 
-**What goes wrong:** 3-for-3 trade simulation calculates AVG impact by subtracting individual player AVGs instead of adjusting underlying H/AB components, producing mathematically impossible results.
+**What goes wrong:**
+Mastra's Fastify adapter mounts its endpoints under `/api/agents`, `/api/workflows` by default. This project already has `/api/draft/narrate`, `/api/leagues`, etc. The collisions are subtle — Mastra's agent endpoints appear at `/api/agents/narrator/...` which doesn't immediately conflict, but the `/api/v1` prefix expected by future versioning gets tangled, and the middleware ordering breaks: custom routes added before `server.init()` lack Mastra context; those added after have access.
 
 **Why it happens:**
-- Current `TradeRecommendationAgent` correctly handles rate stats for 1-for-1 trades (lines 615-684 in `trade-recommendation.ts`)
-- Multi-player extension might naively sum or average individual rate stats
-- Developers forget that AVG(.300) - AVG(.250) ≠ delta_H / delta_AB
+The Fastify adapter documentation says "custom routes you add directly to the app are not affected by this prefix," but CORS configuration, rate limiting, and authentication middleware registered through Fastify's native mechanisms do not automatically apply to Mastra-registered routes. Developers assume `fastify.addHook('onRequest', authenticate)` covers everything; it does not cover Mastra's routes unless registered before `init()`.
 
-**Consequences:**
-- Projected AVG after 3-for-3 trade is .318, but component math yields .285
-- ERA projections go negative or exceed 15.00 (impossible)
-- Users manually calculate and find app is wrong by 20+ batting average points
+**How to avoid:**
+1. Use a non-default prefix: `{ prefix: '/api/mastra' }` to isolate Mastra routes from existing `/api/*` routes.
+2. Register auth middleware **before** calling `server.init()`.
+3. Explicitly configure CORS on the Fastify instance — Mastra's own CORS settings have no effect when using the adapter.
+4. Be aware: custom routes registered via `registerApiRoute()` were broken (returning 404 while appearing in OpenAPI) until Mastra v1.4.0 — verify version before relying on this.
 
-**Prevention:**
+```typescript
+// Correct ordering
+const app = Fastify();
+app.addHook('onRequest', authenticate); // BEFORE init
+const server = new MastraServer({ app, mastra, prefix: '/api/mastra' });
+await server.init();
+// Existing routes still at /api/draft/narrate — no conflict
+```
 
-1. **NEVER directly add/subtract rate stat values:**
-   ```typescript
-   // ❌ WRONG
-   const avgDelta = trade.receivePlayers.reduce((sum, p) => sum + p.avg, 0)
-                  - trade.givePlayers.reduce((sum, p) => sum + p.avg, 0);
+**Warning signs:**
+- Auth not enforced on Mastra agent endpoints
+- CORS errors from extension when hitting Mastra routes but not existing routes
+- 404 on agent routes that appear in OpenAPI spec (pre-v1.4.0 bug)
 
-   // ✅ CORRECT (existing pattern from lines 629-654)
-   const adjustedComponents: Record<string, number> = { ...currentComponents };
-
-   for (const givePlayer of trade.givePlayers) {
-     const proj = projections.get(givePlayer.playerId);
-     const components = proj.stat_components_json as Record<string, number>;
-     adjustedComponents.H -= (components.H || 0);
-     adjustedComponents.AB -= (components.AB || 0);
-   }
-
-   for (const receivePlayer of trade.receivePlayers) {
-     const proj = projections.get(receivePlayer.playerId);
-     const components = proj.stat_components_json as Record<string, number>;
-     adjustedComponents.H += (components.H || 0);
-     adjustedComponents.AB += (components.AB || 0);
-   }
-
-   const projectedAVG = calculateAVG(adjustedComponents);  // H / AB
-   ```
-
-2. **Extend existing component math (already implemented for 1-for-1) to N-for-N:**
-   - Current code at lines 634-653 already loops over `trade.givePlayers` and `trade.receivePlayers`
-   - **This pattern is already correct for multi-player trades!**
-   - Risk: future refactors might "optimize" by averaging rates
-
-3. **Add integration tests with known multi-player component math:**
-   ```typescript
-   test('3-for-3 trade AVG calculation', async () => {
-     // Current roster: 1500 H / 5000 AB = .300
-     // Give: Player A (50 H, 200 AB), Player B (30 H, 100 AB), Player C (20 H, 80 AB)
-     // Receive: Player X (60 H, 180 AB), Player Y (40 H, 120 AB), Player Z (30 H, 90 AB)
-
-     // Post-trade: (1500 - 100 + 130) / (5000 - 380 + 390)
-     //           = 1530 / 5010 = .305
-
-     const impact = await agent.analyzeTradeImpact(leagueId, teamId, date, trade);
-     expect(impact.categoryImpacts.find(c => c.categoryId === 'AVG').projectedValue)
-       .toBeCloseTo(0.305, 3);
-   });
-   ```
-
-4. **Never store computed rate stats in component adjustment loops:**
-   - Only store components (H, AB, IP, ER, BB, K)
-   - Calculate rate at the end from final components
-
-**Detection:**
-- Projected AVG after trade is > .400 or < .150 (outlier check)
-- Component sum (H_final) doesn't equal (H_current - H_give + H_receive)
-- Manual spreadsheet calculation disagrees with app by >0.005
-
-**Phase Mapping:**
-- **Phase 1 (Multi-Player Foundation):** Integration tests for multi-player component math
-- **Phase 1:** Add assertions in simulation code to catch component math bugs
-
-**Current Status:** ✅ IMPLEMENTATION EXISTS - existing code already handles N-for-N correctly (lines 634-653), but risk of regression
-
-**Sources:**
-- [Pitcher List: How to Turn Projections Into Rankings](https://pitcherlist.com/fantasy-101-how-to-turn-projections-into-rankings-and-auction-values/)
-- Existing implementation: `packages/shared/src/formulas.ts` lines 8-41
+**Phase to address:** Mastra integration bootstrap phase, specifically the "mount Mastra into Fastify" step.
 
 ---
 
-### Pitfall 3: Positional Scarcity Ignored in N-for-N
+### Pitfall 3: PostgreSQL Schema Collision — Mastra Auto-Creates Tables in Your Database
 
-**What goes wrong:** 2-for-2 trade shows "+1.5 points" (raw category impact) but ignores that you're trading the #3 catcher (scarce) for the #25 outfielder (plentiful), destroying roster construction.
+**What goes wrong:**
+Mastra's PostgreSQL storage adapter creates its own tables (`mastra_threads`, `mastra_messages`, `mastra_traces`, `mastra_workflow_snapshot`, `mastra_evals`, `mastra_resources`, `mastra_scorers`) in your existing Postgres database on first `init()`. These are unversioned relative to Kysely migrations and invisible to your migration tooling. When you upgrade Mastra versions, new columns may be missing (`requestContext` on `mastra_scorers` is a known example from GitHub issue #11789), and Mastra will crash with schema mismatch errors.
 
 **Why it happens:**
-- Current simulation only looks at category totals, not positional value
-- VBD/SGP calculations in `formulas.ts` (lines 120-248) exist but aren't integrated into trade analysis
-- "Win the trade" doesn't mean "improve your roster" in multi-position scenarios
+Mastra says "auto-creates necessary tables on first interaction" which sounds safe. But it uses `CREATE TABLE IF NOT EXISTS` — it will not add new columns to existing tables when upgrading. The tables are also not in your Kysely schema, so `db.selectFrom('mastra_threads')` won't typecheck. If you use a separate schema for your app (e.g., `public` vs `app`), the Mastra tables land in `public` by default, mixing concerns.
 
-**Consequences:**
-- Trade 3 elite closers for 3 mediocre starters, gain +2 points in counting stats but lose all saves coverage
-- Trade depth (3 bench bats) for a single star, leave roster vulnerable to injuries
-- Positional flexibility lost (trade multi-position player for single-position specialist)
+**How to avoid:**
+1. Use Mastra's PostgreSQL storage with `schema: 'mastra'` to isolate tables in their own schema.
+2. After any Mastra upgrade, manually inspect for missing columns (run Mastra's schema against your DB).
+3. Pin the `@mastra/pg` version in `package.json` and treat upgrades as migrations.
+4. Do NOT use the existing Kysely `db` connection for Mastra storage — create a separate `MastraStorage` instance that owns its own connection lifecycle.
 
-**Prevention:**
+```typescript
+// Correct — isolated schema, separate from Kysely-managed tables
+const mastraStorage = new PostgresStorage({
+  connectionString: process.env.DATABASE_URL,
+  schema: 'mastra', // Creates tables as mastra.mastra_threads, etc.
+});
+```
 
-1. **Calculate positional replacement level for each player:**
-   ```typescript
-   interface PositionalContext {
-     playerId: number;
-     primaryPosition: string;
-     replacementLevelSGP: number;  // From formulas.ts getReplacementLevel()
-     vbd: number;                   // Value over replacement
-     isStarterQuality: boolean;     // Above replacement threshold
-   }
+**Warning signs:**
+- `ERROR: column "requestContext" of relation "mastra_scorers" does not exist` after upgrade
+- Kysely migration tooling shows unexpected tables in schema diff
+- Mastra agent silently stores no memory (storage fails but error is swallowed)
 
-   async getPositionalContext(
-     roster: Player[],
-     trade: ProposedTrade,
-     rosterSlots: RosterSlots
-   ): Promise<Map<number, PositionalContext>> {
-     // For each player, determine:
-     // 1. What position they'd fill (C/1B/MI/OF/UTIL)
-     // 2. Replacement level for that position
-     // 3. Value above replacement
-   }
-   ```
-
-2. **Add positional scarcity warning to trade impact:**
-   ```typescript
-   interface TradeImpactAnalysis {
-     // ... existing fields
-     positionalWarnings: string[];  // e.g., ["Trading your only elite catcher"]
-     rosterBalance: {
-       before: Record<string, number>;  // { "C": 2, "SS": 3, "OF": 5 }
-       after: Record<string, number>;
-       degradedPositions: string[];     // Positions below optimal depth
-     };
-   }
-   ```
-
-3. **Weight trade recommendations by positional scarcity:**
-   ```typescript
-   // In generateTradeCandidates(), adjust sorting:
-   candidates.sort((a, b) => {
-     const aScarcityPenalty = calculateScarcityPenalty(a.trade);
-     const bScarcityPenalty = calculateScarcityPenalty(b.trade);
-
-     return (b.deltaOverallPoints - bScarcityPenalty)
-          - (a.deltaOverallPoints - aScarcityPenalty);
-   });
-   ```
-
-4. **Use SGP methodology from formulas.ts:**
-   - `calculateTotalSGP()` (lines 155-207) already handles positional value
-   - Integrate this into trade simulation to show "SGP lost from scarcity"
-
-**Detection:**
-- Trade recommendations always suggest trading catchers for outfielders (scarcity ignored)
-- Post-trade roster has 0 players at a required position
-- User feedback: "App suggested trading my only good closer"
-
-**Phase Mapping:**
-- **Phase 1 (Multi-Player Foundation):** Basic positional balance checks
-- **Phase 2 (Advanced Multi-Player):** Full VBD/SGP integration, scarcity scoring
-
-**Sources:**
-- [Smart Fantasy Baseball: Standings Gain Points](https://www.smartfantasybaseball.com/2013/03/create-your-own-fantasy-baseball-rankings-part-5-understanding-standings-gain-points/)
-- [BaseballHQ: SGP Denominators](https://www.baseballhq.com/articles/gaming/rotisserie/sgp-denominators-for-2024)
-- Existing implementation: `packages/shared/src/formulas.ts` lines 213-235
+**Phase to address:** Mastra integration bootstrap — establish the storage adapter before any agent code.
 
 ---
 
-### Pitfall 4: VBD/SGP Baseline Shifts from Roster Changes
+### Pitfall 4: Unbounded Memory Growth During a 3-Hour Draft Session
 
-**What goes wrong:** 3-for-1 trade evaluation uses static replacement level, but adding 1 superstar and dropping 3 bench players CHANGES the replacement level for the entire league, invalidating the original calculation.
+**What goes wrong:**
+You enable Mastra memory with `lastMessages: 20` to give the agent draft context across the 120-call session cap. Over a 3-hour, 25-round auction draft with 13 teams (325 total picks), the thread accumulates 120 messages. With the full structured payload per narration (~400–600 tokens each), the thread context hits 60,000+ tokens before the draft ends. The agent's context window fills, responses degrade, latency spikes, and cost multiplies. With `observationalMemory: true`, background compression agents add further LLM calls (Gemini 2.5 Flash by default) and latency.
 
 **Why it happens:**
-- Replacement level is "the Nth best player at a position" (formulas.ts lines 213-235)
-- Multi-player trades change the FA pool (dropped players enter waivers)
-- Other teams' replacement levels improve (can now pick up your drops)
-- Your evaluation assumed static baselines
+Auction draft narration payloads are large (structured JSON signals, player data, alert arrays). Developers set `lastMessages: 20` thinking this caps growth — it does not cap the token size of those 20 messages. The observational memory compression threshold is 30,000 tokens of uncompressed messages before triggering — that threshold can be hit mid-draft, causing a synchronous pause during live bidding.
 
-**Consequences:**
-- 3-for-1 trade looks like +4 points, but after you drop 2 bench players, opponents grab them and net +2 points themselves
-- "Win the trade" but "lose the waiver wire battle"
-- Long-term roster construction damaged
+**How to avoid:**
+For the narrator use case, **do not use Mastra persistent memory at all.** The current architecture is correct: stateless per-call with no conversation history. The agent receives the full current engine state in every request — this is already the "working memory." Thread memory is appropriate for multi-turn conversation assistants, not for stateless signal-to-commentary translation.
 
-**Prevention:**
+If context across picks is genuinely needed, pass a manually-constructed condensed summary (last 3 narrations as a string, max 200 tokens) in the request body rather than threading through Mastra memory.
 
-1. **Simulate league-wide baseline shift:**
-   ```typescript
-   async simulateLeagueWideImpact(
-     leagueId: number,
-     trade: ProposedTrade,
-     snapshotDate: string
-   ): Promise<{
-     yourImpact: number;
-     opponentBestCase: number;  // If they optimally pick up your drops
-     netAdvantage: number;       // yourImpact - opponentBestCase
-   }> {
-     // 1. Simulate your team post-trade
-     const yourDelta = await this.simulateTradeImpact(...);
+```typescript
+// Wrong — memory accumulates 120 narration messages per draft
+await agent.generate(messages, { threadId: draftSessionId, resourceId: userId });
 
-     // 2. Simulate best opponent pickup from your drops
-     const droppedPlayers = identifyDroppedPlayers(trade);
-     const bestOpponentPickup = await this.simulateBestWaiverClaim(
-       leagueId,
-       droppedPlayers,
-       snapshotDate
-     );
+// Correct — stateless, full current state sent each call
+await agent.generate(messages); // no threadId, no memory overhead
+```
 
-     return {
-       yourImpact: yourDelta,
-       opponentBestCase: bestOpponentPickup,
-       netAdvantage: yourDelta - bestOpponentPickup
-     };
-   }
-   ```
+**Warning signs:**
+- Response latency increases progressively through a draft session
+- Agent starts contradicting itself ("you passed on Trout earlier" when it didn't)
+- Token usage reported per-call grows over the course of a session
 
-2. **Add "waiver exposure" warning:**
-   ```typescript
-   interface TradeImpactAnalysis {
-     // ... existing fields
-     waiverExposure?: {
-       droppedPlayers: Player[];
-       estimatedOpponentGain: number;  // Points if best team claims best drop
-       netTradeValue: number;           // Delta minus opponent gain
-     };
-   }
-   ```
-
-3. **For 3-for-1 trades, simulate with replacement player added:**
-   - Don't just remove 3 and add 1
-   - Remove 3, add 1, add best available FA (approximation of optimal roster management)
-
-**Detection:**
-- 3-for-1 trade executed, week later opponent is +3 points and you're only +1
-- Trade impact showed +4 but actual standings change is +1
-- User feedback: "My drops came back to haunt me"
-
-**Phase Mapping:**
-- **Phase 2 (Advanced Multi-Player):** League-wide impact simulation
-- **Phase 2:** "Waiver exposure" warnings for unbalanced trades
-
-**Sources:**
-- [Subvertadown: VBD Baselines Guide](https://subvertadown.com/article/guide-to-understanding-the-different-baselines-in-value-based-drafting-vbd-vols-vs-vorp-vs-man-games-and-beer-)
-- [Footballguys: Rethinking VBD](https://subscribers.footballguys.com/apps/article.php?article=HarstadValueOverBaseline)
+**Phase to address:** Mastra agent design phase — explicitly document the stateless narration pattern as a constraint.
 
 ---
 
-### Pitfall 5: Simulation Explosion (Combinatorial Complexity)
+### Pitfall 5: Streaming SSE Does Not Work in Chrome Extension Background Service Workers
 
-**What goes wrong:** UI adds "Suggest 3-for-3 trades" feature, backend generates 14 million simulations (50 players × 50 players × 50 players combinations), server OOMs, request times out.
+**What goes wrong:**
+You migrate the narrator to use `agent.stream()` for progressive text display (show first words immediately, stream the rest). The extension switches from `fetch()` + `.json()` to reading an SSE stream. This breaks in Chrome MV3 background service workers: `EventSource` is not available in service worker context, and streaming `fetch` responses using `ReadableStream` have known reliability issues in Chrome extensions (connection drops, partial reads, service worker sleep interruption).
 
 **Why it happens:**
-- Current `generateTradeCandidates()` is O(roster_size²) for 1-for-1 (lines 309-322)
-- N-for-N is O(roster_size^(2N))
-- 3-for-3 in 12-team league with 25-player rosters: C(25,3) × C(300,3) = 2,300 × 4,455,100 = 10 billion combinations
+Mastra's streaming uses SSE (`text/event-stream`) for agent responses. SSE requires a persistent connection. Chrome MV3 service workers are ephemeral — they can be terminated while a stream is open. The existing extension correctly uses `AbortController` with regular `fetch()` because it understands this constraint. Developers see streaming as a UX improvement and don't check extension execution context compatibility.
 
-**Consequences:**
-- Feature unusable (request timeout after 60 seconds)
-- Database connection pool exhausted from simulation queries
-- Workers crash from memory pressure
+**How to avoid:**
+Keep the narrator as a non-streaming `agent.generate()` call returning complete text. The latency budget (3s) and output size (200 tokens) don't justify streaming's UX benefit — the user would see words appear over 2.5 seconds rather than the full response at 3s. The abort-and-replace pattern already in `use-narrator.ts` handles stale requests correctly without streaming.
 
-**Prevention:**
+If streaming is genuinely needed in a future iteration, route through the extension's background service worker using `chrome.runtime.sendMessage` to a long-lived offscreen document, not directly from the content script.
 
-1. **Impose hard limits on N-for-N generation:**
-   ```typescript
-   const MAX_SIMULATIONS_MULTI_PLAYER = 1000;  // vs 500 for 1-for-1 (line 288)
-   const MAX_PLAYERS_PER_SIDE = 3;             // No 4-for-4 or higher
+**Warning signs:**
+- SSE connection drops mid-response in extension (no error, just incomplete text)
+- Service worker is killed while stream is open, leaving UI in loading state permanently
+- `EventSource is not defined` runtime error in extension console
 
-   if (trade.givePlayers.length > MAX_PLAYERS_PER_SIDE) {
-     throw new Error("Trades larger than 3-for-3 not supported");
-   }
-   ```
-
-2. **Use heuristic filtering before full simulation:**
-   ```typescript
-   // Step 1: Generate candidate combinations with simple heuristics
-   const candidateCombos = generateCandidateCombinations(
-     userRoster,
-     partnerRoster,
-     { maxPerSide: 3, minValueDelta: 5 }  // Only consider if heuristic shows +5
-   );
-
-   // Step 2: Sort by heuristic score (counting stats sum)
-   candidateCombos.sort((a, b) => b.heuristicScore - a.heuristicScore);
-
-   // Step 3: Simulate top 100 only
-   const topCandidates = candidateCombos.slice(0, 100);
-   for (const combo of topCandidates) {
-     await this.analyzeTradeImpact(...);  // Full simulation
-   }
-   ```
-
-3. **Offer tiered trade generation:**
-   ```typescript
-   interface TradeGenerationOptions {
-     tradeSizes: Array<{ give: number; receive: number }>;
-     // e.g., [{ give: 1, receive: 1 }, { give: 2, receive: 2 }]
-     // Don't auto-generate 3-for-3 unless user requests
-   }
-   ```
-
-4. **Background job for complex trades:**
-   ```typescript
-   // For 3-for-3 and above, don't block HTTP request
-   async generateMultiPlayerTrades(leagueId: number, teamId: number) {
-     // Enqueue BullMQ job
-     await this.tradeQueue.add('generate-3-for-3', { leagueId, teamId });
-
-     return {
-       status: 'processing',
-       estimatedCompletionTime: '2-3 minutes'
-     };
-   }
-   ```
-
-**Detection:**
-- `/api/leagues/:id/teams/:teamId/trades/recommendations?size=3` times out
-- Logs show "simulationsRun: 10000+" but endpoint hasn't returned
-- Memory usage spikes to 2GB+ during trade generation
-
-**Phase Mapping:**
-- **Phase 1 (Multi-Player Foundation):** Limit to 2-for-2, add simulation caps
-- **Phase 2 (Advanced Multi-Player):** Background jobs for 3-for-3+
-
-**Sources:**
-- Current implementation: `trade-recommendation.ts` lines 286-407 (optimization strategies)
+**Phase to address:** Extension integration phase — explicitly choose non-streaming generate() and document the MV3 constraint.
 
 ---
 
-### Pitfall 6: Replacement Player Selection Errors
+### Pitfall 6: Tool Design That Requires Multiple LLM Iterations Destroys Latency Budget
 
-**What goes wrong:** 3-for-1 trade simulation assumes you'll drop your worst bench player, but ESPN auto-drops your best IL player instead, destroying accuracy.
+**What goes wrong:**
+You design the Mastra narrator with tools like `getPlayerProjection(playerName)`, `getLiveAuctionValues()`, `getTeamBudgetStatus(teamId)`. The agent decides to call 2–3 tools before answering. With `maxSteps: 4`, the actual execution is: LLM call 1 (decides to call tools) → tool executions (fast, DB queries) → LLM call 2 (processes tool results, decides to call another tool) → LLM call 3 (final answer). That's 3 LLM calls at ~3s each = 9 seconds total. The auction pick is already decided.
 
 **Why it happens:**
-- Unbalanced trades (receive 3, give 1) require roster cuts
-- Simulation must guess which player gets dropped
-- ESPN's drop logic: can't drop players in active lineup, prioritizes by roster slot
-- App doesn't model ESPN's specific drop rules
+Tool-calling agents are designed for use cases where the agent needs to discover information it doesn't have. The narrator is the opposite: it receives a pre-computed payload with all relevant signals already summarized. Giving the narrator tools to look up data it already has in the payload causes it to call those tools redundantly, multiplying LLM calls.
 
-**Consequences:**
-- Simulation shows +3 points, user accepts trade, ESPN drops wrong player, actual gain is -1
-- Trade recommendation includes receiving 3 IL players, league rules forbid
-- User frustration: "App told me to accept this trade!"
+**Cost implication at 120 calls/session:** Current cost = 120 × ~600 input tokens + ~200 output tokens = ~96K tokens total ≈ $0.05/session at gpt-4.1-mini pricing. With 2 extra LLM calls per trigger: cost triples to ~$0.15/session. With tool calls adding context (tool schemas + results): easily 5× the current cost.
 
-**Prevention:**
+**How to avoid:**
+Keep the narrator **prompt-only, no tools.** All computation belongs in the deterministic engine (already implemented in Phase 20–23 outputs). The narrator's job is interpretation and articulation of pre-computed signals, not data retrieval. If new data is needed, add it to `NarratorPayload` (extend the TypeScript interface) rather than adding a tool.
 
-1. **Model ESPN roster slot priority for auto-drops:**
-   ```typescript
-   function determineAutoDropCandidate(
-     currentRoster: Player[],
-     incomingPlayers: Player[]
-   ): Player {
-     // ESPN priority (from observation, not documented):
-     // 1. Never drop active lineup players
-     // 2. Prefer bench over IL
-     // 3. Within bench, drop lowest projected value
+Reserve Mastra tools for a separate "on-demand research agent" use case (e.g., "tell me about this player's injury history") that is explicitly user-initiated and not latency-constrained.
 
-     const benchPlayers = currentRoster.filter(p => p.rosterSlot === 'BENCH');
-     const ilPlayers = currentRoster.filter(p => p.rosterSlot === 'IL');
+```typescript
+// Wrong — tools cause multi-step LLM iteration
+const narrator = new Agent({
+  tools: { getPlayerProjection, getMarketPrice, getBudgetStatus }
+});
 
-     // If bench available, drop lowest value bench player
-     if (benchPlayers.length > 0) {
-       return findLowestProjectedValue(benchPlayers);
-     }
+// Correct — payload already contains all needed data, no tools
+const narrator = new Agent({
+  // instructions only, no tools
+  instructions: SYSTEM_PROMPT,
+  model: openai('gpt-4.1-mini-2025-04-14'),
+});
+```
 
-     // Otherwise drop IL (may fail if IL required for roster validity)
-     return findLowestProjectedValue(ilPlayers);
-   }
-   ```
+**Warning signs:**
+- Agent response time exceeds 5 seconds
+- `onStepFinish` fires more than twice per narration request
+- Tool call logs show the agent fetching data already present in the user message
 
-2. **Require user to specify drops for unbalanced trades:**
-   ```typescript
-   interface ProposedTrade {
-     givePlayers: TradePlayer[];
-     receivePlayers: TradePlayer[];
-     requiredDrops?: TradePlayer[];  // For N-for-M where N < M
-   }
-
-   // In API endpoint:
-   if (trade.receivePlayers.length > trade.givePlayers.length) {
-     if (!trade.requiredDrops || trade.requiredDrops.length !== delta) {
-       throw new Error(
-         `Trade requires ${delta} drop(s). Please specify which players to drop.`
-       );
-     }
-   }
-   ```
-
-3. **Add "assumed drops" to impact analysis:**
-   ```typescript
-   interface TradeImpactAnalysis {
-     // ... existing fields
-     assumedDrops?: {
-       players: Player[];
-       method: 'user-specified' | 'auto-selected' | 'none-required';
-       impactIncludesDrops: boolean;  // Is drop impact in deltaOverallPoints?
-     };
-   }
-   ```
-
-**Detection:**
-- 3-for-2 trade simulation matches user expectation but post-trade standings don't
-- ESPN trade processor returns error "Cannot drop active player"
-- User feedback: "It dropped the wrong guy!"
-
-**Phase Mapping:**
-- **Phase 1 (Multi-Player Foundation):** Require user-specified drops for unbalanced trades
-- **Phase 2 (Advanced Multi-Player):** Auto-drop candidate suggestion with warnings
-
-**Sources:**
-- [Yahoo Fantasy uneven trade error](https://help.yahoo.com/kb/uneven-trade-error-message-fantasy-sports-sln6976.html)
+**Phase to address:** Mastra agent design phase — enforce the "no tools on narrator" constraint in the agent definition.
 
 ---
 
-## Historical Analysis
+### Pitfall 7: Mastra v1 Import Path Changes Break Existing Agent Code
 
-### Pitfall 7: ESPN Historical Data Deletion
-
-**What goes wrong:** User requests "show my league's 2023 season replay," app tries to backfill via ESPN API, but ESPN returns 404 or empty arrays because they delete data after 1-2 years.
+**What goes wrong:**
+You install `@mastra/core` and use `import { Agent } from '@mastra/core'`. This worked in pre-v1 but throws a module error in Mastra 1.0+. The framework now requires subpath imports: `import { Agent } from '@mastra/core/agent'`, `import { createTool } from '@mastra/core/tools'`. Additionally, the `createTool` execute function signature changed from `(context)` to `(inputData, context)`, which causes runtime errors when tools are called — not TypeScript errors at compile time if you're using `any`.
 
 **Why it happens:**
-- ESPN deletes historical boxscore data, transaction logs, and even league structures after seasons end
-- No official retention policy published
-- Community reports data loss for seasons >2 years old
-- Some data (transaction events) deleted immediately after roster resets
+Mastra v1 was released in January 2026 and reorganized its package structure for tree-shaking. All tutorials and Stack Overflow answers written before January 2026 use the old import style. The AI SDK model adapter also changed: `openai('gpt-4.1-mini')` now requires `@ai-sdk/openai` and AI SDK v5/v6 — not the `openai` npm package used directly by the existing narrator.
 
-**Consequences:**
-- Historical replay impossible for old leagues
-- "Season rewind" feature only works for current + previous season
-- User expectations unmet: "My league has 10 years of history!"
+**Breaking changes in v1 relevant to this project:**
+- `import { Agent } from '@mastra/core'` → `import { Agent } from '@mastra/core/agent'`
+- `createTool` execute: `(context)` → `(inputData, context)`
+- `RuntimeContext` renamed to `RequestContext`
+- Memory `memoryOptions` parameter renamed to `memory`
+- `stream()` returns AI SDK v5 types (not v4); use `streamLegacy()` for v4 compatibility
+- Node.js 22.13.0 minimum required
+- DB migration required for PostgreSQL and libSQL users
 
-**Prevention:**
+**How to avoid:**
+Pin to the specific Mastra version you test against. Read the official v1 migration guide before installing. Run the provided codemods. Treat each Mastra minor version bump as a potential breaking change until the API stabilizes (it is actively developed).
 
-1. **Document data retention limits upfront:**
-   ```markdown
-   ## Historical Analysis Limitations
+**Warning signs:**
+- `Module '"@mastra/core"' has no exported member 'Agent'` TypeScript error
+- Tool execute functions receive `undefined` for `context` parameter
+- `generateLegacy is not a function` at runtime after upgrading
 
-   ESPN deletes historical data after seasons end:
-   - **Current season:** Full data available
-   - **Previous season:** Most data available (through ~March)
-   - **2+ years ago:** Limited or no data
-
-   **Recommendation:** Connect your league NOW to preserve this season's history.
-   ```
-
-2. **Archive snapshot data perpetually (don't depend on ESPN):**
-   ```typescript
-   // ALREADY DOING THIS ✓
-   // league_daily_snapshot table stores daily snapshots
-   // league_raw_payload archives ESPN responses
-
-   // Extend to capture MORE:
-   interface EnhancedSnapshot {
-     // ... existing snapshot fields
-     preservedForHistorical: boolean;  // Flag for permanent retention
-     archiveMetadata: {
-       espnDataAvailable: boolean;      // Can we re-fetch from ESPN?
-       lastVerifiedDate: string;        // When we last confirmed ESPN has data
-     };
-   }
-   ```
-
-3. **Backfill with degradation:**
-   ```typescript
-   async backfillHistoricalData(
-     leagueId: number,
-     startDate: string,
-     endDate: string
-   ): Promise<BackfillResult> {
-     const results = [];
-
-     for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
-       try {
-         const snapshot = await this.espnAdapter.fetchLeague(leagueId, date);
-         results.push({ date, status: 'success', data: snapshot });
-       } catch (error) {
-         if (error.status === 404) {
-           results.push({
-             date,
-             status: 'data-deleted',
-             degraded: true,
-             reason: 'ESPN data no longer available'
-           });
-         }
-       }
-     }
-
-     return { results, completeness: calculateCompleteness(results) };
-   }
-   ```
-
-4. **Offer manual upload for historical data:**
-   - Let users upload CSV exports from their own archives
-   - "If you have old ESPN exports, upload them here for historical analysis"
-
-**Detection:**
-- Backfill job returns 404 for dates >1 year ago
-- `league_daily_snapshot` table has gaps for old seasons
-- User requests "2020 season replay" and gets empty results
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation):** Document retention limits, enhanced archival flags
-- **Phase 3 (Historical Advanced):** Manual CSV upload for old seasons
-
-**Sources:**
-- [GitHub: ESPN API historical data discussion](https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/league.py)
-- [Steven Morse: ESPN Fantasy API](https://stmorse.github.io/journal/espn-fantasy-v3.html)
-- Community reports: "league data disappearing from previous years"
+**Phase to address:** Mastra integration bootstrap — pin version, run codemod, write integration test.
 
 ---
 
-### Pitfall 8: Transaction Deduplication Failures
+### Pitfall 8: AbortController Not Propagated to Mastra Stream
 
-**What goes wrong:** Backfill fetches 90 days of ESPN data, trade on June 15 appears 90 times in `league_transaction_event` table (once per day's snapshot), breaking trade retrospectives.
+**What goes wrong:**
+The extension's `use-narrator.ts` already implements in-flight request cancellation: when a new trigger fires before the previous request completes, `abortControllerRef.current.abort()` is called. With the raw `fetch()` approach this works. After migrating to Mastra client SDK, the abort signal is not propagated to the underlying stream request in certain SDK versions — the request continues server-side after the client aborts, consuming tokens and incurring cost for a response the user will never see.
 
 **Why it happens:**
-- ESPN API returns "all transactions to date" in each league fetch (cumulative, not incremental)
-- No unique transaction ID in ESPN responses
-- Naive ingestion: `INSERT INTO league_transaction_event (date, type, players)`
-- Same trade inserted every snapshot
+GitHub issue #5673 confirmed that `@mastra/client-js@0.10.9` had a bug where `signal` passed to `agent.stream()` was not forwarded to the underlying HTTP request. The fix required passing the abort signal at client instantiation, not at the method level. This bug is fixed in post-0.10.9 versions, but the correct usage pattern is non-obvious.
 
-**Consequences:**
-- Trade retrospective shows "You made 90 trades on June 15"
-- Database bloat (millions of duplicate rows)
-- Timeline visualization broken
-- Transaction-based features unusable
+**How to avoid:**
+1. Don't use the Mastra client SDK from the extension — continue using raw `fetch()` to `POST /api/draft/narrate`. The extension talks to the Fastify route, which calls `agent.generate()` internally. This avoids the client SDK's abort bug entirely.
+2. If using `agent.stream()` server-side (not recommended, see Pitfall 5), pass `abortSignal` through to the agent call from the Fastify request's abort signal.
 
-**Prevention:**
+```typescript
+// Extension: keep raw fetch with AbortController (already correct)
+const response = await fetch(`${baseUrl}/api/draft/narrate`, {
+  method: 'POST',
+  signal: abortControllerRef.current.signal, // still works
+  body: JSON.stringify(payload),
+});
 
-1. **Generate deterministic transaction hash:**
-   ```typescript
-   function generateTransactionHash(txn: ESPNTransaction): string {
-     // Hash of: date + type + sorted player IDs + teams
-     const key = [
-       txn.date,
-       txn.type,  // 'TRADE', 'ADD', 'DROP'
-       txn.teamIds.sort().join(','),
-       txn.playerIds.sort().join(',')
-     ].join('|');
+// Fastify route: pass Fastify's request abort signal to Mastra
+const narration = await agent.generate(messages, {
+  abortSignal: request.raw.socket.destroyed
+    ? AbortSignal.abort()
+    : undefined,
+});
+```
 
-     return crypto.createHash('sha256').update(key).digest('hex');
-   }
-   ```
+**Warning signs:**
+- Token usage continues climbing after user navigates away from draft
+- Server logs show completed responses with no corresponding frontend receipt
+- Cost per session higher than expected given call count
 
-2. **Use hash as deduplication key:**
-   ```typescript
-   // In transaction ingestion:
-   for (const txn of espnTransactions) {
-     const hash = generateTransactionHash(txn);
-
-     // Upsert: insert if not exists, update if exists
-     await db
-       .insertInto('league_transaction_event')
-       .values({
-         league_id: leagueId,
-         transaction_hash: hash,  // NEW: unique constraint
-         transaction_date: txn.date,
-         transaction_type: txn.type,
-         teams_json: txn.teams,
-         players_json: txn.players,
-         raw_espn_json: txn.raw
-       })
-       .onConflict((oc) => oc.column('transaction_hash').doNothing())
-       .execute();
-   }
-   ```
-
-3. **Add `league_transaction_event.transaction_hash` column:**
-   ```sql
-   ALTER TABLE league_transaction_event
-     ADD COLUMN transaction_hash VARCHAR(64) UNIQUE;
-
-   CREATE INDEX idx_transaction_hash
-     ON league_transaction_event(transaction_hash);
-   ```
-
-4. **Idempotent backfill:**
-   - Re-running backfill for same date range shouldn't create duplicates
-   - Use UPSERT pattern with transaction_hash
-
-**Detection:**
-- `SELECT transaction_date, COUNT(*) FROM league_transaction_event GROUP BY transaction_date` shows 90 rows per date
-- Trade retrospective UI lists same trade 100 times
-- Database size explodes after historical backfill
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation - CRITICAL):** Add transaction_hash column, deduplication logic
-- **Phase 2:** Migration to deduplicate existing data
-
-**Sources:**
-- [ESPN Transaction Counter](https://support.espn.com/hc/en-us/articles/360058312172-Transaction-Counter)
-- [GitHub: ESPN Fantasy Transaction Importer](https://github.com/wyndylew/espn-flb-transaction-importer)
+**Phase to address:** Mastra integration phase — explicitly test abort behavior, log token usage per call.
 
 ---
 
-### Pitfall 9: Snapshot Gaps in Time Series
+### Pitfall 9: Mastra's Node.js 22.13.0 Minimum Conflicts with Production Runtime
 
-**What goes wrong:** Historical standings chart shows smooth line from April 1 to April 20, then jumps discontinuously to May 5 (15-day gap), making trends impossible to read.
+**What goes wrong:**
+The project runs Node.js 18 LTS or 20 LTS (typical for production backends). Mastra v1 requires Node.js 22.13.0 minimum. Installing Mastra in the backend fails silently or produces cryptic `ERR_UNSUPPORTED_ESM_URL_SCHEME` or native module errors at runtime. Docker base images, CI runners, and Heroku/Railway/Fly.io dyno defaults may all be below this threshold.
 
 **Why it happens:**
-- Daily snapshots fail for various reasons (ESPN API down, server restart, cron job missed)
-- Historical backfill can't recover missing days if ESPN data deleted
-- Time series queries assume continuous daily data
-- No interpolation for missing dates
+Mastra v1 uses features from Node 22 including native fetch improvements, `--experimental-vm-modules` behaviors, and native `AbortController` changes. The requirement is listed in the migration guide but not prominently surfaced in `npm install` output.
 
-**Consequences:**
-- Charts have visual gaps (broken lines)
-- "When did I peak in HR standings?" shows wrong date
-- Trade retrospectives fail (need standings on trade_date + 7 days)
+**How to avoid:**
+Before adding Mastra, verify current Node.js version across: local dev, Docker image, CI runner, production runtime. If below 22.13.0, plan the Node.js upgrade as a prerequisite task in the same phase as Mastra integration. Update `.nvmrc` and `engines` in `package.json` simultaneously.
 
-**Prevention:**
+```json
+// package.json
+{
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}
+```
 
-1. **Detect gaps during time series query:**
-   ```typescript
-   async getStandingsTimeSeries(
-     leagueId: number,
-     teamId: number,
-     startDate: string,
-     endDate: string
-   ): Promise<TimeSeriesData> {
-     const snapshots = await db
-       .selectFrom('team_daily_overall')
-       .selectAll()
-       .where('league_id', '=', leagueId)
-       .where('team_id', '=', teamId)
-       .where('snapshot_date', '>=', startDate)
-       .where('snapshot_date', '<=', endDate)
-       .orderBy('snapshot_date', 'asc')
-       .execute();
+**Warning signs:**
+- `npm install @mastra/core` succeeds but `node -e "require('@mastra/core/agent')"` fails
+- CI passes (if CI uses newer Node) but production deploy fails
+- Cryptic module resolution errors with no clear "Node version" message
 
-     const gaps = detectGaps(snapshots, startDate, endDate);
-
-     return {
-       data: snapshots,
-       gaps,  // Array of { start, end, durationDays }
-       completeness: (snapshots.length / expectedDays) * 100
-     };
-   }
-   ```
-
-2. **Interpolation for counting stats (with warnings):**
-   ```typescript
-   function interpolateGaps(
-     snapshots: Snapshot[],
-     gaps: Gap[]
-   ): Snapshot[] {
-     const interpolated = [...snapshots];
-
-     for (const gap of gaps) {
-       const before = findSnapshotBefore(gap.start);
-       const after = findSnapshotAfter(gap.end);
-
-       if (!before || !after) {
-         // Can't interpolate edges, leave gap
-         continue;
-       }
-
-       // LINEAR interpolation for counting stats (HR, RBI, etc.)
-       // This is APPROXIMATION, mark as synthetic
-       const syntheticSnapshots = linearInterpolate(before, after, gap);
-
-       syntheticSnapshots.forEach(s => {
-         s.is_synthetic = true;  // NEW FLAG
-         s.interpolation_method = 'linear';
-       });
-
-       interpolated.push(...syntheticSnapshots);
-     }
-
-     return interpolated.sort((a, b) => a.date - b.date);
-   }
-   ```
-
-3. **NEVER interpolate rate stats directly:**
-   ```typescript
-   // ❌ WRONG: Linear interpolation of AVG
-   const interpolatedAVG = avgBefore + ((avgAfter - avgBefore) / gapDays) * dayOffset;
-
-   // ✅ CORRECT: Interpolate components, recalculate rate
-   const interpolatedH = hBefore + ((hAfter - hBefore) / gapDays) * dayOffset;
-   const interpolatedAB = abBefore + ((abAfter - abBefore) / gapDays) * dayOffset;
-   const interpolatedAVG = interpolatedH / interpolatedAB;
-   ```
-
-4. **UI treatment of gaps:**
-   ```typescript
-   // In frontend chart:
-   const chartConfig = {
-     data: timeSeries,
-     annotations: gaps.map(gap => ({
-       type: 'region',
-       start: gap.start,
-       end: gap.end,
-       style: { fill: 'yellow', opacity: 0.3 },
-       label: `${gap.durationDays} days missing`
-     }))
-   };
-   ```
-
-**Detection:**
-- Time series chart has visible breaks
-- Query returns 120 days of data in 180-day range (33% missing)
-- Tooltip shows "Interpolated (estimated)"
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation):** Gap detection, UI annotations
-- **Phase 3 (Historical Advanced):** Component-based interpolation, completeness scoring
-
-**Sources:**
-- [Towards Data Science: Handling Gaps in Time Series](https://towardsdatascience.com/handling-gaps-in-time-series-dc47ae883990/)
-- [Time Series Interpolation Techniques](https://fastercapital.com/content/Time-Series-Interpolation--Filling-the-Gaps--Time-Series-Interpolation-Techniques.html)
+**Phase to address:** Pre-integration infrastructure phase — verify and upgrade Node.js before writing any Mastra code.
 
 ---
 
-### Pitfall 10: Retroactive Projection Fallacy
+## Technical Debt Patterns
 
-**What goes wrong:** Historical "what-if" simulation uses TODAY's projections to simulate a June trade, but June projections were COMPLETELY DIFFERENT (pre-injury, pre-breakout).
-
-**Why it happens:**
-- `player_projection` table stores only current projections
-- Historical backfill can't recreate what FanGraphs projected on June 15, 2023
-- Developers assume "use current projection, subtract actual stats to date"
-- This produces anachronistic simulations (using knowledge from the future)
-
-**Consequences:**
-- Trade retrospective: "You should have traded for Ohtani in June" (but June projections didn't show his injury)
-- "If you'd made this trade, you'd have won!" (but analysis uses post-season projections)
-- Misleading "what-if" scenarios that don't reflect real-time decision quality
-
-**Prevention:**
-
-1. **Archive projections at time of snapshot:**
-   ```typescript
-   // Extend projections_run schema:
-   interface ProjectionsRun {
-     id: number;
-     run_date: Date;
-     as_of_date: string;
-     source: 'fangraphs' | 'steamer' | 'thebat';
-     is_archived: boolean;        // NEW: mark historical projections
-     archived_from_date: string;  // NEW: "these were the RoS projections as of X"
-   }
-
-   // When user uploads new projections, DON'T delete old ones:
-   async ingestProjections(csv: string, asOfDate: string) {
-     // Mark previous run as archived (don't delete)
-     await db
-       .updateTable('projections_run')
-       .set({ is_archived: true, archived_from_date: asOfDate })
-       .where('run_date', '<', asOfDate)
-       .execute();
-
-     // Insert new run
-     const newRun = await db
-       .insertInto('projections_run')
-       .values({ run_date: now(), as_of_date: asOfDate, is_archived: false })
-       .execute();
-   }
-   ```
-
-2. **Query correct historical projection for retrospectives:**
-   ```typescript
-   async getProjectionsAsOf(date: string): Promise<ProjectionsRun> {
-     // Get projections that were current on that historical date
-     return db
-       .selectFrom('projections_run')
-       .selectAll()
-       .where('as_of_date', '<=', date)
-       .orderBy('as_of_date', 'desc')
-       .limit(1)
-       .executeTakeFirst();
-   }
-   ```
-
-3. **Warn when historical projections unavailable:**
-   ```typescript
-   interface TradeRetrospective {
-     tradeDate: string;
-     actualImpact: CategoryImpact[];
-     simulatedImpact: CategoryImpact[];
-     simulationWarnings: string[];  // e.g., ["Using current projections (historical unavailable)"]
-   }
-   ```
-
-4. **Document projection archival requirements:**
-   - Users must upload fresh projections weekly/monthly to build historical record
-   - First-time users can't do retrospectives (no historical projection baseline)
-
-**Detection:**
-- "What-if" simulation for June trade shows player with 200 projected HR (he hit 50 total)
-- Trade retrospective accuracy is terrible (recommendations don't match results)
-- All historical simulations use same projection values
-
-**Phase Mapping:**
-- **Phase 3 (Historical Advanced):** Projection archival, as-of-date queries
-- **Phase 3:** UI warnings when using anachronistic projections
-
-**Sources:**
-- Projection staleness already flagged in base PITFALLS.md (Pitfall #7)
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Wrap existing `DraftNarratorAgent` with Mastra without restructuring | Fast first integration | Mastra's lifecycle management conflicts with per-request class instantiation | Never — restructure at integration time |
+| Use Mastra's default `libsql` in-memory storage | No DB config needed | Restarts lose all thread state; fails silently under load | Local dev only, never production |
+| Skip pinning `@mastra/core` version | Always gets latest fixes | Breaking changes on any deploy; AI SDK v4/v5/v6 churn is real | Never in production |
+| Enable `observationalMemory: true` without a cost model | Better long-context behavior | Adds Gemini 2.5 Flash calls you don't control; cost and latency unpredictable | Never without explicit budget approval |
+| Use Mastra tools for data the payload already contains | Feels more "agentic" | 2–3× more LLM calls, 3× cost, 3× latency per narration | Never for this narrator use case |
+| Mix Mastra's PostgreSQL tables with Kysely-managed tables in same schema | Simpler config | Schema drift on Mastra upgrades breaks Kysely migrations | Never — use `schema: 'mastra'` isolation |
 
 ---
 
-### Pitfall 11: Rate Stat Interpolation Errors
+## Integration Gotchas
 
-**What goes wrong:** Time series has 10-day gap, interpolation calculates `AVG_gap = (AVG_before + AVG_after) / 2 = .285`, but component math yields `.301` (20-point error).
-
-**Why it happens:**
-- Pitfall #9 solution uses linear interpolation
-- Naive developer interpolates rate stats directly instead of components
-- Same error as multi-player trade math (Pitfall #2) but in time series context
-
-**Consequences:**
-- Historical charts show impossible trends (AVG increasing by 50 points in 1 day)
-- ERA goes negative during gap periods
-- Users manually verify and find app wrong
-
-**Prevention:**
-
-1. **ALWAYS interpolate components, never rates:**
-   ```typescript
-   function interpolateSnapshot(
-     before: Snapshot,
-     after: Snapshot,
-     targetDate: string
-   ): Snapshot {
-     const daysBefore = daysBetween(before.date, targetDate);
-     const totalDays = daysBetween(before.date, after.date);
-     const ratio = daysBefore / totalDays;
-
-     // ✅ CORRECT: Interpolate H and AB
-     const interpolatedH = before.H + (after.H - before.H) * ratio;
-     const interpolatedAB = before.AB + (after.AB - before.AB) * ratio;
-
-     // Calculate AVG from interpolated components
-     const interpolatedAVG = interpolatedH / interpolatedAB;
-
-     // ❌ WRONG (don't do this):
-     // const interpolatedAVG = before.AVG + (after.AVG - before.AVG) * ratio;
-
-     return {
-       date: targetDate,
-       H: interpolatedH,
-       AB: interpolatedAB,
-       AVG: interpolatedAVG,
-       is_synthetic: true
-     };
-   }
-   ```
-
-2. **Use existing formulas from `formulas.ts`:**
-   ```typescript
-   import { calculateAVG, calculateERA, calculateWHIP } from '@/shared/formulas';
-
-   // After interpolating components:
-   snapshot.AVG = calculateAVG({ H: snapshot.H, AB: snapshot.AB });
-   snapshot.ERA = calculateERA({ ER: snapshot.ER, IP: snapshot.IP });
-   snapshot.WHIP = calculateWHIP({ H: snapshot.H, BB: snapshot.BB, IP: snapshot.IP });
-   ```
-
-3. **Store components in snapshot tables:**
-   ```sql
-   -- team_daily_category_totals already has components_json ✓ (line 124 in schema.ts)
-   -- Ensure interpolation uses this field, not computed value column
-   ```
-
-4. **Add test for gap interpolation accuracy:**
-   ```typescript
-   test('interpolate 7-day gap maintains component math', () => {
-     const before = { date: '2025-04-01', H: 100, AB: 300, AVG: 0.333 };
-     const after = { date: '2025-04-08', H: 120, AB: 360, AVG: 0.333 };
-
-     const interpolated = interpolateSnapshot(before, after, '2025-04-04');
-
-     // Midpoint components
-     expect(interpolated.H).toBeCloseTo(110, 0);
-     expect(interpolated.AB).toBeCloseTo(330, 0);
-
-     // AVG calculated from components (not averaged)
-     expect(interpolated.AVG).toBeCloseTo(110 / 330, 4);  // 0.3333
-     expect(interpolated.AVG).not.toBeCloseTo(0.333, 4);  // Would be same if averaged
-   });
-   ```
-
-**Detection:**
-- Interpolated AVG value is impossible (> .400 or < .150)
-- Manual calculation of H/AB doesn't match displayed AVG
-- Chart shows discontinuous jumps after gap filling
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation - CRITICAL):** Component-based interpolation
-- **Phase 2:** Integration tests for gap filling accuracy
-
-**Current Status:** ⚠️ RISK - interpolation logic doesn't exist yet, easy to implement wrong
-
-**Sources:**
-- Same as Pitfall #2 (component math)
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Mastra + Fastify 4 | Registering routes then calling `init()` | Call `init()` after all hooks but before routes; use `prefix: '/api/mastra'` to avoid collision |
+| Mastra + OpenAI | Using `openai` npm package directly | Use `@ai-sdk/openai` with `openai('model-id')` — Mastra uses AI SDK v5/v6 model format |
+| Mastra + existing PostgreSQL | Pointing `MastraStorage` at same schema as app tables | Use `{ schema: 'mastra' }` to isolate Mastra tables |
+| Mastra + Chrome extension | Using Mastra client SDK from content script | Use raw `fetch()` to Fastify route — client SDK has SSE limitations in MV3 service workers |
+| Mastra memory + draft session | Using `threadId` for draft session ID | Do not use memory for narrator — stateless per-call is correct for this use case |
+| AI SDK v4 vs v5 | Mixing `stream()` (v5) with v4 model adapters | Use `streamLegacy()`/`generateLegacy()` when using AI SDK v4 models; new methods require v5 |
 
 ---
 
-### Pitfall 12: Trade Retrospective Attribution
+## Performance Traps
 
-**What goes wrong:** "Trade impact: +3 points" but user's standings actually went +5, app says "trade worked!" but ignores that 2 other trades and 10 waiver moves also happened that week.
-
-**Why it happens:**
-- Trade retrospective compares `standings[trade_date]` vs `standings[trade_date + 30]`
-- Attributes entire delta to the trade
-- Ignores other roster moves, injuries, player performance variance
-- No causal isolation
-
-**Consequences:**
-- "This trade won you the league!" (actually the waiver pickup did)
-- "This trade destroyed you" (actually player got injured post-trade)
-- False confidence in trade evaluation accuracy
-
-**Prevention:**
-
-1. **Isolate trade impact using projection-based expectation:**
-   ```typescript
-   interface TradeRetrospective {
-     trade: ProposedTrade;
-     tradeDate: string;
-
-     // Simulated impact (what we predicted)
-     simulatedImpact: {
-       projectedDelta: number;
-       categoryImpacts: CategoryImpact[];
-     };
-
-     // Actual impact (what happened)
-     actualImpact: {
-       standingsBefore: number;  // On trade_date
-       standingsAfter: number;   // 30 days later
-       actualDelta: number;
-
-       // Attribution breakdown
-       attributedToTrade: number;     // Based on traded players' actual stats
-       attributedToOther: number;     // Residual (other moves, variance)
-       otherMovesDuringPeriod: number; // Count of waivers/trades after this trade
-     };
-
-     accuracy: {
-       projectionError: number;        // actualDelta - projectedDelta
-       errorReasons: string[];         // ["Player X injured", "Breakout by Player Y"]
-     };
-   }
-   ```
-
-2. **Calculate "attributed to trade" using actual stats:**
-   ```typescript
-   async calculateAttributedImpact(
-     trade: ProposedTrade,
-     tradeDate: string,
-     evaluationDate: string  // e.g., 30 days later
-   ): Promise<number> {
-     // Get actual stats accrued by traded players during period
-     const receivedPlayers = trade.receivePlayers;
-     const givenPlayers = trade.givePlayers;
-
-     // Stats accumulated between tradeDate and evaluationDate
-     const receivedStats = await getPlayerStatsInPeriod(receivedPlayers, tradeDate, evaluationDate);
-     const givenStats = await getPlayerStatsInPeriod(givenPlayers, tradeDate, evaluationDate);
-
-     // Calculate category delta using component math
-     const categoryDeltas = calculateCategoryDeltas(receivedStats, givenStats);
-
-     // Convert to standings points
-     return convertDeltasToStandingsPoints(categoryDeltas);
-   }
-   ```
-
-3. **Flag confounding variables:**
-   ```typescript
-   const confounds = [];
-
-   // Check for injuries to traded players
-   if (receivedPlayers.some(p => wentOnIL(p, tradeDate, evaluationDate))) {
-     confounds.push('Received player(s) injured during evaluation period');
-   }
-
-   // Check for other trades
-   const otherTrades = await getTradesDuringPeriod(teamId, tradeDate, evaluationDate);
-   if (otherTrades.length > 0) {
-     confounds.push(`${otherTrades.length} other trades during evaluation period`);
-   }
-
-   // Check for waiver activity
-   const waiverMoves = await getWaiversDuringPeriod(teamId, tradeDate, evaluationDate);
-   if (waiverMoves.length > 5) {
-     confounds.push('Heavy waiver activity (impact unclear)');
-   }
-   ```
-
-4. **Present retrospective with caveats:**
-   ```markdown
-   ## Trade Retrospective: [Player A] for [Player B]
-
-   **Projected impact:** +2.5 points
-   **Actual standings change (30 days):** +4.0 points
-
-   **Attribution:**
-   - Directly from trade: +2.0 points
-   - Other roster moves: +1.5 points
-   - Variance/luck: +0.5 points
-
-   **Confounding factors:**
-   - 3 other trades during evaluation period
-   - Player C went on IL (unrelated to trade)
-   ```
-
-**Detection:**
-- Every trade retrospective shows "trade was good!" (confirmation bias)
-- Retrospective accuracy is 50% (random)
-- Users say "that's not why I won, it was the waiver pickup!"
-
-**Phase Mapping:**
-- **Phase 3 (Historical Advanced):** Attribution analysis, confound detection
-- **Phase 3:** UI showing breakdown of impact sources
-
-**Sources:**
-- Statistical concept: confounding variables, causal inference
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| `maxSteps > 1` with tools on narrator | Each narration takes 6–9s instead of 3s | Keep `maxSteps: 1` for prompt-only narrator, never add tools | On every trigger when tools are present |
+| Thread memory enabled during 120-call draft session | Latency grows throughout session; token count grows | Disable memory for narrator agent entirely | After ~30 calls when context fills |
+| `observationalMemory` compression triggers mid-pick | 2–5s pause during live auction nomination | Disable observational memory for narrator; use stateless calls | When thread hits ~30K tokens (~50 narrations with full payloads) |
+| Structured output with separate extraction model | Two LLM calls per narration (generate + extract) | Use prompt-enforced plain text output, not `structuredOutput` | Every call — doubles cost and latency |
+| Tools returning large JSON results | Tool result fills context window, leaving no room for final answer | Cap tool outputs at 500 tokens, filter to only needed fields | When tools return full player arrays or projection tables |
+| Full draft state in every narration (unfiltered) | Input token count at 2,000+ per call vs. current ~600 | Pre-filter in `buildNarratorPayload()` before sending to Mastra | Already addressed by existing payload builder — don't regress this |
 
 ---
 
-### Pitfall 13: Settings Changes Mid-Season
+## Security Mistakes
 
-**What goes wrong:** Historical replay shows team had 10 roto points in June, 12 in July, but June used 10-team league (10 categories) and July switched to 12-team league (12 categories), making comparison nonsensical.
-
-**Why it happens:**
-- Leagues can add/remove categories mid-season (rare but possible)
-- Leagues can add teams mid-season (expansion)
-- `league_settings_version.effective_date` tracks this (already in schema!)
-- Time series queries ignore settings changes
-
-**Consequences:**
-- Charts show discontinuous jumps at settings change boundaries
-- "You gained 15 points!" (actually league added 5 categories)
-- Historical comparisons invalid
-
-**Prevention:**
-
-1. **Use existing `league_settings_version` table (schema.ts lines 56-62):**
-   ```typescript
-   async getSettingsForDate(
-     leagueId: number,
-     snapshotDate: string
-   ): Promise<LeagueSettings> {
-     return db
-       .selectFrom('league_settings_version')
-       .selectAll()
-       .where('league_id', '=', leagueId)
-       .where('effective_date', '<=', snapshotDate)
-       .orderBy('effective_date', 'desc')
-       .limit(1)
-       .executeTakeFirst();
-   }
-   ```
-
-2. **Normalize time series across settings changes:**
-   ```typescript
-   async getStandingsTimeSeries(
-     leagueId: number,
-     teamId: number,
-     startDate: string,
-     endDate: string
-   ): Promise<TimeSeriesData> {
-     const snapshots = await fetchSnapshots(...);
-
-     // Detect settings changes
-     const settingsChanges = await db
-       .selectFrom('league_settings_version')
-       .selectAll()
-       .where('league_id', '=', leagueId)
-       .where('effective_date', '>=', startDate)
-       .where('effective_date', '<=', endDate)
-       .execute();
-
-     if (settingsChanges.length > 1) {
-       // Settings changed during period
-       return {
-         data: snapshots,
-         settingsChanges: settingsChanges.map(sc => ({
-           date: sc.effective_date,
-           changes: diffSettings(previousSettings, sc.settings_json)
-         })),
-         warning: 'League settings changed during this period. Comparisons may not be valid.'
-       };
-     }
-   }
-   ```
-
-3. **Annotate charts at settings change points:**
-   ```typescript
-   // In frontend:
-   const annotations = settingsChanges.map(change => ({
-     type: 'line',
-     position: change.date,
-     label: 'Settings changed',
-     style: { stroke: 'red', strokeWidth: 2, strokeDasharray: '5,5' }
-   }));
-   ```
-
-4. **Recalculate historical points using consistent settings:**
-   - For "season summary," pick one settings version (e.g., final)
-   - Recompute all historical points using final settings
-   - Label as "Normalized to end-of-season settings"
-
-**Detection:**
-- Time series chart has vertical jump on specific date
-- User says "we changed categories in June but chart doesn't show it"
-- Roto points sum doesn't match number of categories × number of teams
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation):** Settings change detection, UI annotations
-- **Phase 3 (Historical Advanced):** Normalized historical recalculation
-
-**Current Status:** ✅ SCHEMA SUPPORTS - `league_settings_version` table exists, just need to use it
-
-**Sources:**
-- Existing schema: `packages/backend/src/db/schema.ts` lines 56-62
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Exposing Mastra's auto-generated agent endpoints without auth | Any client can call agent with arbitrary prompts — prompt injection, cost exhaustion | Always register auth middleware before `server.init()`; use `prefix: '/api/mastra'` and block from public access |
+| Logging full `NarratorPayload` at debug level | Draft strategy leaks in logs; OpenAI API key visible if logged together | Redact `apiKey` field; log only `triggerReason` and call count at debug level |
+| Trusting `resourceId` from request body | Caller can impersonate another user's draft session | Derive `resourceId` from authenticated session, never accept it from client |
+| OpenAI API key in environment without rotation plan | Key exhausted by runaway agent (no `maxSteps` set) | Set explicit `maxSteps` cap; add server-side rate limiting on `/api/draft/narrate` (already implemented: 30/min) |
 
 ---
 
-### Pitfall 14: Backfill Rate Limiting
+## UX Pitfalls
 
-**What goes wrong:** User requests "backfill entire 2024 season" (180 days), app fires 180 ESPN API requests in 10 seconds, ESPN returns 429 Too Many Requests, IP banned for 24 hours, all users impacted.
-
-**Why it happens:**
-- Backfill naively loops over dates without rate limiting
-- ESPN API has undocumented rate limits
-- No exponential backoff on 429 responses
-- Single-threaded backfill (can't pause/resume)
-
-**Consequences:**
-- ESPN bans app's IP
-- All league snapshots fail for 24 hours
-- Users complain "app is down"
-- Backfill feature becomes unusable
-
-**Prevention:**
-
-1. **Implement rate limiting for backfill:**
-   ```typescript
-   async backfillHistoricalData(
-     leagueId: number,
-     startDate: string,
-     endDate: string
-   ): Promise<void> {
-     const dates = generateDateRange(startDate, endDate);
-
-     // Limit: 1 request per 2 seconds (30 per minute, well below ESPN's limit)
-     for (const date of dates) {
-       await this.rateLimiter.throttle(async () => {
-         await this.fetchAndStoreSnapshot(leagueId, date);
-       }, { minDelayMs: 2000 });
-     }
-   }
-   ```
-
-2. **Exponential backoff on 429:**
-   ```typescript
-   async fetchWithRetry(url: string, maxRetries = 3): Promise<Response> {
-     for (let attempt = 0; attempt < maxRetries; attempt++) {
-       const response = await fetch(url);
-
-       if (response.status === 429) {
-         const retryAfter = response.headers.get('Retry-After') || (2 ** attempt);
-         this.logger.warn({ retryAfter }, 'Rate limited, backing off');
-         await sleep(retryAfter * 1000);
-         continue;
-       }
-
-       return response;
-     }
-
-     throw new Error('Max retries exceeded');
-   }
-   ```
-
-3. **Backfill as background job (BullMQ):**
-   ```typescript
-   // Don't block HTTP request
-   async requestBackfill(leagueId: number, startDate: string, endDate: string) {
-     const job = await this.backfillQueue.add('historical-backfill', {
-       leagueId,
-       startDate,
-       endDate
-     }, {
-       attempts: 3,
-       backoff: { type: 'exponential', delay: 60000 }
-     });
-
-     return {
-       jobId: job.id,
-       status: 'queued',
-       estimatedDuration: `${daysBetween(startDate, endDate) * 2}s`
-     };
-   }
-   ```
-
-4. **Progress tracking:**
-   ```typescript
-   interface BackfillStatus {
-     jobId: string;
-     totalDays: number;
-     completedDays: number;
-     progress: number;  // 0-100
-     status: 'queued' | 'running' | 'completed' | 'failed';
-     errors: Array<{ date: string; reason: string }>;
-   }
-   ```
-
-5. **Circuit breaker on ESPN API:**
-   ```typescript
-   // If error rate >10% across all requests, pause backfill
-   if (this.espnErrorRate > 0.1) {
-     this.logger.error('ESPN API error rate too high, pausing backfill');
-     throw new Error('ESPN API unhealthy, try again later');
-   }
-   ```
-
-**Detection:**
-- ESPN returns 429 during backfill
-- Backfill job completes in 10 seconds (should take 6+ minutes for 180 days)
-- All users see "Unable to fetch league data" immediately after backfill starts
-
-**Phase Mapping:**
-- **Phase 2 (Historical Foundation - CRITICAL):** Rate limiting, exponential backoff
-- **Phase 2:** Background job queue for backfill
-- **Phase 3 (Historical Advanced):** Circuit breaker, progress tracking UI
-
-**Sources:**
-- [GitHub: ESPN API rate limiting discussion](https://github.com/cwendt94/espn-api)
-- Base PITFALLS.md: Pitfall #11 (Missing Rate Limiting)
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Showing "loading" state for full 3s before any text appears | User stresses during live auction nomination — 3s feels eternal when a pick costs $50 | Show last narration until new one replaces it; only show spinner on manual "Ask for advice" button |
+| Streaming partial narration tokens | Text reads awkwardly mid-sentence during live bid | Non-streaming generate() gives complete, grammatically correct text atomically |
+| Agent "thinking out loud" about tools (tool call reasoning exposed) | Confusing intermediate text like "I need to check the budget first..." | No tools on narrator means no intermediate reasoning visible |
+| Memory causing agent to reference prior picks incorrectly | "You passed on Soto earlier" when pick belongs to opponent | Stateless calls with full current state prevent stale cross-pick confusions |
 
 ---
 
-## Summary: Critical Path for Multi-Player Trades & Historical Analysis
+## "Looks Done But Isn't" Checklist
 
-### Must-Fix Before Launch
-
-| Pitfall | Phase | Risk Level | Estimated Effort |
-|---------|-------|------------|------------------|
-| #1: Roster slot validation | Phase 1 | 🚨 Blocker | 1 week |
-| #2: Multi-player component math tests | Phase 1 | 🚨 Critical | 3 days |
-| #5: Simulation complexity limits | Phase 1 | 🚨 Blocker | 3 days |
-| #8: Transaction deduplication | Phase 2 | 🚨 Critical | 1 week |
-| #11: Rate stat interpolation | Phase 2 | 🚨 Critical | 3 days |
-| #14: Backfill rate limiting | Phase 2 | 🚨 Critical | 3 days |
-
-**Total Critical Work:** ~3 weeks
-
-### Recommended Phases
-
-**Phase 1: Multi-Player Foundation (2-3 weeks)**
-- Pitfall #1: Roster constraint validation
-- Pitfall #2: Component math testing
-- Pitfall #5: Simulation limits (2-for-2 max)
-- Pitfall #6: Required drops for unbalanced trades
-
-**Phase 2: Historical Foundation (3-4 weeks)**
-- Pitfall #7: Document ESPN data retention
-- Pitfall #8: Transaction deduplication
-- Pitfall #9: Gap detection in time series
-- Pitfall #11: Component-based interpolation
-- Pitfall #13: Settings change handling
-- Pitfall #14: Backfill rate limiting
-
-**Phase 3: Advanced Features (4-6 weeks)**
-- Pitfall #3: Positional scarcity (VBD/SGP integration)
-- Pitfall #4: League-wide impact simulation
-- Pitfall #5: 3-for-3 trades (background jobs)
-- Pitfall #10: Projection archival
-- Pitfall #12: Trade attribution analysis
+- [ ] **Mastra installed:** Verify `@mastra/core` version is pinned; check `node --version >= 22.13.0`; verify imports use subpath style (`@mastra/core/agent`)
+- [ ] **Fastify integration:** Confirm auth hook registered before `server.init()`; confirm Mastra routes use non-default prefix; confirm CORS set via Fastify native (not Mastra config)
+- [ ] **Database:** Confirm Mastra storage uses `schema: 'mastra'`; run Mastra's schema init; verify no collision with Kysely migration state
+- [ ] **Agent definition:** Confirm `maxSteps` is explicitly set; confirm no tools on narrator agent; confirm model uses `@ai-sdk/openai` format
+- [ ] **Memory disabled:** Confirm no `threadId` or `resourceId` passed in narrator calls; confirm no memory adapter attached to narrator agent
+- [ ] **AbortController:** Confirm extension still uses raw `fetch()` with `signal`; confirm server-side request abort tested manually
+- [ ] **Cost baseline:** Measure token count per call before and after Mastra migration; confirm cost ≤ current baseline
+- [ ] **Session cap:** Confirm 120-call server-side enforcement still works through Mastra wrapper (it lives in rate limiter on route, not in agent)
+- [ ] **Node.js version:** Updated in Docker base image, `.nvmrc`, CI matrix, and `package.json` `engines` field
 
 ---
 
-## Integration with Existing System
+## Recovery Strategies
 
-### Leverage Existing Patterns ✅
-
-1. **Component math already correct:** `TradeRecommendationAgent.simulateTradeImpact()` lines 629-654 already handle multi-player rate stats correctly
-2. **Settings versioning exists:** `league_settings_version` table ready for historical queries
-3. **Degraded state pattern:** Extend to historical gaps (`is_synthetic`, `interpolation_method` flags)
-4. **Raw payload archival:** `league_raw_payload` can store historical ESPN responses for deduplication
-
-### New Infrastructure Needed ⚠️
-
-1. **Transaction hash column:** `league_transaction_event.transaction_hash` (Pitfall #8)
-2. **Projection archival:** `projections_run.is_archived`, `archived_from_date` (Pitfall #10)
-3. **Synthetic snapshot flags:** `league_daily_snapshot.is_synthetic`, `interpolation_method` (Pitfall #9)
-4. **Backfill job queue:** BullMQ queue for historical data fetching (Pitfall #14)
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| maxSteps too low — tools silently ignored | LOW | Add `maxSteps` param; redeploy |
+| Route prefix collision breaks existing endpoints | MEDIUM | Change Mastra prefix; update extension `backendUrl` if path changed; redeploy |
+| PostgreSQL schema collision after Mastra upgrade | MEDIUM | Run `ALTER TABLE mastra.mastra_scorers ADD COLUMN IF NOT EXISTS ...` manually; pin Mastra version |
+| Memory growth caused draft-session latency spike | LOW | Remove `threadId` from narrator `generate()` call; no data lost (narrator has no state to preserve) |
+| Node.js version mismatch breaks production deploy | HIGH | Emergency Node 22 upgrade across all infrastructure; may require Docker base image update and full CI rebuild |
+| Cost explosion from accidental tool-calling loop | MEDIUM | Set `maxSteps: 1`; add per-session token budget enforcement via OpenAI's `max_tokens` (already set to 200) |
+| v1 import path errors post-upgrade | LOW | Run Mastra's automated codemods: `npx @mastra/codemod`; fix remaining manually |
 
 ---
 
-## Using This Document
+## Cost Estimation: Mastra Agent vs. Current Narrator
 
-**For Feature Planning:**
-- Phase 1 must complete before multi-player trades go live
-- Phase 2 must complete before historical analysis release
-- Phase 3 is optional (advanced features)
+All estimates use gpt-4.1-mini-2025-04-14 at $0.40/M input tokens, $1.60/M output tokens (OpenAI API, March 2026).
 
-**For Code Reviews:**
-- Reference pitfall numbers in PRs
-- Multi-player trade PRs must address Pitfalls #1, #2, #5, #6
-- Historical PRs must address Pitfalls #8, #9, #11, #14
+**Current narrator (raw OpenAI SDK):**
+- Input: ~600 tokens/call (system prompt ~200 + payload ~400)
+- Output: ~150 tokens/call (120 words)
+- Per call: (600 × $0.40 + 150 × $1.60) / 1,000,000 = $0.000240 + $0.000240 = **$0.00048**
+- Per 120-call session: **~$0.058**
 
-**For Testing:**
-- Integration tests from Pitfall #2 (component math)
-- Deduplication tests from Pitfall #8
-- Gap interpolation tests from Pitfall #11
+**Mastra prompt-only agent (no tools, no memory) — target:**
+- Overhead: +50–100 tokens input for Mastra's internal prompt formatting
+- Per call: ~$0.00053 (+10% vs. current)
+- Per 120-call session: **~$0.064** (acceptable)
 
-**For User Documentation:**
-- Pitfall #7 → "Historical data limitations" help article
-- Pitfall #9 → "Understanding data gaps in charts"
-- Pitfall #12 → "How trade retrospectives work (and their limits)"
+**Mastra with 2 tools, maxSteps: 4 — worst case:**
+- Tool schemas add ~300 input tokens; tool results add ~400 tokens; second LLM call adds another full-context call
+- Effective: 3 LLM calls × ~1,500 tokens input + ~150 tokens output = $0.0018 per narration
+- Per 120-call session: **~$0.22** (3.8× current cost)
+
+**Mastra with observationalMemory enabled:**
+- Adds Gemini 2.5 Flash calls for compression (uncontrolled frequency)
+- Estimated +$0.001–0.003 per compression cycle (unknown frequency)
+- Not recommended for narrator use case
+
+**Recommendation:** Mastra prompt-only is cost-neutral. Mastra with tools is a cost regression. Do not enable tools on the narrator agent.
 
 ---
 
-**Last Updated:** 2026-02-20
-**Confidence:** HIGH (based on existing codebase analysis + domain research)
-**Next Review:** Before Phase 1 kickoff (multi-player trades)
+## Pitfall-to-Phase Mapping
 
-**Sources:**
-- [Smart Fantasy Baseball: Standings Gain Points](https://www.smartfantasybaseball.com/2013/03/create-your-own-fantasy-baseball-rankings-part-5-understanding-standings-gain-points/)
-- [BaseballHQ: SGP Denominators](https://www.baseballhq.com/articles/gaming/rotisserie/sgp-denominators-for-2024)
-- [Subvertadown: VBD Baselines Guide](https://subvertadown.com/article/guide-to-understanding-the-different-baselines-in-value-based-drafting-vbd-vols-vs-vorp-vs-man-games-and-beer-)
-- [Yahoo Fantasy: Uneven Trade Error](https://help.yahoo.com/kb/uneven-trade-error-message-fantasy-sports-sln6976.html)
-- [ESPN Transaction Counter](https://support.espn.com/hc/en-us/articles/360058312172-Transaction-Counter)
-- [Towards Data Science: Handling Gaps in Time Series](https://towardsdatascience.com/handling-gaps-in-time-series-dc47ae883990/)
-- [GitHub: ESPN API (cwendt94)](https://github.com/cwendt94/espn-api)
-- [Steven Morse: ESPN Fantasy API v3](https://stmorse.github.io/journal/espn-fantasy-v3.html)
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| maxSteps default silently disables tools | Mastra integration bootstrap | Integration test: register a dummy tool, confirm it is never called (tools should not be on narrator) |
+| Fastify route prefix collision | Mastra integration bootstrap | `GET /api/draft/narrate` and `GET /api/mastra/agents` both return 200 with no interference |
+| PostgreSQL schema collision | Pre-integration infrastructure | `\dn` in psql shows `mastra` schema; `\dt mastra.*` shows Mastra tables; `\dt public.*` shows no Mastra tables |
+| Memory growth / thread accumulation | Mastra agent design | 120 calls in a test session: final call latency ≤ first call latency ± 20% |
+| SSE streaming breaks in Chrome MV3 | Extension integration | Narrator works after background service worker is killed and restarted mid-session |
+| Tools multiply LLM calls | Mastra agent design | Confirm `onStepFinish` fires exactly once per narrate call; token usage per call ≤ 800 |
+| v1 import path breaking changes | Version pinning | CI: `tsc --noEmit` passes; no `@mastra/core` top-level imports in codebase |
+| AbortController not propagated | Extension integration | Trigger two narrations within 500ms; confirm only one completes (log on server side) |
+| Node.js version mismatch | Pre-integration infrastructure | `node --version` in CI, Docker, and production all show ≥22.13.0 |
+
+---
+
+## Sources
+
+- [Mastra Agent Memory Documentation](https://mastra.ai/docs/agents/agent-memory) — thread/resource ownership, lastMessages, storage requirements. Confidence: HIGH.
+- [Mastra Memory Overview](https://mastra.ai/docs/memory/overview) — storage backend requirements, auto-table creation. Confidence: HIGH.
+- [Mastra Observational Memory](https://mastra.ai/docs/memory/observational-memory) — compression triggers (30K tokens), default model (Gemini 2.5 Flash), async vs. sync behavior. Confidence: HIGH.
+- [Mastra Working Memory](https://mastra.ai/docs/memory/working-memory) — scope exclusivity pitfall, storage adapter requirements. Confidence: HIGH.
+- [Mastra Server Adapters Documentation](https://mastra.ai/docs/server/server-adapters) — middleware ordering, prefix configuration, CORS behavior in adapters. Confidence: HIGH.
+- [Mastra v1 Migration Guide](https://mastra.ai/guides/migrations/upgrade-to-v1/overview) — import subpath changes, createTool signature, Node 22 requirement, DB migration requirement. Confidence: HIGH.
+- [Mastra Streaming Migration Guide](https://mastra.ai/blog/migration-guide-streaming) — stream/streamLegacy rename, AI SDK v5 type changes, modelSettings restructure. Confidence: HIGH.
+- [Mastra Agent Orchestration Blog](https://mastra.ai/blog/announcing-mastra-improved-agent-orchestration-ai-sdk-v5-support) — maxSteps control, Mastra now owns the agent loop (not AI SDK). Confidence: HIGH.
+- [Mastra Server Adapter Announcement](https://mastra.ai/blog/mastra-server-adapters) — Fastify/Express adapter integration pattern. Confidence: HIGH.
+- [GitHub Issue #5673: Abort stream not working](https://github.com/mastra-ai/mastra/issues/5673) — AbortController bug in Mastra client SDK v0.10.9, fixed in PR #5686. Confidence: HIGH.
+- [GitHub Issue #11789: Missing migration for new columns](https://github.com/mastra-ai/mastra/issues/11789) — PostgreSQL schema drift on Mastra upgrade, requestContext column missing. Confidence: HIGH.
+- [GitHub Issue #2930: maxSteps docs unclear](https://github.com/mastra-ai/mastra/issues/2930) — confirms maxSteps default of 1, docs gap acknowledged. Confidence: HIGH.
+- [GitHub Issue #11856: Thread and resource isolation](https://github.com/mastra-ai/mastra/issues/11856) — threadId isolation gap in listMessages API. Confidence: HIGH.
+- [Mastra Latency Optimization Blog](https://mastra.ai/blog/building-fast-reliable-input-processors) — sub-500ms achievable with prompt surgery, schema optimization. Confidence: HIGH.
+- [GPT-4.1 mini Performance Analysis](https://artificialanalysis.ai/models/gpt-4-1-mini) — TTFT 0.47–0.77s, 62–79 t/s output speed, ~3–4s for 200 token completion. Confidence: MEDIUM (measured benchmarks, not real-time SLAs).
+- [Mastra Changelog 2026-01-20](https://mastra.ai/blog/changelog-2026-01-20) — v1 release details, adapter packages for Express/Fastify/Hono/Koa. Confidence: HIGH.
+- [Dynamic Agents: Runtime Context in Mastra](https://mastra.ai/blog/dynamic-agents) — context injection pattern, per-request isolation requirements. Confidence: HIGH.
+
+---
+
+*Pitfalls research for: Adding Mastra AI agent to ESPN Fantasy Baseball Draft Assistant (Fastify backend + Chrome extension)*
+*Researched: 2026-03-05*

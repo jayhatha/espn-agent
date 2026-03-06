@@ -1,318 +1,244 @@
 # Project Research Summary
 
-**Project:** ESPN Fantasy Baseball Assistant - v1.1 Trades & History
-**Domain:** Fantasy sports analytics with historical analysis and multi-player trade evaluation
-**Researched:** 2026-02-20
-**Confidence:** HIGH
+**Project:** ESPN Fantasy Baseball Assistant - Mastra AI Agent Integration
+**Domain:** AI agent framework integration into existing Fastify backend + Chrome extension for real-time auction draft advising
+**Researched:** 2026-03-05
+**Confidence:** HIGH (core integration), MEDIUM (streaming + memory interaction under live draft load)
 
 ## Executive Summary
 
-This milestone extends the existing ESPN Fantasy Baseball Assistant with multi-player trade evaluation (2-for-2, 3-for-1, N-for-M trades) and historical season analysis features. Research reveals that 90% of the needed infrastructure already exists in the codebase. The existing `TradeRecommendationAgent.simulateTradeImpact()` method already handles N-for-N trades correctly through component-based rate stat math, requiring only candidate generation logic to be added. Historical data is available from ESPN via the `scoringPeriodId` parameter (already supported by the adapter), enabling week-by-week backfill through the existing snapshot pipeline.
+This milestone replaces the stateless `DraftNarratorAgent` (a single OpenAI SDK call per request) with a Mastra-powered agent that has typed tools, thread-scoped memory, and SSE streaming. The existing narrator sends the entire engine signal payload as an 800-token text wall; the Mastra agent instead queries 8 focused tools on demand, remembers what it said earlier in the draft session, and streams text token-by-token to the sidebar. The core integration adds 4 packages (`@mastra/core`, `@mastra/memory`, `@mastra/pg`, and a Zod 4 upgrade) to the backend. Critically, `@mastra/fastify` must NOT be used -- it requires Fastify v5, while the existing backend runs Fastify v4. Instead, the `Agent` class from `@mastra/core` is called directly inside existing Fastify v4 route handlers.
 
-The recommended approach builds on existing patterns: extend agents rather than rewrite them, reuse the snapshot architecture for historical data, and leverage the existing temporal table design (`league_daily_snapshot`) for time series queries. No new database tables are needed. The primary risks are ESPN historical data retention (unclear beyond current season), combinatorial explosion in multi-player candidate generation (mitigated via genetic algorithms), and rate limiting during backfill (mitigated via BullMQ job queues with 2-second delays).
+The recommended build order is: (1) prerequisite upgrades (Zod v4, verify Node >= 22.13.0), (2) Mastra instance + PostgresStore wiring, (3) 8 tool definitions pulling from engine signals via AsyncLocalStorage, (4) agent definition with memory, (5) SSE streaming endpoint in the existing `/api/draft/narrate` route using `reply.raw`, (6) extension-side SSE consumer using `fetch` + `ReadableStream`. This order reflects strict dependency chains and ensures each step is independently testable.
 
-Critical architectural insight: this is a views and simulation milestone, not a data model milestone. All features query and visualize existing snapshot data in new ways rather than requiring schema changes.
+The pitfalls research raises strong warnings against tools, memory, and streaming -- arguing the narrator should remain stateless and prompt-only to stay within the 3-second latency budget. These warnings are valuable engineering constraints, not vetoes. The user explicitly requested tools, memory, and streaming as the purpose of this milestone. The correct approach is to implement all three with the safeguards the pitfalls research identifies: cap `maxSteps: 4`, keep tool outputs under 200 tokens each, use `lastMessages: 10` (not 40) to bound context growth, and use `AsyncLocalStorage` for request-scoped signal access. If latency exceeds 5 seconds in testing, tools can be selectively disabled per trigger type (e.g., tools on `user_request` only, prompt-only on `nomination`).
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack (Fastify, Next.js 14, Kysely, BullMQ, Recharts) handles all new features with only two library additions. No framework changes required. The stack was well-chosen for this domain—component-based math in `formulas.ts` scales to N-player trades, Kysely's temporal queries support season replay natively, and BullMQ handles historical backfill orchestration.
+Four new packages in `packages/backend` only. No new infrastructure services, no new databases, no new Redis queues. Zod v4 upgrade is a blocking prerequisite -- Mastra 1.x imports `zod/v4` subpath which does not exist in Zod 3.
 
-**New dependencies (minimal additions):**
-- **js-combinatorics ^2.1.2**: N-for-N trade candidate generation via genetic algorithm. TypeScript-native, 95% reduction in evaluations vs brute force (2-for-2: 11,025 combinations → 500 evaluations).
-- **react-window ^2.2.3**: Virtualize 100+ player lists in trade builder and free agent views. 30KB, native TypeScript, complements existing Recharts usage.
+**Core technologies:**
+- **@mastra/core** (1.9.x): Agent class, `createTool`, `Mastra` instance. Framework-agnostic -- no Fastify dependency. Call `agent.stream()` from any HTTP handler.
+- **@mastra/memory** (1.4.x): Thread-based conversation memory. `lastMessages: 10` scopes context window. Thread ID = draft session, resource ID = extension.
+- **@mastra/pg** (1.7.x): PostgreSQL storage for memory. Reuses existing `DATABASE_URL`. Creates `mastra_*` tables in a `mastra` schema (isolated from Kysely-managed tables).
+- **zod** (v3 -> v4): Mandatory upgrade. Schema API is backward compatible -- existing `z.object()` / `z.string()` calls unchanged. Must be done BEFORE installing any `@mastra/*` package.
 
-**Existing stack upgrades:**
-- **bullmq 5.1.5 → ^5.69.3**: 68 patch releases of reliability fixes, FlowProducer dependency improvements needed for parent-child job trees (backfill orchestration).
+**What NOT to add:**
+- `@mastra/fastify` -- requires Fastify v5 peer dep. Upgrading Fastify v4 -> v5 would require changes across all 12 route files for zero feature benefit.
+- `@ai-sdk/openai` or `@ai-sdk/anthropic` -- Mastra routes to providers internally via string format (`"openai/gpt-4.1-mini"`). Installing these creates version conflicts.
+- `@mastra/fastembed` -- adds native binary + pgvector. Unnecessary for draft narration (short sessions, not semantic search).
+- `mastra` CLI -- only needed for `mastra dev` playground. Not needed when embedding via `@mastra/core` directly.
+- `@fastify/sse` -- conflicts with manual `reply.raw` SSE pattern needed for Fastify v4 streaming.
 
-**What stays unchanged (leverage existing):**
-- Kysely 0.27.2: Already supports recursive CTEs and temporal queries for season replay
-- Recharts 2.10.4: Already handles timeline visualization (LineChart with annotations)
-- Next.js 14 App Router: searchParams prop supports historical date ranges with no changes
-- Component math in `formulas.ts`: Already handles multi-player rate stats correctly (H/AB for AVG, never averaging rates)
+**Version constraints:**
+- All `@mastra/*` packages must be installed at the same version. Mixed versions cause runtime errors.
+- Node.js >= 22.13.0 required (Mastra v1 uses Node 22 features). Current environment is v25.6.0 -- no action needed locally. Verify Docker images and CI runners.
 
 ### Expected Features
 
-Research across mainstream trade analyzers (FantasySP, RotoBaller, Baseball Monster) and season review tools (League Legacy, Yahoo Fantasy) establishes clear expectations.
+**Must have (P1 -- agent is not better than current narrator without these):**
+- Streaming SSE response from `/api/draft/narrate` -- eliminates 1-2s blank wait
+- 8 focused tools wired to engine signals -- agent queries what it needs per trigger type
+- `maxSteps: 4` on agent -- enables tool call + reflection loop
+- Thread-scoped session memory with PostgresStore -- agent does not repeat itself
+- Extension sends stable `threadId` (UUID) per draft session
+- Sidebar renders streaming text with ephemeral "Checking [tool]..." status
+- `AsyncLocalStorage` for engine signals -- concurrency-safe request scoping
 
-**Must have (table stakes):**
-- **N-for-N trade evaluation (2-for-2, 3-for-3)**: Every major analyzer supports multi-player trades. Users expect 3+ players per side.
-- **Category-by-category impact breakdown**: Standard across all tools. Users need granular impact (HR rank, RBI rank, etc.), not just overall points delta.
-- **Trade history view**: ESPN/Yahoo both show transaction logs. Users expect to see past trades with players, dates, teams.
-- **Week-by-week standings progression**: Yahoo shows past standings. Expected for any season review feature.
-
-**Should have (differentiators):**
-- **Trade retrospectives (projection accuracy)**: "How did this trade actually work out?" Novel feature—not found in mainstream tools. Shows projected impact at trade time vs actual outcome. Builds trust in projections.
-- **Historical data backfill from ESPN**: Most users have multi-year leagues. Backfilling 2024 season makes "season replay" instantly valuable. ESPN API supports `leagueHistory/{leagueId}?seasonId={year}` endpoint.
-- **Interactive trade builder**: Users propose 3-for-2, see live impact as they add/remove players. More engaging than static form submit.
-- **Transaction annotations on timeline**: Highlight weeks where team jumped 3 ranks due to waiver pickup. Context for why standings changed.
+**Should have (P2 -- add after core works in 2-3 real drafts):**
+- Working memory template for draft strategy tracking
+- Conversational follow-up ("why did you say that?") -- nearly free once memory is wired
+- Full tool-call transparency with named indicators in sidebar
 
 **Defer (v2+):**
-- **Real-time trade notifications**: Scope creep. Requires polling ESPN every N minutes. Not core to evaluation features. Defer to Slack integration milestone.
-- **Keeper/dynasty trade value**: Multi-year impact requires future projections and draft pick valuation. Out of scope for redraft leagues (current focus).
-- **Automated historical backfill on connect**: Too slow for UX (30+ seconds for 3 seasons). Initial connect should be instant. Background job handles backfill separately.
+- Strategy transition narration (requires validated working memory across many sessions)
+- Snake draft mode (different tool set and trigger logic)
+- Semantic recall across past draft seasons (vector DB infrastructure, near-zero tactical value)
+- Agent-initiated bids or autonomous actions (advisory-only is the correct abstraction)
 
 ### Architecture Approach
 
-The milestone extends existing agents rather than creating parallel systems. 90% of needed functionality already exists in current snapshot and trade analysis pipelines. The architecture leverages temporal tables (daily snapshots with immutable inserts) as the foundation for both historical replay and trade retrospectives.
+The `Agent` class from `@mastra/core/agent` is framework-agnostic. It is instantiated as a singleton and called from the existing Fastify v4 route handler for `POST /api/draft/narrate`. The route sets SSE headers via `reply.raw.writeHead()`, wraps the request in `AsyncLocalStorage.run()` to scope engine signals, calls `agent.stream()`, and pipes chunks via `reply.raw.write()`. The extension consumes the stream via `fetch()` + `response.body.getReader()` (not `EventSource`, which only supports GET).
 
-**Component modifications:**
-1. **TradeRecommendationAgent (EXTEND)**: Add `generateMultiPlayerCandidates()` method using genetic algorithm. Existing `simulateTradeImpact()` method already handles N-for-M trades correctly via loops over `givePlayers[]` and `receivePlayers[]` arrays (lines 634-653). Only candidate generation logic is new.
-2. **SnapshotOrchestratorAgent (EXTEND)**: Add `scoringPeriodId` parameter to `SnapshotJobOptions`, pass through to ESPNAdapter. Entire snapshot pipeline reused for historical data.
-3. **ESPNAdapter (NO CHANGE)**: Already supports `scoringPeriodId` parameter for historical fetches. No code changes needed.
+**Major components:**
+1. **Mastra instance** (`packages/backend/src/mastra/index.ts`) -- registers agent, configures PostgresStore with `schema: 'mastra'` for table isolation from Kysely
+2. **Draft narrator agent** (`packages/backend/src/mastra/agents/draft-narrator-agent.ts`) -- Agent definition with 8 tools, memory, system prompt (migrated from existing `SYSTEM_PROMPT`)
+3. **8 tool definitions** (`packages/backend/src/mastra/tools/`) -- `get_budget_status`, `get_inflation_state`, `get_scarcity`, `get_category_gaps`, `get_optimization`, `get_top_targets`, `get_draft_phase`, `get_archetype`. All read-only, pull from AsyncLocalStorage-scoped engine signals, return <200 tokens each
+4. **Modified route** (`packages/backend/src/api/draft.ts`) -- SSE streaming via `reply.raw`, AsyncLocalStorage wrapping, `buildUserMessage()` reused from existing code
+5. **Modified extension hook** (`packages/extension/lib/use-narrator.ts`) -- `fetch` + `ReadableStream` SSE consumer replacing `response.json()`
+6. **Signals context** (`packages/backend/src/mastra/signals-context.ts`) -- `AsyncLocalStorage<DraftEngineSignals>` for request-scoped tool access
 
-**New components:**
-1. **HistoricalBackfillAgent (NEW)**: Orchestrates backfill jobs via BullMQ FlowProducer. Parent job creates child jobs for each scoring period, guarantees fetch-before-snapshot ordering.
-2. **TradeRetrospectiveAgent (NEW)**: Compares actual vs expected trade outcomes. Queries snapshots before/after trade, calls existing `simulateTradeImpact()` for counterfactual.
-3. **SeasonTimeline component (NEW, frontend)**: Recharts LineChart consuming existing `/timeseries/overall` and `/timeseries/annotations` endpoints. Pure visualization, no new backend code.
-
-**Data flow for multi-player trades:**
-```
-User builds 2-for-2 trade → POST /trades/impact → TradeRecommendationAgent
-→ simulateTradeImpact() [EXISTING, handles arrays] → component math for rate stats
-→ re-rank teams → return category impacts
-```
-
-**Data flow for historical backfill:**
-```
-Admin triggers backfill → BullMQ job → HistoricalBackfillAgent
-→ For each scoring period: SnapshotOrchestrator.executeSnapshot(scoringPeriodId: N)
-→ ESPNAdapter.fetchLeague(scoringPeriodId: N) → archive → normalize → write snapshots
-→ Mark degraded if no ROS projections for that date
-```
+**Files that do NOT change:** All deterministic engine logic in `packages/extension/lib/engine/`, shared types in `packages/shared/src/`, server setup in `packages/backend/src/index.ts`, existing `NarratorPayload` type.
 
 ### Critical Pitfalls
 
-Research identified 14 domain-specific pitfalls beyond general ESPN API issues. Top 6 blockers for launch:
+1. **`maxSteps` defaults to 1, silently disabling tools.** Mastra's default means the agent makes one LLM call and stops -- tools are never invoked, no error thrown. Set `maxSteps: 4` explicitly in the agent definition, not at call time.
 
-1. **Roster slot constraint violations**: N-for-N simulation shows "+2.5 points" but trade is illegal (4 catchers, league max: 2). Prevention: Parse `roster_slots` from settings, validate pre-simulation, return `isLegal` flag with `rosterViolations` array. Phase 1 blocker.
+2. **Fastify v4 incompatibility with `@mastra/fastify`.** The adapter requires Fastify v5 as a peer dependency. Upgrading Fastify would require changes to all 12 route files. Use `@mastra/core` directly instead -- the Agent class has no framework dependency.
 
-2. **Component math errors in multi-player rate stats**: 3-for-3 trade calculates AVG by averaging individual player AVGs instead of adjusting H/AB components, producing impossible results. Prevention: NEVER directly add/subtract rate stats. Existing code at lines 634-653 already correct—extend with integration tests to prevent regression. Phase 1 critical.
+3. **PostgreSQL schema collision.** Mastra auto-creates 7 tables via `CREATE TABLE IF NOT EXISTS` but does NOT add new columns on upgrade. Use `schema: 'mastra'` to isolate from Kysely-managed tables. Pin `@mastra/pg` version and treat upgrades as migrations.
 
-3. **Simulation explosion (combinatorial complexity)**: 3-for-3 in 15-player roster = 455,000 combinations, OOMs server. Prevention: Cap at 3-for-3 max, use genetic algorithm (95% reduction), queue large searches as background jobs. Phase 1 blocker.
+4. **Memory growth during 120-call draft session.** With full NarratorPayload per message (400-600 tokens), 120 messages would hit 60K+ tokens. Mitigation: set `lastMessages: 10` (not 40), keep tool outputs under 200 tokens, and monitor per-call latency throughout test sessions. If latency grows >20% over a session, reduce to `lastMessages: 5`.
 
-4. **Transaction deduplication failures**: Backfill fetches 90 days, same trade inserted 90 times. Prevention: Add `transaction_hash` column (SHA256 of date + type + sorted player IDs), use UPSERT with `ON CONFLICT DO NOTHING`. Phase 2 critical.
+5. **Tool-calling multiplies LLM calls and latency.** Each tool step adds ~0.5-1s (LLM decision + tool execution + LLM reflection). With 2 tools and `maxSteps: 4`, worst case is 3 LLM calls = 6-9s. Mitigation: system prompt instructs agent to call 1-2 tools maximum per response, tools return minimal data, and per-trigger-type tool guidance in the prompt reduces unnecessary calls. Benchmark early -- if latency exceeds budget, restrict tools to `user_request` trigger type only.
 
-5. **Rate stat interpolation errors**: Time series gap interpolation averages AVG directly (`.285` + `.301`) / 2 instead of interpolating H and AB components. Prevention: ALWAYS interpolate components, calculate rate from interpolated totals. Use existing `formulas.ts` functions. Phase 2 critical.
+6. **Mastra v1 import paths changed.** Use subpath imports: `@mastra/core/agent`, `@mastra/core/tools`. Top-level `@mastra/core` imports fail. Pin exact version and verify imports in CI.
 
-6. **Backfill rate limiting**: Backfill fires 180 ESPN requests in 10 seconds, IP banned for 24 hours. Prevention: 2-second delay between requests (30/min, well below ESPN limit), exponential backoff on 429, BullMQ background jobs with progress tracking. Phase 2 critical.
-
-**Additional pitfalls flagged for later phases:**
-- Positional scarcity ignored (trade 3 elite closers for mediocre starters, lose saves coverage) — Phase 2
-- Retroactive projection fallacy (using today's projections for June trade) — Phase 3
-- Trade retrospective attribution (ignore confounding variables like injuries) — Phase 3
+7. **Chrome extension streaming reliability.** MV3 service workers can be terminated mid-stream. The extension's narrator hook runs in a content script (not service worker), so `fetch` + `ReadableStream` is reliable there. Confirm the streaming consumer does NOT run in the background service worker. The existing `AbortController` pattern in `use-narrator.ts` continues to work with `fetch`.
 
 ## Implications for Roadmap
 
-Based on dependency analysis, component reuse patterns, and pitfall sequencing, recommended 4-phase structure:
+### Phase 1: Prerequisites and Infrastructure
 
-### Phase 1: Multi-Player Trade Foundation
-**Duration:** 8-12 days
-**Rationale:** Core feature request, pure extension of existing agent, no external dependencies.
+**Rationale:** Zod v4 and Node.js verification are hard blockers -- nothing else installs without them. PostgresStore setup must happen before any agent code.
 
 **Delivers:**
-- 2-for-2 and 3-for-1 trade evaluation
-- Roster constraint validation (prevents illegal trades)
-- Multi-select player UI component
+- Zod v4 upgrade with passing test suite
+- Node.js >= 22.13.0 verified across local, Docker, CI
+- `@mastra/core`, `@mastra/memory`, `@mastra/pg` installed and importable
+- Mastra instance created with PostgresStore (`schema: 'mastra'`)
+- Mastra tables auto-created, verified isolated from Kysely schema
+- `AsyncLocalStorage` signals context module
 
-**Addresses (from FEATURES.md):**
-- N-for-N trade evaluation (table stakes)
-- Category-by-category impact breakdown (table stakes)
+**Addresses:** Stack prerequisites, Pitfall #3 (schema collision), Pitfall #9 (Node version)
+**Avoids:** Installing packages in wrong order, schema conflicts with existing DB
 
-**Avoids (from PITFALLS.md):**
-- Pitfall #1: Roster slot violations
-- Pitfall #2: Component math errors (via integration tests)
-- Pitfall #5: Simulation explosion (cap at 3-for-3, genetic algorithm)
+### Phase 2: Tool Definitions and Agent Core
 
-**Implementation:**
-- Extend `TradeRecommendationAgent` with genetic algorithm candidate generation
-- Add API endpoints for N-for-M trade structures (`?tradeSize=2x2`)
-- Frontend multi-select picker with position eligibility filtering
-- Integration tests for 2-for-2 and 3-for-1 component math accuracy
-
-**Research flags:** None (standard combinatorial optimization, well-documented genetic algorithms).
-
-### Phase 2: Historical Backfill & Timeline
-**Duration:** 6-10 days
-**Rationale:** Unlocks all historical features, isolated from trade evaluation, can parallelize with Phase 1.
+**Rationale:** Tools must exist before the agent can use them. Agent definition depends on tools + memory. This phase produces a testable agent callable from a unit test (no HTTP layer yet).
 
 **Delivers:**
-- ESPN historical data backfill (week-by-week)
-- Week-by-week standings timeline visualization
-- Trade history view (transaction log)
+- 8 `createTool()` definitions reading from AsyncLocalStorage-scoped signals
+- Zod input/output schemas for each tool
+- Draft narrator agent definition with `maxSteps: 4`, tools, memory
+- System prompt migrated from existing `DraftNarratorAgent.SYSTEM_PROMPT`
+- Unit tests: tool execution with mock signals, agent.generate() with tool invocation
 
-**Uses (from STACK.md):**
-- BullMQ ^5.69.3 FlowProducer for parent-child job trees
-- Kysely temporal queries (already supports WHERE snapshot_date BETWEEN)
-- Recharts LineChart for timeline (existing component)
+**Addresses:** 8 focused tools (P1 feature), maxSteps (P1 feature), session memory (P1 feature)
+**Avoids:** Pitfall #1 (maxSteps default), Pitfall #6 (tool latency -- benchmark here before wiring HTTP)
 
-**Implements (from ARCHITECTURE.md):**
-- HistoricalBackfillAgent (orchestrates scoring period fetches)
-- SeasonTimeline component (frontend visualization)
+### Phase 3: SSE Streaming Endpoint
 
-**Avoids (from PITFALLS.md):**
-- Pitfall #7: ESPN data deletion (document retention limits)
-- Pitfall #8: Transaction deduplication (transaction_hash column)
-- Pitfall #9: Snapshot gaps (gap detection, UI annotations)
-- Pitfall #14: Backfill rate limiting (2s delays, exponential backoff)
-
-**Implementation:**
-- Add `scoringPeriodId` parameter to `SnapshotJobOptions`
-- Build `HistoricalBackfillAgent` with BullMQ job orchestration
-- Add admin API endpoints for backfill trigger + job status polling
-- Frontend timeline using existing `/timeseries/overall` endpoint
-
-**Research flags:** Validate ESPN historical endpoint schema stability (2024 vs 2025 responses). May need phase-specific research if schema differs.
-
-### Phase 3: Season Replay & Annotations
-**Duration:** 4-6 days
-**Rationale:** Depends on Phase 2 historical data, adds context to timeline without complex simulation.
+**Rationale:** The HTTP layer connects the agent to the extension. SSE via `reply.raw` is the only pattern that works with Fastify v4. This phase modifies one existing route file.
 
 **Delivers:**
-- Transaction annotations on timeline (show trades/waivers on chart)
-- Week-over-week category movement highlights
-- Season-end summary statistics
+- Modified `POST /api/draft/narrate` with SSE headers via `reply.raw.writeHead()`
+- `AsyncLocalStorage.run()` wrapping agent call with request-scoped signals
+- `for await` loop over `stream.fullStream` with `text-delta` and `tool-call` chunk types
+- `[DONE]` sentinel and error event handling
+- `curl` testable: progressive SSE chunks from real agent
 
-**Addresses (from FEATURES.md):**
-- Week-by-week standings progression (table stakes)
-- Transaction annotations (differentiator)
+**Addresses:** Streaming response (P1 feature), tool-call transparency (P1 feature)
+**Avoids:** Pitfall #2 (no @mastra/fastify), Anti-pattern #4 (no reply.send() during stream), Anti-pattern #6 (no await stream.text)
 
-**Avoids (from PITFALLS.md):**
-- Pitfall #11: Rate stat interpolation (component-based gap filling)
-- Pitfall #13: Settings changes mid-season (annotations at settings change boundaries)
+### Phase 4: Extension SSE Consumer
 
-**Implementation:**
-- New endpoint `/timeline/impact-analysis` (join transactions with category ranks)
-- Annotation tooltips on Recharts timeline
-- Gap interpolation using component math (H, AB, not AVG directly)
-
-**Research flags:** None (standard time series visualization patterns).
-
-### Phase 4: Trade Retrospectives
-**Duration:** 5-8 days
-**Rationale:** Depends on Phase 1 (multi-player simulation) and Phase 2 (historical snapshots). Novel feature requiring careful attribution logic.
+**Rationale:** Final integration point. Extension must switch from `response.json()` to `ReadableStream` SSE parsing. Includes `threadId` generation for memory scoping.
 
 **Delivers:**
-- Trade retrospective analysis (actual vs expected outcomes)
-- "How did this trade work out?" UI
-- Projection accuracy metrics
+- Modified `use-narrator.ts` with `fetch` + `response.body.getReader()` SSE consumer
+- Progressive `setNarration(accumulated)` for token-by-token UI update
+- Stable `threadId` (UUID) generated at draft session start, reused across all calls
+- Ephemeral "Checking [tool]..." status from tool-call chunks in sidebar
+- `AbortController` integration verified with streaming
+- Graceful degradation: if stream fails, fall back to engine-only mode
 
-**Addresses (from FEATURES.md):**
-- Trade retrospectives (differentiator, novel feature)
-- Projection version tracking (differentiator)
+**Addresses:** Extension threadId (P1), sidebar streaming + tool status (P1), graceful degradation (P1)
+**Avoids:** Pitfall #5 (service worker streaming -- confirmed content script context), Pitfall #8 (AbortController propagation), Anti-pattern #3 (no EventSource for POST), Anti-pattern #5 (no new threadId per request)
 
-**Avoids (from PITFALLS.md):**
-- Pitfall #10: Retroactive projection fallacy (use projections as-of trade date)
-- Pitfall #12: Trade attribution (flag confounding variables like injuries)
+### Phase 5: Validation and Hardening
 
-**Implementation:**
-- Build `TradeRetrospectiveAgent` (queries snapshots before/after trade)
-- Reuse `TradeRecommendationAgent.simulateTradeImpact()` for counterfactual
-- Archive projections with `is_archived` flag for historical lookups
-- UI showing "Projected: +2.5, Actual: +4.0, Surprise: +1.5"
+**Rationale:** Memory growth, latency regression, and cost must be validated against real draft sessions before shipping. This is not a feature phase -- it is a test/tune phase.
 
-**Research flags:** Phase-specific research recommended for projection accuracy metrics (MAE, RMSE vs simpler "beat projection" indicator). User expectation unclear.
+**Delivers:**
+- End-to-end test: 20+ narrator calls in a simulated draft session
+- Latency benchmark: per-call latency at call 1 vs call 20 vs call 50
+- Cost measurement: token usage per call with tools vs without
+- Decision: tools enabled for all triggers vs restricted to `user_request` only
+- Decision: `lastMessages: 10` confirmed or reduced to 5
+- Cleanup: delete old `DraftNarratorAgent` if Mastra agent is stable
+
+**Addresses:** Pitfall #4 (memory growth), Pitfall #6 (tool latency), cost implications
+**Avoids:** Shipping with untested memory accumulation or latency regression
 
 ### Phase Ordering Rationale
 
-**Why Phase 1 first:**
-- Core user request (multi-player trades)
-- Pure extension of existing code (no architectural changes)
-- Can ship standalone value without historical features
-- Builds confidence in component math before historical replay uses same logic
-
-**Why Phase 2 before Phase 4:**
-- Retrospectives require historical snapshots (dependency)
-- Backfill is isolated infrastructure work (no UX complexity)
-- Timeline visualization validates backfill quality before retrospectives consume it
-
-**Why Phase 3 after Phase 2:**
-- Annotations require transaction data (populated by backfill)
-- Lower complexity than retrospectives (no simulation, just joins)
-- Adds polish to timeline without blocking other features
-
-**Parallelization opportunities:**
-- Phase 1 + Phase 2 can run in parallel (no shared code)
-- Reduces total timeline from 23-36 days to 20-30 days
+- **Phase 1 before everything:** Zod v4 and Mastra packages are hard prerequisites. Nothing compiles without them.
+- **Phase 2 before Phase 3:** Agent and tools must exist before the HTTP endpoint can call them. Unit testing the agent in isolation catches tool design issues before HTTP complexity.
+- **Phase 3 before Phase 4:** Backend SSE endpoint must work before the extension can consume it. `curl` testing validates the wire format.
+- **Phase 4 last (before validation):** Extension changes are the final integration point. Changing both backend and extension simultaneously makes debugging impossible.
+- **Phase 5 non-optional:** Memory growth and latency are the two most likely failure modes. They only manifest under sustained use, not in unit tests.
 
 ### Research Flags
 
 **Phases needing deeper research during planning:**
-- **Phase 2 (Historical Backfill)**: ESPN historical endpoint schema stability. Validate 2024 vs 2025 responses match structure. Community reports suggest compatibility but no official docs.
-- **Phase 4 (Trade Retrospectives)**: Projection accuracy metrics. What's "good" accuracy? Should we show MAE, RMSE, or simpler "beat projection 60% of time"? User expectation unclear.
+- **Phase 3 (SSE Streaming):** The exact `fullStream` chunk type schema varies across Mastra versions. Verify chunk types (`text-delta`, `tool-call`, `tool-result`, `finish`) against the pinned version's actual output. May need to fall back to `textStream` if `fullStream` format is unstable.
+- **Phase 4 (Extension Consumer):** Chrome MV3 content script `ReadableStream` reliability under extension updates and page navigation. Test: does the stream survive if the user switches ESPN tabs mid-response?
 
 **Phases with standard patterns (skip research-phase):**
-- **Phase 1 (Multi-Player Trades)**: Genetic algorithms well-documented (arXiv:2511.17535), combinatorial optimization is solved problem.
-- **Phase 3 (Timeline Annotations)**: Time series visualization is standard data viz pattern.
+- **Phase 1 (Prerequisites):** Zod v4 upgrade is documented, backward compatible. Package installation is straightforward.
+- **Phase 2 (Tools and Agent):** Mastra `createTool()` and `Agent` APIs are well-documented with verified examples.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Existing stack handles all features. Only 2 new libraries (js-combinatorics, react-window), both stable with TypeScript support. BullMQ upgrade well-tested (68 patch releases). |
-| Features | HIGH | Table stakes verified across 5+ mainstream tools (FantasySP, RotoBaller, Yahoo). Differentiators based on community requests and League Legacy competitive analysis. |
-| Architecture | HIGH | 90% reuse confirmed via codebase analysis. Existing `simulateTradeImpact()` handles N-for-N (lines 634-653). Temporal table design already supports historical queries. |
-| Pitfalls | HIGH | 14 pitfalls identified via domain research and codebase analysis. Existing code already handles critical ones correctly (component math). Mitigation strategies tested in academic research (genetic algorithms) or standard practice (rate limiting). |
+| Stack | HIGH | All 4 packages verified via npm, GitHub releases, official docs. Zod v4 compatibility confirmed via GitHub issue #5821. Fastify v4 compatibility confirmed by using @mastra/core directly (no adapter). |
+| Features | HIGH | 8-tool set derived from existing NarratorPayload structure. Memory API verified in Mastra docs. Streaming API verified. Feature scope is clear and bounded. |
+| Architecture | HIGH | @mastra/fastify v5 requirement confirmed via npm peer deps -- using @mastra/core directly is the correct path. reply.raw SSE pattern is standard Fastify v4. AsyncLocalStorage is Node.js stdlib. |
+| Pitfalls | HIGH | 9 pitfalls with specific mitigations. Key tension (tools/memory/streaming vs latency/cost) explicitly addressed with benchmarking plan rather than premature optimization. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-**ESPN historical data retention:**
-- Gap: Unclear how far back ESPN retains historical data. Community reports suggest current + prior season only.
-- Resolution: Document supported date ranges in UI ("Historical data available for 2024-2025"). Graceful error on 404 responses.
-- Validation: Test backfill with actual 2024 season data in Phase 2 planning.
+**Tool latency under real conditions:**
+- Gap: No measured data on latency with `maxSteps: 4` and 2 tool calls in the Mastra framework (tool schemas add input tokens, extra LLM roundtrips add wall time). Pitfalls research estimates 6-9s worst case.
+- Resolution: Phase 2 includes latency benchmarking. If >5s, restrict tools to `user_request` trigger only. Nomination triggers use `maxSteps: 1` (prompt-only, like current narrator).
+- Fallback: Tools disabled entirely; agent receives signals in prompt (current behavior) but gains streaming and memory.
 
-**Projection accuracy metrics:**
-- Gap: No consensus on how to present "this trade beat projections by X%". MAE/RMSE too technical for users?
-- Resolution: Phase 4 planning includes user research (show 3 options to beta users, measure comprehension).
-- Fallback: Simple indicator ("Exceeded projections", "Met projections", "Underperformed").
+**Memory token growth rate:**
+- Gap: Exact token count per stored message depends on NarratorPayload size and agent response length. `lastMessages: 10` could be 4K tokens or 12K tokens depending on message sizes.
+- Resolution: Phase 5 measures actual token growth. Reduce `lastMessages` or truncate stored messages if growth exceeds budget.
 
-**Multi-player UI complexity:**
-- Gap: Free-form N-for-M builder (unlimited players) vs preset structures (2x2, 3x1). Research shows both patterns.
-- Resolution: Preset structures for v1 (simpler UI, easier performance tuning). Free-form in v2 if user demand.
-- Validation: Phase 1 planning includes trade size analytics from existing 1-for-1 usage.
+**Cost per session with tools:**
+- Gap: Pitfalls research estimates 3.8x cost increase ($0.058 -> $0.22 per 120-call session) with tools enabled. Actual cost depends on how often the LLM decides to call tools.
+- Resolution: Phase 5 measures actual token usage. System prompt engineering in Phase 2 guides agent to call tools selectively (1-2 per response, not on every trigger).
+- Budget ceiling: If cost exceeds $0.30/session, restrict tools to user-initiated requests only.
 
-**Genetic algorithm convergence:**
-- Gap: No benchmark for "good enough" convergence. 50 generations vs 100 vs 500?
-- Resolution: Phase 1 implementation testing with actual roster data. Measure delta between top candidate at gen 50 vs gen 100.
-- Target: <5% delta in projected points = acceptable convergence.
+**Mastra version stability:**
+- Gap: Mastra is actively developed (1.9.x as of March 2026). Minor version bumps have historically included breaking changes (v1 migration guide lists 7 breaking changes).
+- Resolution: Pin exact version in package.json. Do not use `@latest` in production. Test before any version bump.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-**Stack Research:**
-- [BullMQ FlowProducer Official Docs](https://docs.bullmq.io/guide/flows) - Job orchestration patterns
-- [Kysely CTE Documentation](https://kysely.dev/docs/category/cte) - Temporal query support
-- [Recharts Timeline Examples](https://recharts.github.io/en-US/examples/TimelineExample/) - Timeline visualization
-- [js-combinatorics npm](https://www.npmjs.com/package/js-combinatorics) - Combinatorial generation
-
-**Feature Research:**
-- [FantasySP Trade Analyzer](https://www.fantasysp.com/mlb_trade_analyzer/) - Multi-player support verified
-- [RotoBaller Trade Analyzer](https://www.rotoballer.com/fantasy-baseball-trade-analyzer-tool) - Category breakdown patterns
-- [League Legacy ESPN Tools](https://leaguelegacy.io/services/espn) - Season replay features
-- [Yahoo Fantasy Historical Standings](https://help.yahoo.com/kb/SLN22671.html) - Historical UI patterns
-
-**Architecture Research:**
-- [ESPN Fantasy API v3 Guide](https://stmorse.github.io/journal/espn-fantasy-v3.html) - scoringPeriodId usage confirmed
-- [GitHub: espn-api Python Library](https://github.com/cwendt94/espn-api/blob/master/espn_api/baseball/league.py) - Scoring period mapping
-- Existing codebase: `packages/backend/src/agents/trade-recommendation.ts` lines 634-653 - Component math already correct
-
-**Pitfalls Research:**
-- [Smart Fantasy Baseball: SGP Guide](https://www.smartfantasybaseball.com/2013/03/create-your-own-fantasy-baseball-rankings-part-5-understanding-standings-gain-points/) - Positional scarcity math
-- [Toward Data Science: Time Series Gaps](https://towardsdatascience.com/handling-gaps-in-time-series-dc47ae883990/) - Interpolation patterns
-- [Yahoo Fantasy Uneven Trade Error](https://help.yahoo.com/kb/uneven-trade-error-message-fantasy-sports-sln6976.html) - Roster constraint validation
+- [Mastra GitHub Releases](https://github.com/mastra-ai/mastra/releases) -- version 1.9.0 confirmed March 4, 2026
+- [Mastra Server Adapters Docs](https://mastra.ai/docs/server/server-adapters) -- adapter architecture, route registration, middleware ordering
+- [Mastra v1 Migration Guide](https://mastra.ai/guides/migrations/upgrade-to-v1/overview) -- import subpaths, createTool signature, Node 22 requirement
+- [Mastra Agent Memory Docs](https://mastra.ai/docs/agents/agent-memory) -- thread/resource concepts, lastMessages config
+- [Mastra PostgreSQL Storage Reference](https://mastra.ai/reference/storage/postgresql) -- auto-created tables, schema isolation, disableInit
+- [Mastra createTool Reference](https://mastra.ai/reference/tools/create-tool) -- inputSchema, outputSchema, execute signature
+- [Mastra Streaming Overview](https://mastra.ai/docs/streaming/overview) -- stream() vs streamLegacy(), textStream vs fullStream
+- [npm: @mastra/fastify](https://www.npmjs.com/package/@mastra/fastify) -- peer dependency `fastify: ^5.0.0` confirmed
+- [GitHub Issue #5821](https://github.com/mastra-ai/mastra/issues/5821) -- Zod v4 compatibility, zod/v4 subpath requirement
+- [GitHub Issue #11789](https://github.com/mastra-ai/mastra/issues/11789) -- PostgreSQL schema drift on upgrade
+- [GitHub Issue #2930](https://github.com/mastra-ai/mastra/issues/2930) -- maxSteps default of 1, docs gap
+- [GitHub Issue #5673](https://github.com/mastra-ai/mastra/issues/5673) -- AbortController bug in Mastra client SDK
 
 ### Secondary (MEDIUM confidence)
-- [arXiv:2511.17535 - Genetic Algorithm for Fantasy Trades](https://www.arxiv.org/pdf/2511.17535) - Evolutionary approach (academic paper, not production-tested)
-- [GitHub Discussion #525 - ESPN Data Retention](https://github.com/cwendt94/espn-api/discussions/525) - Community reports on historical data deletion
-- [ESPN Transaction Counter Support](https://support.espn.com/hc/en-us/articles/360058312172-Transaction-Counter) - Transaction behavior documentation
+- [Mastra Observational Memory Docs](https://mastra.ai/docs/memory/observational-memory) -- compression triggers at 30K tokens, Gemini 2.5 Flash default
+- [GPT-4.1 mini Performance Analysis](https://artificialanalysis.ai/models/gpt-4-1-mini) -- TTFT 0.47-0.77s, 62-79 t/s output
+- [DeepWiki: Mastra Streaming Architecture](https://deepwiki.com/mastra-ai/mastra/9.6-streaming-architecture-and-sse) -- SSE internals
+- [Mastra Latency Optimization Blog](https://mastra.ai/blog/building-fast-reliable-input-processors) -- sub-500ms achievable
 
 ### Tertiary (LOW confidence, needs validation)
-- ESPN historical endpoint schema stability (no official docs, community inference only)
-- Optimal genetic algorithm convergence (50 vs 100 generations) - needs empirical testing
+- fullStream chunk type schema stability across Mastra minor versions -- no official stability guarantee
+- Chrome MV3 content script ReadableStream reliability during page navigation -- needs empirical testing
+- Exact cost multiplier with tools enabled -- depends on LLM tool-calling frequency, needs measurement
 
 ---
-*Research completed: 2026-02-20*
+*Research completed: 2026-03-05*
 *Ready for roadmap: yes*

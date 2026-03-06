@@ -1,490 +1,325 @@
 # Technology Stack Additions
 
-**Project:** ESPN Fantasy Baseball Assistant - Multi-Player Trades & Historical Analysis
-**Researched:** 2026-02-20
-**Confidence:** HIGH
+**Project:** ESPN Fantasy Baseball Assistant - Mastra AI Agent Integration
+**Researched:** 2026-03-05
+**Confidence:** HIGH (Context7 unavailable for Mastra; verified via official docs + npm + GitHub issues + changelogs)
 
 ## Executive Summary
 
-The existing stack (Fastify, Next.js 14, Kysely, BullMQ, Recharts) handles the NEW features with minimal additions. No new frameworks required. Three focused libraries plus existing infrastructure upgrades address:
+Mastra is a TypeScript AI agent framework built on top of Vercel AI SDK. The integration adds typed tools, persistent memory, and streaming to replace the existing stateless `DraftNarratorAgent` OpenAI call. As of March 2026, Mastra 1.9.x is stable with ~300K weekly downloads and official `@mastra/fastify` adapter support.
 
-1. **Multi-player trade combinatorics** → js-combinatorics (already familiar pattern from your codebase)
-2. **Large free agent/candidate lists** → react-window (complement to existing Recharts)
-3. **Historical backfill orchestration** → BullMQ FlowProducer (already have BullMQ 5.1.5)
-4. **ESPN historical data** → Same adapter, new query params (no new library)
-
-**Key principle:** Leverage what you have. Kysely handles temporal queries natively. Recharts handles timeline visualization. BullMQ handles backfill jobs.
+**Net new packages:** 5 (core + fastify adapter + memory + pg storage + zod upgrade)
+**Keep:** `openai` SDK (optional — Mastra has its own routing, but no need to remove existing non-narrator calls)
+**Replace:** `DraftNarratorAgent` stateless GPT call → Mastra `Agent` with typed tools and thread memory
+**TypeScript config:** Already compatible (`ES2022` target, `bundler` moduleResolution — Mastra requires exactly this)
+**Zod conflict:** Existing `zod@^3.22.4` MUST be upgraded to `zod@^4` before installing Mastra (Mastra 1.x imports `zod/v4` subpath absent in v3)
 
 ---
 
-## NEW Dependencies
+## NEW Dependencies (Backend Package Only)
 
-### Backend: Combinatorial Trade Analysis
+### Core Framework
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| **js-combinatorics** | ^2.1.2 | N-for-N trade candidate generation | TypeScript-native (compiled from .ts), BigInt support for large combinations, proven in 132+ npm projects. Alternative considered: manual recursion (unmaintainable for 3-for-3+ trades). |
+| **@mastra/core** | `@latest` (1.9.x) | Agent class, createTool, Mastra instance | Core abstraction. Provides `Agent` class with typed tools, streaming (`.stream()`), memory injection, and LLM provider routing via `"anthropic/model-name"` string format. Built on Vercel AI SDK internally. No separate AI SDK install needed for Anthropic. |
+| **@mastra/fastify** | `@latest` (1.9.x) | Registers Mastra HTTP endpoints on existing Fastify server | Official adapter. Calls `MastraServer({ app, mastra }).init()` — registers `/api/agents/*`, `/api/workflows/*` routes alongside existing Fastify routes with zero conflict. Handles SSE streaming automatically. Must be initialized AFTER auth middleware so Mastra routes inherit authentication. |
+| **@mastra/memory** | `@latest` (1.4.x) | Thread-based conversation memory across draft sessions | Enables `new Memory({ storage, options: { lastMessages: 20 } })` on the agent. Draft sessions are isolated by `thread` ID. Without this, agent is stateless (same as current narrator). |
+| **@mastra/pg** | `@latest` (1.7.x) | PostgreSQL storage backend for Mastra memory | Uses existing `DATABASE_URL` env var. Creates 7 dedicated tables (`mastra_threads`, `mastra_messages`, etc.) in the `public` schema automatically. Pass existing `pg.Pool` if you want shared connection pooling. Does NOT conflict with Kysely — they use separate tables. Set `disableInit: true` only if managing migrations separately. |
 
-**Installation:**
+### Peer Dependency Upgrade (Required)
+
+| Library | Current | Required | Why |
+|---------|---------|---------|-----|
+| **zod** | `^3.22.4` | `^4.0.0` | Mastra 1.x imports `zod/v4` subpath which only exists in Zod 4.x. Mastra dev server crashes on startup with Zod 3.x. Fixed in Mastra 1.1.0+ — but the fix requires Zod 4 to be installed. All existing Zod schemas remain compatible (no API breaking changes for schemas used in this codebase). |
+
+---
+
+## Installation
+
 ```bash
+# In packages/backend
 cd packages/backend
-pnpm add js-combinatorics
+
+# 1. Upgrade Zod FIRST (required before @mastra/core install)
+pnpm add zod@^4
+
+# 2. Install Mastra core packages
+pnpm add @mastra/core@latest @mastra/fastify@latest @mastra/memory@latest @mastra/pg@latest
+
+# 3. No OPENAI_API_KEY changes needed — add Anthropic key if switching models
+# ANTHROPIC_API_KEY=... (optional — Mastra routes to Anthropic without @ai-sdk/anthropic)
+# OPENAI_API_KEY=...   (keep — existing non-narrator routes still use openai SDK)
 ```
 
-**Integration point:** New `MultiPlayerTradeAgent` in `packages/backend/src/agents/`. Uses `Combination` class to generate candidates, filters via projection delta simulation (reusing existing StandingsProjectionAgent component math).
-
-**Why NOT add:**
-- ❌ **optimization-js** — Overkill. Assignment problem solvers (Hungarian algorithm) are for weighted bipartite matching. Fantasy trades aren't optimization problems; they're simulation + ranking.
-- ❌ **Custom recursive generators** — js-combinatorics handles edge cases (empty sets, large N), provides iterators (memory-efficient for 5-for-5 trades = 3,003 combinations from 15-player rosters).
+**Important version note:** Install all `@mastra/*` packages at the same version. Mixed versions cause runtime errors. Use `@latest` consistently or pin all to the same semver.
 
 ---
 
-### Frontend: Virtualized Lists
+## Existing Stack: What to Keep
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **react-window** | ^2.2.3 | Virtualize 100+ free agent/candidate lists | Built-in TypeScript defs, 30KB smaller than react-virtualized, integrates with existing TanStack Query data fetching. Recharts handles charts; react-window handles tables. |
-| **@types/react-window** | (NOT needed) | N/A | react-window 2.2.3+ includes native TypeScript definitions. Installing @types would conflict. |
+### `openai` SDK — KEEP (do not remove)
 
-**Installation:**
-```bash
-cd packages/frontend
-pnpm add react-window
-```
+The existing `openai@^6.25.0` SDK stays installed. Only the `DraftNarratorAgent` is replaced by Mastra. If other agents or routes use `openai` directly, they continue to work unchanged.
 
-**Integration point:**
-- `/leagues/[id]/free-agents` — FixedSizeList for player rows
-- `/leagues/[id]/teams/[teamId]/trades/recommendations` — VariableSizeList for multi-player trade candidates (varying row height based on N-for-N complexity)
+**Model routing in Mastra:** Specify model as `"openai/gpt-4.1-mini"` string — Mastra resolves to the provider internally using your `OPENAI_API_KEY`. No `@ai-sdk/openai` needed. No `@ai-sdk/anthropic` needed for Anthropic either.
 
-**Why NOT add:**
-- ❌ **react-virtuoso** — Infinite scroll focus. We need fixed-height tables with sorting (which you already handle via TanStack Query state).
-- ❌ **@tanstack/react-virtual** — Headless (no styled components). react-window provides <FixedSizeList> out-of-box, pairs with existing Tailwind classes.
+### Fastify 4 — KEEP, augment only
 
----
+`@mastra/fastify` adds to your existing Fastify instance. It does not replace it. Your existing routes (`/api/draft/narrate`, etc.) remain unchanged during the migration period.
 
-## Existing Stack: UPGRADE Versions
+### `zod` — UPGRADE, not replace
 
-### BullMQ FlowProducer (Already Installed)
+Zod 4 is backward compatible for schema definitions. The existing schemas in the codebase (`z.object`, `z.string`, `z.number`, `z.array`) are unchanged. Only new Mastra tool schemas use Zod 4 patterns.
 
-| Current | Upgrade To | Purpose | Why Upgrade |
-|---------|------------|---------|-------------|
-| bullmq@5.1.5 | bullmq@^5.69.3 | Historical backfill job orchestration | FlowProducer dependency fixes (v5.20+), batch processing improvements (v5.40+), 68 patch releases of reliability fixes. |
+### `@mastra/pg` vs Kysely — NO CONFLICT
 
-**Installation:**
-```bash
-cd packages/backend
-pnpm add bullmq@^5.69.3
-```
-
-**Integration point:** New `HistoricalBackfillOrchestrator` agent uses FlowProducer to create job trees:
-```
-Parent: BackfillSeason(2023)
-├─ Child: FetchWeek(1) → Child: SnapshotWeek(1)
-├─ Child: FetchWeek(2) → Child: SnapshotWeek(2)
-└─ Child: FetchWeek(26) → Child: SnapshotWeek(26)
-```
-
-FlowProducer guarantees fetch-before-snapshot ordering per week, parallelizes weeks, marks parent complete only when all 26 weeks succeed.
-
-**Why NOT add:**
-- ❌ **Temporal.io** — Workflow engine overkill. You have 16 tables, not 1000 microservices.
-- ❌ **Agenda** — MongoDB-backed. You're on PostgreSQL.
-
-**Configuration additions** (no new libraries):
-```typescript
-// Existing BullMQ worker already supports batch processing (v5.1.5+)
-// Add to SnapshotOrchestratorAgent worker options:
-{
-  concurrency: 3, // Parallel weeks
-  limiter: {
-    max: 10,      // ESPN rate limit (existing pattern)
-    duration: 1000
-  }
-}
-```
+`@mastra/pg` creates its own tables (`mastra_*`) in PostgreSQL. Kysely manages existing ESPN app tables (`league`, `team`, `player`, etc.). They share the connection string but write to different tables. Use `disableInit: true` if you prefer Mastra tables created via your existing migration pipeline.
 
 ---
 
-## Existing Stack: NO Changes Needed
+## Integration Architecture
 
-### PostgreSQL + Kysely → Temporal Queries
-
-**Current:** Kysely 0.27.2
-**Action:** None. Already supports recursive CTEs, window functions, and "AS OF" query patterns.
-
-**Why no temporal_tables extension:**
-Your `league_daily_snapshot` table IS a temporal table (manually implemented):
-- snapshot_date = valid_from (inclusive)
-- Immutable inserts (no updates) = system-versioned
-- Primary key (league_id, snapshot_date) = bitemporal-ready
-
-**Season replay query** (pure Kysely, no new libraries):
-```typescript
-// Week-by-week standings from April 1 to Oct 1, 2023
-db.selectFrom('team_daily_overall')
-  .where('league_id', '=', leagueId)
-  .where('snapshot_date', '>=', '2023-04-01')
-  .where('snapshot_date', '<=', '2023-10-01')
-  .where(sql`EXTRACT(DOW FROM snapshot_date) = 0`) // Sundays only
-  .orderBy('snapshot_date', 'asc')
-```
-
-**Trade retrospective query** (joins existing tables):
-```typescript
-// Actual outcome vs projection at trade time
-db.selectFrom('league_transaction_event as t')
-  .innerJoin('team_daily_projected_overall as proj', (join) => join
-    .onRef('proj.team_id', '=', 't.team_id')
-    .onRef('proj.snapshot_date', '=', 't.timestamp::date') // "AS OF" trade date
-  )
-  .innerJoin('team_daily_overall as actual', (join) => join
-    .onRef('actual.team_id', '=', 't.team_id')
-    .on('actual.snapshot_date', '=', '2023-10-01') // End of season
-  )
-  .select([
-    'proj.total_points as projected_at_trade',
-    'actual.total_points as actual_final',
-    sql<number>`actual.total_points - proj.total_points`.as('delta')
-  ])
-```
-
-**Why NOT add:**
-- ❌ **temporal_tables extension** — Overkill. Adds trigger complexity for features you already have via immutable inserts.
-- ❌ **TimescaleDB** — Hypertable partitioning irrelevant. 182 snapshots/year/league × 10 leagues = 1,820 rows (tiny for PostgreSQL).
-
----
-
-### Recharts → Timeline Visualization
-
-**Current:** Recharts 2.10.4
-**Action:** None. Already handles timeline charts.
-
-**Season replay visualization** (existing Recharts components):
-```tsx
-// Week-by-week standings race chart
-<LineChart data={weeklyStandings}>
-  <XAxis dataKey="week" label="Week" />
-  <YAxis label="Roto Points" />
-  <Tooltip />
-  <Legend />
-  {teams.map(team => (
-    <Line
-      key={team.id}
-      type="monotone"
-      dataKey={`team_${team.id}`}
-      stroke={teamColors[team.id]}
-      strokeWidth={2}
-    />
-  ))}
-</LineChart>
-```
-
-**Trade retrospective visualization** (stacked bar):
-```tsx
-// Projected vs Actual delta per category
-<BarChart data={tradeOutcomes}>
-  <XAxis dataKey="category" />
-  <YAxis label="Roto Point Delta" />
-  <Bar dataKey="projected_delta" fill="#8884d8" />
-  <Bar dataKey="actual_delta" fill="#82ca9d" />
-  <ReferenceLine y={0} stroke="#000" />
-</BarChart>
-```
-
-**Why NOT add:**
-- ❌ **D3.js** — 200KB unminified. Recharts (React wrapper over D3) is already installed, declarative (fits Next.js paradigm).
-- ❌ **Chart.js / react-chartjs-2** — Imperative API (canvas refs). Recharts is React-first (components as data).
-- ❌ **Visx** — Lower-level than Recharts. You'd rebuild what Recharts provides (axes, tooltips, legends).
-
-**Best practice from research:**
-- Limit data points for performance. For 182-day season, render every 7th point (26 weeks) unless user zooms.
-- Use React.memo on <LineChart> when parent re-renders (TanStack Query refetch).
-
----
-
-## ESPN API: Historical Data Endpoints
-
-**New capability, NO new libraries.**
-
-### Historical Endpoint Structure
-
-ESPN Fantasy API supports historical seasons via two endpoints:
-
-| Season | Endpoint | Auth |
-|--------|----------|------|
-| 2018+ | `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/{YYYY}/segments/0/leagues/{leagueId}` | SWID + espn_s2 cookies |
-| 2017- | `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/leagueHistory/{leagueId}?seasonId={YYYY}` | SWID + espn_s2 cookies |
-
-**Query parameters for week-by-week backfill:**
-```typescript
-// Existing adapter: packages/backend/src/adapters/espn.ts
-// Add method:
-async fetchHistoricalWeek(
-  leagueId: number,
-  season: number,
-  scoringPeriodId: number // 1-26 for baseball (weekly scoring periods)
-): Promise<LeagueData> {
-  const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${season}/segments/0/leagues/${leagueId}`;
-  const params = {
-    view: ['mTeam', 'mRoster', 'mMatchup', 'mSettings'],
-    scoringPeriodId: scoringPeriodId, // NEW: fetches standings as-of this week
-  };
-  // Existing retry/backoff logic applies (axios-retry 4.5.0 already installed)
-}
-```
-
-**Caveats from research:**
-- **Data retention:** ESPN may delete historical data. Pre-2018 boxscores often missing. Design doc's `is_degraded` flag handles this (mark snapshot degraded if ESPN returns partial data).
-- **Rate limiting:** Historical fetches count against same limits as current-season API. Your existing `@fastify/rate-limit` + backoff handles this.
-
-**Why NOT add:**
-- ❌ **espn-api (Python client)** — Wrong language. You're TypeScript.
-- ❌ **API client codegen** — ESPN API is undocumented, changes without notice. Hand-maintained adapter (existing pattern) allows quick fixes.
-
----
-
-## Architecture Patterns: Backfill Job Orchestration
-
-**Uses existing BullMQ (upgraded), NO new queue system.**
-
-### Job Tree Structure (BullMQ FlowProducer)
+### Mastra Instance (`packages/backend/src/mastra/index.ts`)
 
 ```typescript
-// packages/backend/src/agents/historical-backfill-orchestrator.ts
-import { FlowProducer } from 'bullmq';
+import { Mastra } from '@mastra/core';
+import { PostgresStore } from '@mastra/pg';
+import { draftNarratorAgent } from './agents/draft-narrator-agent.js';
 
-const flowProducer = new FlowProducer({ connection: redisConnection });
+export const mastra = new Mastra({
+  agents: { draftNarratorAgent },
+  storage: new PostgresStore({
+    connectionString: process.env.DATABASE_URL!,
+    // disableInit: true  // Add this if managing mastra_* tables via Kysely migrations
+  }),
+});
+```
 
-await flowProducer.add({
-  name: `backfill-season-${season}`,
-  queueName: 'backfill-orchestrator',
-  data: { leagueId, season },
-  children: [
-    {
-      name: `fetch-week-1`,
-      queueName: 'espn-fetcher',
-      data: { leagueId, season, week: 1 },
-      children: [
-        {
-          name: `snapshot-week-1`,
-          queueName: 'snapshot-processor',
-          data: { leagueId, season, week: 1 },
-        }
-      ]
+### Fastify Integration (`packages/backend/src/index.ts`)
+
+```typescript
+import Fastify from 'fastify';
+import { MastraServer } from '@mastra/fastify';
+import { mastra } from './mastra/index.js';
+
+const app = Fastify({ logger: true });
+
+// Register all existing middleware and auth FIRST
+await app.register(jwtPlugin);
+await app.register(corsPlugin);
+// ... other existing plugins
+
+// Register Mastra AFTER middleware (so Mastra routes inherit auth context)
+const mastraServer = new MastraServer({ app, mastra });
+await mastraServer.init();
+
+// Existing custom routes continue to work unchanged
+await app.register(draftRoutes);
+// ...
+```
+
+### Draft Narrator Agent (`packages/backend/src/mastra/agents/draft-narrator-agent.ts`)
+
+```typescript
+import { Agent } from '@mastra/core/agent';
+import { createTool } from '@mastra/core/tools';
+import { Memory } from '@mastra/memory';
+import { PostgresStore } from '@mastra/pg';
+import { z } from 'zod';
+
+const getDraftContextTool = createTool({
+  id: 'get-draft-context',
+  description: 'Retrieve current draft state signals from the engine',
+  inputSchema: z.object({
+    sessionId: z.string(),
+  }),
+  outputSchema: z.object({
+    inflation: z.number(),
+    budgetRemaining: z.number(),
+    topAlerts: z.array(z.object({ title: z.string(), severity: z.number() })),
+  }),
+  execute: async ({ context }) => {
+    // Pull from deterministic engine state
+    return { inflation: 0, budgetRemaining: 200, topAlerts: [] };
+  },
+});
+
+export const draftNarratorAgent = new Agent({
+  name: 'draft-narrator-agent',
+  instructions: `[existing SYSTEM_PROMPT from DraftNarratorAgent]`,
+  model: 'openai/gpt-4.1-mini-2025-04-14', // or 'anthropic/claude-3-5-haiku-20241022'
+  tools: { getDraftContextTool },
+  memory: new Memory({
+    storage: new PostgresStore({
+      connectionString: process.env.DATABASE_URL!,
+    }),
+    options: {
+      lastMessages: 10, // Keep draft session context tight
     },
-    // ... repeat for weeks 2-26
-  ]
+  }),
 });
 ```
 
-**Guarantees:**
-- Fetch → Snapshot ordering per week (children run after parent)
-- Week parallelization (siblings run concurrently, respecting `concurrency: 3`)
-- Atomic failure handling (if fetch-week-5 fails, snapshot-week-5 never runs, parent marked failed)
+### Streaming from Mastra Agent
 
-**Priority queue for user-triggered backfills:**
 ```typescript
-// User clicks "Backfill 2023" button → high priority
-await flowProducer.add({
-  // ... same structure
-  opts: {
-    priority: 1, // Lower = higher priority (1-2,097,152 range)
-  }
+// Agent streaming — Mastra handles SSE automatically via @mastra/fastify routes
+// OR if called from an existing Fastify route:
+const stream = await draftNarratorAgent.stream('Narrate current draft state', {
+  memory: {
+    resource: `league-${leagueId}`,
+    thread: `draft-session-${sessionId}`,
+  },
 });
 
-// Nightly cron backfill → low priority
-await flowProducer.add({
-  // ... same structure
-  opts: {
-    priority: 1000,
-  }
-});
-```
-
-**Why NOT add:**
-- ❌ **Celery (Python)** — Wrong language, Redis-backed anyway (same infra).
-- ❌ **RabbitMQ** — Message broker overkill. BullMQ is job queue (state persistence, retries, priorities built-in). RabbitMQ would require rebuilding these features.
-
----
-
-## Component Math: NO Changes
-
-Existing `packages/shared/src/formulas.ts` handles multi-player trades without modification.
-
-**Example: 3-for-2 trade simulation**
-```typescript
-// Team A trades: Player X, Y, Z
-// Team A receives: Player M, N
-
-// Team A's new AVG projection (component-based, existing formula):
-const teamA_new_AB = teamA_current_AB - (X.AB + Y.AB + Z.AB) + (M.AB + N.AB) + (X.proj_AB + Y.proj_AB + Z.proj_AB) - (M.proj_AB + N.proj_AB);
-const teamA_new_H = teamA_current_H - (X.H + Y.H + Z.H) + (M.H + N.H) + (X.proj_H + Y.proj_H + Z.proj_H) - (M.proj_H + N.proj_H);
-const teamA_new_AVG = teamA_new_H / teamA_new_AB; // Rate from components (correct)
-
-// Rank all 12 teams by new_AVG → assign roto points → sum across 12 categories
-```
-
-Component math scales to N-for-N trades. js-combinatorics generates candidates; existing projection logic evaluates them.
-
----
-
-## Database Schema: NO New Tables
-
-Existing 16 tables support new features:
-
-| Feature | Tables Used | Query Pattern |
-|---------|-------------|---------------|
-| Multi-player trade evaluation | player_projection, team_daily_category_totals, team_daily_projected_overall | IN clause for N players, component aggregation (SUM) |
-| Season replay | league_daily_snapshot, team_daily_overall | WHERE snapshot_date BETWEEN start AND end |
-| Trade retrospectives | league_transaction_event, team_daily_projected_overall, team_daily_overall | JOIN on trade date (temporal point-in-time) |
-| Historical backfill | league_raw_payload, league_daily_snapshot (all snapshot tables) | INSERT with ON CONFLICT DO NOTHING (idempotent) |
-
-**Why NO temporal_tables extension:**
-- Existing schema already implements System-Versioned Temporal Tables pattern (SQL:2011 standard):
-  - `snapshot_date` = SysStartTime
-  - Immutable rows = automatic history
-  - No updates (only inserts) = no triggers needed
-
----
-
-## Frontend Routing: NO Changes
-
-Next.js 14 App Router handles new routes with existing patterns:
-
-| Route | Pattern | Existing or New |
-|-------|---------|-----------------|
-| `/leagues/[id]/trades/evaluate` | Dynamic segment + query params | NEW page, existing pattern |
-| `/leagues/[id]/history?season=2023` | searchParams prop | NEW page, existing pattern |
-| `/leagues/[id]/history/trades/[tradeId]` | Nested dynamic segments | NEW page, existing pattern |
-
-**Query param handling (already supported):**
-```tsx
-// packages/frontend/src/app/leagues/[id]/history/page.tsx
-export default async function HistoryPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ season?: string; week?: string }>;
-}) {
-  const { id } = await params;
-  const { season, week } = await searchParams;
-  // TanStack Query hook (existing pattern)
+// Pipe textStream to Fastify response
+reply.header('Content-Type', 'text/event-stream');
+for await (const chunk of stream.textStream) {
+  reply.raw.write(`data: ${chunk}\n\n`);
 }
 ```
 
 ---
 
-## Development Tooling: NO Changes
+## LLM Provider Configuration
 
-Existing tools handle new features:
+### OpenAI (current model — keep)
 
-| Tool | Current | Needed For | Status |
-|------|---------|------------|--------|
-| tsx | 4.7.0 | Hot reload during agent development | ✓ Installed |
-| vitest | 1.1.1 | Unit tests for combinatorial logic | ✓ Installed |
-| TypeScript | 5.3.3 | Type safety for js-combinatorics generics | ✓ Installed |
-
-**Test example (vitest, no new deps):**
-```typescript
-// packages/backend/src/agents/__tests__/multi-player-trade.test.ts
-import { describe, it, expect } from 'vitest';
-import { Combination } from 'js-combinatorics';
-
-describe('MultiPlayerTradeAgent', () => {
-  it('generates correct 2-for-2 candidates from 15-player roster', () => {
-    const roster = Array.from({ length: 15 }, (_, i) => ({ id: i }));
-    const combos = new Combination(roster, 2);
-    expect([...combos].length).toBe(105); // 15 choose 2
-  });
-});
-```
-
----
-
-## Deployment: NO Changes
-
-Railway config supports new features without modification:
-
-| Service | Existing | New Feature Support |
-|---------|----------|---------------------|
-| Backend | Fastify + 11 agents | +3 agents (MultiPlayerTrade, HistoricalBackfill, SeasonReplay) run in same process |
-| Workers | BullMQ workers (Redis) | FlowProducer uses same Redis, same worker pool (no separate service) |
-| Database | PostgreSQL (Railway) | Temporal queries use same indexes (snapshot_date already indexed per design doc) |
-| Frontend | Next.js 14 (Vercel/Railway) | react-window adds 30KB gzipped (negligible for bundle) |
-
-**Environment variables (NO new secrets):**
 ```bash
-# Existing .env (no additions needed)
-ESPN_SWID=...          # Same cookie for historical API
-ESPN_S2=...            # Same cookie for historical API
-POSTGRES_URL=...       # Same DB for temporal queries
-REDIS_URL=...          # Same Redis for FlowProducer
+OPENAI_API_KEY=sk-...  # Already set
 ```
+
+```typescript
+model: 'openai/gpt-4.1-mini-2025-04-14'
+```
+
+No `@ai-sdk/openai` install needed. Mastra reads `OPENAI_API_KEY` and routes internally.
+
+### Anthropic (optional upgrade path)
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...  # Add to .env
+```
+
+```typescript
+model: 'anthropic/claude-3-5-haiku-20241022'  // Fast, cheap — similar use case as gpt-4.1-mini
+// or
+model: 'anthropic/claude-3-5-sonnet-20241022' // Higher reasoning
+```
+
+No `@ai-sdk/anthropic` install needed. Mastra reads `ANTHROPIC_API_KEY` and routes internally.
+
+**Recommendation:** Keep `openai/gpt-4.1-mini-2025-04-14` for the narrator initially. The existing `SYSTEM_PROMPT` and `buildUserMessage` logic is already tuned for this model. Swap to Anthropic only if you want to add prompt caching (Anthropic supports this natively, reduces cost for repeated system prompts in live drafts).
 
 ---
 
-## Anti-Patterns to AVOID
+## Alternatives Considered
 
-### 1. Averaging Rate Stats
-**Wrong:**
-```typescript
-// 2-for-2 trade: average the AVGs
-const newAVG = (playerA.AVG + playerB.AVG - playerX.AVG - playerY.AVG) / 2;
-```
-
-**Correct (existing formulas.ts pattern):**
-```typescript
-const newAB = teamAB - (playerX.AB + playerY.AB) + (playerA.AB + playerB.AB);
-const newH = teamH - (playerX.H + playerY.H) + (playerA.H + playerB.H);
-const newAVG = newH / newAB; // Component-based rate
-```
-
-### 2. Separate Temporal Database
-**Wrong:** Add PostgreSQL extension temporal_tables or switch to TimescaleDB.
-
-**Correct:** Your existing schema (league_daily_snapshot with snapshot_date) IS a temporal table. Just query it.
-
-### 3. Client-Side Combinatorics
-**Wrong:** Generate 10,000 trade candidates in browser (blocks UI thread).
-
-**Correct:** js-combinatorics on backend, stream top 50 candidates to frontend (react-window renders).
-
-### 4. Real-Time Historical Backfill
-**Wrong:** User clicks "Backfill 2023" → blocks UI for 2 minutes fetching 26 weeks.
-
-**Correct:** BullMQ FlowProducer returns job ID immediately → frontend polls job status → shows progress bar.
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| `@mastra/fastify` adapter | Separate Mastra server process | Adds deployment complexity (two processes, two ports, CORS). Adapter registers routes in-process. |
+| `@mastra/pg` (existing PostgreSQL) | LibSQL / SQLite | You already have PostgreSQL. Adding SQLite creates a second DB to operate. Composite Storage lets you use PG for everything. |
+| Mastra model router strings | `@ai-sdk/anthropic` directly | Model router gives provider-agnostic failover. String format `"anthropic/model-name"` is simpler than instantiating AI SDK provider objects. Existing `openai` SDK calls (non-narrator) are unaffected. |
+| `zod@^4` (upgrade) | Stay on `zod@^3` + patch | Zod 3 crashes Mastra 1.x dev server (missing `zod/v4` subpath). No option to stay on v3 with current Mastra. Zod 4 API is backward compatible for schemas used in this project. |
+| Thread memory (per draft session) | Semantic recall with embeddings | Auction drafts are 2-4 hours. Last 10 messages gives all the context needed. Semantic recall (vector search) is overkill and adds `@mastra/fastembed` + pgvector dependency. |
 
 ---
 
-## Migration Plan
+## What NOT to Add
 
-### Phase 1: Upgrade Existing (Zero New Features)
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `@ai-sdk/openai` | Unnecessary — Mastra routes to OpenAI internally via string `"openai/model"`. Installing both creates version conflicts with the existing `openai` SDK. | Mastra model string `"openai/gpt-4.1-mini"` |
+| `@ai-sdk/anthropic` | Same reason — Mastra reads `ANTHROPIC_API_KEY` directly. | Mastra model string `"anthropic/claude-..."` |
+| `@mastra/fastembed` | Requires native binary compilation. Adds `PgVector` + vector column to PostgreSQL. Unnecessary for draft narration (short sessions, not semantic search). | `lastMessages: 10` in `Memory` options |
+| `mastra` CLI as dev dep | CLI is for `mastra dev` playground mode. Not needed when embedding Mastra in existing Fastify server via adapter. | `@mastra/fastify` adapter only |
+| Separate `@mastra/server` install | `@mastra/fastify` depends on `@mastra/server` internally. Installing it separately causes version drift. | Let `@mastra/fastify` resolve it as a transitive dep |
+| `@fastify/sse` plugin | `@mastra/fastify` handles SSE for agent streaming internally. Adding a separate SSE plugin creates conflicts. | Let Mastra adapter handle stream routing |
+
+---
+
+## Version Compatibility
+
+| Package A | Compatible With | Notes |
+|-----------|-----------------|-------|
+| `@mastra/core@1.9.x` | `zod@^4.0.0` | Requires Zod 4. Zod 3 crashes dev server (zod/v4 subpath missing). Fixed in Mastra 1.1.0+ but the fix requires Zod 4 to be present. |
+| `@mastra/core@1.9.x` | `fastify@^4.25.2` | Confirmed: `@mastra/fastify` adapter supports Fastify 4. No Fastify 5 required. |
+| `@mastra/core@1.9.x` | `typescript@^5.3.3` | Compatible. Mastra requires ES2022 target + bundler moduleResolution — both already in `packages/backend/tsconfig.json`. |
+| `@mastra/core@1.9.x` | `openai@^6.25.0` | No conflict. Mastra doesn't use `openai` SDK directly. They coexist independently. |
+| `@mastra/pg@1.7.x` | `pg@^8.11.3` | `@mastra/pg` uses `pg` internally. Existing `pg` dep satisfies it (check for version conflicts post-install). |
+| All `@mastra/*` packages | Each other at same minor version | Install all `@mastra/*` at `@latest` together. Mixed versions (e.g., `@mastra/core@1.8` + `@mastra/memory@1.4`) cause runtime errors. |
+
+---
+
+## pnpm Monorepo Notes
+
+- Install ALL Mastra packages in `packages/backend/package.json` only. Do not hoist to workspace root — Mastra has path alias resolution issues in some monorepo configurations.
+- Mastra's own codebase uses pnpm + Turbo (same as this project). No fundamental incompatibility.
+- If TypeScript path alias (`@/`) errors occur during `mastra dev`, use `transpilePackages` in Mastra config — but this only applies if running the Mastra dev playground, not when using `@mastra/fastify` adapter.
+- The Fastify adapter approach avoids most monorepo path alias issues since Mastra runs embedded in the existing backend process.
+
+---
+
+## Environment Variables (additions)
+
+```bash
+# packages/backend/.env additions:
+
+# Required: already set
+OPENAI_API_KEY=sk-...
+
+# Optional: add only if switching narrator to Claude
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Already set — @mastra/pg uses this directly
+DATABASE_URL=postgresql://user:pass@host:5432/espn_fantasy
+```
+
+No new infrastructure (no new Redis queues, no new PostgreSQL databases). Mastra memory writes to existing PostgreSQL.
+
+---
+
+## Migration Plan (Incremental)
+
+### Step 1: Upgrade Zod (no functionality change)
+
 ```bash
 cd packages/backend
-pnpm add bullmq@^5.69.3  # 68 patch releases of fixes
-pnpm test                # Ensure existing SnapshotOrchestrator still works
+pnpm add zod@^4
+pnpm test  # Ensure existing schema usage still works
 ```
 
-### Phase 2: Add Combinatorics (Backend Only)
+Zod 4 is schema-API compatible. No `z.object()` / `z.string()` calls need changes.
+
+### Step 2: Install Mastra packages
+
 ```bash
-pnpm add js-combinatorics@^2.1.2
+pnpm add @mastra/core@latest @mastra/fastify@latest @mastra/memory@latest @mastra/pg@latest
 ```
-Create `MultiPlayerTradeAgent` (mirrors existing `TradeRecommendationAgent` structure).
 
-### Phase 3: Add Virtualization (Frontend Only)
-```bash
-cd packages/frontend
-pnpm add react-window@^2.2.3
-```
-Refactor `/free-agents` table to `<FixedSizeList>`.
+### Step 3: Create Mastra instance + agent file
 
-### Phase 4: Historical Orchestration (Backend Only)
-Extend `ESPNAdapter` with `fetchHistoricalWeek` method.
-Create `HistoricalBackfillOrchestrator` using BullMQ FlowProducer.
+New file: `packages/backend/src/mastra/index.ts`
+New file: `packages/backend/src/mastra/agents/draft-narrator-agent.ts`
 
-**Total new dependencies:** 2 (js-combinatorics, react-window)
-**Total upgrades:** 1 (bullmq)
+Keep existing `DraftNarratorAgent` in `packages/backend/src/agents/draft-narrator.ts` unchanged during this step.
+
+### Step 4: Register `@mastra/fastify` in Fastify server
+
+Call `MastraServer({ app, mastra }).init()` AFTER existing middleware registration.
+
+### Step 5: Wire Mastra to existing `/api/draft/narrate` route OR keep separate
+
+Two options:
+- **Option A:** Keep existing `/api/draft/narrate` route, replace its implementation to call `draftNarratorAgent.generate(payload)`. Extension calls same endpoint.
+- **Option B:** Let `@mastra/fastify` expose `/api/agents/draft-narrator-agent/generate` and update extension to call new URL.
+
+Option A is lower risk (no extension changes required).
+
+### Step 6: Delete old `DraftNarratorAgent`
+
+Once Mastra agent is verified in production, delete `packages/backend/src/agents/draft-narrator.ts`.
 
 ---
 
@@ -492,52 +327,35 @@ Create `HistoricalBackfillOrchestrator` using BullMQ FlowProducer.
 
 | Library | Action | Version | Confidence |
 |---------|--------|---------|------------|
-| js-combinatorics | ADD | ^2.1.2 | HIGH (npm registry, 2 years stable) |
-| react-window | ADD | ^2.2.3 | HIGH (official docs, native TS) |
-| bullmq | UPGRADE | ^5.69.3 | HIGH (official docs, 4 days old) |
-| Kysely | NO CHANGE | 0.27.2 | HIGH (existing recursive CTE support) |
-| Recharts | NO CHANGE | 2.10.4 | HIGH (existing timeline examples) |
-| Next.js | NO CHANGE | 14.1.0 | HIGH (existing searchParams support) |
+| `@mastra/core` | ADD | `@latest` (1.9.x) | HIGH (verified via GitHub releases March 4 2026) |
+| `@mastra/fastify` | ADD | `@latest` (1.9.x) | HIGH (official docs, same release train) |
+| `@mastra/memory` | ADD | `@latest` (1.4.x) | HIGH (official docs, npm page) |
+| `@mastra/pg` | ADD | `@latest` (1.7.x) | HIGH (official docs, verified table list) |
+| `zod` | UPGRADE `^3` → `^4` | `^4.0.0` | HIGH (Mastra 1.x zod/v4 subpath requirement; confirmed in GitHub issue #5821 + fix in 1.1.0+) |
+| `openai` | KEEP | `^6.25.0` | HIGH (no conflict with Mastra) |
+| `fastify` | KEEP | `^4.25.2` | HIGH (adapter supports Fastify 4) |
+| `typescript` | KEEP | `^5.3.3` | HIGH (ES2022 + bundler already set) |
+| `@ai-sdk/anthropic` | DO NOT ADD | N/A | HIGH (Mastra routes internally) |
+| `@ai-sdk/openai` | DO NOT ADD | N/A | HIGH (Mastra routes internally, no conflict with existing `openai` SDK) |
 
 ---
 
 ## Sources
 
-### ESPN API Research
-- [Using ESPN's new Fantasy API (v3)](https://stmorse.github.io/journal/espn-fantasy-v3.html)
-- [ESPN Fantasy API GitHub (cwendt94)](https://github.com/cwendt94/espn-api)
-- [ESPN's Hidden API: How to Access Free Sports Data](https://scrapecreators.com/blog/espn-api-free-sports-data)
+- [Mastra GitHub Releases](https://github.com/mastra-ai/mastra/releases) — Version 1.9.0 confirmed March 4, 2026
+- [Mastra Server Adapters Docs](https://mastra.ai/docs/server/server-adapters) — @mastra/fastify setup, route registration, middleware ordering
+- [Announcing Mastra 1.0](https://mastra.ai/blog/announcing-mastra-1) — Server adapters, composite storage, AI SDK v6 support, breaking changes list
+- [Mastra Changelog 2026-01-30](https://mastra.ai/blog/changelog-2026-01-30) — Zod v3/v4 conflict fix in @mastra/core@1.1.0
+- [Anthropic Models on Mastra](https://mastra.ai/models/providers/anthropic) — Model string format, no @ai-sdk/anthropic needed
+- [Agent Memory Docs](https://mastra.ai/docs/agents/agent-memory) — @mastra/memory, thread/resource IDs, lastMessages config
+- [PostgreSQL Storage Reference](https://mastra.ai/reference/storage/postgresql) — @mastra/pg, auto-created tables list, disableInit option, Pool sharing
+- [createTool Reference](https://mastra.ai/reference/tools/create-tool) — inputSchema, outputSchema, execute signature
+- [Mastra Server Adapters blog post](https://mastra.ai/blog/mastra-server-adapters) — Rationale, coexistence with existing routes
+- [GitHub Issue #5821](https://github.com/mastra-ai/mastra/issues/5821) — Zod v4 compatibility ZodFirstPartyTypeKind error, resolved
+- [GitHub Issue #7092](https://github.com/mastra-ai/mastra/issues/7092) — MCPClient.getTools() Zod v4 fix in @mastra/schema-compat
+- [WorkOS Mastra Quickstart](https://workos.com/blog/mastra-ai-quick-start) — Agent + tool setup with @ai-sdk/openai pattern
+- [Mastra Streaming Overview](https://mastra.ai/docs/streaming/overview) — .stream() vs .streamLegacy(), textStream iteration
 
-### Combinatorics
-- [js-combinatorics - npm](https://www.npmjs.com/package/js-combinatorics)
-- [GitHub - dankogai/js-combinatorics](https://github.com/dankogai/js-combinatorics)
-
-### Virtualization
-- [react-window - npm](https://www.npmjs.com/package/react-window)
-- [Virtualize large lists with react-window](https://web.dev/articles/virtualize-long-lists-react-window)
-- [react-virtualized vs. react-window - LogRocket](https://blog.logrocket.com/react-virtualized-vs-react-window/)
-
-### BullMQ & Job Orchestration
-- [BullMQ - Flows](https://docs.bullmq.io/guide/flows)
-- [BullMQ - Prioritized Jobs](https://docs.bullmq.io/guide/jobs/prioritized)
-- [Untangling Job Dependencies with BullMQ's FlowProducer](https://seyiogunjuyigbe.medium.com/untangling-job-dependencies-with-bullmqs-flowproducer-76eec80a976c)
-- [How to Use BullMQ Flow Producer for Job Pipelines](https://oneuptime.com/blog/post/2026-01-21-bullmq-flow-producer-pipelines/view)
-
-### Recharts & Visualization
-- [Recharts Timeline Example](https://recharts.github.io/en-US/examples/TimelineExample/)
-- [Data Formatting Best Practices - Recharts](https://app.studyraid.com/en/read/11352/354981/data-formatting-best-practices)
-- [The Top 5 React Chart Libraries to Know in 2026](https://www.syncfusion.com/blogs/post/top-5-react-chart-libraries)
-
-### PostgreSQL Temporal Queries
-- [Saving Data Historically with Temporal Tables](https://www.red-gate.com/simple-talk/databases/postgresql/saving-data-historically-with-temporal-tables-part-1-queries/)
-- [Temporal Extensions - PostgreSQL wiki](https://wiki.postgresql.org/wiki/Temporal_Extensions)
-- [GitHub - arkhipov/temporal_tables](https://github.com/arkhipov/temporal_tables)
-
-### Kysely
-- [CTE | Kysely](https://kysely.dev/docs/category/cte)
-- [Simple selects | Kysely](https://kysely.dev/docs/examples/cte/simple-selects)
-
-### Next.js 14 App Router
-- [File-system conventions: Dynamic Segments | Next.js](https://nextjs.org/docs/app/building-your-application/routing/dynamic-routes)
-- [Functions: useSearchParams | Next.js](https://nextjs.org/docs/app/api-reference/functions/use-search-params)
-- [Functions: useParams | Next.js](https://nextjs.org/docs/app/api-reference/functions/use-params)
+---
+*Stack research for: Mastra AI agent integration into existing Fastify/pnpm monorepo*
+*Researched: 2026-03-05*
