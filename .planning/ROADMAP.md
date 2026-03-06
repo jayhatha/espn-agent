@@ -452,10 +452,10 @@ Plans:
   3. Each player row within a group shows player name, max bid, expected market price, and value surplus
   4. Position groups are ordered highest-priority first, matching the combined priority score from the engine
   5. When no unfilled roster positions remain, the Shopping List section collapses to a compact completion state rather than showing an empty list
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 27 to break down)
+- [ ] 27-01-PLAN.md — Create ShoppingList.tsx component and replace Top Targets section in EngineInsights with position-grouped shopping list
 
 ## Progress
 
@@ -488,4 +488,4 @@ Plans:
 | 24. Narrator Optimization Signals | v1.4 | 1/1 | Complete | 2026-03-05 |
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
-| 27. Shopping List UI | v2.0 | 0/TBD | Not started | - |
+| 27. Shopping List UI | v2.0 | 0/1 | Planned | - |
