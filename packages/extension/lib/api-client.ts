@@ -314,14 +314,29 @@ function buildBundledRankings(): {
 }
 
 /**
+ * Cached draft board data — ESPN player pool is static during a draft session.
+ * Fetched once at draft start, reused for all subsequent calls.
+ */
+let cachedDraftBoardData: { rankings: PlayerRanking[]; auctionValues: AuctionValue[] } | null | undefined;
+
+/**
  * Fetch draft data from /api/draft/espn and merge with bundled PitcherList rankings.
  * Uses the same data source as the admin draft board page for consistency.
+ * Returns cached result on subsequent calls — ESPN player pool doesn't change mid-draft.
  * Returns null if fetch fails or returns empty data.
  */
 export async function getDraftBoardData(): Promise<{
   rankings: PlayerRanking[];
   auctionValues: AuctionValue[];
 } | null> {
+  // Practice drafts don't have backend league data — skip network call entirely
+  // and let callers fall back to bundled FanGraphs data
+  if (isPracticeDraft()) {
+    console.log("[API Client] Practice draft — skipping backend draft board fetch");
+    return null;
+  }
+
+  if (cachedDraftBoardData !== undefined) return cachedDraftBoardData;
   return dedupedRequest("draftBoardData", async () => {
     try {
       const { backendUrl } = await chrome.storage.local.get(["backendUrl"]);
@@ -441,9 +456,11 @@ export async function getDraftBoardData(): Promise<{
       }
 
       console.log("[API Client] Using draft board data for rankings:", players.length, "players");
-      return { rankings, auctionValues };
+      cachedDraftBoardData = { rankings, auctionValues };
+      return cachedDraftBoardData;
     } catch (error) {
       console.warn("[API Client] getDraftBoardData failed:", error);
+      cachedDraftBoardData = null;
       return null;
     }
   });

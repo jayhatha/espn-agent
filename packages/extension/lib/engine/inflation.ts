@@ -40,9 +40,25 @@ export function computeInflation(
     totalRemainingBudget = Math.max(0, totalInitialBudget - totalSpent);
   }
 
+  // Compute total league budget for normalization
+  const totalInitialBudget = allTeamBudgets.length > 0
+    ? allTeamBudgets.reduce((sum, t) => sum + t.remainingBudget, 0)
+      + allPicks.reduce((sum, p) => sum + (p.cost ?? 0), 0)  // remaining + spent = initial
+    : 260 * totalTeams;
+
+  // FanGraphs dollar values are calibrated to an idealized pool that may differ from
+  // the league's actual total budget. Normalize so the full auction value pool scales
+  // to the league's budget. Without this, inflation is always negative when
+  // sum(FG dollars) > league budget.
+  const totalAuctionValuePool = auctionValues.reduce((sum, av) => sum + av.dollarValue, 0);
+  const normalizationFactor = totalAuctionValuePool > 0
+    ? totalInitialBudget / totalAuctionValuePool
+    : 1.0;
+  const normalizedRemainingValue = totalRemainingValue * normalizationFactor;
+
   // Core formula from CONTEXT.md: inflation = remaining_budget / remaining_projected_value
-  const rawFactor = totalRemainingValue > 0
-    ? totalRemainingBudget / totalRemainingValue
+  const rawFactor = normalizedRemainingValue > 0
+    ? totalRemainingBudget / normalizedRemainingValue
     : 1.0;
 
   // Clamp per Phase 11 decision: 0.5 to 2.0
@@ -55,7 +71,7 @@ export function computeInflation(
     inflationFactor,
     rawInflationFactor: rawFactor,
     totalRemainingBudget,
-    totalRemainingValue,
+    totalRemainingValue: normalizedRemainingValue,  // Use normalized for display
     confidence,
     percentOverMarket: Math.round((inflationFactor - 1) * 100),
   };
