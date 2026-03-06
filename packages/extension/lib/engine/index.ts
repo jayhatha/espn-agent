@@ -6,6 +6,7 @@ import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
 import { buildFgPlayerPool, normalizeName } from "./archetype";
 import { computeLeagueAnalysis } from "./league-analysis";
+import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
@@ -17,9 +18,9 @@ import {
   fgAuctionHittersData,
   fgAuctionPitchersData,
 } from "../fangraphs-data";
-import type { PoolPlayer, TargetRecommendation } from "./types";
+import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -80,6 +81,9 @@ let sgpCacheKey: number = -1;  // allPicks.length at last computation
 let cachedBidResult: { maxBid: ReturnType<typeof computeMaxBid>; monteCarlo: ReturnType<typeof runMonteCarlo> } | null = null;
 let bidCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length
 
+let cachedProjectedStandings: ProjectedStandingsSignal | null = null;
+let projectedStandingsCacheKey: number = -1;  // allPicks.length at last computation
+
 // ============================================================
 // computeRosterOptimization
 // ============================================================
@@ -87,6 +91,7 @@ let bidCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length
 function computeRosterOptimization(
   input: DraftEngineInput,
   inflation: { inflationFactor: number },
+  projectedStandings: ProjectedStandingsSignal | null,
 ): RosterOptimizationSignal {
   const t0 = performance.now();
 
@@ -124,6 +129,9 @@ function computeRosterOptimization(
       computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
     };
   }
+
+  // Extract weak categories for top-target boost
+  const weakCategories = new Set(projectedStandings?.myWeakCategories ?? []);
 
   // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
   const activeSlots = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
@@ -295,7 +303,18 @@ function computeRosterOptimization(
       return Math.max(max, needByPosition[posUpper] ?? 0);
     }, 0);
     // 50% boost per empty slot at the player's best position
-    const adjustedSgp = sgp * (1 + maxNeed * 0.5);
+    const positionalAdjustedSgp = sgp * (1 + maxNeed * 0.5);
+    // Weak-category boost: 30% per weak category this player contributes to, capped at 2x
+    let weakBoost = 1.0;
+    if (weakCategories.size > 0) {
+      for (const statKey of weakCategories) {
+        if ((p.stats[statKey] ?? 0) > 0) {
+          weakBoost += 0.3;
+        }
+      }
+      weakBoost = Math.min(weakBoost, 2.0);
+    }
+    const adjustedSgp = positionalAdjustedSgp * weakBoost;
     return { player: p, sgp, adjustedSgp, index: i };
   });
   const hitterPool = indexedAll.filter(e => !e.player.isPitcher).sort((a, b) => b.adjustedSgp - a.adjustedSgp);
@@ -447,11 +466,54 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     }
   }
 
+  // 5c. Projected standings engine
+  let projectedStandings: ProjectedStandingsSignal | null = null;
+  if (
+    leagueAnalysis !== null &&
+    leagueAnalysis.teamDraftedTotals != null &&
+    leagueAnalysis.teamsAnalyzed >= 3 &&
+    input.leagueCategories.length > 0
+  ) {
+    try {
+      // Cache: only recompute when pick count changes
+      if (projectedStandingsCacheKey !== input.allPicks.length || cachedProjectedStandings === null) {
+        // Build undrafted player pool for replacement-level stats
+        const draftedNormalizedNames = new Set<string>();
+        for (const pick of input.allPicks) {
+          draftedNormalizedNames.add(normalizeName(pick.playerName));
+        }
+        const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
+          fgLeaderboardHittersData,
+          fgLeaderboardPitchersData,
+          fgAuctionHittersData,
+          fgAuctionPitchersData,
+          draftedNormalizedNames,
+        );
+        const undraftedPlayers: PoolPlayer[] = [...undraftedHitters, ...undraftedPitchers];
+
+        cachedProjectedStandings = computeProjectedStandings(
+          leagueAnalysis.teamDraftedTotals,
+          input.teamRosters,
+          input.allPicks,
+          input.myTeamId,
+          input.leagueCategories,
+          undraftedPlayers,
+          input.rosterSize,
+          input.totalTeams,
+        );
+        projectedStandingsCacheKey = input.allPicks.length;
+      }
+      projectedStandings = cachedProjectedStandings;
+    } catch (e) {
+      console.warn("[DraftEngine] Projected standings failed:", e);
+    }
+  }
+
   // 6. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
     try {
-      optimization = computeRosterOptimization(input, inflation);
+      optimization = computeRosterOptimization(input, inflation, projectedStandings);
     } catch (e) {
       console.warn("[DraftEngine] Roster optimization failed:", e);
     }
@@ -471,6 +533,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     computeTimeMs: Math.round(elapsed * 10) / 10,
     optimization,
     leagueAnalysis,
-    projectedStandings: null,  // Computed in Plan 02 via computeProjectedStandings
+    projectedStandings,
   };
 }
