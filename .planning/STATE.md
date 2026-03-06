@@ -151,6 +151,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 28 P02 | 5 | 2 tasks | 3 files |
 | Phase 28 P03 | 1 | 1 tasks | 1 files |
 | Phase quick-45 P01 | 3 | 2 tasks | 5 files |
+| Phase quick-46 PP01 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -351,6 +352,9 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-45]: Normalize FG dollar pool to league budget rather than adjusting individual player values
 - [Phase quick-45]: Remove allPlayers[0] fallback entirely -- return safe defaults (maxBid=0, shouldBid=false) when no nominated player match
 - [Phase quick-45]: Two-strategy nominated player matching: auctionValues ID lookup primary, DOM player name fallback secondary
+- [Phase quick-46]: formula_id added inline to content.tsx fallback instead of importing getDefault5x5Categories -- avoids DOM dependency complications
+- [Phase quick-46]: Budget estimation derives initial budget from user remainingBudget+mySpent then subtracts opponent known spend from allPicks
+- [Phase quick-46]: Standard roto tie-handling: tied teams share averaged points across tied positions instead of arbitrary sort-order assignment
 
 ### Roadmap Evolution
 
