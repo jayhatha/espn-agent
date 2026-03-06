@@ -10,7 +10,7 @@ Requirements for Position Shopping List milestone. Each maps to roadmap phases.
 ### Engine — Position Targets (TARG)
 
 - [ ] **TARG-01**: Engine computes top N available players per unfilled roster position, ranked by adjusted SGP value
-- [ ] **TARG-02**: Each target includes max bid (binary search optimizer) and expected market price (opponent model)
+- [ ] **TARG-02**: Each target includes max bid estimate and expected market price (opponent model)
 - [ ] **TARG-03**: Positions are ordered by a combined priority score blending scarcity urgency, empty roster slot count, and budget fit
 - [ ] **TARG-04**: Position targets update dynamically as players are drafted and roster fills
 - [ ] **TARG-05**: Multi-position eligible players appear under each position they qualify for

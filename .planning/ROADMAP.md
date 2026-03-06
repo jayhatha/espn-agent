@@ -430,7 +430,7 @@ Plans:
 **Requirements:** TARG-01, TARG-02, TARG-03, TARG-04, TARG-05, PRIO-01, PRIO-02, PRIO-03
 **Success Criteria** (what must be TRUE):
   1. Engine produces a shopping list keyed by position, each entry containing top N available players sorted by adjusted SGP value
-  2. Each player entry includes max bid (binary search optimizer) and expected market price (opponent model), alongside a value surplus (max bid minus expected market price)
+  2. Each player entry includes max bid estimate and expected market price (opponent model), alongside a value surplus (max bid minus expected market price)
   3. Positions are ordered by a combined priority score that weights scarcity index, number of unfilled roster slots at that position, and remaining budget relative to target prices
   4. Positions with zero unfilled roster slots are excluded from the output entirely
   5. Multi-position eligible players (e.g., 1B/3B) appear as candidates under each position they qualify for
