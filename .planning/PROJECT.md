@@ -36,39 +36,37 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Active
 
+- [ ] Position-organized shopping list replacing Top Targets in draft sidebar
+- [ ] Combined priority scoring (scarcity + roster needs + budget fit) for position ordering
+- [ ] Per-position top N targets with max bid and expected market price
+- [ ] Dynamic adjustment as players are drafted
+
+### Deferred
+
 - [ ] Mastra AI agent with tools for draft engine signals, player data, and league state
 - [ ] Agent memory for draft session context (remembers earlier advice, strategy evolution)
 - [ ] Streaming agent responses in extension sidebar
-- [ ] Agent tools: query inflation, scarcity, projected standings, budget curve, archetype
-- [ ] Replace stateless narrator with agentic reasoning (multi-step signal analysis)
-
-### Deferred (from v1.1)
-
 - [ ] Multi-player trade evaluation (user proposes N-for-N trades, sees projected standings impact)
 - [ ] Season replay (week-by-week standings evolution from collected snapshots and backfilled data)
 - [ ] Trade retrospectives (how past trades impacted standings based on actual outcomes)
 - [ ] Historical data backfill from ESPN API (pull season data from before league connection)
 
-## Current Milestone: v2.0 Mastra AI Agent
+## Current Milestone: v2.0 Position Shopping List
 
-**Goal:** Replace the stateless GPT narrator with a proper Mastra AI agent that has typed tools for all draft engine signals, session memory, streaming responses, and multi-step reasoning
+**Goal:** Replace the generic Top Targets section with a position-organized shopping list that shows the best available players at each unfilled position, with max bids and market prices, prioritized by a combined scarcity + roster needs + budget fit score
 
 **Target features:**
-- Mastra agent on Fastify backend with tools for draft engine signals
-- Typed tools (Zod-validated I/O) for inflation, scarcity, standings, budget, archetype
-- Session memory so the agent remembers earlier strategy advice within a draft
-- Streaming responses for real-time feel in the extension sidebar
-- Replace ad-hoc narrator prompt engineering with structured tool use
-- Agent can chain signals: "Team X needs saves + is budget-constrained → closers will be cheap later"
+- Position-by-position target recommendations replacing Top Targets in sidebar
+- Combined priority scoring blending scarcity urgency, empty roster slots, and budget constraints
+- Top N available players per position with max bid (binary search) and expected market price (opponent model)
+- Dynamic updates as draft progresses — positions re-prioritize as roster fills and pool shrinks
 
 ### Out of Scope
 
-- Web app agents (waiver advice, trade analysis, daily briefings) — draft agent first, expand later
-- Autonomous draft actions — agent advises, user decides
-- RAG / vector search — not needed for draft signals (structured data, not documents)
-- Multi-agent orchestration — single agent is sufficient for draft context
-- Mobile native app — web-first
-- Custom LLM fine-tuning — use Claude/GPT via Mastra's model router
+- AI/LLM agent integration — deferred to v2.1 (research complete in .planning/research/)
+- Web app changes — extension sidebar only
+- New data sources — uses existing FanGraphs projections and engine signals
+- Snake draft support — auction only for now
 
 ## Context
 

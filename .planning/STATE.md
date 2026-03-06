@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Milestone v2.0 — Mastra AI Agent (defining requirements)
+**Current focus:** Milestone v2.0 — Position Shopping List (defining requirements)
 
 ## Current Position
 

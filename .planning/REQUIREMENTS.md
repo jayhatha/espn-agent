@@ -3,9 +3,33 @@
 **Defined:** 2026-02-21
 **Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
 
-## v1.1 Requirements
+## v2.0 Requirements
 
-Requirements for v1.1 Trades & History milestone. Each maps to roadmap phases.
+Requirements for Position Shopping List milestone. Each maps to roadmap phases.
+
+### Engine — Position Targets (TARG)
+
+- [ ] **TARG-01**: Engine computes top N available players per unfilled roster position, ranked by adjusted SGP value
+- [ ] **TARG-02**: Each target includes max bid (binary search optimizer) and expected market price (opponent model)
+- [ ] **TARG-03**: Positions are ordered by a combined priority score blending scarcity urgency, empty roster slot count, and budget fit
+- [ ] **TARG-04**: Position targets update dynamically as players are drafted and roster fills
+- [ ] **TARG-05**: Multi-position eligible players appear under each position they qualify for
+
+### Engine — Priority Scoring (PRIO)
+
+- [ ] **PRIO-01**: Combined position priority score weights scarcity index, number of empty slots at that position, and remaining budget relative to target prices
+- [ ] **PRIO-02**: Positions with zero unfilled slots are excluded from the shopping list
+- [ ] **PRIO-03**: Priority re-sorts after each pick as scarcity and roster state change
+
+### UI — Shopping List Display (SHOP)
+
+- [ ] **SHOP-01**: Shopping list replaces the current Top Targets section in the EngineInsights sidebar
+- [ ] **SHOP-02**: Each position shown as a collapsible group with position label and priority indicator
+- [ ] **SHOP-03**: Each player row shows name, max bid, expected market price, and value surplus
+- [ ] **SHOP-04**: Position groups are ordered by combined priority score (most urgent first)
+- [ ] **SHOP-05**: Shopping list collapses gracefully when no unfilled positions remain
+
+## v1.1 Requirements (Completed)
 
 ### Multi-Player Trade Evaluation
 
@@ -27,15 +51,23 @@ Requirements for v1.1 Trades & History milestone. Each maps to roadmap phases.
 - [x] **TIME-02**: Timeline shows transaction annotations (trades, waiver adds/drops) at the weeks they occurred
 - [x] **TIME-03**: User can select different seasons/date ranges for the timeline view
 
-### Trade Retrospectives
+## Deferred
 
-- [ ] **RETRO-01**: User can view trade history showing all past trades with players, dates, and teams involved
-- [ ] **RETRO-02**: Each past trade shows actual vs projected outcomes (projected impact at trade time vs actual result)
-- [ ] **RETRO-03**: Past trades display accuracy indicators ("Exceeded projections", "Met projections", "Underperformed")
+### Mastra AI Agent (v2.1)
 
-## v2 Requirements
+- **MSTR-01**: Mastra agent on Fastify backend with tools for draft engine signals
+- **MSTR-02**: Typed tools (Zod-validated I/O) for inflation, scarcity, standings, budget, archetype
+- **MSTR-03**: Session memory so the agent remembers earlier strategy advice within a draft
+- **MSTR-04**: Streaming SSE responses for real-time feel in the extension sidebar
+- **MSTR-05**: Replace ad-hoc narrator prompt engineering with structured tool use
 
-Deferred to future release. Tracked but not in current roadmap.
+*Research complete: see `.planning/research/` for Stack, Features, Architecture, Pitfalls analysis.*
+
+### Trade Retrospectives (from v1.1)
+
+- **RETRO-01**: User can view trade history showing all past trades with players, dates, and teams involved
+- **RETRO-02**: Each past trade shows actual vs projected outcomes
+- **RETRO-03**: Past trades display accuracy indicators
 
 ### Trade Evaluation
 
@@ -49,15 +81,16 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
+| AI/LLM agent integration | Deferred to v2.1 — research complete, implement after shopping list proves value |
+| Web app changes | Extension sidebar only for draft features |
+| Snake draft support | Auction-only for now — different paradigm |
+| New data sources | Uses existing FanGraphs projections and engine signals |
+| Autonomous bidding | Agent/engine advises, user decides |
 | Real-time trade notifications | Scope creep — requires polling ESPN every N minutes |
 | Keeper/dynasty trade value | Multi-year impact requires future projections and draft pick valuation |
-| Automated roster moves via ESPN API | ESPN has no official write API; ToS risk |
-| Points league support | Roto category leagues only for v1 |
-| Custom stat categories (QS, K/9, OPS+) | Standard categories only for v1 |
+| Points league support | Roto category leagues only |
 
 ## Traceability
 
@@ -76,16 +109,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIME-01 | Phase 7 | Complete |
 | TIME-02 | Phase 8 | Complete |
 | TIME-03 | Phase 8 | Complete |
-| RETRO-01 | Phase 9 | Pending |
-| RETRO-02 | Phase 9 | Pending |
-| RETRO-03 | Phase 9 | Pending |
+| TARG-01 | — | Pending |
+| TARG-02 | — | Pending |
+| TARG-03 | — | Pending |
+| TARG-04 | — | Pending |
+| TARG-05 | — | Pending |
+| PRIO-01 | — | Pending |
+| PRIO-02 | — | Pending |
+| PRIO-03 | — | Pending |
+| SHOP-01 | — | Pending |
+| SHOP-02 | — | Pending |
+| SHOP-03 | — | Pending |
+| SHOP-04 | — | Pending |
+| SHOP-05 | — | Pending |
 
 **Coverage:**
-- v1.1 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0
-- Coverage: 100% ✓
+- v2.0 requirements: 13 total
+- Mapped to phases: 0
+- Unmapped: 13 ⚠️
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after roadmap creation*
+*Last updated: 2026-03-05 after milestone pivot to Position Shopping List*
