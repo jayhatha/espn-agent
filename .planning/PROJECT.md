@@ -36,37 +36,47 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Active
 
+- [ ] Mastra AI agent with tools for draft engine signals, player data, and league state
+- [ ] Agent memory for draft session context (remembers earlier advice, strategy evolution)
+- [ ] Streaming agent responses in extension sidebar
+- [ ] Agent tools: query inflation, scarcity, projected standings, budget curve, archetype
+- [ ] Replace stateless narrator with agentic reasoning (multi-step signal analysis)
+
+### Deferred (from v1.1)
+
 - [ ] Multi-player trade evaluation (user proposes N-for-N trades, sees projected standings impact)
 - [ ] Season replay (week-by-week standings evolution from collected snapshots and backfilled data)
 - [ ] Trade retrospectives (how past trades impacted standings based on actual outcomes)
 - [ ] Historical data backfill from ESPN API (pull season data from before league connection)
 
-## Current Milestone: v1.1 Trades & History
+## Current Milestone: v2.0 Mastra AI Agent
 
-**Goal:** Enable multi-player trade evaluation and historical season analysis with data backfill
+**Goal:** Replace the stateless GPT narrator with a proper Mastra AI agent that has typed tools for all draft engine signals, session memory, streaming responses, and multi-step reasoning
 
 **Target features:**
-- Multi-player trade evaluation with projected standings impact
-- Season replay timeline (week-by-week standings evolution)
-- Trade retrospective analysis (actual outcomes vs projections at time of trade)
-- ESPN historical data backfill for full-season coverage
+- Mastra agent on Fastify backend with tools for draft engine signals
+- Typed tools (Zod-validated I/O) for inflation, scarcity, standings, budget, archetype
+- Session memory so the agent remembers earlier strategy advice within a draft
+- Streaming responses for real-time feel in the extension sidebar
+- Replace ad-hoc narrator prompt engineering with structured tool use
+- Agent can chain signals: "Team X needs saves + is budget-constrained → closers will be cheap later"
 
 ### Out of Scope
 
-- Automated roster moves via ESPN API — ESPN has no official write API; ToS risk
-- What-if counterfactual analysis — v2 feature; requires more historical depth than v1.1 backfill provides
-- Mobile native app — web-first, responsive design covers mobile
-- Real-time live scoring — ESPN doesn't expose real-time feeds reliably
-- Points league support — roto category leagues only for v1
-- Multi-player trade suggestion generation (AI finds optimal combos) — v1.1 focuses on user-proposed evaluation only
-- Custom stat categories (QS, K/9, OPS+) — standard categories only for v1
-- Automated FanGraphs data fetching — ToS compliance, manual CSV upload only
+- Web app agents (waiver advice, trade analysis, daily briefings) — draft agent first, expand later
+- Autonomous draft actions — agent advises, user decides
+- RAG / vector search — not needed for draft signals (structured data, not documents)
+- Multi-agent orchestration — single agent is sufficient for draft context
+- Mobile native app — web-first
+- Custom LLM fine-tuning — use Claude/GPT via Mastra's model router
 
 ## Context
 
 Shipped v1.0 with 24,177 lines of TypeScript across a monorepo (Turbo + pnpm). Backend: Fastify 4, Kysely (PostgreSQL), BullMQ (Redis). Frontend: Next.js 14 (App Router), TanStack Query v5, Tailwind CSS, Recharts. Shared package: types, component-based stat formulas (AVG, OBP, SLG, OPS, ERA, WHIP), VBD/SGP draft math.
 
 7 backend agents: ESPNAdapter, ProjectionsIngestAgent, PlayerIdentityResolutionAgent, StandingsProjectionAgent, WaiverRecommendationAgent, TradeRecommendationAgent, SnapshotOrchestratorAgent. Plus: DraftRankingsAgent, AuctionValuationAgent, LineupOptimizerAgent, StreamingPitcherAgent. Admin API with user management, system stats, league health, and batch upload.
+
+Chrome extension (WXT + React) with deterministic draft engine: inflation tracking, enhanced scarcity, category gap analysis, budget curves, build archetype detection, projected standings, roster optimization (SGP-based max bid, Monte Carlo simulation, opponent modeling). Current AI layer: stateless narrator (Phase 22-24) calling GPT with engine signals as prompt context — no tools, no memory, no reasoning chain.
 
 ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies (encrypted at rest with AES-256-GCM). MLB StatsAPI (free, no auth) used for game schedules and probable pitchers.
 
@@ -95,6 +105,8 @@ ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies
 | Manual FanGraphs CSV upload only | ToS compliance — no automated scraping | ✓ Good — batch upload UX acceptable |
 | Two-tier component structure (ui/ + league/) | Generic primitives vs domain-specific separation | ✓ Good |
 | HttpOnly cookies for JWT (not localStorage) | XSS protection, automatic inclusion | ✓ Good |
+| Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic — proper agent framework vs ad-hoc prompts | — Pending |
+| Agent on backend (not extension) | Extension can't hold long-lived agent state; backend can persist memory, manage API keys | — Pending |
 
 ---
-*Last updated: 2026-02-21 after v1.1 milestone start*
+*Last updated: 2026-03-05 after v2.0 milestone start*

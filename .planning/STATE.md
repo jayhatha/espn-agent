@@ -2,22 +2,17 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-21)
+See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 25 - Projected Standings Engine (COMPLETE)
+**Current focus:** Milestone v2.0 — Mastra AI Agent (defining requirements)
 
 ## Current Position
 
-Phase: 25 (Projected Standings Engine) - COMPLETE
-Plan: 2 of 2 complete (all plans done)
-Status: Complete
-Last activity: 2026-03-06 - Completed 25-02: projected standings wired as step 5c, weak-category boost, sidebar section
-
-Progress: Phase 25: [██████████] 100% (2 of 2 plans complete)
-
-Last session: 2026-03-06
-Stopped at: Completed 25-02-PLAN.md: projected standings wired as step 5c in engine orchestrator, weak-category boost for top targets, sidebar Projected Standings section in EngineInsights
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-05 — Milestone v2.0 started
 
 ## Performance Metrics
 
