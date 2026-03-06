@@ -13,15 +13,18 @@ import { computeMaxBid } from "./bid-optimizer";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { runMonteCarlo } from "./monte-carlo";
 import { computeShoppingList } from "./shopping-list";
+import { simulateFullDraft, computeSimStandings } from "./draft-simulator";
+import { compareDecisions, aggregateOutcomes } from "./decision-comparison";
+import { recommendNomination } from "./nomination-strategy";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
   fgAuctionHittersData,
   fgAuctionPitchersData,
 } from "../fangraphs-data";
-import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal } from "./types";
+import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -85,6 +88,106 @@ let bidCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length
 let cachedProjectedStandings: ProjectedStandingsSignal | null = null;
 let projectedStandingsCacheKey: number = -1;  // allPicks.length at last computation
 
+let cachedSimulation: ForwardSimulationSignal | null = null;
+let simulationCacheKey: string = '';  // allPicks.length + '_' + currentAuctionPlayerId
+
+// ============================================================
+// buildSimDraftState
+// ============================================================
+
+/**
+ * Construct a SimDraftState from the current draft state for forward simulation.
+ *
+ * Seeds categoryTotals and componentTotals from leagueAnalysis for accurate
+ * mid-draft win probability — without these, all teams start at zero and
+ * absolute win probabilities are distorted.
+ *
+ * Returns null when:
+ * - myTeamId is null (can't identify which team is ours)
+ * - teamRosters.size < 3 (not enough teams for meaningful simulation)
+ */
+function buildSimDraftState(
+  allPlayers: PoolPlayer[],
+  input: DraftEngineInput,
+  opponentModel: ReturnType<typeof buildOpponentModel>,
+  activeSlots: Record<string, number>,
+  myRemainingSlots: Record<string, number>,
+  leagueAnalysis: LeagueAnalysisSignal | null,
+): SimDraftState | null {
+  if (input.myTeamId == null || input.teamRosters.size < 3) return null;
+
+  const totalSlots = Object.values(activeSlots).reduce((s, v) => s + v, 0);
+
+  // Count picks per team
+  const pickCountByTeam = new Map<string, number>();
+  for (const pick of input.allPicks) {
+    pickCountByTeam.set(pick.teamId, (pickCountByTeam.get(pick.teamId) ?? 0) + 1);
+  }
+
+  const teamIds = Array.from(input.teamRosters.keys());
+  let myTeamIndex = -1;
+
+  const teamStates: SimTeamState[] = teamIds.map((teamId, idx) => {
+    const isMyTeam = teamId === input.myTeamId;
+    if (isMyTeam) myTeamIndex = idx;
+
+    // Budget
+    const budget = isMyTeam
+      ? input.remainingBudget
+      : (opponentModel.teamBudgets.get(teamId) ?? input.remainingBudget);
+
+    // slotsRemaining
+    let slotsRemaining: Record<string, number>;
+    if (isMyTeam) {
+      slotsRemaining = { ...myRemainingSlots };
+    } else {
+      // Approximate opponent slot fill based on pick count
+      const pickCount = pickCountByTeam.get(teamId) ?? 0;
+      const remainingTotal = Math.max(0, totalSlots - pickCount);
+
+      if (totalSlots <= 0) {
+        slotsRemaining = { ...activeSlots };
+      } else {
+        slotsRemaining = {};
+        for (const [slot, count] of Object.entries(activeSlots)) {
+          const approx = Math.max(0, Math.round(count * remainingTotal / totalSlots));
+          if (approx > 0) slotsRemaining[slot] = approx;
+        }
+      }
+    }
+
+    // categoryTotals from leagueAnalysis.teamDraftedTotals
+    const categoryTotals: Record<string, number> =
+      leagueAnalysis?.teamDraftedTotals?.get(teamId) != null
+        ? { ...(leagueAnalysis.teamDraftedTotals!.get(teamId)!) }
+        : {};
+
+    // componentTotals from leagueAnalysis.teamDraftedComponents
+    const componentTotals: Record<string, number> =
+      leagueAnalysis?.teamDraftedComponents?.get(teamId) != null
+        ? { ...(leagueAnalysis.teamDraftedComponents!.get(teamId)!) }
+        : {};
+
+    return { budget, slotsRemaining, categoryTotals, componentTotals };
+  });
+
+  if (myTeamIndex === -1) return null;
+
+  // Build availableIndices: players not yet drafted (not in allPicks by normalized name)
+  const draftedNames = new Set<string>();
+  for (const pick of input.allPicks) {
+    draftedNames.add(normalizeName(pick.playerName));
+  }
+  const availableIndices = new Set<number>();
+  for (let i = 0; i < allPlayers.length; i++) {
+    if (!draftedNames.has(allPlayers[i].normalizedName)) {
+      availableIndices.add(i);
+    }
+  }
+
+  return { availableIndices, teamStates, myTeamIndex };
+}
+
 // ============================================================
 // computeRosterOptimization
 // ============================================================
@@ -94,29 +197,16 @@ function computeRosterOptimization(
   inflation: { inflationFactor: number },
   projectedStandings: ProjectedStandingsSignal | null,
   scarcitySignals: EnhancedScarcitySignal[],
+  // Hoisted parameters (computed in computeDraftEngine for sharing with simulation step)
+  allPlayers: PoolPlayer[],
+  sgpValues: number[],
+  opponentModel: ReturnType<typeof buildOpponentModel>,
+  activeSlots: Record<string, number>,
+  remainingSlots: Record<string, number>,
+  needByPosition: Record<string, number>,
+  weakCategories: Set<string>,
 ): RosterOptimizationSignal {
   const t0 = performance.now();
-
-  // Build drafted name set from ALL picks
-  const draftedNormalizedNames = new Set<string>();
-  for (const pick of input.allPicks) {
-    draftedNormalizedNames.add(normalizeName(pick.playerName));
-  }
-
-  // Build FG player pool (undrafted hitters + pitchers)
-  const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
-    fgLeaderboardHittersData,
-    fgLeaderboardPitchersData,
-    fgAuctionHittersData,
-    fgAuctionPitchersData,
-    draftedNormalizedNames,
-  );
-
-  // Combine and cap at top 200 by dollar value
-  const allPlayers: PoolPlayer[] = [
-    ...undraftedHitters,
-    ...undraftedPitchers,
-  ].sort((a, b) => b.dollars - a.dollars).slice(0, 200);
 
   if (allPlayers.length === 0) {
     return {
@@ -133,92 +223,13 @@ function computeRosterOptimization(
     };
   }
 
-  // Extract weak categories for top-target boost
-  const weakCategories = new Set(projectedStandings?.myWeakCategories ?? []);
-
-  // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
-  const activeSlots = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
-
-  // Warn if rosterSize differs from active slot total
   const activeTotal = Object.values(activeSlots).reduce((s, v) => s + v, 0);
-  if (input.rosterSize !== activeTotal) {
-    console.warn(
-      `[DraftEngine] rosterSize=${input.rosterSize} differs from active slot total=${activeTotal}. ` +
-      `Using ${input.rosterSlots ? "detected" : "default"} roster slots.`,
-    );
-  }
-
-  // ----------------------------------------------------------------
-  // SGP cache: rebuild only when pick count changes (new pick)
-  // ----------------------------------------------------------------
-  if (sgpCacheKey !== input.allPicks.length || cachedSGPVectors === null) {
-    cachedSGPVectors = buildSGPVectors(
-      allPlayers,
-      input.leagueCategories,
-      activeSlots,
-      input.totalTeams,
-    );
-    sgpCacheKey = input.allPicks.length;
-  }
-
-  const sgpVectors = cachedSGPVectors;
-  const sgpValues = sgpVectors.playerSGPs;
-
-  // ----------------------------------------------------------------
-  // Build opponent model
-  // ----------------------------------------------------------------
-  const opponentModel = buildOpponentModel(
-    input.teamRosters,
-    input.allTeamBudgets,
-    activeSlots,
-    allPlayers,
-    input.allPicks,
-    inflation.inflationFactor,
-  );
+  const myBudget = input.remainingBudget;
 
   // ----------------------------------------------------------------
   // Bid cache: rebuild only when nomination OR pick count changes
   // ----------------------------------------------------------------
   const newBidCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}`;
-  const mySpent = input.myRoster.reduce((sum, p) => sum + (p.cost ?? 0), 0);
-  const myBudget = input.remainingBudget;
-
-  // Compute remaining roster slots by subtracting my drafted players' positions
-  // (computed outside bid cache so needByPosition is available for top targets sort)
-  const remainingSlots: Record<string, number> = { ...activeSlots };
-  for (const drafted of input.myRoster) {
-    const slotMap = new Map(Object.entries(remainingSlots).filter(([, v]) => v > 0));
-    const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
-    const slot = findBestSlotForPositions(positions, slotMap);
-    if (slot && remainingSlots[slot] > 0) {
-      remainingSlots[slot]--;
-    }
-  }
-  // Remove zero-count slots
-  for (const [slot, count] of Object.entries(remainingSlots)) {
-    if (count <= 0) delete remainingSlots[slot];
-  }
-
-  // Compute positional need from remaining slots (UTIL, P, BN excluded)
-  const needByPosition: Record<string, number> = {};
-  for (const [slot, count] of Object.entries(remainingSlots)) {
-    if (slot === 'UTIL' || slot === 'P' || slot === 'BN') continue;
-    if (count > 0) {
-      needByPosition[slot] = count;
-    }
-  }
-  // Expand combo slots: CI need applies to 1B and 3B, MI need applies to 2B and SS
-  if (needByPosition['CI'] && needByPosition['CI'] > 0) {
-    needByPosition['1B'] = (needByPosition['1B'] ?? 0) + needByPosition['CI'];
-    needByPosition['3B'] = (needByPosition['3B'] ?? 0) + needByPosition['CI'];
-  }
-  if (needByPosition['MI'] && needByPosition['MI'] > 0) {
-    needByPosition['2B'] = (needByPosition['2B'] ?? 0) + needByPosition['MI'];
-    needByPosition['SS'] = (needByPosition['SS'] ?? 0) + needByPosition['MI'];
-  }
-  // Remove combo slot keys themselves (players have real positions, not CI/MI)
-  delete needByPosition['CI'];
-  delete needByPosition['MI'];
 
   let maxBidResult: ReturnType<typeof computeMaxBid> | null = null;
   let monteCarloResult: ReturnType<typeof runMonteCarlo> | null = null;
@@ -541,12 +552,229 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   }
 
   // 6. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
+  // Build shared player pool, SGP vectors, and opponent model (hoisted from computeRosterOptimization
+  // so Step 7 simulation can access the same data without recomputation).
+
+  // Build drafted name set from ALL picks
+  const draftedNormalizedNamesOpt = new Set<string>();
+  for (const pick of input.allPicks) {
+    draftedNormalizedNamesOpt.add(normalizeName(pick.playerName));
+  }
+
+  // Build FG player pool (undrafted hitters + pitchers)
+  const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
+    fgLeaderboardHittersData,
+    fgLeaderboardPitchersData,
+    fgAuctionHittersData,
+    fgAuctionPitchersData,
+    draftedNormalizedNamesOpt,
+  );
+
+  // Combine and cap at top 200 by dollar value
+  const allPlayersOpt: PoolPlayer[] = [
+    ...undraftedHitters,
+    ...undraftedPitchers,
+  ].sort((a, b) => b.dollars - a.dollars).slice(0, 200);
+
+  // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
+  const activeSlotsOpt = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
+
+  // Warn if rosterSize differs from active slot total
+  const activeTotalOpt = Object.values(activeSlotsOpt).reduce((s, v) => s + v, 0);
+  if (input.rosterSize !== activeTotalOpt) {
+    console.warn(
+      `[DraftEngine] rosterSize=${input.rosterSize} differs from active slot total=${activeTotalOpt}. ` +
+      `Using ${input.rosterSlots ? "detected" : "default"} roster slots.`,
+    );
+  }
+
+  // SGP cache: rebuild only when pick count changes (new pick)
+  if (sgpCacheKey !== input.allPicks.length || cachedSGPVectors === null) {
+    cachedSGPVectors = buildSGPVectors(
+      allPlayersOpt,
+      input.leagueCategories,
+      activeSlotsOpt,
+      input.totalTeams,
+    );
+    sgpCacheKey = input.allPicks.length;
+  }
+  const sgpValuesOpt = cachedSGPVectors.playerSGPs;
+
+  // Build opponent model
+  const opponentModelOpt = buildOpponentModel(
+    input.teamRosters,
+    input.allTeamBudgets,
+    activeSlotsOpt,
+    allPlayersOpt,
+    input.allPicks,
+    inflation.inflationFactor,
+  );
+
+  // Compute remaining roster slots by subtracting my drafted players' positions
+  const remainingSlotsOpt: Record<string, number> = { ...activeSlotsOpt };
+  for (const drafted of input.myRoster) {
+    const slotMap = new Map(Object.entries(remainingSlotsOpt).filter(([, v]) => v > 0));
+    const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
+    const slot = findBestSlotForPositions(positions, slotMap);
+    if (slot && remainingSlotsOpt[slot] > 0) {
+      remainingSlotsOpt[slot]--;
+    }
+  }
+  // Remove zero-count slots
+  for (const [slot, count] of Object.entries(remainingSlotsOpt)) {
+    if (count <= 0) delete remainingSlotsOpt[slot];
+  }
+
+  // Compute positional need from remaining slots (UTIL, P, BN excluded)
+  const needByPositionOpt: Record<string, number> = {};
+  for (const [slot, count] of Object.entries(remainingSlotsOpt)) {
+    if (slot === 'UTIL' || slot === 'P' || slot === 'BN') continue;
+    if (count > 0) {
+      needByPositionOpt[slot] = count;
+    }
+  }
+  // Expand combo slots: CI need applies to 1B and 3B, MI need applies to 2B and SS
+  if (needByPositionOpt['CI'] && needByPositionOpt['CI'] > 0) {
+    needByPositionOpt['1B'] = (needByPositionOpt['1B'] ?? 0) + needByPositionOpt['CI'];
+    needByPositionOpt['3B'] = (needByPositionOpt['3B'] ?? 0) + needByPositionOpt['CI'];
+  }
+  if (needByPositionOpt['MI'] && needByPositionOpt['MI'] > 0) {
+    needByPositionOpt['2B'] = (needByPositionOpt['2B'] ?? 0) + needByPositionOpt['MI'];
+    needByPositionOpt['SS'] = (needByPositionOpt['SS'] ?? 0) + needByPositionOpt['MI'];
+  }
+  delete needByPositionOpt['CI'];
+  delete needByPositionOpt['MI'];
+
+  // Extract weak categories for top-target boost
+  const weakCategoriesOpt = new Set(projectedStandings?.myWeakCategories ?? []);
+
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
     try {
-      optimization = computeRosterOptimization(input, inflation, projectedStandings, scarcity);
+      optimization = computeRosterOptimization(
+        input,
+        inflation,
+        projectedStandings,
+        scarcity,
+        allPlayersOpt,
+        sgpValuesOpt,
+        opponentModelOpt,
+        activeSlotsOpt,
+        remainingSlotsOpt,
+        needByPositionOpt,
+        weakCategoriesOpt,
+      );
     } catch (e) {
       console.warn("[DraftEngine] Roster optimization failed:", e);
+    }
+  }
+
+  // 7. Forward-looking draft simulation (Phase 28)
+  let simulation: ForwardSimulationSignal | null = null;
+  const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}`;
+
+  if (newSimCacheKey === simulationCacheKey && cachedSimulation !== null) {
+    simulation = cachedSimulation;
+  } else if (
+    optimization !== null &&
+    input.leagueCategories.length > 0 &&
+    input.teamRosters.size >= 3 &&
+    input.myTeamId != null
+  ) {
+    // Performance safeguard: skip simulation in early draft (< 10% picks made)
+    const totalPicksExpected = input.totalTeams * input.rosterSize;
+    const draftProgressFraction = totalPicksExpected > 0
+      ? input.allPicks.length / totalPicksExpected
+      : 0;
+
+    if (draftProgressFraction >= 0.1) {
+      try {
+        const simT0 = performance.now();
+
+        const simState = buildSimDraftState(
+          allPlayersOpt,
+          input,
+          opponentModelOpt,
+          activeSlotsOpt,
+          remainingSlotsOpt,
+          leagueAnalysis,
+        );
+
+        if (simState !== null) {
+          const SIMS_PER_DECISION = 200;
+          const TEMPERATURE = 1.0;
+
+          // Baseline win probability (no decision scenario)
+          const baselineSimResults: number[][] = [];
+          for (let s = 0; s < SIMS_PER_DECISION; s++) {
+            const completed = simulateFullDraft(
+              allPlayersOpt, sgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
+            );
+            baselineSimResults.push(
+              computeSimStandings(completed.teamStates, input.leagueCategories),
+            );
+          }
+          const winProbability = aggregateOutcomes(
+            simState.myTeamIndex, baselineSimResults, simState.teamStates.length,
+          );
+
+          // Decision comparison (bid vs pass) when a player is nominated
+          let currentDecision: DecisionComparison | null = null;
+          if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
+            const nominated = input.auctionValues.find(
+              av => av.playerId === input.currentAuctionPlayerId,
+            );
+            if (nominated) {
+              const nName = normalizeName(nominated.playerName ?? '');
+              const nomIdx = allPlayersOpt.findIndex(p => p.normalizedName === nName);
+              if (nomIdx >= 0) {
+                const candidateActions: CandidateAction[] = [
+                  { type: "bid", label: `Bid $${optimization.maxBid}`, playerIndex: nomIdx, bidPrice: optimization.maxBid },
+                  { type: "pass", label: "Pass", playerIndex: nomIdx },
+                ];
+                currentDecision = compareDecisions(
+                  candidateActions, simState, allPlayersOpt, sgpValuesOpt,
+                  input.leagueCategories, SIMS_PER_DECISION, TEMPERATURE,
+                );
+              }
+            }
+          }
+
+          // Nomination strategy
+          let nominationStrategy: ForwardSimulationSignal['nominationStrategy'] = null;
+          const myIdx = simState.myTeamIndex;
+          const oppStates = simState.teamStates.filter((_, i) => i !== myIdx);
+          if (oppStates.length > 0) {
+            const availableForNom = Array.from(simState.availableIndices)
+              .map(i => allPlayersOpt[i])
+              .filter((p): p is PoolPlayer => p !== undefined);
+            const availableSgps = Array.from(simState.availableIndices)
+              .map(i => sgpValuesOpt[i] ?? 0);
+            nominationStrategy = recommendNomination(
+              availableForNom, availableSgps,
+              simState.teamStates[myIdx], opponentModelOpt, oppStates, 5,
+            );
+          }
+
+          const simElapsed = performance.now() - simT0;
+
+          if (simElapsed > 800) {
+            console.warn(`[DraftEngine] Forward simulation took ${simElapsed.toFixed(1)}ms -- exceeds 800ms budget`);
+          }
+
+          simulation = {
+            currentDecision,
+            winProbability,
+            nominationStrategy,
+            computeTimeMs: Math.round(simElapsed * 10) / 10,
+          };
+        }
+
+        cachedSimulation = simulation;
+        simulationCacheKey = newSimCacheKey;
+      } catch (e) {
+        console.warn("[DraftEngine] Forward simulation failed:", e);
+      }
     }
   }
 
@@ -565,6 +793,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     optimization,
     leagueAnalysis,
     projectedStandings,
-    simulation: null,  // Phase 28 Plan 02 wires the forward-looking simulation signal
+    simulation,
   };
 }
