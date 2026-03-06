@@ -153,6 +153,66 @@ export function calculateAuctionValue(
 }
 
 /**
+ * Compare FanGraphs dollar value against ESPN ASV market price.
+ * Returns a colored indicator showing whether the market underprices or overprices the player.
+ *
+ * Positive pctDiff = FG values player MORE than ESPN (underpriced by market)
+ * Negative pctDiff = FG values player LESS than ESPN (overpriced by market)
+ */
+export function calculateFgVsMarket(
+  fgDollarValue: number,
+  espnAsv: number | null,
+): ValueIndicator | null {
+  if (
+    espnAsv === null ||
+    espnAsv === undefined ||
+    espnAsv === 0 ||
+    fgDollarValue === 0
+  ) {
+    return null;
+  }
+
+  const pctDiff = ((fgDollarValue - espnAsv) / espnAsv) * 100;
+
+  if (pctDiff >= 30) {
+    return {
+      value: pctDiff,
+      label: `FG $${fgDollarValue} \u2191`,
+      color: "green",
+      severity: "steal",
+    };
+  } else if (pctDiff >= 15) {
+    return {
+      value: pctDiff,
+      label: `FG $${fgDollarValue} \u2191`,
+      color: "green",
+      severity: "value",
+    };
+  } else if (pctDiff > -15) {
+    return {
+      value: pctDiff,
+      label: `FG $${fgDollarValue}`,
+      color: "yellow",
+      severity: "fair",
+    };
+  } else if (pctDiff > -30) {
+    return {
+      value: pctDiff,
+      label: `FG $${fgDollarValue} \u2193`,
+      color: "red",
+      severity: "reach",
+    };
+  } else {
+    return {
+      value: pctDiff,
+      label: `FG $${fgDollarValue} \u2193`,
+      color: "red",
+      severity: "overpay",
+    };
+  }
+}
+
+/**
  * Get Tailwind classes for value indicator color
  */
 export function getValueColorClasses(color: ValueIndicator["color"]): {
