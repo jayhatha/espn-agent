@@ -148,6 +148,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 26 P02 | 2 | 2 tasks | 2 files |
 | Phase 27-shopping-list-ui P01 | 1 | 2 tasks | 2 files |
 | Phase 28 P01 | 8 | 2 tasks | 6 files |
+| Phase 28 P02 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -340,6 +341,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 28]: Top-K=15 filter before softmax for O(n) simulation performance without quality loss
 - [Phase 28]: SimTeamState tracks both categoryTotals (counting) and componentTotals (rate) for complete standings computation
 - [Phase 28]: simulation: null placeholder in DraftEngineSignals return — Plan 02 wires actual compareDecisions computation
+- [Phase 28]: Hoisted player pool, SGP, opponent model out of computeRosterOptimization to share with simulation step (option a)
+- [Phase 28]: Skip forward simulation when draft progress < 10% complete — too many remaining picks makes it expensive with minimal signal quality
 
 ### Roadmap Evolution
 

@@ -471,7 +471,7 @@ Plans:
   6. Simulation results cached and invalidated on pick count + nomination change
   7. All simulation code is pure functions (no Zustand, no DOM) running under 1 second
   8. Rate stats in standings use component-based math via calculateFinalRate (never averaged)
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 28-01-PLAN.md — Core simulation engine: types, draft-simulator.ts with softmax selection and standings computation, decision-comparison.ts with bid vs pass evaluation (TDD)
@@ -510,4 +510,4 @@ Plans:
 | 25. Projected Standings Engine | v1.4 | 2/2 | Complete | 2026-03-05 |
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
 | 27. Shopping List UI | 1/1 | Complete    | 2026-03-06 | - |
-| 28. Forward-Looking Draft Simulation | 1/3 | In Progress|  | - |
+| 28. Forward-Looking Draft Simulation | 2/3 | In Progress|  | - |
