@@ -141,6 +141,7 @@ Stopped at: Completed 24-01-PLAN.md: optimization fields in NarratorPayload, nom
 | Phase quick-42 P01 | 2 | 2 tasks | 4 files |
 | Phase quick-43 P01 | 2 | 1 tasks | 1 files |
 | Phase quick-44 P01 | 2 | 1 tasks | 1 files |
+| Phase 25 P01 | 7 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -317,6 +318,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 24]: Nomination trigger fires first in useEffect priority order so every new player gets immediate narration regardless of alert state
 - [Phase 24]: buildDedupeKey includes player name and shouldBid to prevent deduplication suppressing nomination-triggered calls
 - [Phase quick-44]: Zustand persist hydration gate: always await persist.hasHydrated()/onFinishHydration() before first getState() in async content scripts
+- [Phase 25]: Median undrafted pool stats for replacement level — outlier-resistant filler prevents elite players skewing projections
+- [Phase 25]: teamDraftedTotals optional on LeagueAnalysisSignal — backwards-compatible, existing consumers unaffected
+- [Phase 25]: Minimum 3 teams guard in computeProjectedStandings — degenerate standings rankings require at least 3 data points
 
 ### Roadmap Evolution
 
