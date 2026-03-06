@@ -437,8 +437,9 @@ None yet.
 | 43 | Top targets positional need weighting — boost players at positions with empty roster slots (50% SGP boost per empty slot) | 2026-03-05 | be22ca7 | ✅ | [43-top-targets-should-weight-positional-nee](./quick/43-top-targets-should-weight-positional-nee/) |
 | 44 | Fix roster count not resetting on draft page reload — await Zustand persist hydration before initializeDraft | 2026-03-06 | 0a9dd98 | ✅ | [44-fix-roster-count-not-resetting-on-draft-](./quick/44-fix-roster-count-not-resetting-on-draft-/) |
 | 45 | Bug fixes: skip backend for practice drafts, normalize inflation, fix nominated player matching for max bid/narrator | 2026-03-06 | 782eefe | ✅ | [45-bug-fixes-remove-espn-league-connection-](./quick/45-bug-fixes-remove-espn-league-connection-/) |
+| 46 | Fix win probability showing 100%: add formula_id to default RATE categories, fix opponent budget fallback, add roto tie-handling | 2026-03-06 | 1996647 | ✅ | [46-fix-win-probability-showing-100-with-top](./quick/46-fix-win-probability-showing-100-with-top/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 45: bug fixes (practice draft, inflation, player matching)
+Last activity: 2026-03-06 - Completed quick task 46: fix win probability (formula_id, opponent budget, tie-handling)
 Resume file: None
