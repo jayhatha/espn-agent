@@ -399,7 +399,7 @@ Plans:
 
 **Goal:** Project full-season roto standings for all teams during a live auction draft using replacement-level filler for remaining roster slots, draft-progress confidence weighting, and weak-category boost for top-target recommendations — surfaced in the extension sidebar as a Projected Standings section
 **Depends on:** Phase 24
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 25-01-PLAN.md — Add projected standings types, refactor league-analysis.ts to expose teamDraftedTotals, create projected-standings.ts pure function module
