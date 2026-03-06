@@ -819,11 +819,11 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
           let draftTargets: DraftTargetRecommendation[] | null = null;
           try {
             const shoppingList = optimization?.shoppingList;
-            if (shoppingList != null && shoppingList.groups.length > 0) {
+            if (shoppingList != null && shoppingList.positionGroups.length > 0) {
               // Collect top candidate per position group (max 5)
               const candidates: Array<{ name: string; pos: string; idx: number; bid: number }> = [];
               const seen = new Set<number>();
-              for (const group of shoppingList.groups) {
+              for (const group of shoppingList.positionGroups) {
                 for (const target of group.targets) {
                   if (candidates.length >= 5) break;
                   // Find player index in allPlayersOpt
