@@ -10,7 +10,7 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
     return null;
   }
 
-  const { inflation, scarcity, optimization, leagueAnalysis } = engineSignals;
+  const { inflation, scarcity, optimization, leagueAnalysis, projectedStandings } = engineSignals;
 
   // Inflation color: green < 5%, neutral 5-15%, warning > 15%
   const inflationPct = inflation.percentOverMarket;
@@ -235,6 +235,124 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
                     — {rec}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Projected Standings section — collapsed by default, shown when >= 3 teams have data */}
+      {projectedStandings != null && projectedStandings.teamsWithData >= 3 && (
+        <details className="group">
+          <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
+            <div className="flex items-center gap-2">
+              <span className="text-body-sm font-semibold text-content">Projected Standings</span>
+              {projectedStandings.myTeamRank > 0 && (
+                <span className="font-display text-body-sm font-semibold text-accent">
+                  #{projectedStandings.myTeamRank}
+                </span>
+              )}
+              <span
+                className={`text-body-xs font-semibold px-1.5 py-0.5 rounded ${
+                  projectedStandings.draftProgressWeight >= 0.5
+                    ? "bg-positive-light text-positive"
+                    : "bg-warning-light text-warning"
+                }`}
+              >
+                {projectedStandings.draftProgressWeight >= 0.5
+                  ? "HIGH"
+                  : projectedStandings.draftProgressWeight >= 0.2
+                  ? "MED"
+                  : "LOW"}
+              </span>
+            </div>
+            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
+          </summary>
+          <div className="px-3 pb-3 pt-2 bg-surface">
+            {/* Standings table — all teams sorted by rank */}
+            <div className="space-y-1">
+              {projectedStandings.standings.map((team) => {
+                const isMyTeam = team.projectedOverallRank === projectedStandings.myTeamRank && projectedStandings.myTeamRank > 0;
+                return (
+                  <div
+                    key={team.teamId}
+                    className={`flex items-center justify-between text-body-xs ${
+                      isMyTeam ? "ring-1 ring-accent rounded px-1.5 py-1" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-display text-content font-semibold w-4 text-right">
+                        {team.projectedOverallRank}
+                      </span>
+                      <span className={`${isMyTeam ? "font-semibold text-content" : "text-content"}`}>
+                        {team.teamName.length > 15
+                          ? team.teamName.slice(0, 15) + "…"
+                          : team.teamName}
+                        {isMyTeam && (
+                          <span className="ml-1 text-accent font-normal">(you)</span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-content-secondary">
+                      {Math.round(team.projectedRotoPts)} pts
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* My category ranks — only shown when user's team is in standings */}
+            {projectedStandings.myTeamRank > 0 && (() => {
+              const myStanding = projectedStandings.standings.find(
+                s => s.projectedOverallRank === projectedStandings.myTeamRank,
+              );
+              if (!myStanding) return null;
+              const totalTeams = projectedStandings.totalTeamCount;
+              const categoryEntries = Object.entries(myStanding.categoryRanks);
+              if (categoryEntries.length === 0) return null;
+
+              return (
+                <div className="border-t border-surface-tertiary mt-2 pt-2">
+                  <div className="text-body-xs font-semibold text-content mb-1">My Category Ranks</div>
+                  <div className="space-y-1">
+                    {categoryEntries.map(([statKey, rank]) => {
+                      const isTop3 = rank <= 3;
+                      const isBottom3 = totalTeams >= 4 && rank >= totalTeams - 2;
+                      const rankColorClass = isTop3
+                        ? "text-positive"
+                        : isBottom3
+                        ? "text-negative"
+                        : "text-content-secondary";
+                      return (
+                        <div
+                          key={statKey}
+                          className="flex items-center justify-between text-body-xs"
+                        >
+                          <span className="text-content">{statKey}</span>
+                          <span className={`font-semibold ${rankColorClass}`}>
+                            {rank}/{totalTeams}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Weak/strong category summary */}
+            {(projectedStandings.myWeakCategories.length > 0 || projectedStandings.myStrongCategories.length > 0) && (
+              <div className="border-t border-surface-tertiary mt-2 pt-2 space-y-0.5">
+                {projectedStandings.myStrongCategories.length > 0 && (
+                  <div className="text-body-xs text-positive">
+                    Strong: {projectedStandings.myStrongCategories.join(", ")}
+                  </div>
+                )}
+                {projectedStandings.myWeakCategories.length > 0 && (
+                  <div className="text-body-xs text-negative">
+                    Weak: {projectedStandings.myWeakCategories.join(", ")}
+                  </div>
+                )}
               </div>
             )}
           </div>
