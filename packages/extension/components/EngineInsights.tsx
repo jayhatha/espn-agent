@@ -1,6 +1,5 @@
 import React from "react";
 import type { DraftEngineSignals } from "../lib/engine";
-import ShoppingList from "./ShoppingList";
 import IdealRosterPanel from "./IdealRosterPanel";
 
 interface EngineInsightsProps {
@@ -12,7 +11,7 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
     return null;
   }
 
-  const { optimization, leagueAnalysis, simulation, idealRoster } = engineSignals;
+  const { simulation, idealRoster } = engineSignals;
 
   return (
     <div className="border-b border-surface-tertiary">
@@ -133,102 +132,8 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
         </details>
       )}
 
-      {/* Shopping List section — replaces Top Targets */}
-      <ShoppingList shoppingList={optimization?.shoppingList ?? null} />
-
       {/* Ideal Roster section — greedy-optimal roster with tier badges */}
       <IdealRosterPanel idealRoster={idealRoster} />
-
-      {/* League Analysis section — collapsed by default */}
-      {leagueAnalysis != null && leagueAnalysis.teamsAnalyzed > 1 && (
-        <details className="group">
-          <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
-            <span className="text-body-sm font-semibold text-content">League Analysis</span>
-            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
-          </summary>
-          <div className="px-3 pb-3 pt-2 bg-surface">
-            {/* Category Rankings grid */}
-            <div className="space-y-1">
-              {leagueAnalysis.categoryRankings.map((ranking) => {
-                const isTop3 = ranking.myRank <= 3;
-                const isBottom3 = ranking.myRank >= ranking.totalTeams - 2 && ranking.totalTeams >= 4;
-                const rankColorClass = isTop3
-                  ? "text-positive"
-                  : isBottom3
-                  ? "text-negative"
-                  : "text-content-secondary";
-                // Precision: 0 decimals for counting stats, 3 for rate stats
-                const isRateStat = ["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"].includes(ranking.category);
-                const displayTotal = isRateStat
-                  ? ranking.myTotal.toFixed(3)
-                  : Math.round(ranking.myTotal).toString();
-
-                return (
-                  <div
-                    key={ranking.category}
-                    className="flex items-center justify-between text-body-xs"
-                  >
-                    <span className="text-content">{ranking.category}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-content-secondary">{displayTotal}</span>
-                      <span className={`font-semibold ${rankColorClass}`}>
-                        {ranking.myRank}/{ranking.totalTeams}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Market Demand subsection — only high/medium demand categories */}
-            {leagueAnalysis.categoryDemand.some(d => d.demandLevel === "high" || d.demandLevel === "medium") && (
-              <div className="border-t border-surface-tertiary mt-2 pt-2">
-                <div className="text-body-xs font-semibold text-content mb-1">Market Demand</div>
-                <div className="space-y-1">
-                  {leagueAnalysis.categoryDemand
-                    .filter(d => d.demandLevel === "high" || d.demandLevel === "medium")
-                    .map((demand) => {
-                      const totalTeamsForDemand = leagueAnalysis.teamsAnalyzed;
-                      return (
-                        <div
-                          key={demand.category}
-                          className="flex items-center justify-between text-body-xs"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-content">{demand.category}</span>
-                            <span
-                              className={`text-body-xs font-semibold px-1.5 py-0.5 rounded ${
-                                demand.demandLevel === "high"
-                                  ? "bg-negative-light text-negative"
-                                  : "bg-warning-light text-warning"
-                              }`}
-                            >
-                              {demand.demandLevel === "high" ? "HIGH" : "MED"}
-                            </span>
-                          </div>
-                          <span className="text-content-secondary">
-                            {demand.weakTeamCount} of {totalTeamsForDemand} weak
-                          </span>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-
-            {/* Strategic Recommendations */}
-            {leagueAnalysis.recommendations.length > 0 && (
-              <div className="border-t border-surface-tertiary mt-2 pt-2 space-y-1">
-                {leagueAnalysis.recommendations.map((rec, i) => (
-                  <div key={i} className="text-body-xs text-content-secondary">
-                    — {rec}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </details>
-      )}
 
       {/* Draft Targets section — simulation-ranked players to target next */}
       {simulation?.draftTargets != null && simulation.draftTargets.length > 0 && (

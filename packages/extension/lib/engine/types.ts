@@ -147,35 +147,6 @@ export interface RosterOptimizationSignal {
   simulationEV: number;
   simulationStdDev: number;
   computeTimeMs: number;
-  shoppingList: ShoppingListSignal | null;
-}
-
-export interface TeamCategoryRanking {
-  category: string;
-  myRank: number;          // 1-based rank among all teams (1 = best)
-  totalTeams: number;
-  myTotal: number;
-  leagueMedian: number;
-  direction: "HIGHER_BETTER" | "LOWER_BETTER";
-}
-
-export interface CategoryDemand {
-  category: string;
-  weakTeamCount: number;   // Teams below median (potential bidders)
-  strongTeamCount: number; // Teams above median (unlikely to bid heavily)
-  demandLevel: "high" | "medium" | "low";  // high = many weak teams = bidding wars expected
-}
-
-export interface LeagueAnalysisSignal {
-  categoryRankings: TeamCategoryRanking[];  // My rank per category vs field
-  categoryDemand: CategoryDemand[];         // Market demand per category
-  recommendations: string[];                // 2-3 strategic recommendations
-  teamsAnalyzed: number;                    // How many teams had enough data
-  computeTimeMs: number;
-  /** Exposed for projected-standings.ts — teamId -> stat_key -> total. Optional: existing consumers unaffected. */
-  teamDraftedTotals?: Map<string, Record<string, number>>;
-  /** Per-team summed components (H, AB, IP, ER, etc.) for rate stat recomposition in projected-standings. */
-  teamDraftedComponents?: Map<string, Record<string, number>>;
 }
 
 // ============================================================
@@ -211,7 +182,6 @@ export interface DraftEngineSignals {
   alerts: DraftAlert[];
   computeTimeMs: number;
   optimization: RosterOptimizationSignal | null;  // null when no nomination or insufficient data
-  leagueAnalysis: LeagueAnalysisSignal | null;
   projectedStandings: ProjectedStandingsSignal | null;
   simulation: ForwardSimulationSignal | null;  // null when insufficient data or too early
   idealRoster: IdealRosterSignal | null;        // null when leagueCategories empty, allPlayers empty, or computation fails
@@ -244,37 +214,6 @@ export interface TargetRecommendation {
   dollarValue: number;
   maxBid: number;
   expectedMarketPrice: number;
-}
-
-/** A single player target within a position group */
-export interface PositionTarget {
-  playerName: string;
-  normalizedName: string;
-  positions: string[];        // All eligible positions (e.g., ["1B", "3B"])
-  sgpValue: number;           // Raw SGP
-  adjustedSgp: number;        // SGP with positional need + weak category boosts
-  dollarValue: number;        // FanGraphs auction dollar value
-  maxBid: number;             // Estimated max bid (SGP-share heuristic, NOT binary search)
-  expectedMarketPrice: number;// Opponent model estimate
-  valueSurplus: number;       // maxBid - expectedMarketPrice
-  isPitcher: boolean;
-}
-
-/** A position group in the shopping list */
-export interface PositionGroup {
-  position: string;           // e.g., "SS", "OF", "SP"
-  priorityScore: number;      // Combined priority (0-1 scale, higher = more urgent)
-  unfilledSlots: number;      // How many slots at this position are unfilled
-  scarcityIndex: number;      // From EnhancedScarcitySignal (0 if not found)
-  budgetFit: number;          // Fraction of targets affordable (0-1)
-  targets: PositionTarget[];  // Top N players, sorted by adjustedSgp descending
-}
-
-/** The complete shopping list signal */
-export interface ShoppingListSignal {
-  positionGroups: PositionGroup[];  // Sorted by priorityScore descending
-  totalTargets: number;             // Sum of all targets across groups
-  computeTimeMs: number;
 }
 
 // ============================================================
