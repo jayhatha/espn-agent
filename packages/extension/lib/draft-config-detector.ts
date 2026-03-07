@@ -46,9 +46,8 @@ export function detectRosterSlotsFromPlayersTable(): {
     } else if (rawLabel === "1B/3B") {
       slotKey = "CI";
     } else if (rawLabel === "BE") {
-      // Bench — excluded from active roster slots
+      slotKey = "BN";
       benchCount++;
-      return;
     } else {
       slotKey = rawLabel;
     }
@@ -821,6 +820,6 @@ function getDefault5x5Roster(): Record<string, number> {
     "SP": 4,
     "RP": 2,
     "P": 2,
-    "BN": 3,
+    "BN": 5,
   };
 }

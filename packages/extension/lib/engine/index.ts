@@ -46,6 +46,7 @@ const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
   OF: 4,
   UTIL: 3,
   P: 9,
+  BN: 3,
 };
 
 // ============================================================
