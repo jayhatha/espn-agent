@@ -1,5 +1,4 @@
-import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal, ShoppingListSignal } from "./types";
-import { computeInflation } from "./inflation";
+import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal, ShoppingListSignal, InflationSignal, IdealRosterSignal, IdealRosterPlayer } from "./types";
 import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
@@ -25,7 +24,7 @@ import {
 } from "../fangraphs-data";
 import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison, DraftTargetRecommendation } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation, IdealRosterSignal, IdealRosterPlayer } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -91,6 +90,9 @@ let projectedStandingsCacheKey: number = -1;  // allPicks.length at last computa
 
 let cachedSimulation: ForwardSimulationSignal | null = null;
 let simulationCacheKey: string = '';  // allPicks.length + '_' + currentAuctionPlayerId
+
+let cachedIdealRoster: IdealRosterSignal | null = null;
+let idealRosterCacheKey: number = -1;  // allPicks.length at last computation
 
 // ============================================================
 // buildSimDraftState
@@ -222,6 +224,7 @@ function computeRosterOptimization(
   remainingSlots: Record<string, number>,
   needByPosition: Record<string, number>,
   weakCategories: Set<string>,
+  nameToExternalRank: Map<string, number>,
 ): RosterOptimizationSignal {
   const t0 = performance.now();
 
@@ -242,14 +245,6 @@ function computeRosterOptimization(
 
   const activeTotal = Object.values(activeSlots).reduce((s, v) => s + v, 0);
   const myBudget = input.remainingBudget;
-
-  // Build normalizedName → externalRank lookup from DraftRankings
-  const nameToExternalRank = new Map<string, number>();
-  for (const r of input.rankings) {
-    if (r.externalRank != null) {
-      nameToExternalRank.set(normalizeName(r.playerName), r.externalRank);
-    }
-  }
 
   // Build normalizedName → ASV lookup for market price override.
   // When ESPN ASV is available, use it directly as expected market price
@@ -484,6 +479,111 @@ function computeRosterOptimization(
 }
 
 // ============================================================
+// computeIdealRoster
+// ============================================================
+
+/**
+ * Classify a player's spend tier based on FanGraphs projected dollar value.
+ * anchor: > $20, core: $5-$20, value: < $5
+ */
+function classifyTier(dollars: number): "anchor" | "core" | "value" {
+  if (dollars > 20) return "anchor";
+  if (dollars >= 5) return "core";
+  return "value";
+}
+
+/**
+ * Compute the ideal roster for the current draft state.
+ *
+ * Uses rank-boosted SGP values (consistent with top targets and shopping list),
+ * locks already-drafted myRoster players, and classifies each selected player into
+ * anchor/core/value tiers. Budget is passed as remainingBudget + lockedTotalCost
+ * so the optimizer handles subtraction internally (no double-counting).
+ *
+ * Returns null when allPlayers is empty or leagueCategories is empty.
+ */
+function computeIdealRoster(
+  allPlayers: PoolPlayer[],
+  sgpValuesRaw: number[],
+  input: DraftEngineInput,
+  remainingSlots: Record<string, number>,
+  nameToExternalRank: Map<string, number>,
+): IdealRosterSignal | null {
+  if (allPlayers.length === 0 || input.leagueCategories.length === 0) {
+    return null;
+  }
+
+  const t0 = performance.now();
+
+  // Build rank-boosted SGP values for the optimizer
+  const adjustedSgpValues = allPlayers.map((player, i) => {
+    const rawSgp = sgpValuesRaw[i] ?? 0;
+    const extRank = nameToExternalRank.get(player.normalizedName);
+    const boost = computeExternalRankBoost(extRank);
+    return rawSgp * boost;
+  });
+
+  // Build locked players from input.myRoster
+  const lockedNames = new Set<string>();
+  const lockedPlayers: { player: PoolPlayer; cost: number }[] = [];
+  let lockedTotalCost = 0;
+
+  for (const drafted of input.myRoster) {
+    const draftedNorm = normalizeName(drafted.playerName);
+    const poolPlayer = allPlayers.find(p => p.normalizedName === draftedNorm);
+    if (poolPlayer) {
+      const cost = drafted.cost ?? 0;
+      lockedPlayers.push({ player: poolPlayer, cost });
+      lockedTotalCost += cost;
+      lockedNames.add(poolPlayer.normalizedName);
+    }
+  }
+
+  // Pass totalBudget = remainingBudget + lockedTotalCost so optimizer handles subtraction internally
+  // (per research Pitfall 3: avoids double-counting locked player costs)
+  const totalBudgetForOptimizer = input.remainingBudget + lockedTotalCost;
+
+  // Run greedy knapsack optimizer with rank-boosted SGP and locked players
+  const result = optimizeRoster(
+    allPlayers,
+    adjustedSgpValues,
+    totalBudgetForOptimizer,
+    remainingSlots,
+    lockedPlayers,
+  );
+
+  // Build IdealRosterPlayer[] from result.roster
+  const players: IdealRosterPlayer[] = result.roster.map(player => {
+    const poolIdx = allPlayers.indexOf(player);
+    const sgpValue = sgpValuesRaw[poolIdx] ?? 0;
+    return {
+      name: player.name,
+      positions: player.positions,
+      dollars: player.dollars,
+      tier: classifyTier(player.dollars),
+      isLocked: lockedNames.has(player.normalizedName),
+      sgpValue,
+    };
+  });
+
+  // Count tier members
+  const anchorCount = players.filter(p => p.tier === "anchor").length;
+  const coreCount = players.filter(p => p.tier === "core").length;
+  const valueCount = players.filter(p => p.tier === "value").length;
+
+  return {
+    players,
+    totalSGPValue: result.totalSGPValue,
+    budgetUsed: result.budgetUsed,
+    unfilledSlots: result.unfilledSlots,
+    anchorCount,
+    coreCount,
+    valueCount,
+    computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
+  };
+}
+
+// ============================================================
 // computeDraftEngine
 // ============================================================
 
@@ -493,14 +593,15 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // Build rankingsMap for O(1) lookups
   const rankingsMap = new Map(input.rankings.map(r => [r.playerId, r]));
 
-  // 1. Inflation model
-  const inflation = computeInflation(
-    input.allPicks,
-    input.auctionValues,
-    input.allTeamBudgets,
-    input.totalTeams,
-    input.remainingBudget,
-  );
+  // 1. Inflation model — disabled (neutral 1.0 factor), kept as placeholder for type compatibility
+  const inflation: InflationSignal = {
+    inflationFactor: 1.0,
+    rawInflationFactor: 1.0,
+    totalRemainingBudget: 0,
+    totalRemainingValue: 0,
+    confidence: "high",
+    percentOverMarket: 0,
+  };
 
   // 2. Enhanced scarcity model (uses external rankings + auction $ for tier drops)
   const scarcity = computeEnhancedScarcity(
@@ -546,7 +647,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   );
 
   // 5. Generate alerts from all signals
-  const alerts = generateAlerts(inflation, scarcity, categoryGaps, budgetCurve);
+  const alerts = generateAlerts(scarcity, categoryGaps, budgetCurve);
 
   // 5b. League-wide category analysis
   let leagueAnalysis: LeagueAnalysisSignal | null = null;
@@ -706,6 +807,16 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // Extract weak categories for top-target boost
   const weakCategoriesOpt = new Set(projectedStandings?.myWeakCategories ?? []);
 
+  // Build normalizedName → externalRank lookup from DraftRankings
+  // Hoisted to computeDraftEngine scope so it can be shared with both computeRosterOptimization
+  // and computeIdealRoster without duplication.
+  const nameToExternalRankOpt = new Map<string, number>();
+  for (const r of input.rankings) {
+    if (r.externalRank != null) {
+      nameToExternalRankOpt.set(normalizeName(r.playerName), r.externalRank);
+    }
+  }
+
   let optimization: RosterOptimizationSignal | null = null;
   if (input.leagueCategories.length > 0) {
     try {
@@ -721,6 +832,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         remainingSlotsOpt,
         needByPositionOpt,
         weakCategoriesOpt,
+        nameToExternalRankOpt,
       );
     } catch (e) {
       console.warn("[DraftEngine] Roster optimization failed:", e);
@@ -930,6 +1042,26 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     }
   }
 
+  // 6b. Ideal roster optimizer (Phase 29)
+  // Cache invalidates on allPicks.length — recomputes when a new pick is made.
+  let idealRoster: IdealRosterSignal | null = null;
+  if (idealRosterCacheKey !== input.allPicks.length || cachedIdealRoster === null) {
+    try {
+      cachedIdealRoster = computeIdealRoster(
+        allPlayersOpt,
+        sgpValuesOpt,
+        input,
+        remainingSlotsOpt,
+        nameToExternalRankOpt,
+      );
+      idealRosterCacheKey = input.allPicks.length;
+    } catch (e) {
+      console.warn("[DraftEngine] Ideal roster failed:", e);
+      cachedIdealRoster = null;
+    }
+  }
+  idealRoster = cachedIdealRoster;
+
   const elapsed = performance.now() - t0;
   if (elapsed > 300) {
     console.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
@@ -946,5 +1078,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     leagueAnalysis,
     projectedStandings,
     simulation,
+    idealRoster,
   };
 }
