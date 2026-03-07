@@ -125,7 +125,7 @@ function buildSimDraftState(
   teamDraftedComponents: Map<string, Record<string, number>> | null,
 ): SimDraftState | null {
   if (input.myTeamId == null || input.teamRosters.size < 3) {
-    console.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
+    if (import.meta.env.DEV) console.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
     return null;
   }
 
@@ -195,7 +195,7 @@ function buildSimDraftState(
   });
 
   if (myTeamIndex === -1) {
-    console.warn(`[DraftEngine] buildSimDraftState: myTeamId="${input.myTeamId}" not found in teamRosters keys: [${teamIds.join(', ')}]`);
+    if (import.meta.env.DEV) console.warn(`[DraftEngine] buildSimDraftState: myTeamId="${input.myTeamId}" not found in teamRosters keys: [${teamIds.join(', ')}]`);
     return null;
   }
 
@@ -713,6 +713,25 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     }
   }
 
+  // Build drafted name set and FG player pool ONCE — shared across projected standings and roster optimization
+  const draftedNormalizedNames = new Set<string>();
+  for (const pick of input.allPicks) {
+    draftedNormalizedNames.add(normalizeName(pick.playerName));
+  }
+  const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
+    fgLeaderboardHittersData,
+    fgLeaderboardPitchersData,
+    fgAuctionHittersData,
+    fgAuctionPitchersData,
+    draftedNormalizedNames,
+  );
+  const undraftedPlayers: PoolPlayer[] = [...undraftedHitters, ...undraftedPitchers];
+
+  // Top 200 for roster optimization (sort by dollar value)
+  const allPlayersOpt: PoolPlayer[] = [...undraftedPlayers]
+    .sort((a, b) => b.dollars - a.dollars)
+    .slice(0, 200);
+
   // 5c. Projected standings engine
   let projectedStandings: ProjectedStandingsSignal | null = null;
   if (
@@ -723,20 +742,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     try {
       // Cache: only recompute when pick count changes
       if (projectedStandingsCacheKey !== input.allPicks.length || cachedProjectedStandings === null) {
-        // Build undrafted player pool for replacement-level stats
-        const draftedNormalizedNames = new Set<string>();
-        for (const pick of input.allPicks) {
-          draftedNormalizedNames.add(normalizeName(pick.playerName));
-        }
-        const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
-          fgLeaderboardHittersData,
-          fgLeaderboardPitchersData,
-          fgAuctionHittersData,
-          fgAuctionPitchersData,
-          draftedNormalizedNames,
-        );
-        const undraftedPlayers: PoolPlayer[] = [...undraftedHitters, ...undraftedPitchers];
-
         cachedProjectedStandings = computeProjectedStandings(
           teamDraftedTotals,
           input.teamRosters,
@@ -752,34 +757,14 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
       }
       projectedStandings = cachedProjectedStandings;
     } catch (e) {
-      console.warn("[DraftEngine] Projected standings failed:", e);
+      if (import.meta.env.DEV) console.warn("[DraftEngine] Projected standings failed:", e);
     }
   }
 
   // 6. Roster optimization (SGP-based max bid, Monte Carlo, opponent model)
   // Build shared player pool, SGP vectors, and opponent model (hoisted from computeRosterOptimization
   // so Step 7 simulation can access the same data without recomputation).
-
-  // Build drafted name set from ALL picks
-  const draftedNormalizedNamesOpt = new Set<string>();
-  for (const pick of input.allPicks) {
-    draftedNormalizedNamesOpt.add(normalizeName(pick.playerName));
-  }
-
-  // Build FG player pool (undrafted hitters + pitchers)
-  const { undraftedHitters, undraftedPitchers } = buildFgPlayerPool(
-    fgLeaderboardHittersData,
-    fgLeaderboardPitchersData,
-    fgAuctionHittersData,
-    fgAuctionPitchersData,
-    draftedNormalizedNamesOpt,
-  );
-
-  // Combine and cap at top 200 by dollar value
-  const allPlayersOpt: PoolPlayer[] = [
-    ...undraftedHitters,
-    ...undraftedPitchers,
-  ].sort((a, b) => b.dollars - a.dollars).slice(0, 200);
+  // allPlayersOpt already built above (shared with projected standings).
 
   // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
   const activeSlotsOpt = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
@@ -787,7 +772,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // Warn if rosterSize differs from active slot total
   const activeTotalOpt = Object.values(activeSlotsOpt).reduce((s, v) => s + v, 0);
   if (input.rosterSize !== activeTotalOpt) {
-    console.warn(
+    if (import.meta.env.DEV) console.warn(
       `[DraftEngine] rosterSize=${input.rosterSize} differs from active slot total=${activeTotalOpt}. ` +
       `Using ${input.rosterSlots ? "detected" : "default"} roster slots.`,
     );
@@ -892,7 +877,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         nameToExternalRankOpt,
       );
     } catch (e) {
-      console.warn("[DraftEngine] Roster optimization failed:", e);
+      if (import.meta.env.DEV) console.warn("[DraftEngine] Roster optimization failed:", e);
     }
   }
 
@@ -908,7 +893,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     input.teamRosters.size < 3 ||
     input.myTeamId == null
   ) {
-    console.warn(
+    if (import.meta.env.DEV) console.warn(
       `[DraftEngine] Simulation skipped: optimization=${optimization != null}, categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
     );
   } else {
@@ -918,7 +903,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
       ? input.allPicks.length / totalPicksExpected
       : 0;
 
-    console.warn(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
+    if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
 
     if (draftProgressFraction >= 0.05) {
       try {
@@ -935,10 +920,10 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         );
 
         if (simState === null) {
-          console.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
+          if (import.meta.env.DEV) console.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
         } else {
-          console.warn(`[DraftEngine] Simulation starting: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
-          const SIMS_PER_DECISION = 200;
+          if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation starting: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
+          const SIMS_PER_DECISION = 50;
           const TEMPERATURE = 1.0;
 
           // Baseline win probability (no decision scenario)
@@ -956,9 +941,9 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
             winProbability = aggregateOutcomes(
               simState.myTeamIndex, baselineSimResults, simState.teamStates.length,
             );
-            console.warn(`[DraftEngine] Baseline sim done: expectedFinish=${winProbability.expectedFinish.toFixed(1)}, winProb=${(winProbability.winProbability*100).toFixed(0)}%`);
+            if (import.meta.env.DEV) console.log(`[DraftEngine] Baseline sim done: expectedFinish=${winProbability.expectedFinish.toFixed(1)}, winProb=${(winProbability.winProbability*100).toFixed(0)}%`);
           } catch (e) {
-            console.warn('[DraftEngine] Baseline simulation crashed:', e);
+            if (import.meta.env.DEV) console.warn('[DraftEngine] Baseline simulation crashed:', e);
           }
 
           // Decision comparison (bid vs pass) when a player is nominated
@@ -995,7 +980,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
               }
             }
           } catch (e) {
-            console.warn('[DraftEngine] Decision comparison crashed:', e);
+            if (import.meta.env.DEV) console.warn('[DraftEngine] Decision comparison crashed:', e);
           }
 
           // Nomination strategy
@@ -1015,7 +1000,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
               );
             }
           } catch (e) {
-            console.warn('[DraftEngine] Nomination strategy crashed:', e);
+            if (import.meta.env.DEV) console.warn('[DraftEngine] Nomination strategy crashed:', e);
           }
 
           // Draft Targets — simulate top-SGP players to rank by win probability
@@ -1045,7 +1030,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
                 bidPrice: c.bid,
               }));
 
-              const SIMS_PER_TARGET = 100;
+              const SIMS_PER_TARGET = 50;
               const targetComparison = compareDecisions(
                 targetActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
                 input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
@@ -1064,13 +1049,13 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
                 .sort((a, b) => b.winProbability - a.winProbability);
             }
           } catch (e) {
-            console.warn('[DraftEngine] Draft targets crashed:', e);
+            if (import.meta.env.DEV) console.warn('[DraftEngine] Draft targets crashed:', e);
           }
 
           const simElapsed = performance.now() - simT0;
 
           if (simElapsed > 800) {
-            console.warn(`[DraftEngine] Forward simulation took ${simElapsed.toFixed(1)}ms -- exceeds 800ms budget`);
+            if (import.meta.env.DEV) console.warn(`[DraftEngine] Forward simulation took ${simElapsed.toFixed(1)}ms -- exceeds 800ms budget`);
           }
 
           simulation = {
@@ -1085,7 +1070,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         cachedSimulation = simulation;
         simulationCacheKey = newSimCacheKey;
       } catch (e) {
-        console.warn("[DraftEngine] Forward simulation failed:", e);
+        if (import.meta.env.DEV) console.warn("[DraftEngine] Forward simulation failed:", e);
       }
     }
   }
@@ -1106,7 +1091,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
       );
       idealRosterCacheKey = newIdealRosterCacheKey;
     } catch (e) {
-      console.warn("[DraftEngine] Ideal roster failed:", e);
+      if (import.meta.env.DEV) console.warn("[DraftEngine] Ideal roster failed:", e);
       cachedIdealRoster = null;
     }
   }
@@ -1114,7 +1099,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
 
   const elapsed = performance.now() - t0;
   if (elapsed > 300) {
-    console.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
+    if (import.meta.env.DEV) console.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
   }
 
   return {

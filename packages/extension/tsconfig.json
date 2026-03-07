@@ -14,8 +14,9 @@
     "jsx": "react-jsx",
     "outDir": "./dist",
     "rootDir": ".",
+    "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", ".wxt/types/globals.d.ts"],
   "exclude": ["node_modules", "dist", ".output"]
 }
