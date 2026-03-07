@@ -455,8 +455,9 @@ None yet.
 | 48 | Fix team count detection — update totalTeams from pick train budget polling instead of one-shot page load | 2026-03-06 | 6310fa7 | ✅ | [48-fix-team-count-detection-from-pick-train](./quick/48-fix-team-count-detection-from-pick-train/) |
 | 49 | Parse roster size from ESPN Position Tracker DOM to fix rosterSize mismatch warning | 2026-03-06 | fc241ce | ✅ | [49-parse-roster-size-from-espn-position-tra](./quick/49-parse-roster-size-from-espn-position-tra/) |
 | 51 | Incorporate external rankings strongly into draft targets math (rank boost multiplier) | 2026-03-06 | 1c1884d | ✅ | [51-incorporate-external-rankings-into-draft-targets](./quick/51-incorporate-external-rankings-into-draft-targets/) |
+| 52 | Add pitcher/hitter percentage weight slider for ideal roster and bid recommendations | 2026-03-07 | 9c5f618 | ✅ | [52-add-pitcher-hitter-percentage-weight-sli](./quick/52-add-pitcher-hitter-percentage-weight-sli/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 51: external rank boost in draft targets
+Last activity: 2026-03-07 - Completed quick task 52: pitcher/hitter split slider
 Resume file: None
