@@ -207,6 +207,7 @@ export interface DraftEngineSignals {
   leagueAnalysis: LeagueAnalysisSignal | null;
   projectedStandings: ProjectedStandingsSignal | null;
   simulation: ForwardSimulationSignal | null;  // null when insufficient data or too early
+  idealRoster: IdealRosterSignal | null;        // null when leagueCategories empty, allPlayers empty, or computation fails
 }
 
 // ============================================================
@@ -266,6 +267,38 @@ export interface PositionGroup {
 export interface ShoppingListSignal {
   positionGroups: PositionGroup[];  // Sorted by priorityScore descending
   totalTargets: number;             // Sum of all targets across groups
+  computeTimeMs: number;
+}
+
+// ============================================================
+// Phase 29: Ideal Roster Optimizer types
+// ============================================================
+
+/**
+ * A single player in the ideal roster output.
+ * Combines optimizer-selected pool player with tier classification and lock status.
+ */
+export interface IdealRosterPlayer {
+  name: string;
+  positions: string[];              // All eligible positions from FG auction data
+  dollars: number;                  // FanGraphs projected auction value (used for tier classification)
+  tier: "anchor" | "core" | "value"; // Spend tier classification based on dollar value
+  isLocked: boolean;                // true if player is already drafted (from myRoster)
+  sgpValue: number;                 // Raw SGP contribution
+}
+
+/**
+ * Full ideal roster signal: best possible roster given remaining budget, slots, and player pool.
+ * Uses rank-boosted SGP values consistent with top targets and shopping list.
+ */
+export interface IdealRosterSignal {
+  players: IdealRosterPlayer[];     // Full ideal roster (locked + optimally selected)
+  totalSGPValue: number;            // Total SGP value from optimizer result
+  budgetUsed: number;               // Total budget used from optimizer result
+  unfilledSlots: number;            // Unfilled roster slots from optimizer result
+  anchorCount: number;              // Count of players with dollars > 20
+  coreCount: number;                // Count of players with dollars >= 5 and <= 20
+  valueCount: number;               // Count of players with dollars < 5
   computeTimeMs: number;
 }
 
