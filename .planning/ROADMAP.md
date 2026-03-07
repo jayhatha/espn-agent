@@ -511,7 +511,7 @@ Plans:
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
 | 27. Shopping List UI | 1/1 | Complete    | 2026-03-06 | - |
 | 28. Forward-Looking Draft Simulation | 3/3 | Complete    | 2026-03-06 | - |
-| 29. Ideal Roster Optimizer | 2/2 | Complete   | 2026-03-07 | - |
+| 29. Ideal Roster Optimizer | 2/2 | Complete    | 2026-03-07 | - |
 
 ### Phase 29: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
 
