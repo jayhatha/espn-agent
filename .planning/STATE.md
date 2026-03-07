@@ -154,6 +154,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase quick-46 PP01 | 2 | 2 tasks | 3 files |
 | Phase quick-47 PP01 | 2min | 2 tasks | 4 files |
 | Phase 29 P01 | 3 | 2 tasks | 2 files |
+| Phase 29 P02 | 1 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -362,6 +363,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 29]: totalBudget = remainingBudget + lockedTotalCost passed to optimizeRoster in computeIdealRoster — optimizer subtracts locked costs internally, no double-counting (per research Pitfall 3)
 - [Phase 29]: Ideal roster cache keyed on allPicks.length (not nomination) — ideal roster only changes when a pick is made, not when nomination changes
 - [Phase 29]: Tier thresholds: anchor >20 dollars, core 5-20 dollars, value <5 dollars — per plan locked decisions for IdealRosterPlayer classification
+- [Phase 29]: IdealRosterPanel placed between Shopping List and League Analysis for natural action-to-analysis flow
+- [Phase 29]: Tier badges use design token classes (bg-warning-light/text-warning for anchor, bg-info-light/text-info for core) matching existing sidebar pattern
+- [Phase 29]: Locked players shown with text-content-secondary dimming plus bullet marker — visually distinct without strikethrough
 
 ### Roadmap Evolution
 
