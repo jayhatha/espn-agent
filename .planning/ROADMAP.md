@@ -529,3 +529,12 @@ Plans:
 Plans:
 - [ ] 29-01-PLAN.md — Add IdealRosterPlayer/IdealRosterSignal types, computeIdealRoster function with rank-boosted SGP, locked player handling, and cache
 - [ ] 29-02-PLAN.md — Create IdealRosterPanel UI component, wire into EngineInsights between Shopping List and League Analysis
+
+### Phase 30: Extension is kind of locking up. Let's do a perf and code quality audit.
+
+**Goal:** [To be planned]
+**Depends on:** Phase 29
+**Plans:** 1/2 plans executed
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 30 to break down)

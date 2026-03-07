@@ -156,6 +156,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 29 P01 | 3 | 2 tasks | 2 files |
 | Phase 29 P02 | 1 | 1 tasks | 2 files |
 | Phase 52 P01 | 8 | 2 tasks | 5 files |
+| Phase 30-extension-perf-audit P01 | 5 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -367,6 +368,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 29]: IdealRosterPanel placed between Shopping List and League Analysis for natural action-to-analysis flow
 - [Phase 29]: Tier badges use design token classes (bg-warning-light/text-warning for anchor, bg-info-light/text-info for core) matching existing sidebar pattern
 - [Phase 29]: Locked players shown with text-content-secondary dimming plus bullet marker — visually distinct without strikethrough
+- [Phase 30-extension-perf-audit]: Remove shopping list and league analysis entirely to reduce computation cost during live drafts; extract team stat aggregation inline with module-level FG projection map caching
 
 ### Roadmap Evolution
 
@@ -390,6 +392,7 @@ Recent decisions affecting v1.1 work:
 - Phase 27 added: Shopping List UI — collapsible position groups replacing Top Targets section in EngineInsights (v2.0)
 - Phase 28 added: Forward-looking draft simulation — full draft completion Monte Carlo with standings-based decision comparison, nomination strategy, and win probability
 - Phase 29 added: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
+- Phase 30 added: Extension perf and code quality audit — extension is locking up, investigate performance issues and code quality
 
 ### Pending Todos
 
