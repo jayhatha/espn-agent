@@ -1,6 +1,7 @@
 import React from "react";
 import type { DraftEngineSignals } from "../lib/engine";
 import ShoppingList from "./ShoppingList";
+import IdealRosterPanel from "./IdealRosterPanel";
 
 interface EngineInsightsProps {
   engineSignals: DraftEngineSignals | null;
@@ -11,48 +12,10 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
     return null;
   }
 
-  const { inflation, optimization, leagueAnalysis, projectedStandings, simulation } = engineSignals;
-
-  // Inflation color: green < 5%, neutral 5-15%, warning > 15%
-  const inflationPct = inflation.percentOverMarket;
-  const inflationColorClass =
-    Math.abs(inflationPct) < 5
-      ? "text-positive"
-      : Math.abs(inflationPct) < 15
-      ? "text-content"
-      : "text-warning";
-
-  const inflationSign = inflationPct >= 0 ? "+" : "";
+  const { optimization, leagueAnalysis, simulation, idealRoster } = engineSignals;
 
   return (
     <div className="border-b border-surface-tertiary">
-      {/* Inflation section */}
-      <details open className="group">
-        <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none">
-          <span className="text-body-sm font-semibold text-content">Inflation</span>
-          <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
-        </summary>
-        <div className="px-3 pb-3 pt-2 bg-surface">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className={`text-h2 font-display ${inflationColorClass}`}>
-              {inflationSign}{Math.round(inflationPct)}%
-            </span>
-            <span
-              className={`text-body-xs font-semibold px-1.5 py-0.5 rounded ${
-                inflation.confidence === "high"
-                  ? "bg-positive-light text-positive"
-                  : "bg-warning-light text-warning"
-              }`}
-            >
-              {inflation.confidence.toUpperCase()}
-            </span>
-          </div>
-          <div className="text-body-xs text-content-secondary">
-            League budget remaining: ${Math.round(inflation.totalRemainingBudget)}
-          </div>
-        </div>
-      </details>
-
       {/* Win Probability section — shown when simulation has baseline data */}
       {simulation?.winProbability != null && (
         <details open className="group">
@@ -173,6 +136,9 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
       {/* Shopping List section — replaces Top Targets */}
       <ShoppingList shoppingList={optimization?.shoppingList ?? null} />
 
+      {/* Ideal Roster section — greedy-optimal roster with tier badges */}
+      <IdealRosterPanel idealRoster={idealRoster} />
+
       {/* League Analysis section — collapsed by default */}
       {leagueAnalysis != null && leagueAnalysis.teamsAnalyzed > 1 && (
         <details className="group">
@@ -264,134 +230,54 @@ export default function EngineInsights({ engineSignals }: EngineInsightsProps) {
         </details>
       )}
 
-      {/* Projected Standings section — collapsed by default, shown when >= 3 teams have data */}
-      {projectedStandings != null && projectedStandings.teamsWithData >= 3 && (
-        <details className="group">
+      {/* Draft Targets section — simulation-ranked players to target next */}
+      {simulation?.draftTargets != null && simulation.draftTargets.length > 0 && (
+        <details open className="group">
           <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
-            <div className="flex items-center gap-2">
-              <span className="text-body-sm font-semibold text-content">Projected Standings</span>
-              {projectedStandings.myTeamRank > 0 && (
-                <span className="font-display text-body-sm font-semibold text-accent">
-                  #{projectedStandings.myTeamRank}
-                </span>
-              )}
-              <span
-                className={`text-body-xs font-semibold px-1.5 py-0.5 rounded ${
-                  projectedStandings.draftProgressWeight >= 0.5
-                    ? "bg-positive-light text-positive"
-                    : "bg-warning-light text-warning"
-                }`}
-              >
-                {projectedStandings.draftProgressWeight >= 0.5
-                  ? "HIGH"
-                  : projectedStandings.draftProgressWeight >= 0.2
-                  ? "MED"
-                  : "LOW"}
-              </span>
-            </div>
-            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">▾</span>
+            <span className="text-body-sm font-semibold text-content">Draft Targets</span>
+            <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform">&#9662;</span>
           </summary>
           <div className="px-3 pb-3 pt-2 bg-surface">
-            {/* Standings table — all teams sorted by rank */}
-            <div className="space-y-1">
-              {projectedStandings.standings.map((team) => {
-                const isMyTeam = team.projectedOverallRank === projectedStandings.myTeamRank && projectedStandings.myTeamRank > 0;
+            <div className="text-body-xs text-content-secondary mb-2">
+              Players ranked by simulated win probability impact
+            </div>
+            <div className="space-y-1.5">
+              {simulation.draftTargets.map((target, i) => {
+                const isTop = i === 0;
                 return (
                   <div
-                    key={team.teamId}
-                    className={`flex items-center justify-between text-body-xs ${
-                      isMyTeam ? "ring-1 ring-accent rounded px-1.5 py-1" : ""
+                    key={`target-${i}`}
+                    className={`flex items-center justify-between text-body-xs rounded px-1.5 py-1 ${
+                      isTop ? "ring-1 ring-accent bg-surface-secondary" : ""
                     }`}
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-display text-content font-semibold w-4 text-right">
-                        {team.projectedOverallRank}
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      {isTop && (
+                        <span className="text-accent font-semibold text-body-xs">&#10003;</span>
+                      )}
+                      <div className="min-w-0">
+                        <div className={`truncate ${isTop ? "font-semibold text-content" : "text-content"}`}>
+                          {target.playerName}
+                        </div>
+                        <div className="text-content-secondary">{target.position} &middot; ${target.bidPrice}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end flex-shrink-0 ml-2">
+                      <span className="font-semibold text-content">
+                        {Math.round(target.winProbability * 100)}% win
                       </span>
-                      <span className={`${isMyTeam ? "font-semibold text-content" : "text-content"}`}>
-                        {team.teamName.length > 15
-                          ? team.teamName.slice(0, 15) + "…"
-                          : team.teamName}
-                        {isMyTeam && (
-                          <span className="ml-1 text-accent font-normal">(you)</span>
-                        )}
+                      <span className="text-content-secondary">
+                        #{target.expectedFinish.toFixed(1)}
                       </span>
                     </div>
-                    <span className="text-content-secondary">
-                      {Math.round(team.projectedRotoPts)} pts
-                    </span>
                   </div>
                 );
               })}
             </div>
-
-            {/* My category ranks with projected values — only shown when user's team is in standings */}
-            {projectedStandings.myTeamRank > 0 && (() => {
-              const myStanding = projectedStandings.standings.find(
-                s => s.projectedOverallRank === projectedStandings.myTeamRank,
-              );
-              if (!myStanding) return null;
-              const totalTeams = projectedStandings.totalTeamCount;
-              const categoryEntries = Object.entries(myStanding.categoryRanks);
-              if (categoryEntries.length === 0) return null;
-
-              const RATE_STATS = new Set(["AVG", "OBP", "SLG", "OPS", "ERA", "WHIP"]);
-
-              return (
-                <div className="border-t border-surface-tertiary mt-2 pt-2">
-                  <div className="text-body-xs font-semibold text-content mb-1">My Projected Categories</div>
-                  <div className="space-y-1">
-                    {categoryEntries.map(([statKey, rank]) => {
-                      const isTop3 = rank <= 3;
-                      const isBottom3 = totalTeams >= 4 && rank >= totalTeams - 2;
-                      const rankColorClass = isTop3
-                        ? "text-positive"
-                        : isBottom3
-                        ? "text-negative"
-                        : "text-content-secondary";
-                      const value = myStanding.categoryValues?.[statKey];
-                      const isRate = RATE_STATS.has(statKey);
-                      const displayValue = value != null
-                        ? isRate ? value.toFixed(3) : Math.round(value).toString()
-                        : "—";
-
-                      return (
-                        <div
-                          key={statKey}
-                          className="flex items-center justify-between text-body-xs"
-                        >
-                          <span className="text-content">{statKey}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-content-secondary">{displayValue}</span>
-                            <span className={`font-semibold ${rankColorClass}`}>
-                              {rank}/{totalTeams}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Weak/strong category summary */}
-            {(projectedStandings.myWeakCategories.length > 0 || projectedStandings.myStrongCategories.length > 0) && (
-              <div className="border-t border-surface-tertiary mt-2 pt-2 space-y-0.5">
-                {projectedStandings.myStrongCategories.length > 0 && (
-                  <div className="text-body-xs text-positive">
-                    Strong: {projectedStandings.myStrongCategories.join(", ")}
-                  </div>
-                )}
-                {projectedStandings.myWeakCategories.length > 0 && (
-                  <div className="text-body-xs text-negative">
-                    Weak: {projectedStandings.myWeakCategories.join(", ")}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </details>
       )}
+
       {/* Nomination Strategy section — collapsed by default */}
       {simulation?.nominationStrategy != null && simulation.nominationStrategy.length > 0 && (
         <details className="group">
