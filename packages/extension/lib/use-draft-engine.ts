@@ -20,6 +20,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     espnDomAuctionValues,
     draftFormat,
     detectedRosterSlots,
+    pitcherHitterSplit,
   } = useDraftStore();
 
   // Extract playerId and playerName separately — only changes on new nominations (not bid updates)
@@ -47,6 +48,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       currentAuctionPlayerId: currentPlayerId,
       currentAuctionPlayerName: currentPlayerName,
       espnDomAuctionValues,
+      pitcherHitterSplit,
     });
   }, [
     rankings,
@@ -65,5 +67,6 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     currentPlayerName, // Name-based fallback for nominated player matching
     espnDomAuctionValues,
     detectedRosterSlots, // Recompute when roster slots are detected for the first time
+    pitcherHitterSplit, // Recompute when pitcher/hitter split preference changes
   ]);
 }

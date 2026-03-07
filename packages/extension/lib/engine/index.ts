@@ -94,7 +94,7 @@ let cachedSimulation: ForwardSimulationSignal | null = null;
 let simulationCacheKey: string = '';  // allPicks.length + '_' + currentAuctionPlayerId
 
 let cachedIdealRoster: IdealRosterSignal | null = null;
-let idealRosterCacheKey: number = -1;  // allPicks.length at last computation
+let idealRosterCacheKey: string = '';  // allPicks.length + '_' + splitValue
 
 // ============================================================
 // buildSimDraftState
@@ -262,9 +262,9 @@ function computeRosterOptimization(
   }
 
   // ----------------------------------------------------------------
-  // Bid cache: rebuild only when nomination OR pick count changes
+  // Bid cache: rebuild only when nomination OR pick count OR split changes
   // ----------------------------------------------------------------
-  const newBidCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}`;
+  const newBidCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}_${input.pitcherHitterSplit ?? 65}`;
 
   let maxBidResult: ReturnType<typeof computeMaxBid> | null = null;
   let monteCarloResult: ReturnType<typeof runMonteCarlo> | null = null;
@@ -778,6 +778,17 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   }
   const sgpValuesOpt = cachedSGPVectors.playerSGPs;
 
+  // Apply pitcher/hitter split weighting to create adjusted SGP values.
+  // The base sgpValuesOpt is preserved (cache-safe); adjustedSgpValuesOpt is
+  // used for all downstream optimizer and simulation calls.
+  const splitValue = input.pitcherHitterSplit ?? 65;
+  const hitterMultiplier = splitValue / 50;           // 65 → 1.3, 50 → 1.0, 20 → 0.4
+  const pitcherMultiplier = (100 - splitValue) / 50;  // 65 → 0.7, 50 → 1.0, 80 → 0.4
+  const adjustedSgpValuesOpt = sgpValuesOpt.map((sgp, i) => {
+    const multiplier = allPlayersOpt[i].isPitcher ? pitcherMultiplier : hitterMultiplier;
+    return sgp * multiplier;
+  });
+
   // Build opponent model
   const opponentModelOpt = buildOpponentModel(
     input.teamRosters,
@@ -845,7 +856,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         projectedStandings,
         scarcity,
         allPlayersOpt,
-        sgpValuesOpt,
+        adjustedSgpValuesOpt,
         opponentModelOpt,
         activeSlotsOpt,
         remainingSlotsOpt,
@@ -860,7 +871,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
 
   // 7. Forward-looking draft simulation (Phase 28)
   let simulation: ForwardSimulationSignal | null = null;
-  const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}`;
+  const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}_${splitValue}`;
 
   if (newSimCacheKey === simulationCacheKey && cachedSimulation !== null) {
     simulation = cachedSimulation;
@@ -908,7 +919,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
             const baselineSimResults: number[][] = [];
             for (let s = 0; s < SIMS_PER_DECISION; s++) {
               const completed = simulateFullDraft(
-                allPlayersOpt, sgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
+                allPlayersOpt, adjustedSgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
               );
               baselineSimResults.push(
                 computeSimStandings(completed.teamStates, input.leagueCategories),
@@ -950,7 +961,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
                     { type: "pass", label: "Pass", playerIndex: nomIdx },
                   ];
                   currentDecision = compareDecisions(
-                    candidateActions, simState, allPlayersOpt, sgpValuesOpt,
+                    candidateActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
                     input.leagueCategories, SIMS_PER_DECISION, TEMPERATURE,
                   );
               }
@@ -969,7 +980,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
                 .map(i => allPlayersOpt[i])
                 .filter((p): p is PoolPlayer => p !== undefined);
               const availableSgps = Array.from(simState.availableIndices)
-                .map(i => sgpValuesOpt[i] ?? 0);
+                .map(i => adjustedSgpValuesOpt[i] ?? 0);
               nominationStrategy = recommendNomination(
                 availableForNom, availableSgps,
                 simState.teamStates[myIdx], opponentModelOpt, oppStates, 5,
@@ -1017,7 +1028,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
 
                 const SIMS_PER_TARGET = 100;
                 const targetComparison = compareDecisions(
-                  targetActions, simState, allPlayersOpt, sgpValuesOpt,
+                  targetActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
                   input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
                 );
 
@@ -1062,19 +1073,20 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   }
 
   // 6b. Ideal roster optimizer (Phase 29)
-  // Cache invalidates on allPicks.length — recomputes when a new pick is made.
+  // Cache invalidates on allPicks.length or split change — recomputes when a new pick is made or split changes.
+  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}`;
   let idealRoster: IdealRosterSignal | null = null;
-  if (idealRosterCacheKey !== input.allPicks.length || cachedIdealRoster === null) {
+  if (idealRosterCacheKey !== newIdealRosterCacheKey || cachedIdealRoster === null) {
     try {
       cachedIdealRoster = computeIdealRoster(
         allPlayersOpt,
-        sgpValuesOpt,
+        adjustedSgpValuesOpt,
         input,
         activeSlotsOpt,
         remainingSlotsOpt,
         nameToExternalRankOpt,
       );
-      idealRosterCacheKey = input.allPicks.length;
+      idealRosterCacheKey = newIdealRosterCacheKey;
     } catch (e) {
       console.warn("[DraftEngine] Ideal roster failed:", e);
       cachedIdealRoster = null;

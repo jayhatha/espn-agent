@@ -103,6 +103,12 @@ export interface DraftEngineInput {
   currentAuctionPlayerId?: number;
   currentAuctionPlayerName?: string;
   espnDomAuctionValues?: Record<number, number>;
+  /**
+   * Budget allocation preference: 0-100 where value = % allocated to hitting.
+   * Default 65. Applied as SGP multiplier: hitters get split/50, pitchers get (100-split)/50.
+   * At 50/50 both get 1.0x; at 65/35 hitters get 1.3x and pitchers get 0.7x.
+   */
+  pitcherHitterSplit?: number;
 }
 
 export interface CategoryCeiling {

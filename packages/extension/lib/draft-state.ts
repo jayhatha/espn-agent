@@ -63,6 +63,10 @@ interface DraftState {
     playerId?: number;
   } | null;
 
+  // Pitcher/hitter budget allocation preference (0-100, default 65 = 65% hitting)
+  // Applied as SGP multiplier: hitters get split/50, pitchers get (100-split)/50.
+  pitcherHitterSplit: number;
+
   // ESPN DOM-scraped auction values (playerId -> dollar value)
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
@@ -117,6 +121,7 @@ interface DraftState {
   setAllTeamBudgets: (budgets: Array<{ teamName: string; remainingBudget: number }>) => void;
   setLeagueCategories: (categories: Category[]) => void;
   setDetectedRosterSlots: (slots: Record<string, number>) => void;
+  setPitcherHitterSplit: (split: number) => void;
   reset: () => void;
 }
 
@@ -139,6 +144,7 @@ export const useDraftStore = create<DraftState>()(
       userRankingOverrides: {},
       teamRosters: new Map(),
       currentAuctionPlayer: null,
+      pitcherHitterSplit: 65,
       espnDomAuctionValues: {},
       allTeamBudgets: [],
       leagueCategories: [],
@@ -166,6 +172,9 @@ export const useDraftStore = create<DraftState>()(
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           currentAuctionPlayer: null,
+          // Clear projections — will be recomputed from fresh state
+          projectedStandings: null,
+          userRankingOverrides: {},
         });
       },
 
@@ -285,6 +294,8 @@ export const useDraftStore = create<DraftState>()(
 
       setDetectedRosterSlots: (slots) => set({ detectedRosterSlots: slots }),
 
+      setPitcherHitterSplit: (split) => set({ pitcherHitterSplit: Math.max(0, Math.min(100, split)) }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -348,6 +359,7 @@ export const useDraftStore = create<DraftState>()(
         userRankingOverrides: state.userRankingOverrides,
         selectedPosition: state.selectedPosition,
         showOnlyNeeds: state.showOnlyNeeds,
+        pitcherHitterSplit: state.pitcherHitterSplit,
         teamRosters: Array.from(state.teamRosters.entries()), // Serialize Map to array
         // ESPN DOM-scraped values (accumulated across page sessions)
         espnDomAuctionValues: state.espnDomAuctionValues,
