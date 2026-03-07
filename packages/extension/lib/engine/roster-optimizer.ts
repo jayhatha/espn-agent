@@ -20,7 +20,7 @@ import type { PoolPlayer, RosterOptimizationResult } from "./types";
  * then flex slots. This ensures a catcher fills C before UTIL.
  */
 const SLOT_PRIORITY: string[] = [
-  "C", "SS", "2B", "3B", "1B", "OF", "CI", "MI", "UTIL", "P", "BN",
+  "C", "SS", "2B", "3B", "1B", "OF", "SP", "RP", "DH", "CI", "MI", "UTIL", "P", "BN",
 ];
 
 /**
@@ -30,6 +30,7 @@ const SLOT_PRIORITY: string[] = [
 const FLEX_ELIGIBILITY: Record<string, string[]> = {
   CI: ["1B", "3B"],
   MI: ["2B", "SS"],
+  DH: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
   UTIL: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
   BN: ["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP", "P"],
   P: ["SP", "RP"],
@@ -175,6 +176,9 @@ export function optimizeRoster(
   const totalSlots = Array.from(remainingSlots.values()).reduce((s, v) => s + v, 0);
   let slotsToFill = totalSlots;
 
+  // Track slot assignments for budget upgrade pass
+  const greedyEntries: { player: PoolPlayer; sgp: number; slot: string }[] = [];
+
   for (const { player, sgp } of indexed) {
     if (slotsToFill === 0) break;
 
@@ -198,10 +202,64 @@ export function optimizeRoster(
     }
 
     roster.push(player);
+    greedyEntries.push({ player, sgp, slot });
     totalSGPValue += sgp;
     budgetUsed += player.dollars;
     remainingBudget -= player.dollars;
     slotsToFill--;
+  }
+
+  // ------------------------------------------------------------------
+  // Phase 4: Budget upgrade pass
+  // ------------------------------------------------------------------
+  // Greedy efficiency fill picks cheap high-SGP/$ players, leaving budget
+  // unspent. Upgrade cheapest picks to more expensive alternatives with
+  // higher raw SGP when budget allows.
+  if (slotsToFill === 0 && remainingBudget > 1) {
+    const usedPlayers = new Set(roster);
+
+    // Upgrade cheapest players first
+    greedyEntries.sort((a, b) => a.player.dollars - b.player.dollars);
+
+    for (const entry of greedyEntries) {
+      if (remainingBudget < 2) break;
+
+      const maxCost = entry.player.dollars + remainingBudget;
+      let bestUpgrade: { player: PoolPlayer; sgp: number } | null = null;
+
+      for (const cand of indexed) {
+        if (usedPlayers.has(cand.player)) continue;
+        if (cand.player.dollars <= entry.player.dollars) continue;
+        if (cand.player.dollars > maxCost) continue;
+        if (cand.sgp <= entry.sgp) continue;
+
+        // Candidate must fit the same slot the current player occupies
+        const normPos = cand.player.positions.map(normalizePosition);
+        const fits = DEDICATED_SLOTS.has(entry.slot)
+          ? normPos.includes(entry.slot)
+          : (FLEX_ELIGIBILITY[entry.slot]?.some(p => normPos.includes(p)) ?? false);
+        if (!fits) continue;
+
+        if (!bestUpgrade || cand.sgp > bestUpgrade.sgp) {
+          bestUpgrade = { player: cand.player, sgp: cand.sgp };
+        }
+      }
+
+      if (bestUpgrade) {
+        const costDiff = bestUpgrade.player.dollars - entry.player.dollars;
+        const rosterIdx = roster.indexOf(entry.player);
+        if (rosterIdx >= 0) roster[rosterIdx] = bestUpgrade.player;
+
+        usedPlayers.delete(entry.player);
+        usedPlayers.add(bestUpgrade.player);
+        totalSGPValue += (bestUpgrade.sgp - entry.sgp);
+        budgetUsed += costDiff;
+        remainingBudget -= costDiff;
+
+        entry.player = bestUpgrade.player;
+        entry.sgp = bestUpgrade.sgp;
+      }
+    }
   }
 
   // Count unfilled slots

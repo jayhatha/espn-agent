@@ -276,14 +276,13 @@ export interface ShoppingListSignal {
 
 /**
  * A single player in the ideal roster output.
- * Combines optimizer-selected pool player with tier classification and lock status.
+ * Combines optimizer-selected pool player with tier classification.
  */
 export interface IdealRosterPlayer {
   name: string;
   positions: string[];              // All eligible positions from FG auction data
   dollars: number;                  // FanGraphs projected auction value (used for tier classification)
   tier: "anchor" | "core" | "value"; // Spend tier classification based on dollar value
-  isLocked: boolean;                // true if player is already drafted (from myRoster)
   sgpValue: number;                 // Raw SGP contribution
 }
 
@@ -292,7 +291,7 @@ export interface IdealRosterPlayer {
  * Uses rank-boosted SGP values consistent with top targets and shopping list.
  */
 export interface IdealRosterSignal {
-  players: IdealRosterPlayer[];     // Full ideal roster (locked + optimally selected)
+  players: IdealRosterPlayer[];     // Optimally selected roster from available pool
   totalSGPValue: number;            // Total SGP value from optimizer result
   budgetUsed: number;               // Total budget used from optimizer result
   unfilledSlots: number;            // Unfilled roster slots from optimizer result

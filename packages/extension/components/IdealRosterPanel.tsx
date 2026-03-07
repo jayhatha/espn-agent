@@ -48,10 +48,6 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
                 ? "bg-info-light text-info"
                 : "bg-surface-tertiary text-content-secondary";
 
-            const nameClass = player.isLocked
-              ? "text-content-secondary"
-              : "font-semibold text-content";
-
             return (
               <div
                 key={`${player.name}-${i}`}
@@ -63,11 +59,8 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
                   >
                     {player.tier}
                   </span>
-                  <span className={`truncate ${nameClass}`}>
+                  <span className="truncate font-semibold text-content">
                     {player.name}
-                    {player.isLocked && (
-                      <span className="text-content-secondary font-normal ml-1">&#8226;</span>
-                    )}
                   </span>
                 </div>
                 <span className="text-content-secondary flex-shrink-0">${Math.round(player.dollars)}</span>

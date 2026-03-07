@@ -53,9 +53,10 @@ const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
 // ============================================================
 
 /** Same priority as roster-optimizer: dedicated first, then flex */
-const SLOT_ORDER = ["C", "SS", "2B", "3B", "1B", "OF", "CI", "MI", "UTIL", "P", "BN"];
+const SLOT_ORDER = ["C", "SS", "2B", "3B", "1B", "OF", "SP", "RP", "DH", "CI", "MI", "UTIL", "P", "BN"];
 const FLEX_MAP: Record<string, string[]> = {
   CI: ["1B", "3B"], MI: ["2B", "SS"],
+  DH: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
   UTIL: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
   P: ["SP", "RP"], BN: ["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"],
 };
@@ -495,10 +496,10 @@ function classifyTier(dollars: number): "anchor" | "core" | "value" {
 /**
  * Compute the ideal roster for the current draft state.
  *
- * Uses rank-boosted SGP values (consistent with top targets and shopping list),
- * locks already-drafted myRoster players, and classifies each selected player into
- * anchor/core/value tiers. Budget is passed as remainingBudget + lockedTotalCost
- * so the optimizer handles subtraction internally (no double-counting).
+ * Uses rank-boosted SGP values (consistent with top targets and shopping list).
+ * allPlayers is the undrafted pool and remainingSlots already accounts for drafted
+ * players, so no locked player logic needed — just fill remaining slots with
+ * remaining budget.
  *
  * Returns null when allPlayers is empty or leagueCategories is empty.
  */
@@ -523,33 +524,15 @@ function computeIdealRoster(
     return rawSgp * boost;
   });
 
-  // Build locked players from input.myRoster
-  const lockedNames = new Set<string>();
-  const lockedPlayers: { player: PoolPlayer; cost: number }[] = [];
-  let lockedTotalCost = 0;
-
-  for (const drafted of input.myRoster) {
-    const draftedNorm = normalizeName(drafted.playerName);
-    const poolPlayer = allPlayers.find(p => p.normalizedName === draftedNorm);
-    if (poolPlayer) {
-      const cost = drafted.cost ?? 0;
-      lockedPlayers.push({ player: poolPlayer, cost });
-      lockedTotalCost += cost;
-      lockedNames.add(poolPlayer.normalizedName);
-    }
-  }
-
-  // Pass totalBudget = remainingBudget + lockedTotalCost so optimizer handles subtraction internally
-  // (per research Pitfall 3: avoids double-counting locked player costs)
-  const totalBudgetForOptimizer = input.remainingBudget + lockedTotalCost;
-
-  // Run greedy knapsack optimizer with rank-boosted SGP and locked players
+  // allPlayers is already the undrafted pool (drafted players filtered out).
+  // remainingSlots already accounts for myRoster (positions subtracted).
+  // remainingBudget already accounts for myRoster spend.
+  // So just call optimizeRoster directly with remaining budget and slots.
   const result = optimizeRoster(
     allPlayers,
     adjustedSgpValues,
-    totalBudgetForOptimizer,
+    input.remainingBudget,
     remainingSlots,
-    lockedPlayers,
   );
 
   // Build IdealRosterPlayer[] from result.roster
@@ -561,7 +544,6 @@ function computeIdealRoster(
       positions: player.positions,
       dollars: player.dollars,
       tier: classifyTier(player.dollars),
-      isLocked: lockedNames.has(player.normalizedName),
       sgpValue,
     };
   });
