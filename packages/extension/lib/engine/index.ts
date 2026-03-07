@@ -587,13 +587,10 @@ function computeIdealRoster(
   const coreCount = optimizerPlayers.filter(p => p.tier === "core").length;
   const valueCount = optimizerPlayers.filter(p => p.tier === "value").length;
 
-  // Budget used = drafted spend + optimizer spend
-  const draftedSpend = input.myRoster.reduce((s, d) => s + (d.cost ?? 0), 0);
-
   return {
     players,
     totalSGPValue: result.totalSGPValue,
-    budgetUsed: draftedSpend + result.budgetUsed,
+    budgetUsed: result.budgetUsed,
     unfilledSlots: result.unfilledSlots,
     anchorCount,
     coreCount,

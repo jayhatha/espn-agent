@@ -84,7 +84,7 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
 
         {/* Total SGP + budget summary */}
         <div className="text-body-xs text-content-secondary mt-2 border-t border-surface-tertiary pt-2">
-          {totalSGPValue.toFixed(1)} projected SGP &middot; ${Math.round(budgetUsed)} budget used
+          {totalSGPValue.toFixed(1)} projected SGP &middot; ${Math.round(budgetUsed)} remaining to spend
         </div>
       </div>
     </details>
