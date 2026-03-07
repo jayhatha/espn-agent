@@ -280,9 +280,13 @@ export const useDraftStore = create<DraftState>()(
       setCurrentAuctionPlayer: (player) => set({ currentAuctionPlayer: player }),
 
       setEspnDomAuctionValues: (values) =>
-        set((state) => ({
-          espnDomAuctionValues: { ...state.espnDomAuctionValues, ...values },
-        })),
+        set((state) => {
+          const hasChanges = Object.entries(values).some(
+            ([id, val]) => state.espnDomAuctionValues[Number(id)] !== val
+          );
+          if (!hasChanges) return state;
+          return { espnDomAuctionValues: { ...state.espnDomAuctionValues, ...values } };
+        }),
 
       setMyTeamId: (teamId) => set({ myTeamId: teamId }),
 

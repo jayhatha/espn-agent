@@ -600,10 +600,10 @@ export default defineContentScript({
       }
     });
 
-    if (document.documentElement) {
-      sidebarMountObserver.observe(document.documentElement, {
+    if (document.body) {
+      sidebarMountObserver.observe(document.body, {
         childList: true,
-        subtree: true,
+        subtree: false,  // sidebar root is a direct body child
       });
     }
 

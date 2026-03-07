@@ -30,12 +30,13 @@ export default function AuctionRecommendations() {
     return calculateBudgetPacing(260, myRoster, rosterSize);
   }, [myRoster, rosterSize]);
 
-  // Filter out already-drafted players
-  const draftedPlayerIds = new Set(allPicks.map((p) => p.playerId));
-  const draftedPlayerNames = new Set(
-    allPicks.map((p) => normalizePlayerName(p.playerName)),
-  );
+  // Filter out already-drafted players — Sets are inside useMemo so they're only
+  // rebuilt when allPicks changes, not on every render caused by espnDomAuctionValues updates.
   const availablePlayers = useMemo(() => {
+    const draftedPlayerIds = new Set(allPicks.map((p) => p.playerId));
+    const draftedPlayerNames = new Set(
+      allPicks.map((p) => normalizePlayerName(p.playerName)),
+    );
     return auctionValues.filter((player) => {
       if (draftedPlayerIds.has(player.playerId)) {
         return false;
