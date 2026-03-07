@@ -16,6 +16,7 @@ import { computeShoppingList } from "./shopping-list";
 import { simulateFullDraft, computeSimStandings } from "./draft-simulator";
 import { compareDecisions, aggregateOutcomes } from "./decision-comparison";
 import { recommendNomination } from "./nomination-strategy";
+import { computeExternalRankBoost } from "./rank-boost";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
@@ -242,6 +243,14 @@ function computeRosterOptimization(
   const activeTotal = Object.values(activeSlots).reduce((s, v) => s + v, 0);
   const myBudget = input.remainingBudget;
 
+  // Build normalizedName → externalRank lookup from DraftRankings
+  const nameToExternalRank = new Map<string, number>();
+  for (const r of input.rankings) {
+    if (r.externalRank != null) {
+      nameToExternalRank.set(normalizeName(r.playerName), r.externalRank);
+    }
+  }
+
   // Build normalizedName → ASV lookup for market price override.
   // When ESPN ASV is available, use it directly as expected market price
   // instead of the SGP-based estimateMarketPrice() computation.
@@ -369,7 +378,10 @@ function computeRosterOptimization(
       }
       weakBoost = Math.min(weakBoost, 2.0);
     }
-    const adjustedSgp = positionalAdjustedSgp * weakBoost;
+    // External rank boost: up to 1.6x for top-ranked, 0.7x penalty for unranked
+    const extRank = nameToExternalRank.get(p.normalizedName);
+    const rankBoost = computeExternalRankBoost(extRank);
+    const adjustedSgp = positionalAdjustedSgp * weakBoost * rankBoost;
     return { player: p, sgp, adjustedSgp, index: i };
   });
   const hitterPool = indexedAll.filter(e => !e.player.isPitcher).sort((a, b) => b.adjustedSgp - a.adjustedSgp);
@@ -444,6 +456,7 @@ function computeRosterOptimization(
       weakCategories,
       topN: 3,
       nameToAsv,
+      nameToExternalRank,
     });
     const slElapsed = performance.now() - slT0;
     if (slElapsed > 10) {

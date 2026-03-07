@@ -19,6 +19,7 @@ import type {
   PositionTarget,
 } from "./types";
 import { estimateMarketPrice, computePositionCompetition } from "./opponent-model";
+import { computeExternalRankBoost } from "./rank-boost";
 
 // ============================================================
 // computePositionPriority
@@ -106,6 +107,8 @@ export function computeShoppingList(params: {
   topN?: number;
   /** ESPN ASV lookup by normalizedName — used directly as expected market price when available */
   nameToAsv?: Map<string, number>;
+  /** External expert ranking by normalizedName — boosts highly-ranked players, penalizes unranked */
+  nameToExternalRank?: Map<string, number>;
 }): ShoppingListSignal {
   const t0 = performance.now();
 
@@ -211,7 +214,10 @@ export function computeShoppingList(params: {
       const unfilledSlots = needByPosition[pos] ?? 0;
       const positionalAdjustedSgp = sgp * (1 + unfilledSlots * 0.5);
 
-      const adjustedSgp = positionalAdjustedSgp * weakBoost;
+      // External rank boost: up to 1.6x for top-ranked, 0.7x penalty for unranked
+      const extRank = params.nameToExternalRank?.get(player.normalizedName);
+      const rankBoost = computeExternalRankBoost(extRank);
+      const adjustedSgp = positionalAdjustedSgp * weakBoost * rankBoost;
 
       positionCandidates.get(pos)!.push({ player, sgp, adjustedSgp, index: i });
     }
