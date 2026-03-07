@@ -30,6 +30,7 @@ export interface SGPVectors {
 /** Result from the greedy knapsack roster optimizer */
 export interface RosterOptimizationResult {
   roster: PoolPlayer[];
+  slotAssignments: string[];      // Parallel to roster — which slot each player fills
   totalSGPValue: number;
   budgetUsed: number;
   unfilledSlots: number;
@@ -276,7 +277,7 @@ export interface ShoppingListSignal {
 
 /**
  * A single player in the ideal roster output.
- * Combines optimizer-selected pool player with tier classification.
+ * Combines optimizer-selected pool player with tier classification and slot assignment.
  */
 export interface IdealRosterPlayer {
   name: string;
@@ -284,6 +285,8 @@ export interface IdealRosterPlayer {
   dollars: number;                  // FanGraphs projected auction value (used for tier classification)
   tier: "anchor" | "core" | "value"; // Spend tier classification based on dollar value
   sgpValue: number;                 // Raw SGP contribution
+  slot: string;                     // Assigned roster slot (C, 1B, OF, BN, etc.)
+  isDrafted: boolean;               // true if already on myRoster
 }
 
 /**

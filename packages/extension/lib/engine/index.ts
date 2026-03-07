@@ -497,10 +497,9 @@ function classifyTier(dollars: number): "anchor" | "core" | "value" {
 /**
  * Compute the ideal roster for the current draft state.
  *
- * Uses rank-boosted SGP values (consistent with top targets and shopping list).
- * allPlayers is the undrafted pool and remainingSlots already accounts for drafted
- * players, so no locked player logic needed — just fill remaining slots with
- * remaining budget.
+ * Combines already-drafted players (myRoster) with optimizer picks for remaining
+ * slots. Each player is assigned a roster slot and sorted by SLOT_ORDER so the
+ * UI shows a roster-position-ordered list.
  *
  * Returns null when allPlayers is empty or leagueCategories is empty.
  */
@@ -508,6 +507,7 @@ function computeIdealRoster(
   allPlayers: PoolPlayer[],
   sgpValuesRaw: number[],
   input: DraftEngineInput,
+  activeSlots: Record<string, number>,
   remainingSlots: Record<string, number>,
   nameToExternalRank: Map<string, number>,
 ): IdealRosterSignal | null {
@@ -525,10 +525,7 @@ function computeIdealRoster(
     return rawSgp * boost;
   });
 
-  // allPlayers is already the undrafted pool (drafted players filtered out).
-  // remainingSlots already accounts for myRoster (positions subtracted).
-  // remainingBudget already accounts for myRoster spend.
-  // So just call optimizeRoster directly with remaining budget and slots.
+  // Optimizer fills remaining slots with remaining budget
   const result = optimizeRoster(
     allPlayers,
     adjustedSgpValues,
@@ -536,8 +533,34 @@ function computeIdealRoster(
     remainingSlots,
   );
 
-  // Build IdealRosterPlayer[] from result.roster
-  const players: IdealRosterPlayer[] = result.roster.map(player => {
+  // Assign drafted players to slots using same priority logic
+  const draftedSlotMap = new Map<string, number>();
+  for (const [slot, count] of Object.entries(activeSlots)) {
+    if (count > 0) draftedSlotMap.set(slot, count);
+  }
+
+  const draftedPlayers: IdealRosterPlayer[] = [];
+  for (const drafted of input.myRoster) {
+    const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
+    const slot = findBestSlotForPositions(positions, draftedSlotMap);
+    if (slot) {
+      const c = draftedSlotMap.get(slot)!;
+      if (c > 1) draftedSlotMap.set(slot, c - 1);
+      else draftedSlotMap.delete(slot);
+    }
+    draftedPlayers.push({
+      name: drafted.playerName,
+      positions: drafted.positions,
+      dollars: drafted.cost ?? 0,
+      tier: classifyTier(drafted.cost ?? 0),
+      sgpValue: 0,
+      slot: slot ?? "BN",
+      isDrafted: true,
+    });
+  }
+
+  // Build optimizer picks with their slot assignments
+  const optimizerPlayers: IdealRosterPlayer[] = result.roster.map((player, i) => {
     const poolIdx = allPlayers.indexOf(player);
     const sgpValue = sgpValuesRaw[poolIdx] ?? 0;
     return {
@@ -546,18 +569,31 @@ function computeIdealRoster(
       dollars: player.dollars,
       tier: classifyTier(player.dollars),
       sgpValue,
+      slot: result.slotAssignments[i] ?? "BN",
+      isDrafted: false,
     };
   });
 
-  // Count tier members
-  const anchorCount = players.filter(p => p.tier === "anchor").length;
-  const coreCount = players.filter(p => p.tier === "core").length;
-  const valueCount = players.filter(p => p.tier === "value").length;
+  // Combine and sort by SLOT_ORDER
+  const players = [...draftedPlayers, ...optimizerPlayers];
+  const slotIndex = (slot: string) => {
+    const idx = SLOT_ORDER.indexOf(slot);
+    return idx >= 0 ? idx : SLOT_ORDER.length;
+  };
+  players.sort((a, b) => slotIndex(a.slot) - slotIndex(b.slot));
+
+  // Count tier members (optimizer picks only — drafted players are already committed)
+  const anchorCount = optimizerPlayers.filter(p => p.tier === "anchor").length;
+  const coreCount = optimizerPlayers.filter(p => p.tier === "core").length;
+  const valueCount = optimizerPlayers.filter(p => p.tier === "value").length;
+
+  // Budget used = drafted spend + optimizer spend
+  const draftedSpend = input.myRoster.reduce((s, d) => s + (d.cost ?? 0), 0);
 
   return {
     players,
     totalSGPValue: result.totalSGPValue,
-    budgetUsed: result.budgetUsed,
+    budgetUsed: draftedSpend + result.budgetUsed,
     unfilledSlots: result.unfilledSlots,
     anchorCount,
     coreCount,
@@ -1034,6 +1070,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         allPlayersOpt,
         sgpValuesOpt,
         input,
+        activeSlotsOpt,
         remainingSlotsOpt,
         nameToExternalRankOpt,
       );

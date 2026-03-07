@@ -130,6 +130,7 @@ export function optimizeRoster(
   }
 
   const roster: PoolPlayer[] = [];
+  const slotAssignments: string[] = [];
   let totalSGPValue = 0;
   let budgetUsed = 0;
 
@@ -148,9 +149,8 @@ export function optimizeRoster(
         }
       }
       roster.push(player);
+      slotAssignments.push(slot ?? "BN");
       budgetUsed += cost;
-      // SGP for locked players is 0 unless caller passes it via a different mechanism
-      // (locked players are pre-assigned; their SGP is tracked externally)
     }
   }
 
@@ -177,7 +177,7 @@ export function optimizeRoster(
   let slotsToFill = totalSlots;
 
   // Track slot assignments for budget upgrade pass
-  const greedyEntries: { player: PoolPlayer; sgp: number; slot: string }[] = [];
+  const greedyEntries: { player: PoolPlayer; sgp: number; slot: string; rosterIdx: number }[] = [];
 
   for (const { player, sgp } of indexed) {
     if (slotsToFill === 0) break;
@@ -202,7 +202,8 @@ export function optimizeRoster(
     }
 
     roster.push(player);
-    greedyEntries.push({ player, sgp, slot });
+    slotAssignments.push(slot);
+    greedyEntries.push({ player, sgp, slot, rosterIdx: roster.length - 1 });
     totalSGPValue += sgp;
     budgetUsed += player.dollars;
     remainingBudget -= player.dollars;
@@ -247,8 +248,7 @@ export function optimizeRoster(
 
       if (bestUpgrade) {
         const costDiff = bestUpgrade.player.dollars - entry.player.dollars;
-        const rosterIdx = roster.indexOf(entry.player);
-        if (rosterIdx >= 0) roster[rosterIdx] = bestUpgrade.player;
+        roster[entry.rosterIdx] = bestUpgrade.player;
 
         usedPlayers.delete(entry.player);
         usedPlayers.add(bestUpgrade.player);
@@ -267,6 +267,7 @@ export function optimizeRoster(
 
   return {
     roster,
+    slotAssignments,
     totalSGPValue,
     budgetUsed,
     unfilledSlots,
