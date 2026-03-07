@@ -153,6 +153,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase quick-45 P01 | 3 | 2 tasks | 5 files |
 | Phase quick-46 PP01 | 2 | 2 tasks | 3 files |
 | Phase quick-47 PP01 | 2min | 2 tasks | 4 files |
+| Phase 29 P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -357,6 +358,10 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-46]: Budget estimation derives initial budget from user remainingBudget+mySpent then subtracts opponent known spend from allPicks
 - [Phase quick-46]: Standard roto tie-handling: tied teams share averaged points across tied positions instead of arbitrary sort-order assignment
 - [Phase quick-47]: ESPN ASV shown as primary dollar number; FG value demoted to colored comparison badge with graceful FG label fallback
+- [Phase 29]: nameToExternalRank hoisted to computeDraftEngine scope and passed as parameter to computeRosterOptimization — eliminates duplicate Map build, shares single source with computeIdealRoster
+- [Phase 29]: totalBudget = remainingBudget + lockedTotalCost passed to optimizeRoster in computeIdealRoster — optimizer subtracts locked costs internally, no double-counting (per research Pitfall 3)
+- [Phase 29]: Ideal roster cache keyed on allPicks.length (not nomination) — ideal roster only changes when a pick is made, not when nomination changes
+- [Phase 29]: Tier thresholds: anchor >20 dollars, core 5-20 dollars, value <5 dollars — per plan locked decisions for IdealRosterPlayer classification
 
 ### Roadmap Evolution
 
@@ -379,6 +384,7 @@ Recent decisions affecting v1.1 work:
 - Phase 26 added: Per-Position Target Engine — per-position top N targets with combined priority scoring (scarcity + slots + budget fit), dynamic updates, multi-position eligibility (v2.0)
 - Phase 27 added: Shopping List UI — collapsible position groups replacing Top Targets section in EngineInsights (v2.0)
 - Phase 28 added: Forward-looking draft simulation — full draft completion Monte Carlo with standings-based decision comparison, nomination strategy, and win probability
+- Phase 29 added: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
 
 ### Pending Todos
 
@@ -442,8 +448,10 @@ None yet.
 | 46 | Fix win probability showing 100%: add formula_id to default RATE categories, fix opponent budget fallback, add roto tie-handling | 2026-03-06 | 1996647 | ✅ | [46-fix-win-probability-showing-100-with-top](./quick/46-fix-win-probability-showing-100-with-top/) |
 | 47 | Use ESPN ASV as market value (primary display), FanGraphs as over/under comparison badge | 2026-03-06 | de20c00 | ✅ | [47-use-espn-asv-as-market-value-fangraphs-as-over-under](./quick/47-use-espn-asv-as-market-value-fangraphs-as-over-under/) |
 | 48 | Fix team count detection — update totalTeams from pick train budget polling instead of one-shot page load | 2026-03-06 | 6310fa7 | ✅ | [48-fix-team-count-detection-from-pick-train](./quick/48-fix-team-count-detection-from-pick-train/) |
+| 49 | Parse roster size from ESPN Position Tracker DOM to fix rosterSize mismatch warning | 2026-03-06 | fc241ce | ✅ | [49-parse-roster-size-from-espn-position-tra](./quick/49-parse-roster-size-from-espn-position-tra/) |
+| 51 | Incorporate external rankings strongly into draft targets math (rank boost multiplier) | 2026-03-06 | 1c1884d | ✅ | [51-incorporate-external-rankings-into-draft-targets](./quick/51-incorporate-external-rankings-into-draft-targets/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 48: fix team count detection from pick train
+Last activity: 2026-03-06 - Completed quick task 51: external rank boost in draft targets
 Resume file: None

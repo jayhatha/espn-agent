@@ -511,7 +511,7 @@ Plans:
 | 26. Per-Position Target Engine | 2/2 | Complete    | 2026-03-06 | - |
 | 27. Shopping List UI | 1/1 | Complete    | 2026-03-06 | - |
 | 28. Forward-Looking Draft Simulation | 3/3 | Complete    | 2026-03-06 | - |
-| 29. Ideal Roster Optimizer | - | 0/2 | Planning | - |
+| 29. Ideal Roster Optimizer | 1/2 | In Progress|  | - |
 
 ### Phase 29: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
 
@@ -524,7 +524,7 @@ Plans:
   3. Sidebar shows collapsible Ideal Roster section with tier count summary and player rows
   4. Already-drafted players appear as locked with visual distinction from undrafted targets
   5. Ideal roster recomputes on pick count change only (cached on allPicks.length)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 29-01-PLAN.md — Add IdealRosterPlayer/IdealRosterSignal types, computeIdealRoster function with rank-boosted SGP, locked player handling, and cache
