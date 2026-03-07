@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 27 — Shopping List UI
-Plan: 01 complete — Phase 27 Plan 01 COMPLETE
-Status: Phase 27 Plan 01 complete — ShoppingList component created, Top Targets replaced in EngineInsights
-Last activity: 2026-03-06 — Phase 27 Plan 01 complete (shopping list UI integrated into sidebar)
+Phase: 30 — Extension Performance Audit
+Plan: 02 complete — Phase 30 Plan 02 COMPLETE
+Status: Phase 30 complete (2/2 plans) — 7 perf fixes: sim count 200->50, DEV-gated logs, deduplicated pool build, observer scope, equality guard, scarcity pre-group, useMemo Sets
+Last activity: 2026-03-07 — Phase 30 Plan 02 complete (extension sidebar performance optimizations applied)
 
-Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 complete
+Progress: Phase 30 complete (2/2 plans) | extension perf audit done
 
 ```
 [############                            ] 30% v2.0
@@ -157,6 +157,7 @@ Progress: v2.0 Phase 26-27 | Phase 26 complete (2/2 plans), Phase 27 Plan 01 com
 | Phase 29 P02 | 1 | 1 tasks | 2 files |
 | Phase 52 P01 | 8 | 2 tasks | 5 files |
 | Phase 30-extension-perf-audit P01 | 5 | 2 tasks | 8 files |
+| Phase 30 P02 | 7 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -369,6 +370,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 29]: Tier badges use design token classes (bg-warning-light/text-warning for anchor, bg-info-light/text-info for core) matching existing sidebar pattern
 - [Phase 29]: Locked players shown with text-content-secondary dimming plus bullet marker — visually distinct without strikethrough
 - [Phase 30-extension-perf-audit]: Remove shopping list and league analysis entirely to reduce computation cost during live drafts; extract team stat aggregation inline with module-level FG projection map caching
+- [Phase 30]: Sim count 200->50: 75% CPU reduction; lower fidelity acceptable since cache prevents re-runs on same state
+- [Phase 30]: Single buildFgPlayerPool call: undraftedPlayers shared with projected standings, top-200 slice for optimizer
+- [Phase 30]: subtree:false observer: sidebar root always direct body child, global DOM observation unnecessary
 
 ### Roadmap Evolution
 
