@@ -1,30 +1,30 @@
-import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, LeagueAnalysisSignal, ShoppingListSignal, InflationSignal, IdealRosterSignal, IdealRosterPlayer } from "./types";
+import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, InflationSignal, IdealRosterSignal, IdealRosterPlayer } from "./types";
 import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
 import { buildFgPlayerPool, normalizeName } from "./archetype";
-import { computeLeagueAnalysis } from "./league-analysis";
 import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { runMonteCarlo } from "./monte-carlo";
-import { computeShoppingList } from "./shopping-list";
 import { simulateFullDraft, computeSimStandings } from "./draft-simulator";
 import { compareDecisions, aggregateOutcomes } from "./decision-comparison";
 import { recommendNomination } from "./nomination-strategy";
 import { computeExternalRankBoost } from "./rank-boost";
+import { calculateFinalRate } from "@espn-fantasy/shared";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
   fgAuctionHittersData,
   fgAuctionPitchersData,
 } from "../fangraphs-data";
+import type { FgHitterProjection, FgPitcherProjection } from "../fangraphs-data";
 import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison, DraftTargetRecommendation } from "./types";
 
-export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, LeagueAnalysisSignal, ProjectedStandingsSignal, ShoppingListSignal, PositionGroup, PositionTarget, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation, IdealRosterSignal, IdealRosterPlayer } from "./types";
+export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, ProjectedStandingsSignal, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation, IdealRosterSignal, IdealRosterPlayer } from "./types";
 
 // ============================================================
 // Hardcoded roster slots (per CONTEXT.md locked decision)
@@ -96,6 +96,10 @@ let simulationCacheKey: string = '';  // allPicks.length + '_' + currentAuctionP
 let cachedIdealRoster: IdealRosterSignal | null = null;
 let idealRosterCacheKey: string = '';  // allPicks.length + '_' + splitValue
 
+// Module-level projection map caches for inline team stat aggregation
+let cachedHitterProjMap: Map<string, FgHitterProjection> | null = null;
+let cachedPitcherProjMap: Map<string, FgPitcherProjection> | null = null;
+
 // ============================================================
 // buildSimDraftState
 // ============================================================
@@ -103,7 +107,7 @@ let idealRosterCacheKey: string = '';  // allPicks.length + '_' + splitValue
 /**
  * Construct a SimDraftState from the current draft state for forward simulation.
  *
- * Seeds categoryTotals and componentTotals from leagueAnalysis for accurate
+ * Seeds categoryTotals and componentTotals from teamDraftedTotals/Components for accurate
  * mid-draft win probability — without these, all teams start at zero and
  * absolute win probabilities are distorted.
  *
@@ -117,7 +121,8 @@ function buildSimDraftState(
   opponentModel: ReturnType<typeof buildOpponentModel>,
   activeSlots: Record<string, number>,
   myRemainingSlots: Record<string, number>,
-  leagueAnalysis: LeagueAnalysisSignal | null,
+  teamDraftedTotals: Map<string, Record<string, number>> | null,
+  teamDraftedComponents: Map<string, Record<string, number>> | null,
 ): SimDraftState | null {
   if (input.myTeamId == null || input.teamRosters.size < 3) {
     console.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
@@ -174,16 +179,16 @@ function buildSimDraftState(
       }
     }
 
-    // categoryTotals from leagueAnalysis.teamDraftedTotals
+    // categoryTotals from teamDraftedTotals
     const categoryTotals: Record<string, number> =
-      leagueAnalysis?.teamDraftedTotals?.get(teamId) != null
-        ? { ...(leagueAnalysis.teamDraftedTotals!.get(teamId)!) }
+      teamDraftedTotals?.get(teamId) != null
+        ? { ...(teamDraftedTotals.get(teamId)!) }
         : {};
 
-    // componentTotals from leagueAnalysis.teamDraftedComponents
+    // componentTotals from teamDraftedComponents
     const componentTotals: Record<string, number> =
-      leagueAnalysis?.teamDraftedComponents?.get(teamId) != null
-        ? { ...(leagueAnalysis.teamDraftedComponents!.get(teamId)!) }
+      teamDraftedComponents?.get(teamId) != null
+        ? { ...(teamDraftedComponents.get(teamId)!) }
         : {};
 
     return { budget, slotsRemaining, categoryTotals, componentTotals };
@@ -241,7 +246,6 @@ function computeRosterOptimization(
       simulationEV: 0,
       simulationStdDev: 0,
       computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
-      shoppingList: null,
     };
   }
 
@@ -436,33 +440,6 @@ function computeRosterOptimization(
     };
   });
 
-  // ----------------------------------------------------------------
-  // Per-position shopping list (Phase 26)
-  // ----------------------------------------------------------------
-  let shoppingList: ShoppingListSignal | null = null;
-  try {
-    const slT0 = performance.now();
-    shoppingList = computeShoppingList({
-      allPlayers,
-      sgpValues,
-      needByPosition,
-      remainingSlots,
-      scarcitySignals,
-      opponentModel,
-      myBudget,
-      weakCategories,
-      topN: 3,
-      nameToAsv,
-      nameToExternalRank,
-    });
-    const slElapsed = performance.now() - slT0;
-    if (slElapsed > 10) {
-      console.debug(`[DraftEngine] Shopping list: ${slElapsed.toFixed(1)}ms`);
-    }
-  } catch (e) {
-    console.warn("[DraftEngine] Shopping list computation failed:", e);
-  }
-
   const elapsed = Math.round((performance.now() - t0) * 10) / 10;
   console.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
 
@@ -476,7 +453,6 @@ function computeRosterOptimization(
     simulationEV: monteCarloResult?.expectedTeamValue ?? 0,
     simulationStdDev: monteCarloResult?.valueStdDev ?? 0,
     computeTimeMs: elapsed,
-    shoppingList,
   };
 }
 
@@ -665,29 +641,83 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
   // 5. Generate alerts from all signals
   const alerts = generateAlerts(scarcity, categoryGaps, budgetCurve);
 
-  // 5b. League-wide category analysis
-  let leagueAnalysis: LeagueAnalysisSignal | null = null;
-  if (input.leagueCategories.length > 0 && input.teamRosters.size > 0 && input.myTeamId) {
-    try {
-      leagueAnalysis = computeLeagueAnalysis(
-        input.teamRosters,
-        input.allPicks,
-        input.myTeamId,
-        input.leagueCategories,
-        fgLeaderboardHittersData,
-        fgLeaderboardPitchersData,
-      );
-    } catch (e) {
-      console.warn("[DraftEngine] League analysis failed:", e);
+  // 5b. Compute per-team drafted stat totals (needed by projected standings + simulation)
+  let teamDraftedTotals: Map<string, Record<string, number>> | null = null;
+  let teamDraftedComponents: Map<string, Record<string, number>> | null = null;
+  let teamsAnalyzed = 0;
+
+  if (input.leagueCategories.length > 0 && input.teamRosters.size > 0) {
+    // Build FG projection lookup maps by normalized name (module-level cache since data is static)
+    if (!cachedHitterProjMap) {
+      cachedHitterProjMap = new Map();
+      for (const h of fgLeaderboardHittersData) {
+        cachedHitterProjMap.set(normalizeName(h.name), h);
+      }
+    }
+    if (!cachedPitcherProjMap) {
+      cachedPitcherProjMap = new Map();
+      for (const p of fgLeaderboardPitchersData) {
+        cachedPitcherProjMap.set(normalizeName(p.name), p);
+      }
+    }
+
+    // Group allPicks by teamId
+    const picksByTeam = new Map<string, Array<{ playerId: number; playerName: string }>>();
+    for (const pick of input.allPicks) {
+      let team = picksByTeam.get(pick.teamId);
+      if (!team) { team = []; picksByTeam.set(pick.teamId, team); }
+      team.push({ playerId: pick.playerId, playerName: pick.playerName });
+    }
+
+    teamDraftedTotals = new Map();
+    teamDraftedComponents = new Map();
+
+    for (const [teamId] of input.teamRosters) {
+      const picks = picksByTeam.get(teamId) ?? [];
+      if (picks.length === 0) continue;
+
+      const teamComponents: Record<string, number> = {};
+      for (const pick of picks) {
+        const nName = normalizeName(pick.playerName);
+        const pitcher = cachedPitcherProjMap.get(nName);
+        const hitter = cachedHitterProjMap.get(nName);
+        if (pitcher) {
+          for (const [k, v] of Object.entries({ W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO, IP: pitcher.IP, HA: pitcher.HA, ER: pitcher.ER, BBA: pitcher.BBA, QS: pitcher.QS, HRA: pitcher.HRA, ERA: pitcher.ERA, WHIP: pitcher.WHIP })) {
+            teamComponents[k] = (teamComponents[k] ?? 0) + v;
+          }
+        } else if (hitter) {
+          for (const [k, v] of Object.entries({ HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB, AVG: hitter.AVG, OPS: hitter.OPS, AB: hitter.AB, H: hitter.H, BB: hitter.BB, HBP: hitter.HBP, SF: hitter.SF, TB: hitter.TB, PA: hitter.PA })) {
+            teamComponents[k] = (teamComponents[k] ?? 0) + v;
+          }
+        }
+      }
+
+      if (Object.keys(teamComponents).length === 0) continue;
+
+      // Compute per-category totals from components
+      const catTotals: Record<string, number> = {};
+      for (const cat of input.leagueCategories) {
+        if (cat.type === "COUNTING") {
+          catTotals[cat.stat_key] = teamComponents[cat.stat_key] ?? 0;
+        } else if (cat.type === "RATE" && cat.formula_id) {
+          try {
+            const rate = calculateFinalRate(cat.formula_id, {}, teamComponents);
+            catTotals[cat.stat_key] = isFinite(rate) ? rate : 0;
+          } catch { catTotals[cat.stat_key] = 0; }
+        }
+      }
+
+      teamDraftedTotals.set(teamId, catTotals);
+      teamDraftedComponents.set(teamId, teamComponents);
+      teamsAnalyzed++;
     }
   }
 
   // 5c. Projected standings engine
   let projectedStandings: ProjectedStandingsSignal | null = null;
   if (
-    leagueAnalysis !== null &&
-    leagueAnalysis.teamDraftedTotals != null &&
-    leagueAnalysis.teamsAnalyzed >= 3 &&
+    teamDraftedTotals !== null &&
+    teamsAnalyzed >= 3 &&
     input.leagueCategories.length > 0
   ) {
     try {
@@ -708,7 +738,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
         const undraftedPlayers: PoolPlayer[] = [...undraftedHitters, ...undraftedPitchers];
 
         cachedProjectedStandings = computeProjectedStandings(
-          leagueAnalysis.teamDraftedTotals,
+          teamDraftedTotals,
           input.teamRosters,
           input.allPicks,
           input.myTeamId,
@@ -716,7 +746,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
           undraftedPlayers,
           input.rosterSize,
           input.totalTeams,
-          leagueAnalysis.teamDraftedComponents ?? new Map(),
+          teamDraftedComponents ?? new Map(),
         );
         projectedStandingsCacheKey = input.allPicks.length;
       }
@@ -900,7 +930,8 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
           opponentModelOpt,
           activeSlotsOpt,
           remainingSlotsOpt,
-          leagueAnalysis,
+          teamDraftedTotals,
+          teamDraftedComponents,
         );
 
         if (simState === null) {
@@ -987,60 +1018,50 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
             console.warn('[DraftEngine] Nomination strategy crashed:', e);
           }
 
-          // Draft Targets — simulate top shopping list candidates to rank by win probability
+          // Draft Targets — simulate top-SGP players to rank by win probability
           let draftTargets: DraftTargetRecommendation[] | null = null;
           try {
-            const shoppingList = optimization?.shoppingList;
-            if (shoppingList != null && shoppingList.positionGroups.length > 0) {
-              // Collect top candidate per position group (max 5)
-              const candidates: Array<{ name: string; pos: string; idx: number; bid: number }> = [];
-              const seen = new Set<number>();
-              for (const group of shoppingList.positionGroups) {
-                for (const target of group.targets) {
-                  if (candidates.length >= 5) break;
-                  // Find player index in allPlayersOpt
-                  const pIdx = allPlayersOpt.findIndex(
-                    p => p.normalizedName === normalizeName(target.playerName),
-                  );
-                  if (pIdx >= 0 && !seen.has(pIdx)) {
-                    seen.add(pIdx);
-                    candidates.push({
-                      name: target.playerName,
-                      pos: group.position,
-                      idx: pIdx,
-                      bid: target.maxBid,
-                    });
-                  }
-                }
-                if (candidates.length >= 5) break;
-              }
+            // Collect top 5 undrafted players by adjusted SGP
+            const candidates: Array<{ name: string; pos: string; idx: number; bid: number }> = [];
+            const sortedByAdjSgp = allPlayersOpt
+              .map((p, i) => ({ player: p, idx: i, sgp: adjustedSgpValuesOpt[i] ?? 0 }))
+              .sort((a, b) => b.sgp - a.sgp);
 
-              if (candidates.length > 0) {
-                const targetActions: CandidateAction[] = candidates.map(c => ({
-                  type: "bid" as const,
-                  label: c.name,
-                  playerIndex: c.idx,
-                  bidPrice: c.bid,
-                }));
+            for (const entry of sortedByAdjSgp) {
+              if (candidates.length >= 5) break;
+              candidates.push({
+                name: entry.player.name,
+                pos: entry.player.positions[0] ?? '',
+                idx: entry.idx,
+                bid: Math.max(1, Math.ceil(entry.player.dollars)),
+              });
+            }
 
-                const SIMS_PER_TARGET = 100;
-                const targetComparison = compareDecisions(
-                  targetActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
-                  input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
-                );
+            if (candidates.length > 0) {
+              const targetActions: CandidateAction[] = candidates.map(c => ({
+                type: "bid" as const,
+                label: c.name,
+                playerIndex: c.idx,
+                bidPrice: c.bid,
+              }));
 
-                draftTargets = targetComparison.decisions
-                  .map((d, i) => ({
-                    playerName: candidates[i].name,
-                    position: candidates[i].pos,
-                    playerIndex: candidates[i].idx,
-                    bidPrice: candidates[i].bid,
-                    expectedFinish: d.outcome.expectedFinish,
-                    winProbability: d.outcome.winProbability,
-                    top3Probability: d.outcome.top3Probability,
-                  }))
-                  .sort((a, b) => b.winProbability - a.winProbability);
-              }
+              const SIMS_PER_TARGET = 100;
+              const targetComparison = compareDecisions(
+                targetActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
+                input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
+              );
+
+              draftTargets = targetComparison.decisions
+                .map((d, i) => ({
+                  playerName: candidates[i].name,
+                  position: candidates[i].pos,
+                  playerIndex: candidates[i].idx,
+                  bidPrice: candidates[i].bid,
+                  expectedFinish: d.outcome.expectedFinish,
+                  winProbability: d.outcome.winProbability,
+                  top3Probability: d.outcome.top3Probability,
+                }))
+                .sort((a, b) => b.winProbability - a.winProbability);
             }
           } catch (e) {
             console.warn('[DraftEngine] Draft targets crashed:', e);
@@ -1104,7 +1125,6 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     alerts,
     computeTimeMs: Math.round(elapsed * 10) / 10,
     optimization,
-    leagueAnalysis,
     projectedStandings,
     simulation,
     idealRoster,

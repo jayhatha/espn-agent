@@ -219,7 +219,7 @@ function computeRotoPts(
  * 5. Compute roto points per category, overall rank.
  * 6. Find user's weak/strong categories.
  *
- * @param teamDraftedTotals - From computeLeagueAnalysis: per-team FG-matched stat totals
+ * @param teamDraftedTotals - Per-team FG-matched stat totals (computed inline in engine orchestrator)
  * @param teamRosters - All teams in draft (teamId -> { teamId, teamName, playerIds })
  * @param allPicks - All picks made so far
  * @param myTeamId - User's team ID (null if unknown)
@@ -227,6 +227,7 @@ function computeRotoPts(
  * @param undraftedPlayers - Undrafted FG player pool (for replacement-level computation)
  * @param rosterSize - Total roster slots per team
  * @param totalTeams - Total number of teams in the league
+ * @param teamDraftedComponents - Per-team summed components (H, AB, IP, ER, etc.) for rate stat recomposition
  */
 export function computeProjectedStandings(
   teamDraftedTotals: Map<string, Record<string, number>>,
@@ -237,6 +238,7 @@ export function computeProjectedStandings(
   undraftedPlayers: PoolPlayer[],
   rosterSize: number,
   totalTeams: number,
+  teamDraftedComponents?: Map<string, Record<string, number>>,
 ): ProjectedStandingsSignal {
   const t0 = performance.now();
 
@@ -290,34 +292,15 @@ export function computeProjectedStandings(
         // Sum drafted components + (replacement components × remaining slots)
         // Then compute rate from totals — never average rates
         const combinedComponents: Record<string, number> = {};
+        const draftedComponents = teamDraftedComponents?.get(teamId);
 
-        // Add drafted player components (already summed in teamDraftedTotals via league-analysis)
-        // For rate stats, we need to reconstruct from components stored per-player.
-        // Since teamDraftedTotals only has final rate values (not components), we use them
-        // as a proxy for component-level filler. For teams with data, we weight by
-        // draftedCount: combinedComponents ≈ replacementComponents × draftedCount + replacementComponents × remainingSlots
-        // = replacementComponents × rosterSize (when no data) or use FG totals as approximation.
-
-        // Get the drafted components by working backward from totals where possible,
-        // OR use the player-level component sum by scaling from the rate value.
-        // Since we don't have per-player components in teamDraftedTotals (only category totals),
-        // we approximate: for rate categories, scale replacement components by draftedCount
-        // and add remainingSlots filler. This is consistent with replacement-level logic:
-        // a team with 0 FG matches gets rosterSize × replacement.
         for (const key of ALL_COMPONENT_KEYS) {
           const replComp = replacementComponents[key] ?? 0;
+          const draftedComp = draftedComponents?.[key] ?? 0;
 
-          if (draftedTotals) {
-            // Team has FG-matched players: drafted portion uses replacement-scaled components,
-            // filler portion adds remaining slots. The approximation is:
-            // total components ≈ replacement_per_player × rosterSize
-            // (since we can't decompose individual player components from the rate totals)
-            // This is safe because rate filler is designed to be symmetric.
-            combinedComponents[key] = replComp * rosterSize;
-          } else {
-            // No FG data: pure replacement-level for all slots
-            combinedComponents[key] = replComp * rosterSize;
-          }
+          // Use actual drafted components + filler for remaining slots.
+          // If team has no drafted pitchers (IP=0), filler covers all remaining slots.
+          combinedComponents[key] = draftedComp + (replComp * remainingSlots);
         }
 
         // Guard against IP <= 0 to prevent NaN/Infinity in ERA/WHIP
@@ -354,6 +337,7 @@ export function computeProjectedStandings(
       projectedRotoPts: rotoResult.rotoPts,
       projectedOverallRank: 0,  // Set after sorting
       categoryRanks: rotoResult.categoryRanks,
+      categoryValues: projectedTotals.get(teamId) ?? {},
       draftedPlayersCount: picksByTeam.get(teamId) ?? 0,
     });
   }
