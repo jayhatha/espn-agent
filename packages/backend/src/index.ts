@@ -5,12 +5,14 @@ import redis from "@fastify/redis";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import fastifyJwt from "@fastify/jwt";
+import fastifyWebsocket from "@fastify/websocket";
 import { getDb } from "./db/connection.js";
 import { leaguesRoutes } from "./api/leagues.js";
 import { projectionsRoutes } from "./api/projections.js";
 import { timeSeriesRoutes } from "./api/timeseries.js";
 import { recommendationsRoutes } from "./api/recommendations.js";
 import { draftRoutes } from "./api/draft.js";
+import { draftLiveRoutes } from "./api/draft-live.js";
 import { slackRoutes } from "./api/slack.js";
 import { internalRoutes } from "./api/internal.js";
 import { authRoutes } from "./api/auth.js";
@@ -58,6 +60,11 @@ export async function buildServer(): Promise<FastifyInstance> {
       }
 
       if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else if (
+        /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(origin)
+      ) {
+        // Allow private LAN IP origins for mobile draft companion
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"), false);
@@ -114,6 +121,9 @@ export async function buildServer(): Promise<FastifyInstance> {
     skipOnError: false,
   });
 
+  // Register WebSocket plugin (must be before any route that uses { websocket: true })
+  await server.register(fastifyWebsocket);
+
   // Add raw body parser for Slack signature verification
   // Slack sends form-encoded payloads that need raw body for HMAC
   server.addContentTypeParser(
@@ -161,6 +171,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(timeSeriesRoutes);
   await server.register(recommendationsRoutes);
   await server.register(draftRoutes);
+  await server.register(draftLiveRoutes);
   await server.register(lineupRoutes);
   await server.register(streamingRoutes);
   await server.register(adminRoutes);
