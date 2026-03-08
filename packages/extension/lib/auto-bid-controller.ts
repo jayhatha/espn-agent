@@ -118,9 +118,11 @@ export class AutoBidController {
         this.lastNominationTime = null;
       }
 
-      // When auction ends (player went away), schedule nomination after 1s delay
-      // to give ESPN time to settle between auctions
+      // When auction ends (player went away), reset attempts and schedule nomination
+      // after 1s delay to give ESPN time to settle between auctions
       if (playerWentAway) {
+        this.nominationAttempts = 0;
+        this.lastNominationTime = null;
         this.scheduleNomination(1000);
       }
 
@@ -426,13 +428,25 @@ export class AutoBidController {
       return;
     }
 
-    // Guard: nomination attempt limit
+    // Guard: nomination attempt limit — reset after 10s so we retry with fresh attempts
     if (this.nominationAttempts >= MAX) {
-      this.lastAttemptResult = `max attempts (${this.nominationAttempts}/${MAX})`;
-      console.log(
-        `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${MAX}) — waiting for state change`
-      );
-      return;
+      const timeSinceLastAttempt = this.lastNominationTime != null
+        ? Date.now() - this.lastNominationTime
+        : Infinity;
+      if (timeSinceLastAttempt > 10_000) {
+        console.log(
+          `[AutoNominate] Resetting stale attempts (${this.nominationAttempts}/${MAX}, ${Math.round(timeSinceLastAttempt / 1000)}s ago)`
+        );
+        this.nominationAttempts = 0;
+        this.lastNominationTime = null;
+      } else {
+        this.lastAttemptResult = `max attempts (${this.nominationAttempts}/${MAX})`;
+        console.log(
+          `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${MAX}) — retrying in 10s`
+        );
+        this.scheduleNomination(10_000);
+        return;
+      }
     }
 
     // Guard: cooldown between attempts
@@ -517,20 +531,20 @@ export class AutoBidController {
 
     const playerId = matchedRanking.playerId;
 
-    // ── Find and click the queue button for this player ──
-    const queueButton = document.querySelector<HTMLButtonElement>(
+    // ── Find and click the select/queue button for this player ──
+    const playerButton = document.querySelector<HTMLButtonElement>(
       `button[data-player-id="${playerId}"]`
     );
 
-    if (queueButton && !queueButton.disabled) {
-      this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason!);
+    if (playerButton && !playerButton.disabled) {
+      this.clickPlayerButton(playerButton, candidateName, playerId, candidateReason!);
       return;
     }
 
-    if (queueButton?.disabled) {
+    if (playerButton?.disabled) {
       this.lastAttemptResult = `button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`;
       console.warn(
-        `[AutoNominate] Queue button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`
+        `[AutoNominate] Button disabled for ${candidateName} (ID: ${playerId}, text="${playerButton.textContent?.trim()}") — already drafted or queued`
       );
       this.nominationAttempts++;
       this.lastNominationTime = Date.now();
@@ -593,19 +607,23 @@ export class AutoBidController {
       return;
     }
 
-    // Type the player name into the search input using React-compatible value setting
+    // Use last name for search — ESPN search works better with just the surname
+    const nameParts = candidateName.trim().split(/\s+/);
+    const searchTerm = nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
+
+    // Type the search term into the search input using React-compatible value setting
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype, 'value'
     )?.set;
     if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(searchInput, candidateName);
+      nativeInputValueSetter.call(searchInput, searchTerm);
     } else {
-      searchInput.value = candidateName;
+      searchInput.value = searchTerm;
     }
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
     searchInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-    console.log(`[AutoNominate] Typed "${candidateName}" into search`);
+    console.log(`[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`);
 
     // Wait for ESPN to filter the table, then find the button
     setTimeout(() => {
