@@ -35,7 +35,7 @@ function makePitcher(name: string, overrides: Partial<FgPitcherProjection> = {})
     team: "NYY",
     mlbamId: Math.floor(Math.random() * 100000),
     fgId: `fg_${name}`,
-    W: 12, L: 8, SV: 0, HLD: 0, ERA: 3.60, WHIP: 1.20, SO: 180,
+    W: 12, SV: 0, HLD: 0, ERA: 3.60, WHIP: 1.20, SO: 180,
     IP: 180, HA: 165, ER: 72, BBA: 51, QS: 20, HRA: 20,
     ...overrides,
   };
@@ -101,7 +101,7 @@ describe("computeBuildArchetype — single hitter pick", () => {
     const result = computeBuildArchetype(
       myRoster,
       215,
-      [{ playerId: myRoster[0].playerId, playerName: myRoster[0].playerName }],
+      [{ playerId: myRoster[0].playerId }],
       [hitter],
       [],
       [auctionHitter],
@@ -147,7 +147,7 @@ describe("computeBuildArchetype — greedy fill respects budget", () => {
     const result = computeBuildArchetype(
       myRoster,
       50, // $50 remaining
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((p, i) => ({ playerId: i })),
       fgHitters,
       fgPitchers,
       auctionHitters,
@@ -190,7 +190,7 @@ describe("computeBuildArchetype — rate stat ceiling uses components", () => {
     const result = computeBuildArchetype(
       myRoster,
       100,
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((_, i) => ({ playerId: i })),
       [hitter1, hitter2],
       [],
       [makeAuctionHitter("Player A", 10, "1B"), makeAuctionHitter("Player B", 5, "2B")],
@@ -234,7 +234,7 @@ describe("computeBuildArchetype — punt detection", () => {
     const result = computeBuildArchetype(
       myRoster,
       100,
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((_, i) => ({ playerId: i })),
       [hitter, ...fgHitters],
       [],
       [auctHitter, ...auctHitters],
@@ -288,7 +288,7 @@ describe("computeBuildArchetype — archetype classification", () => {
     const result = computeBuildArchetype(
       myRoster,
       120, // $120 remaining after spending 140 on 6 players at $40 each (260 total - 120 remaining)
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((p, i) => ({ playerId: i })),
       allFgHitters,
       [],
       auctHitters,
@@ -333,7 +333,7 @@ describe("computeBuildArchetype — pivot players affordability", () => {
     const result = computeBuildArchetype(
       myRoster,
       remainingBudget,
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((_, i) => ({ playerId: i })),
       [...expensiveFgHitters, ...cheapFgHitters],
       [],
       [...expensivePlayers, ...cheapPlayers],
@@ -395,7 +395,7 @@ describe("computeBuildArchetype — competitive targets", () => {
     const result = computeBuildArchetype(
       myRoster,
       215,
-      myRoster.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster.map((_, i) => ({ playerId: i })),
       [hitter, ...fgHitters],
       [],
       [makeAuctionHitter("Aaron Judge", 45, "OF"), ...auctHitters],
@@ -462,7 +462,7 @@ describe("computeBuildArchetype — position-aware greedy fill", () => {
     const result2 = computeBuildArchetype(
       myRoster2,
       190,
-      myRoster2.map((p, i) => ({ playerId: i, playerName: p.playerName })),
+      myRoster2.map((_, i) => ({ playerId: i })),
       fgHitters,
       fgPitchers,
       auctHitters,
