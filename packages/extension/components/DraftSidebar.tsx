@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
 import { autoBidController } from "../lib/auto-bid-controller";
@@ -46,6 +46,100 @@ export default function DraftSidebar() {
   useEffect(() => {
     autoBidController.updateSignals(engineSignals);
   }, [engineSignals]);
+
+  // Debounce ref for storage writes
+  const storageWriteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Write engine signals and draft state to chrome.storage.local for background SW relay (debounced 1s)
+  useEffect(() => {
+    if (storageWriteTimeoutRef.current) {
+      clearTimeout(storageWriteTimeoutRef.current);
+    }
+
+    storageWriteTimeoutRef.current = setTimeout(() => {
+      // Write engine signals (mobile-relevant subset)
+      if (engineSignals) {
+        const mobileSnapshot = {
+          inflation: engineSignals.inflation
+            ? {
+                inflationFactor: engineSignals.inflation.inflationFactor,
+                totalRemainingBudget: engineSignals.inflation.totalRemainingBudget,
+                percentOverMarket: engineSignals.inflation.percentOverMarket,
+              }
+            : null,
+          budgetCurve: engineSignals.budgetCurve
+            ? {
+                budgetPressure: engineSignals.budgetCurve.budgetPressure,
+                maxBidRecommendation: engineSignals.budgetCurve.maxBidRecommendation,
+                optimalRemainingSpend: engineSignals.budgetCurve.optimalRemainingSpend,
+              }
+            : null,
+          alerts: engineSignals.alerts,
+          optimization: engineSignals.optimization
+            ? {
+                maxBid: engineSignals.optimization.maxBid,
+                expectedMarketPrice: engineSignals.optimization.expectedMarketPrice,
+                valueSurplus: engineSignals.optimization.valueSurplus,
+                shouldBid: engineSignals.optimization.shouldBid,
+                simulationEV: engineSignals.optimization.simulationEV,
+              }
+            : null,
+          simulation: engineSignals.simulation
+            ? {
+                winProbability: engineSignals.simulation.winProbability,
+                currentDecision: engineSignals.simulation.currentDecision,
+                computeTimeMs: engineSignals.simulation.computeTimeMs,
+              }
+            : null,
+          remainingSlots: engineSignals.remainingSlots,
+          computeTimeMs: engineSignals.computeTimeMs,
+        };
+
+        chrome.storage.local
+          .set({ "draft-engine-signals": JSON.stringify(mobileSnapshot) })
+          .catch((err) => {
+            if (import.meta.env.DEV) {
+              console.warn("[DraftSidebar] Failed to write engine signals to storage:", err);
+            }
+          });
+      }
+
+      // Write key draft state fields for mobile context
+      const mobileDraftState = {
+        currentAuctionPlayer,
+        rosterLength: myRoster.length,
+        remainingBudget,
+        autoMode,
+        pitcherHitterSplit,
+        draftFormat,
+        picksLength: 0, // allPicks not destructured here — avoid heavy dep
+        currentPick,
+      };
+
+      chrome.storage.local
+        .set({ "draft-mobile-state": JSON.stringify(mobileDraftState) })
+        .catch((err) => {
+          if (import.meta.env.DEV) {
+            console.warn("[DraftSidebar] Failed to write draft state to storage:", err);
+          }
+        });
+    }, 1000);
+
+    return () => {
+      if (storageWriteTimeoutRef.current) {
+        clearTimeout(storageWriteTimeoutRef.current);
+      }
+    };
+  }, [
+    engineSignals,
+    currentAuctionPlayer,
+    myRoster.length,
+    remainingBudget,
+    autoMode,
+    pitcherHitterSplit,
+    draftFormat,
+    currentPick,
+  ]);
 
   const dispatchAssistantEvent = (eventName: string, detail?: unknown) => {
     const targetWindow =
