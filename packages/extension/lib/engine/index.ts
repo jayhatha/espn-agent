@@ -535,6 +535,7 @@ function computeIdealRoster(
       sgpValue: 0,
       slot: slot ?? "BN",
       isDrafted: true,
+      externalRank: nameToExternalRank.get(normalizeName(drafted.playerName)),
     });
   }
 
@@ -555,6 +556,7 @@ function computeIdealRoster(
       sgpValue,
       slot: result.slotAssignments[i] ?? "BN",
       isDrafted: false,
+      externalRank: nameToExternalRank.get(player.normalizedName),
     };
   });
 

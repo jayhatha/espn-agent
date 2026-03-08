@@ -232,6 +232,7 @@ export interface IdealRosterPlayer {
   sgpValue: number;                 // Raw SGP contribution
   slot: string;                     // Assigned roster slot (C, 1B, OF, BN, etc.)
   isDrafted: boolean;               // true if already on myRoster
+  externalRank?: number;            // External ranking (e.g., PitcherList) for display
 }
 
 /**

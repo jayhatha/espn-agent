@@ -60,6 +60,17 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
                   <span className="text-body-xs text-content-secondary w-6 flex-shrink-0 text-right">
                     {player.slot}
                   </span>
+                  {player.externalRank != null && (
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 font-display text-[10px] leading-none ${
+                        player.externalRank <= 10
+                          ? "bg-accent text-content-inverse"
+                          : "bg-surface-tertiary text-content-secondary"
+                      }`}
+                    >
+                      {player.externalRank}
+                    </span>
+                  )}
                   <span
                     className={`text-body-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${tierBadgeClass}`}
                   >
