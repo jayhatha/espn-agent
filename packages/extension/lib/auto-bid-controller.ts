@@ -415,61 +415,84 @@ export class AutoBidController {
       return;
     }
 
-    // Step 1: Click the queue button to select this player for nomination
+    // Step 1: Click the queue/select button to select this player for nomination
+    // ESPN shows "Queue" when it's not your turn and "Select" when it is your turn.
     this.nominationAttempts++;
     this.lastNominationTime = Date.now();
 
+    const btnText = queueButton.textContent?.trim() || "Queue";
     console.log(
-      `[AutoNominate] Queuing ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`
+      `[AutoNominate] Clicking "${btnText}" for ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`
     );
 
     queueButton.click();
 
-    // Step 2: Click the "Nominate" button in the bid control area to submit
-    // ESPN requires a queue click first, then a separate "Nominate" button click.
-    // Add a short delay to let ESPN process the queue selection.
+    // Step 2: Click the confirmation button in the bid control area to submit
+    // ESPN may require a separate "Nominate"/"Select" button click after selection.
+    // Add a short delay to let ESPN process the queue/select action.
     setTimeout(() => {
       this.clickNominateButton(candidateName);
     }, 500);
   }
 
   /**
-   * Find and click the "Nominate" button in the bid control / pick area.
-   * ESPN shows this button after a player has been queued.
+   * Find and click the nomination submit button in the bid control / pick area.
+   * ESPN shows this button after a player has been queued/selected.
+   *
+   * When it's your turn to nominate, ESPN changes "Queue" buttons to "Select"
+   * and the confirmation button may say "Nominate", "Select", or other text.
    */
   private clickNominateButton(candidateName: string): void {
-    // Try multiple selectors for the nomination submit button
-    const nominateSelectors = [
+    // Nominate-specific selectors (high confidence — class/testid contain "nominate")
+    const specificSelectors = [
       "button.nominate-button",
       'button[class*="nominate"]',
       'button[class*="Nominate"]',
       '[data-testid*="nominate"] button',
       'button[data-testid*="nominate"]',
-      ".pickArea button",
-      'form.bidding-form__default button.bid-player__button',
     ];
 
-    // Also try finding any button whose text content says "Nominate"
     let nominateButton: HTMLButtonElement | null = null;
 
-    for (const selector of nominateSelectors) {
+    // Try specific selectors first (no text check needed)
+    for (const selector of specificSelectors) {
       const btn = document.querySelector<HTMLButtonElement>(selector);
       if (btn && !btn.disabled) {
-        // For generic selectors, verify the button text relates to nomination
-        const text = btn.textContent?.toLowerCase() || "";
-        if (selector.includes("nominate") || selector.includes("Nominate") || text.includes("nominate")) {
-          nominateButton = btn;
-          break;
+        nominateButton = btn;
+        break;
+      }
+    }
+
+    // Try generic ESPN action area selectors — accept any action button text
+    // (nominate, select, submit, confirm) since ESPN varies the label
+    if (!nominateButton) {
+      const actionAreaSelectors = [
+        ".pickArea button",
+        "form.bidding-form__default button.bid-player__button",
+        ".bid-player button",
+        '[class*="pickArea"] button',
+      ];
+      const actionWords = ["nominate", "select", "submit", "confirm"];
+
+      for (const selector of actionAreaSelectors) {
+        const btn = document.querySelector<HTMLButtonElement>(selector);
+        if (btn && !btn.disabled) {
+          const text = btn.textContent?.trim().toLowerCase() || "";
+          if (actionWords.some(word => text.includes(word))) {
+            nominateButton = btn;
+            break;
+          }
         }
       }
     }
 
-    // Fallback: scan all buttons for one containing "Nominate" text
+    // Fallback: scan all buttons for nomination/selection action text
     if (!nominateButton) {
+      const actionWords = ["nominate", "select player", "submit"];
       const allButtons = document.querySelectorAll<HTMLButtonElement>("button");
       for (const btn of allButtons) {
         const text = btn.textContent?.trim().toLowerCase() || "";
-        if (text.includes("nominate") && !btn.disabled) {
+        if (actionWords.some(word => text.includes(word)) && !btn.disabled) {
           nominateButton = btn;
           break;
         }
@@ -478,13 +501,13 @@ export class AutoBidController {
 
     if (!nominateButton) {
       console.warn(
-        `[AutoNominate] "Nominate" button not found after queuing ${candidateName} — queue click may auto-submit on some ESPN layouts`
+        `[AutoNominate] Submit button not found after selecting ${candidateName} — click may have auto-submitted`
       );
       return;
     }
 
     console.log(
-      `[AutoNominate] Clicking "Nominate" button for ${candidateName}`
+      `[AutoNominate] Clicking "${nominateButton.textContent?.trim()}" button for ${candidateName}`
     );
     nominateButton.click();
   }
