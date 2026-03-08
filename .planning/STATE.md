@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 31 — Mobile Draft Companion
-Plan: 02 complete — Phase 31 Plan 02 COMPLETE
-Status: Phase 31 in progress (2/3 plans) — Extension WS relay: background SW connects to hub, DraftSidebar writes engine signals to storage, content script handles CONTROL commands
-Last activity: 2026-03-08 — Phase 31 Plan 02 complete (extension relay pipeline wired)
+Plan: 03 complete — Phase 31 Plan 03 COMPLETE — Phase 31 COMPLETE
+Status: Phase 31 complete (3/3 plans) — Mobile page at /draft/live: auto-detected LAN WS URL, nomination/max bid/win probability/budget/alerts, sticky control bar with auto-bid toggle, position filter, split slider
+Last activity: 2026-03-08 — Phase 31 Plan 03 complete (mobile draft companion page delivered)
 
-Progress: Phase 31 in progress (2/3 plans) | Extension relay pipeline done
+Progress: Phase 31 COMPLETE (3/3 plans) | Full relay chain: Extension -> WS hub -> Mobile page
 
 ```
 [############                            ] 30% v2.0
@@ -160,6 +160,7 @@ Progress: Phase 31 in progress (2/3 plans) | Extension relay pipeline done
 | Phase 30 P02 | 7 | 2 tasks | 7 files |
 | Phase 31 P01 | 2 | 2 tasks | 4 files |
 | Phase 31 P02 | 4 | 3 tasks | 3 files |
+| Phase 31 P03 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -389,6 +390,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 31 P02]: Storage-mediated bridge: React component writes to chrome.storage.local; background SW listens via onChanged — required because background SW cannot access React context directly
 - [Phase 31 P02]: Reconnect delay resets to 3s on successful WS connection preventing stuck exponential backoff
 - [Phase 31 P02]: CONTROL listener returns false synchronously since sendResponse is called inline (no async operation needed)
+- [Phase 31 P03]: handleSplitCommit typed as no-arg callback to be compatible with both onMouseUp and onTouchEnd event types — reads splitValue from closure dependency
+- [Phase 31 P03]: Auto-bid toggle uses red background when ON to visually signal risk of automated bidding on mobile
+- [Phase 31 P03]: WS URL defaults to ws://${window.location.hostname}:3001/draft/live?role=mobile — auto-adapts if phone opens the page via LAN IP
 
 ### Roadmap Evolution
 

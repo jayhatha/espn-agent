@@ -550,7 +550,7 @@ Plans:
   3. Control commands from the phone travel through the WS hub to the extension and apply to the Zustand store
   4. Mobile page auto-detects LAN IP, shows live engine signals, and provides touch-optimized controls
   5. 20-second keepalive prevents service worker sleep; auto-reconnect handles backend restarts
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 31-01-PLAN.md — Install @fastify/websocket, create /draft/live WebSocket hub route with fan-out relay, relax CORS for LAN
