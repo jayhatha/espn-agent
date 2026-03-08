@@ -253,26 +253,6 @@ export default function DraftSidebar() {
         <div className="mt-2 text-sm text-content-secondary">
           Roster: {myRoster.length} players
         </div>
-        {draftFormat === "auction" && (
-          <div className="mt-2 pt-2 border-t border-surface-tertiary">
-            <div className="flex items-center justify-between text-body-xs mb-1">
-              <span className="text-content-secondary">Hit/Pitch Split</span>
-              <span className="font-semibold text-content">{pitcherHitterSplit}/{100 - pitcherHitterSplit}</span>
-            </div>
-            <input
-              type="range"
-              min={20}
-              max={80}
-              value={pitcherHitterSplit}
-              onChange={(e) => setPitcherHitterSplit(Number(e.target.value))}
-              className="w-full h-1.5 bg-surface-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-            />
-            <div className="flex justify-between text-body-xs text-content-secondary mt-0.5">
-              <span>Pitch</span>
-              <span>Hit</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Nominated Player Banner — fixed position, does not scroll */}
@@ -409,6 +389,24 @@ export default function DraftSidebar() {
               </div>
             )
           )}
+          <div className="mt-2 pt-2 border-t border-surface-tertiary">
+            <div className="flex items-center justify-between text-body-xs mb-1">
+              <span className="text-content-secondary">Hit/Pitch Split</span>
+              <span className="font-semibold text-content">{pitcherHitterSplit}/{100 - pitcherHitterSplit}</span>
+            </div>
+            <input
+              type="range"
+              min={20}
+              max={80}
+              value={pitcherHitterSplit}
+              onChange={(e) => setPitcherHitterSplit(Number(e.target.value))}
+              className="w-full h-1.5 bg-surface-tertiary rounded-full appearance-none cursor-pointer accent-accent"
+            />
+            <div className="flex justify-between text-body-xs text-content-secondary mt-0.5">
+              <span>Pitch</span>
+              <span>Hit</span>
+            </div>
+          </div>
         </div>
       )}
 
