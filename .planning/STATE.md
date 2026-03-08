@@ -465,8 +465,10 @@ None yet.
 | 51 | Incorporate external rankings strongly into draft targets math (rank boost multiplier) | 2026-03-06 | 1c1884d | ✅ | [51-incorporate-external-rankings-into-draft-targets](./quick/51-incorporate-external-rankings-into-draft-targets/) |
 | 52 | Add pitcher/hitter percentage weight slider for ideal roster and bid recommendations | 2026-03-07 | 9c5f618 | ✅ | [52-add-pitcher-hitter-percentage-weight-sli](./quick/52-add-pitcher-hitter-percentage-weight-sli/) |
 | 53 | Move forward simulation (Monte Carlo) to Web Worker — off main thread, 200 sims restored | 2026-03-07 | d5efb30 | ✅ | [53-move-forward-simulation-monte-carlo-to-a](./quick/53-move-forward-simulation-monte-carlo-to-a/) |
+| 54 | Auto-mode toggle: auto-bidding (+1) when shouldBid && price < maxBid, toggle in nominated banner | 2026-03-08 | 0e1a483 | ✅ | [54-auto-mode-toggle-auto-bidding-1-on-curre](./quick/54-auto-mode-toggle-auto-bidding-1-on-curre/) |
+| 55 | Use ESPN market values (ASV) for ideal roster planning instead of FanGraphs dollar values | 2026-03-08 | 9a0a517 | ✅ | [55-use-espn-market-values-asv-for-ideal-ros](./quick/55-use-espn-market-values-asv-for-ideal-ros/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-07 - Completed quick task 53: simulation Web Worker
+Last activity: 2026-03-08 - Completed quick tasks 54 (auto-bid) and 55 (market values ideal roster)
 Resume file: None
