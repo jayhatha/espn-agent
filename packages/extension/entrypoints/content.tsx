@@ -351,6 +351,10 @@ export default defineContentScript({
 
     const refreshAssistantData = throttle(
       async () => {
+        // Clear stale roster data before re-collecting from DOM
+        const initialBudget = cachedLeagueConfig?.budget || 260;
+        useDraftStore.getState().resetDraftPicks(initialBudget);
+
         const latestBackendLeagueId = await resolveBackendLeagueMapping();
         const currentState = useDraftStore.getState();
 

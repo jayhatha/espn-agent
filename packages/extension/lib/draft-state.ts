@@ -133,6 +133,7 @@ interface DraftState {
   updateTeamRoster: (teamId: string, teamName: string, playerId: number) => void;
   setAllTeamRosters: (rosters: Map<string, { teamId: string; teamName: string; playerIds: number[] }>) => void;
   clearTeamRosters: () => void;
+  resetDraftPicks: (initialBudget: number) => void;
   setCurrentAuctionPlayer: (player: DraftState['currentAuctionPlayer']) => void;
   setEspnDomAuctionValues: (values: Record<number, number>) => void;
   setMyTeamId: (teamId: string) => void;
@@ -301,6 +302,16 @@ export const useDraftStore = create<DraftState>()(
       setAllTeamRosters: (rosters) => set({ teamRosters: rosters }),
 
       clearTeamRosters: () => set({ teamRosters: new Map() }),
+
+      resetDraftPicks: (initialBudget) =>
+        set({
+          myRoster: [],
+          allPicks: [],
+          teamRosters: new Map(),
+          currentPick: 1,
+          remainingBudget: initialBudget,
+          projectedStandings: null,
+        }),
 
       setCurrentAuctionPlayer: (player) => set({ currentAuctionPlayer: player }),
 
