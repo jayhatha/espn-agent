@@ -522,8 +522,9 @@ None yet.
 | 79 | Fix auto-nomination: handle "Select" button + search for non-visible players | 2026-03-08 | bb65764 | ✅ | [79-fix-auto-nomination-when-it-s-our-turn-t](./quick/79-fix-auto-nomination-when-it-s-our-turn-t/) |
 | 80 | Fix autopilot nomination select and nominate button selectors | 2026-03-08 | 1bec228 | ✅ | [80-fix-autopilot-nomination-select-and-nomi](./quick/80-fix-autopilot-nomination-select-and-nomi/) |
 | 81 | Bug. Budget Pacing has the correct number of roster slots but ideal roster does not. | 2026-03-08 | 7a8e90e | ✅ | [81-bug-budget-pacing-has-the-correct-number](./quick/81-bug-budget-pacing-has-the-correct-number/) |
+| 82 | Rearrange extension sidebar — move hitter-pitcher split underneath auto-bid toggle, use toggle switch for AI narrator | 2026-03-08 | a6967eb | ✅ | [82-rearrange-extension-sidebar-move-hitter-](./quick/82-rearrange-extension-sidebar-move-hitter-/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 81: Bug. Budget Pacing has the correct number of roster slots but ideal roster does not.
+Last activity: 2026-03-08 - Completed quick task 82: Rearrange extension sidebar — move hitter-pitcher split underneath auto-bid toggle, use toggle switch for AI narrator
 Resume file: None
