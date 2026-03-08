@@ -506,8 +506,9 @@ None yet.
 | 72 | Fix simulation breaking after reload — persist leagueCategories/myTeamId, conditional initializeDraft, remove Projected Standings section | 2026-03-08 | e34aae3 | ✅ | [72-fix-simulation-breaking-after-reload-pre](./quick/72-fix-simulation-breaking-after-reload-pre/) |
 | 73 | Fix reload adding other teams' players to roster — skip initial DOM scan on same-draft reload, add roster reconciliation to refresh | 2026-03-08 | 90eae8d | ✅ | [73-reloading-still-adds-players-from-other-](./quick/73-reloading-still-adds-players-from-other-/) |
 | 74 | Enhance mobile draft page — sync split, show roster, reduce WS latency (1000ms→150ms debounce) | 2026-03-08 | 717fe15 | ✅ | [74-enhance-mobile-draft-page-sync-split-fro](./quick/74-enhance-mobile-draft-page-sync-split-fro/) |
+| 75 | Fix current player name not showing on mobile — field name mismatch (name→playerName, position→positions) | 2026-03-08 | 9dd6914 | ✅ | [75-fix-current-player-name-not-showing-on-m](./quick/75-fix-current-player-name-not-showing-on-m/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 74: Enhance mobile draft page
+Last activity: 2026-03-08 - Completed quick task 75: Fix current player name on mobile
 Resume file: None
