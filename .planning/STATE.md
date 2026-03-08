@@ -375,6 +375,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 30]: subtree:false observer: sidebar root always direct body child, global DOM observation unnecessary
 - [Phase quick-54]: AutoBidController uses full-state subscribe with manual diffing (store lacks subscribeWithSelector middleware); updateSignals() also triggers evaluateAndBid() to handle late-arriving signals
 - [Phase quick-58]: Moved computeMaxBid + runMonteCarlo to Web Worker following simulation-worker pattern
+- [Phase quick-60]: Auto-nomination uses multi-strategy DOM detection with defensive false-by-default, 5s cooldown, 3-attempt max
 
 ### Roadmap Evolution
 
@@ -471,7 +472,7 @@ None yet.
 | 56 | Auto-bid cap: 10% over ESPN ASV market value instead of engine maxBid | 2026-03-08 | 54ba3b0 | ✅ | [56-auto-bid-cap-bid-as-high-as-needed-for-a](./quick/56-auto-bid-cap-bid-as-high-as-needed-for-a/) |
 | 57 | Fix expected market price not using ESPN ASV — nameToAsv now uses rankings+allPicks+auctionValues | 2026-03-08 | aa5a082 | ✅ | [57-fix-expected-market-price-not-using-espn](./quick/57-fix-expected-market-price-not-using-espn/) |
 | 58 | Move bid optimizer (computeMaxBid + runMonteCarlo) into Web Worker — off main thread | 2026-03-08 | 265a583 | ✅ | [58-move-the-bid-optimizer-into-a-worker](./quick/58-move-the-bid-optimizer-into-a-worker/) |
-| 59 | Fix auto-bid timing: remove shouldBid gate broken by async worker, use strategy filter instead | 2026-03-08 | pending | ✅ | [59-fix-auto-bid-timing](./quick/59-fix-auto-bid-timing/) |
+| 59 | Fix auto-bid timing: remove shouldBid gate broken by async worker, use strategy filter instead | 2026-03-08 | 0ed541a | ✅ | [59-fix-auto-bid-timing](./quick/59-fix-auto-bid-timing/) |
 
 ## Session Continuity
 
