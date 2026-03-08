@@ -231,7 +231,15 @@ export default defineContentScript({
       myTeamId: teamId ?? "user",
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
-    console.log("[ESPN Draft Assistant] Draft state initialized (roster cleared)", {
+
+    // Detect whether state was preserved from a same-draft reload.
+    // initializeDraft preserves allPicks when it detects isSameDraft, so if
+    // allPicks is non-empty after initialization it means we are resuming an
+    // existing draft session rather than starting fresh.
+    const statePreserved = useDraftStore.getState().allPicks.length > 0;
+
+    console.log("[ESPN Draft Assistant] Draft state initialized", {
+      statePreserved,
       myRoster: useDraftStore.getState().myRoster.length,
       allPicks: useDraftStore.getState().allPicks.length,
     });
@@ -414,6 +422,50 @@ export default defineContentScript({
               "[ESPN Draft Assistant] Refresh auction values failed:",
               error,
             );
+          }
+        }
+
+        // Reconcile myRoster from allPicks to remove contamination from prior DOM scans.
+        // When state is preserved (allPicks exist), some picks may have been added to
+        // myRoster due to unreliable ESPN DOM teamId matching on a previous page load.
+        // Rebuild myRoster to only include picks whose teamId matches myTeamId.
+        if (!shouldScrapePicksFromDom) {
+          const currentState = useDraftStore.getState();
+          const myTeamId = currentState.myTeamId;
+          const myPicksFromStore = currentState.allPicks.filter(
+            (p) => p.teamId === myTeamId || p.teamId === "myTeam" || p.teamName === "My Team"
+          );
+
+          // Only rebuild if roster count differs from filtered picks (indicates contamination)
+          if (currentState.myRoster.length !== myPicksFromStore.length) {
+            console.log(
+              "[ESPN Draft Assistant] Roster reconciliation: roster had",
+              currentState.myRoster.length,
+              "players but only",
+              myPicksFromStore.length,
+              "picks match myTeamId"
+            );
+            // Rebuild myRoster from allPicks, preserving existing roster entries where possible
+            const rebuiltRoster = myPicksFromStore.map((pick) => {
+              // Try to find existing roster entry to preserve projectedStats
+              const existing = currentState.myRoster.find(
+                (r) => r.playerId === pick.playerId
+              );
+              if (existing) return existing;
+
+              const matchingRanking = currentState.rankings.find(
+                (ranking) => ranking.playerId === pick.playerId
+              );
+              return {
+                playerId: pick.playerId,
+                playerName: pick.playerName,
+                positions: pick.positions,
+                pickNumber: pick.pickNumber,
+                cost: pick.cost,
+                projectedStats: matchingRanking?.projectedStats || {},
+              };
+            });
+            useDraftStore.setState({ myRoster: rebuiltRoster });
           }
         }
 
@@ -724,8 +776,14 @@ export default defineContentScript({
       refreshAssistantData(); // Throttled, will respect 3s minimum
     }, 2000);
 
-    // Start observing draft board for picks
-    const cleanup = observeDraftBoard((pick) => processDetectedPick(pick));
+    // Start observing draft board for picks.
+    // Pass skipInitialScan when state was preserved from a same-draft reload —
+    // this prevents re-scanning all completed picks and contaminating myRoster
+    // with other teams' players due to unreliable ESPN DOM teamId matching.
+    const cleanup = observeDraftBoard(
+      (pick) => processDetectedPick(pick),
+      { skipInitialScan: statePreserved }
+    );
 
     const refreshHandler = () => {
       refreshAssistantData();

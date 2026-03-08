@@ -197,13 +197,29 @@ function findDraftBoardElement(): Element | null {
 }
 
 /**
+ * Options for observeDraftBoard
+ *
+ * skipInitialScan: When true, skips the initial full-document scan and the
+ * periodic safety-net scan. Use this on same-draft reloads where Zustand
+ * persist has already restored allPicks/myRoster — re-scanning the entire
+ * DOM would re-add picks from other teams (due to unreliable ESPN DOM teamId
+ * matching) and contaminate myRoster. The MutationObserver still runs so
+ * genuinely NEW picks that arrive during the session are captured.
+ */
+export interface ObserveDraftBoardOptions {
+  skipInitialScan?: boolean;
+}
+
+/**
  * Observes ESPN draft board for new picks
  * Returns cleanup function to disconnect observer
  * Updated to support async pick handlers for auto-refresh
  */
 export function observeDraftBoard(
   onPick: (pick: DraftPick) => void | Promise<void>,
+  options: ObserveDraftBoardOptions = {},
 ): () => void {
+  const { skipInitialScan = false } = options;
   let observedBoard: Element | null = null;
   const emittedPickKeys = new Set<string>();
 
@@ -297,7 +313,12 @@ export function observeDraftBoard(
       subtree: true,
     });
 
-    scanCompletedPicks(board);
+    // Skip initial scan when state was preserved from a same-draft reload.
+    // The MutationObserver above will capture new picks without re-processing
+    // the historical completed picks that are already in allPicks.
+    if (!skipInitialScan) {
+      scanCompletedPicks(board);
+    }
   };
 
   const existingBoard = findDraftBoardElement();
@@ -310,7 +331,13 @@ export function observeDraftBoard(
   }
 
   // Capture already-rendered picks even if board observer attaches late.
-  scanEntireDocument();
+  // Skip on same-draft reloads where state was preserved — re-scanning the
+  // entire DOM would contaminate myRoster with picks from other teams.
+  if (!skipInitialScan) {
+    scanEntireDocument();
+  } else {
+    console.log("[ESPN Draft Assistant] Skipping initial DOM scan (state preserved from same-draft reload)");
+  }
 
   const bootstrapObserver = new MutationObserver(() => {
     if (observedBoard) {
@@ -344,16 +371,25 @@ export function observeDraftBoard(
 
   // ESPN can repaint grid cells without adding/removing the board node.
   // Poll completed picks as a safety net; dedupe keeps this cheap and safe.
-  const periodicScan = setInterval(() => {
-    scanEntireDocument();
-  }, 2000);
+  // Skip periodic scan on same-draft reloads to prevent continuous re-adding
+  // of already-processed picks that would contaminate myRoster.
+  let periodicScan: ReturnType<typeof setInterval> | null = null;
+  if (!skipInitialScan) {
+    periodicScan = setInterval(() => {
+      scanEntireDocument();
+    }, 2000);
+  } else {
+    console.log("[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)");
+  }
 
   // Return cleanup function
   return () => {
     observer.disconnect();
     bootstrapObserver.disconnect();
     clearTimeout(bootstrapTimeout);
-    clearInterval(periodicScan);
+    if (periodicScan !== null) {
+      clearInterval(periodicScan);
+    }
   };
 }
 
