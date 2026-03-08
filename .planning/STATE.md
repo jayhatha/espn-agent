@@ -482,8 +482,9 @@ None yet.
 | 64 | Fix ideal roster showing 20 players instead of 10 — name-based dedup in addPick and updateRoster | 2026-03-08 | c783e2e | ✅ | [64-fix-ideal-roster-showing-20-players-inst](./quick/64-fix-ideal-roster-showing-20-players-inst/) |
 | 65 | Fix ideal roster not filling all slots — add C to flex eligibility, normalize LF/CF/RF→OF | 2026-03-08 | 761494e | ✅ | [65-fix-ideal-roster-not-filling-all-roster-](./quick/65-fix-ideal-roster-not-filling-all-roster-/) |
 | 66 | Show external ranking circle next to players in ideal roster panel | 2026-03-08 | 9bc54e9 | ✅ | — |
+| 67 | Fix auto-bid overpaying for top SPs — apply pitcher dampening multiplier to ASV-based bid caps | 2026-03-08 | 7467920 | ✅ | [67-investigate-why-we-re-overpaying-for-top](./quick/67-investigate-why-we-re-overpaying-for-top/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 66: External ranking circle in ideal roster panel
+Last activity: 2026-03-08 - Completed quick task 67: Pitcher dampening applied to auto-bid caps (0.7x at default slider)
 Resume file: None
