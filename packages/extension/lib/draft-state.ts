@@ -178,6 +178,22 @@ export const useDraftStore = create<DraftState>()(
 
       // Actions
       initializeDraft: (config) => {
+        const current = get();
+        const isSameDraft = current.leagueId === config.leagueId && current.allPicks.length > 0;
+
+        if (isSameDraft) {
+          // Same-draft reload: update config only, preserve accumulated draft data
+          set({
+            draftFormat: config.draftFormat,
+            totalTeams: config.totalTeams,
+            rosterSize: config.rosterSize,
+            myTeamId: config.myTeamId,
+            remainingBudget: config.budget || current.remainingBudget,
+          });
+          return;
+        }
+
+        // Different draft or fresh start — clear everything
         set({
           leagueId: config.leagueId,
           draftFormat: config.draftFormat,
@@ -185,8 +201,6 @@ export const useDraftStore = create<DraftState>()(
           rosterSize: config.rosterSize,
           myTeamId: config.myTeamId,
           remainingBudget: config.budget || 260,
-          // Always clear accumulated draft data — picks will be
-          // re-detected from DOM by the MutationObserver
           allPicks: [],
           myRoster: [],
           currentPick: 1,
@@ -194,7 +208,6 @@ export const useDraftStore = create<DraftState>()(
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           currentAuctionPlayer: null,
-          // Clear projections — will be recomputed from fresh state
           projectedStandings: null,
           userRankingOverrides: {},
         });
@@ -360,8 +373,8 @@ export const useDraftStore = create<DraftState>()(
     }),
     {
       name: "espn-draft-assistant-state",
-      version: 2,
-      migrate: (persistedState) => {
+      version: 3,
+      migrate: (persistedState, version) => {
         const state = (persistedState as Partial<DraftState>) ?? {};
 
         // Deserialize teamRosters from array back to Map
@@ -370,20 +383,34 @@ export const useDraftStore = create<DraftState>()(
           ? new Map(teamRostersArray)
           : new Map();
 
+        if (version < 3) {
+          // v2 -> v3: leagueCategories and myTeamId added to partialize.
+          // For old persisted state, these will be missing — they will be populated
+          // on the next setLeagueCategories / setMyTeamId call at page load.
+          // Clear accumulated picks so the extension starts fresh (old state didn't
+          // preserve same-draft data correctly).
+          return {
+            ...state,
+            leagueId: null,
+            draftFormat: "snake",
+            totalTeams: 12,
+            currentPick: 1,
+            rosterSize: 25,
+            myTeamId: null,
+            myRoster: [],
+            remainingBudget: 260,
+            allPicks: [],
+            rankings: [],
+            auctionValues: [],
+            projectedStandings: null,
+            teamRosters,
+            leagueCategories: [],
+          };
+        }
+
+        // v3+: pass state through — merge() handles Map deserialization
         return {
           ...state,
-          leagueId: null,
-          draftFormat: "snake",
-          totalTeams: 12,
-          currentPick: 1,
-          rosterSize: 25,
-          myTeamId: null,
-          myRoster: [],
-          remainingBudget: 260,
-          allPicks: [],
-          rankings: [],
-          auctionValues: [],
-          projectedStandings: null,
           teamRosters,
         };
       },
@@ -409,6 +436,9 @@ export const useDraftStore = create<DraftState>()(
         allTeamBudgets: state.allTeamBudgets,
         // Roster slot layout detected from players-table (persisted since it doesn't change mid-draft)
         detectedRosterSlots: state.detectedRosterSlots,
+        // Session-stable config — set once at draft start, survives reload
+        leagueCategories: state.leagueCategories,
+        myTeamId: state.myTeamId,
       }),
       merge: (persisted, current) => {
         const stored = (persisted as any) ?? {};

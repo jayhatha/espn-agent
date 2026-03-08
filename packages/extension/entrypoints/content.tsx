@@ -351,9 +351,17 @@ export default defineContentScript({
 
     const refreshAssistantData = throttle(
       async () => {
-        // Clear stale roster data before re-collecting from DOM
-        const initialBudget = cachedLeagueConfig?.budget || 260;
-        useDraftStore.getState().resetDraftPicks(initialBudget);
+        // Only re-scrape picks from DOM if store has no picks (fresh start or post-reset).
+        // When state is preserved from a same-draft reload, skip DOM scraping to avoid
+        // contaminating myRoster with other teams' players due to teamId matching issues.
+        const existingPicks = useDraftStore.getState().allPicks;
+        const shouldScrapePicksFromDom = existingPicks.length === 0;
+
+        if (shouldScrapePicksFromDom) {
+          // Clear stale roster data before re-collecting from DOM
+          const initialBudget = cachedLeagueConfig?.budget || 260;
+          useDraftStore.getState().resetDraftPicks(initialBudget);
+        }
 
         const latestBackendLeagueId = await resolveBackendLeagueMapping();
         const currentState = useDraftStore.getState();
@@ -396,8 +404,16 @@ export default defineContentScript({
           );
         }
 
-        const completedPicks = collectCompletedPicksSnapshot();
-        completedPicks.forEach((pick) => processDetectedPick(pick));
+        if (shouldScrapePicksFromDom) {
+          const completedPicks = collectCompletedPicksSnapshot();
+          completedPicks.forEach((pick) => processDetectedPick(pick));
+        } else {
+          console.log(
+            "[ESPN Draft Assistant] Skipping DOM pick scrape — preserved state has",
+            existingPicks.length,
+            "picks"
+          );
+        }
       },
       3000 // 3 seconds minimum between refreshes
     );
