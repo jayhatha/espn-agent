@@ -781,14 +781,19 @@ export function computeDraftEngine(
   // allPlayersOpt already built above (shared with projected standings).
 
   // Use detected roster slots when available, fall back to DEFAULT_ROSTER_SLOTS
-  const activeSlotsOpt = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
+  let activeSlotsOpt = input.rosterSlots ?? DEFAULT_ROSTER_SLOTS;
 
-  // Warn if rosterSize differs from active slot total
+  // Reconcile slot total with rosterSize (source of truth from Position Tracker DOM).
+  // If the slot definitions sum to a different total than rosterSize, adjust BN so
+  // Ideal Roster and Budget Pacing show the same total roster count.
   const activeTotalOpt = Object.values(activeSlotsOpt).reduce((s, v) => s + v, 0);
-  if (input.rosterSize !== activeTotalOpt) {
-    if (import.meta.env.DEV) console.warn(
-      `[DraftEngine] rosterSize=${input.rosterSize} differs from active slot total=${activeTotalOpt}. ` +
-      `Using ${input.rosterSlots ? "detected" : "default"} roster slots.`,
+  if (input.rosterSize > 0 && activeTotalOpt !== input.rosterSize) {
+    const diff = input.rosterSize - activeTotalOpt;
+    const reconciled = { ...activeSlotsOpt };
+    reconciled.BN = Math.max(0, (reconciled.BN ?? 0) + diff);
+    activeSlotsOpt = reconciled;
+    if (import.meta.env.DEV) console.log(
+      `[DraftEngine] Reconciled roster slots: rosterSize=${input.rosterSize}, slotTotal=${activeTotalOpt}, BN adjusted by ${diff}`,
     );
   }
 
