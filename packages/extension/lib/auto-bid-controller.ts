@@ -583,16 +583,25 @@ export class AutoBidController {
       }
     }
 
-    if (!isIdealTarget && !isOpportunity && !isPLUndervalued) {
+    // Path 4: RANKED VALUE — sub-$5 players with any external ranking
+    // When everyone is cheap, external rank is the best differentiator.
+    // Wider rank thresholds than other paths since we're spending very little.
+    const isRankedValue =
+      !isIdealTarget && !isPLUndervalued && !isOpportunity &&
+      espnAsv != null && espnAsv <= 5 &&
+      ranking?.externalRank != null && ranking.externalRank <= 200;
+
+    if (!isIdealTarget && !isOpportunity && !isPLUndervalued && !isRankedValue) {
       console.log(
         `[AutoBidController] Not a target — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, pos=${ranking?.primaryPosition ?? "?"}, belowMkt=${isBelowMarket}, plUnderval=${isPLUndervalued})`
       );
       return;
     }
 
-    // Compute bid cap based on bid path (priority: IDEAL > PL UNDERVALUED > OPPORTUNITY):
+    // Compute bid cap based on bid path (priority: IDEAL > PL UNDERVALUED > RANKED VALUE > OPPORTUNITY):
     // - Ideal targets: ASV + 10% (bid as much as it takes for our strategy)
     // - PL Undervalued: ASV + 15% (PL says they're better than market thinks)
+    // - Ranked Value: ASV + rank-scaled premium (cheap + ranked = grab them)
     // - Opportunities: ASV only (we're buying value, not overpaying)
     let autoBidCap: number;
     let capSource: string;
@@ -617,6 +626,16 @@ export class AutoBidController {
       // PL says they're better than market thinks — willing to go 15% above ASV
       autoBidCap = Math.ceil(espnAsv! * 1.15);
       capSource = `PL UNDERVALUED, rank #${ranking!.externalRank} ${isSP ? "(SP)" : ""} ASV $${espnAsv} +15%`;
+    } else if (isRankedValue) {
+      // Sub-$5 player with an external ranking — the cheaper the player and
+      // better the rank, the more premium we're willing to pay.
+      // Top-50 ranked: ASV + $2 premium (e.g., $3 → $5)
+      // Top-100: ASV + $1 (e.g., $3 → $4)
+      // 100-200: at ASV (still worth grabbing at market)
+      const rank = ranking!.externalRank;
+      const premium = rank <= 50 ? 2 : rank <= 100 ? 1 : 0;
+      autoBidCap = Math.ceil(espnAsv! + premium);
+      capSource = `RANKED VALUE, rank #${rank} ASV $${espnAsv} +$${premium}`;
     } else {
       // Opportunity: cap at market value (espnAsv is guaranteed non-null here by isBelowMarket check)
       autoBidCap = espnAsv!;
