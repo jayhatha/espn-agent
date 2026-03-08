@@ -130,6 +130,18 @@ export class AutoBidController {
       state.rankings?.find((p) => p.playerId === playerId)?.espnAuctionValue ??
       null;
 
+    // Guard: only auto-bid on ANCHOR players (market value > $20).
+    // "Bid as much as it takes" is reserved for anchors — core ($5-$20) and
+    // value (<$5) players aren't worth aggressive auto-bidding.
+    // Use ESPN ASV as the tier signal; fall back to engine maxBid if unavailable.
+    const tierValue = espnAsv ?? maxBid;
+    if (tierValue < 20) {
+      console.log(
+        `[AutoBidController] Player value $${tierValue} below anchor threshold ($20) — skipping`
+      );
+      return;
+    }
+
     // Compute bid cap: ESPN ASV +10% when available, engine maxBid as fallback
     const autoBidCap = espnAsv != null ? Math.ceil(espnAsv * 1.10) : maxBid;
     const capSource = espnAsv != null ? `ESPN ASV $${espnAsv} +10%` : `engine maxBid`;

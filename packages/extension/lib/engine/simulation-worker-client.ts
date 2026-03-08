@@ -14,8 +14,9 @@
  *     This prevents stale results from overwriting newer ones during rapid nominations.
  *   - Timeout: 10 seconds. If worker doesn't respond, resolve with null simulation fields
  *     rather than crashing the engine.
- *   - WXT-compatible worker URL: `new URL('./simulation-worker.ts', import.meta.url)` ensures
- *     Vite/WXT correctly bundles the worker and generates an extension-relative URL.
+ *   - Blob URL wrapper: content scripts run in the page's origin, so we can't construct
+ *     a Worker from chrome-extension:// URLs directly. Instead, a tiny blob with
+ *     importScripts() loads the real worker from web_accessible_resources.
  */
 
 import type { ForwardSimulationSignal } from "./types";
@@ -49,16 +50,19 @@ function nullSimulation(): ForwardSimulationSignal {
 function getOrCreateWorker(): Worker {
   if (worker !== null) return worker;
 
-  // In WXT content scripts, import.meta.url resolves to the page URL (not extension URL).
-  // Use chrome.runtime.getURL to get the extension-relative path to the bundled worker.
-  // The worker is bundled as a separate entrypoint by Vite via the new URL() pattern.
-  const workerUrl = typeof chrome !== "undefined" && chrome.runtime?.getURL
-    ? chrome.runtime.getURL("simulation-worker.js")
-    : new URL("./simulation-worker.ts", import.meta.url).href;
-
-  worker = new Worker(workerUrl, {
-    type: "module",
+  // Content scripts run in the page's origin (e.g., fantasy.espn.com), so
+  // `new Worker(chrome.runtime.getURL(...))` fails with a SecurityError.
+  // Workaround: create a blob URL that uses importScripts to load the
+  // extension-bundled worker. importScripts CAN access chrome-extension://
+  // URLs listed in web_accessible_resources from a classic worker context.
+  const scriptUrl = chrome.runtime.getURL("simulation-worker.js");
+  const blob = new Blob([`importScripts("${scriptUrl}")`], {
+    type: "application/javascript",
   });
+  const blobUrl = URL.createObjectURL(blob);
+
+  worker = new Worker(blobUrl);
+  URL.revokeObjectURL(blobUrl);
 
   worker.onmessage = (event: MessageEvent<SimulationWorkerResponse>) => {
     const response = event.data;
