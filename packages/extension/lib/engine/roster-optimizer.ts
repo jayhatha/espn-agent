@@ -54,6 +54,31 @@ function normalizePosition(pos: string): string {
 }
 
 // ============================================================
+// canFillSlot — check if a player can fill a specific slot
+// ============================================================
+
+/**
+ * Check if a player can fill a specific slot.
+ * Reverse of findBestSlot: given a target slot, can this player occupy it?
+ *
+ * Used by the backfill pass, which iterates slots and looks for eligible players.
+ * Do NOT reuse findBestSlot here — its API is inverted (player → best slot vs slot → can player fill it).
+ */
+function canFillSlot(playerPositions: string[], slot: string): boolean {
+  const normalizedPositions = playerPositions.map(normalizePosition);
+
+  if (DEDICATED_SLOTS.has(slot)) {
+    // Dedicated slot: player must have exact position match
+    return normalizedPositions.includes(slot);
+  }
+
+  // Flex slot: player must have a position in FLEX_ELIGIBILITY[slot]
+  const eligible = FLEX_ELIGIBILITY[slot];
+  if (!eligible) return false;
+  return normalizedPositions.some(pos => eligible.includes(pos));
+}
+
+// ============================================================
 // findBestSlot — find the most-specific available slot for a player
 // ============================================================
 
@@ -208,6 +233,52 @@ export function optimizeRoster(
     budgetUsed += player.dollars;
     remainingBudget -= player.dollars;
     slotsToFill--;
+  }
+
+  // ------------------------------------------------------------------
+  // Phase 3b: Backfill pass
+  // ------------------------------------------------------------------
+  // After greedy fill, some slots may still be unfilled because the $1/slot reserve
+  // prevented affordable picks. Backfill force-places the cheapest eligible player
+  // into each remaining slot regardless of budget — the ideal roster MUST be complete.
+  if (slotsToFill > 0) {
+    const usedInRoster = new Set(roster);
+
+    // Iterate SLOT_PRIORITY order so dedicated slots backfill before flex
+    for (const slot of SLOT_PRIORITY) {
+      const count = remainingSlots.get(slot) ?? 0;
+      for (let s = 0; s < count; s++) {
+        // Find cheapest eligible player not already in roster
+        let cheapest: { player: PoolPlayer; sgp: number } | null = null;
+        for (const entry of indexed) {
+          if (usedInRoster.has(entry.player)) continue;
+          if (!canFillSlot(entry.player.positions, slot)) continue;
+          if (
+            !cheapest ||
+            entry.player.dollars < cheapest.player.dollars ||
+            (entry.player.dollars === cheapest.player.dollars && entry.sgp > cheapest.sgp)
+          ) {
+            cheapest = { player: entry.player, sgp: entry.sgp };
+          }
+        }
+        if (cheapest) {
+          // Place regardless of budget (fill is mandatory)
+          roster.push(cheapest.player);
+          slotAssignments.push(slot);
+          greedyEntries.push({ player: cheapest.player, sgp: cheapest.sgp, slot, rosterIdx: roster.length - 1 });
+          usedInRoster.add(cheapest.player);
+          totalSGPValue += cheapest.sgp;
+          budgetUsed += cheapest.player.dollars;
+          remainingBudget -= cheapest.player.dollars;
+          slotsToFill--;
+
+          // Decrement slot count in remainingSlots so outer loop doesn't double-count
+          const c = remainingSlots.get(slot)!;
+          if (c > 1) remainingSlots.set(slot, c - 1);
+          else remainingSlots.delete(slot);
+        }
+      }
+    }
   }
 
   // ------------------------------------------------------------------
