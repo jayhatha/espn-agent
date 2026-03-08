@@ -105,6 +105,7 @@ export function buildFgPlayerPool(
     const stats: Record<string, number> = {};
     if (proj) {
       stats.W = proj.W;
+      stats.L = proj.L;
       stats.SV = proj.SV;
       stats.HLD = proj.HLD;
       stats.ERA = proj.ERA;
@@ -118,6 +119,8 @@ export function buildFgPlayerPool(
       stats.BBA = proj.BBA;
       stats.QS = proj.QS;
       stats.HRA = proj.HRA;
+      const totalDecisions = (proj.W || 0) + (proj.L || 0);
+      stats.WPCT = totalDecisions > 0 ? proj.W / totalDecisions : 0;
     }
 
     undraftedPitchers.push({
@@ -726,6 +729,7 @@ export function computeBuildArchetype(
       const proj = pitcherProjMap.get(nName);
       if (proj) {
         stats.W = proj.W;
+        stats.L = proj.L;
         stats.SV = proj.SV;
         stats.HLD = proj.HLD;
         stats.ERA = proj.ERA;
@@ -738,6 +742,8 @@ export function computeBuildArchetype(
         stats.BBA = proj.BBA;
         stats.QS = proj.QS;
         stats.HRA = proj.HRA;
+        const totalDecisions = (proj.W || 0) + (proj.L || 0);
+        stats.WPCT = totalDecisions > 0 ? proj.W / totalDecisions : 0;
       }
     } else {
       const proj = hitterProjMap.get(nName);

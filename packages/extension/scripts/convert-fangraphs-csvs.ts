@@ -169,6 +169,7 @@ function convertPitcherLeaderboard(): void {
       mlbamId: num(r["MLBAMID"]),
       fgId: r["PlayerId"] || "",
       W: num(r["W"]),
+      L: num(r["L"]),
       SV: num(r["SV"]),
       HLD: num(r["HLD"]),
       ERA: num(r["ERA"]),

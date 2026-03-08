@@ -54,6 +54,7 @@ export interface FgPitcherProjection {
   mlbamId: number;
   fgId: string;
   W: number;
+  L: number;
   SV: number;
   HLD: number;
   ERA: number;
