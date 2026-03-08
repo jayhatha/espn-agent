@@ -104,6 +104,10 @@ export class AutoBidController {
     const { currentBid } = currentAuctionPlayer;
     if (currentBid === undefined) return;
 
+    // Guard: player ID required to look up ESPN ASV
+    const playerId = currentAuctionPlayer.playerId;
+    if (playerId == null) return;
+
     // Guard: already bid at this price (prevent repeat clicks)
     if (this.lastBidPrice === currentBid) return;
 
@@ -118,10 +122,22 @@ export class AutoBidController {
       return;
     }
 
-    // Guard: price has reached or exceeded maxBid
-    if (currentBid >= maxBid) {
+    // Resolve ESPN ASV with two-source fallback:
+    // 1. DOM-scraped values (most accurate, scraped from ESPN fixed data table)
+    // 2. Rankings API values (populated from ESPN draft board API)
+    const espnAsv =
+      state.espnDomAuctionValues?.[playerId] ??
+      state.rankings?.find((p) => p.playerId === playerId)?.espnAuctionValue ??
+      null;
+
+    // Compute bid cap: ESPN ASV +10% when available, engine maxBid as fallback
+    const autoBidCap = espnAsv != null ? Math.ceil(espnAsv * 1.10) : maxBid;
+    const capSource = espnAsv != null ? `ESPN ASV $${espnAsv} +10%` : `engine maxBid`;
+
+    // Guard: price has reached or exceeded the cap
+    if (currentBid >= autoBidCap) {
       console.log(
-        `[AutoBidController] Price $${currentBid} exceeds maxBid $${maxBid} — stopping`
+        `[AutoBidController] Price $${currentBid} reached cap $${autoBidCap} (${capSource}) — stopping`
       );
       return;
     }
@@ -145,7 +161,7 @@ export class AutoBidController {
     this.lastBidPrice = currentBid;
 
     console.log(
-      `[AutoBidController] Auto-bidding +1 at $${currentBid} (maxBid: $${maxBid})`
+      `[AutoBidController] Auto-bidding +1 at $${currentBid} (cap: $${autoBidCap} via ${capSource})`
     );
 
     button.click();
