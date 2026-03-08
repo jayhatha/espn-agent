@@ -49,7 +49,14 @@ function nullSimulation(): ForwardSimulationSignal {
 function getOrCreateWorker(): Worker {
   if (worker !== null) return worker;
 
-  worker = new Worker(new URL("./simulation-worker.ts", import.meta.url), {
+  // In WXT content scripts, import.meta.url resolves to the page URL (not extension URL).
+  // Use chrome.runtime.getURL to get the extension-relative path to the bundled worker.
+  // The worker is bundled as a separate entrypoint by Vite via the new URL() pattern.
+  const workerUrl = typeof chrome !== "undefined" && chrome.runtime?.getURL
+    ? chrome.runtime.getURL("simulation-worker.js")
+    : new URL("./simulation-worker.ts", import.meta.url).href;
+
+  worker = new Worker(workerUrl, {
     type: "module",
   });
 

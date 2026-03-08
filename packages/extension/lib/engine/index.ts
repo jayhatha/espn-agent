@@ -10,11 +10,10 @@ import { optimizeRoster } from "./roster-optimizer";
 import { computeMaxBid } from "./bid-optimizer";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { runMonteCarlo } from "./monte-carlo";
-import { simulateFullDraft, computeSimStandings } from "./draft-simulator";
-import { compareDecisions, aggregateOutcomes } from "./decision-comparison";
-import { recommendNomination } from "./nomination-strategy";
 import { computeExternalRankBoost } from "./rank-boost";
 import { calculateFinalRate } from "@espn-fantasy/shared";
+import { runSimulationInWorker } from "./simulation-worker-client";
+import type { SimulationWorkerRequest, SerializedNominationInput } from "./simulation-worker";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
@@ -22,7 +21,7 @@ import {
   fgAuctionPitchersData,
 } from "../fangraphs-data";
 import type { FgHitterProjection, FgPitcherProjection } from "../fangraphs-data";
-import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal, CandidateAction, DecisionComparison, DraftTargetRecommendation } from "./types";
+import type { PoolPlayer, TargetRecommendation, ProjectedStandingsSignal, EnhancedScarcitySignal, SimDraftState, SimTeamState, ForwardSimulationSignal } from "./types";
 
 export type { DraftEngineSignals, DraftEngineInput, DraftAlert, InflationSignal, EnhancedScarcitySignal, CategoryGapSignal, BudgetCurveSignal, RosterOptimizationSignal, ProjectedStandingsSignal, ForwardSimulationSignal, SimulationOutcome, NominationRecommendation, DecisionComparison, DraftTargetRecommendation, IdealRosterSignal, IdealRosterPlayer } from "./types";
 
@@ -579,7 +578,10 @@ function computeIdealRoster(
 // computeDraftEngine
 // ============================================================
 
-export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals {
+export function computeDraftEngine(
+  input: DraftEngineInput,
+  onSimulationComplete?: (sim: ForwardSimulationSignal) => void,
+): DraftEngineSignals {
   const t0 = performance.now();
 
   // Build rankingsMap for O(1) lookups
@@ -881,34 +883,33 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     }
   }
 
-  // 7. Forward-looking draft simulation (Phase 28)
-  let simulation: ForwardSimulationSignal | null = null;
+  // 7. Forward-looking draft simulation (Phase 28 → Phase 53: moved to Web Worker)
+  // Returns cached result synchronously; fires async worker to update on next render.
   const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}_${splitValue}`;
 
-  if (newSimCacheKey === simulationCacheKey && cachedSimulation !== null) {
-    simulation = cachedSimulation;
-  } else if (
-    optimization === null ||
-    input.leagueCategories.length === 0 ||
-    input.teamRosters.size < 3 ||
-    input.myTeamId == null
-  ) {
-    if (import.meta.env.DEV) console.warn(
-      `[DraftEngine] Simulation skipped: optimization=${optimization != null}, categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
-    );
-  } else {
-    // Performance safeguard: skip simulation in very early draft (< 5% picks made)
-    const totalPicksExpected = input.totalTeams * input.rosterSize;
-    const draftProgressFraction = totalPicksExpected > 0
-      ? input.allPicks.length / totalPicksExpected
-      : 0;
+  if (newSimCacheKey !== simulationCacheKey || cachedSimulation === null) {
+    if (
+      optimization === null ||
+      input.leagueCategories.length === 0 ||
+      input.teamRosters.size < 3 ||
+      input.myTeamId == null
+    ) {
+      if (import.meta.env.DEV) console.warn(
+        `[DraftEngine] Simulation skipped: optimization=${optimization != null}, categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
+      );
+      // Reset cache when conditions not met
+      cachedSimulation = null;
+      simulationCacheKey = newSimCacheKey;
+    } else {
+      // Performance safeguard: skip simulation in very early draft (< 5% picks made)
+      const totalPicksExpected = input.totalTeams * input.rosterSize;
+      const draftProgressFraction = totalPicksExpected > 0
+        ? input.allPicks.length / totalPicksExpected
+        : 0;
 
-    if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
+      if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
 
-    if (draftProgressFraction >= 0.05) {
-      try {
-        const simT0 = performance.now();
-
+      if (draftProgressFraction >= 0.05) {
         const simState = buildSimDraftState(
           allPlayersOpt,
           input,
@@ -921,156 +922,111 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
 
         if (simState === null) {
           if (import.meta.env.DEV) console.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
+          cachedSimulation = null;
+          simulationCacheKey = newSimCacheKey;
         } else {
-          if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation starting: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
-          const SIMS_PER_DECISION = 50;
+          if (import.meta.env.DEV) console.log(`[DraftEngine] Firing simulation to worker: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
+
+          const SIMS_PER_DECISION = 200;
           const TEMPERATURE = 1.0;
 
-          // Baseline win probability (no decision scenario)
-          let winProbability: ReturnType<typeof aggregateOutcomes> | null = null;
-          try {
-            const baselineSimResults: number[][] = [];
-            for (let s = 0; s < SIMS_PER_DECISION; s++) {
-              const completed = simulateFullDraft(
-                allPlayersOpt, adjustedSgpValuesOpt, input.leagueCategories, simState, TEMPERATURE,
-              );
-              baselineSimResults.push(
-                computeSimStandings(completed.teamStates, input.leagueCategories),
-              );
-            }
-            winProbability = aggregateOutcomes(
-              simState.myTeamIndex, baselineSimResults, simState.teamStates.length,
+          // Resolve nominated player index (stays on main thread — needs normalizeName + auctionValues)
+          let currentAuctionPlayerIndex: number | null = null;
+          if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
+            let nomIdx = -1;
+
+            // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
+            const nominated = input.auctionValues.find(
+              av => av.playerId === input.currentAuctionPlayerId,
             );
-            if (import.meta.env.DEV) console.log(`[DraftEngine] Baseline sim done: expectedFinish=${winProbability.expectedFinish.toFixed(1)}, winProb=${(winProbability.winProbability*100).toFixed(0)}%`);
-          } catch (e) {
-            if (import.meta.env.DEV) console.warn('[DraftEngine] Baseline simulation crashed:', e);
-          }
-
-          // Decision comparison (bid vs pass) when a player is nominated
-          let currentDecision: DecisionComparison | null = null;
-          try {
-            if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
-              let nomIdx = -1;
-
-              // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
-              const nominated = input.auctionValues.find(
-                av => av.playerId === input.currentAuctionPlayerId,
-              );
-              if (nominated) {
-                const nName = normalizeName(nominated.playerName ?? '');
-                nomIdx = allPlayersOpt.findIndex(p => p.normalizedName === nName);
-              }
-
-              // Strategy 2: Direct name match from DOM-observed player name
-              if (nomIdx < 0 && input.currentAuctionPlayerName) {
-                const domName = normalizeName(input.currentAuctionPlayerName);
-                const domIdx = allPlayersOpt.findIndex(p => p.normalizedName === domName);
-                if (domIdx >= 0) nomIdx = domIdx;
-              }
-
-              if (nomIdx >= 0) {
-                  const candidateActions: CandidateAction[] = [
-                    { type: "bid", label: `Bid $${optimization.maxBid}`, playerIndex: nomIdx, bidPrice: optimization.maxBid },
-                    { type: "pass", label: "Pass", playerIndex: nomIdx },
-                  ];
-                  currentDecision = compareDecisions(
-                    candidateActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
-                    input.leagueCategories, SIMS_PER_DECISION, TEMPERATURE,
-                  );
-              }
-            }
-          } catch (e) {
-            if (import.meta.env.DEV) console.warn('[DraftEngine] Decision comparison crashed:', e);
-          }
-
-          // Nomination strategy
-          let nominationStrategy: ForwardSimulationSignal['nominationStrategy'] = null;
-          try {
-            const myIdx = simState.myTeamIndex;
-            const oppStates = simState.teamStates.filter((_, i) => i !== myIdx);
-            if (oppStates.length > 0) {
-              const availableForNom = Array.from(simState.availableIndices)
-                .map(i => allPlayersOpt[i])
-                .filter((p): p is PoolPlayer => p !== undefined);
-              const availableSgps = Array.from(simState.availableIndices)
-                .map(i => adjustedSgpValuesOpt[i] ?? 0);
-              nominationStrategy = recommendNomination(
-                availableForNom, availableSgps,
-                simState.teamStates[myIdx], opponentModelOpt, oppStates, 5,
-              );
-            }
-          } catch (e) {
-            if (import.meta.env.DEV) console.warn('[DraftEngine] Nomination strategy crashed:', e);
-          }
-
-          // Draft Targets — simulate top-SGP players to rank by win probability
-          let draftTargets: DraftTargetRecommendation[] | null = null;
-          try {
-            // Collect top 5 undrafted players by adjusted SGP
-            const candidates: Array<{ name: string; pos: string; idx: number; bid: number }> = [];
-            const sortedByAdjSgp = allPlayersOpt
-              .map((p, i) => ({ player: p, idx: i, sgp: adjustedSgpValuesOpt[i] ?? 0 }))
-              .sort((a, b) => b.sgp - a.sgp);
-
-            for (const entry of sortedByAdjSgp) {
-              if (candidates.length >= 5) break;
-              candidates.push({
-                name: entry.player.name,
-                pos: entry.player.positions[0] ?? '',
-                idx: entry.idx,
-                bid: Math.max(1, Math.ceil(entry.player.dollars)),
-              });
+            if (nominated) {
+              const nName = normalizeName(nominated.playerName ?? '');
+              nomIdx = allPlayersOpt.findIndex(p => p.normalizedName === nName);
             }
 
-            if (candidates.length > 0) {
-              const targetActions: CandidateAction[] = candidates.map(c => ({
-                type: "bid" as const,
-                label: c.name,
-                playerIndex: c.idx,
-                bidPrice: c.bid,
-              }));
-
-              const SIMS_PER_TARGET = 50;
-              const targetComparison = compareDecisions(
-                targetActions, simState, allPlayersOpt, adjustedSgpValuesOpt,
-                input.leagueCategories, SIMS_PER_TARGET, TEMPERATURE,
-              );
-
-              draftTargets = targetComparison.decisions
-                .map((d, i) => ({
-                  playerName: candidates[i].name,
-                  position: candidates[i].pos,
-                  playerIndex: candidates[i].idx,
-                  bidPrice: candidates[i].bid,
-                  expectedFinish: d.outcome.expectedFinish,
-                  winProbability: d.outcome.winProbability,
-                  top3Probability: d.outcome.top3Probability,
-                }))
-                .sort((a, b) => b.winProbability - a.winProbability);
+            // Strategy 2: Direct name match from DOM-observed player name
+            if (nomIdx < 0 && input.currentAuctionPlayerName) {
+              const domName = normalizeName(input.currentAuctionPlayerName);
+              const domIdx = allPlayersOpt.findIndex(p => p.normalizedName === domName);
+              if (domIdx >= 0) nomIdx = domIdx;
             }
-          } catch (e) {
-            if (import.meta.env.DEV) console.warn('[DraftEngine] Draft targets crashed:', e);
+
+            if (nomIdx >= 0) currentAuctionPlayerIndex = nomIdx;
           }
 
-          const simElapsed = performance.now() - simT0;
+          // Build nomination input (serialize Maps -> plain objects for structured clone)
+          const myIdx = simState.myTeamIndex;
+          const oppStates = simState.teamStates.filter((_, i) => i !== myIdx);
+          let nominationInput: SerializedNominationInput | null = null;
+          if (oppStates.length > 0) {
+            const availableIndicesArr = Array.from(simState.availableIndices);
+            const availableSgps = availableIndicesArr.map(i => adjustedSgpValuesOpt[i] ?? 0);
 
-          if (simElapsed > 800) {
-            if (import.meta.env.DEV) console.warn(`[DraftEngine] Forward simulation took ${simElapsed.toFixed(1)}ms -- exceeds 800ms budget`);
+            // Serialize OpponentModel Maps -> plain objects
+            const serializedTeamNeeds: Record<string, string[]> = {};
+            for (const [teamId, posSet] of opponentModelOpt.teamNeeds.entries()) {
+              serializedTeamNeeds[teamId] = Array.from(posSet);
+            }
+            const serializedTeamBudgets: Record<string, number> = Object.fromEntries(
+              opponentModelOpt.teamBudgets.entries(),
+            );
+
+            nominationInput = {
+              myTeamIndex: myIdx,
+              opponentStates: oppStates,
+              availablePlayerIndices: availableIndicesArr,
+              availableSgps,
+              opponentModel: {
+                teamNeeds: serializedTeamNeeds,
+                teamBudgets: serializedTeamBudgets,
+                competitionFactors: opponentModelOpt.competitionFactors,
+                leagueInflationFactor: opponentModelOpt.leagueInflationFactor,
+              },
+            };
           }
 
-          simulation = {
-            currentDecision,
-            winProbability,
-            nominationStrategy,
-            draftTargets,
-            computeTimeMs: Math.round(simElapsed * 10) / 10,
+          // Build top candidates for draft targets (top 5 by adjusted SGP)
+          const topCandidates: SimulationWorkerRequest["topCandidates"] = [];
+          const sortedByAdjSgp = allPlayersOpt
+            .map((p, i) => ({ player: p, idx: i, sgp: adjustedSgpValuesOpt[i] ?? 0 }))
+            .sort((a, b) => b.sgp - a.sgp);
+
+          for (const entry of sortedByAdjSgp) {
+            if (topCandidates.length >= 5) break;
+            topCandidates.push({
+              name: entry.player.name,
+              pos: entry.player.positions[0] ?? '',
+              idx: entry.idx,
+              bid: Math.max(1, Math.ceil(entry.player.dollars)),
+            });
+          }
+
+          // Build worker request (Set<number> -> number[])
+          const workerRequest: Omit<SimulationWorkerRequest, "requestId"> = {
+            allPlayers: allPlayersOpt,
+            sgpValues: adjustedSgpValuesOpt,
+            categories: input.leagueCategories,
+            availableIndices: Array.from(simState.availableIndices),
+            teamStates: simState.teamStates,
+            myTeamIndex: simState.myTeamIndex,
+            currentAuctionPlayerIndex,
+            maxBid: optimization.maxBid,
+            nominationInput,
+            topCandidates,
+            simsPerDecision: SIMS_PER_DECISION,
+            temperature: TEMPERATURE,
           };
-        }
 
-        cachedSimulation = simulation;
-        simulationCacheKey = newSimCacheKey;
-      } catch (e) {
-        if (import.meta.env.DEV) console.warn("[DraftEngine] Forward simulation failed:", e);
+          // Fire and forget — update cached result and call callback when done
+          const capturedCacheKey = newSimCacheKey;
+          runSimulationInWorker(workerRequest).then(result => {
+            cachedSimulation = result;
+            simulationCacheKey = capturedCacheKey;
+            onSimulationComplete?.(result);
+          }).catch(e => {
+            if (import.meta.env.DEV) console.warn("[DraftEngine] Simulation worker failed:", e);
+          });
+        }
       }
     }
   }
@@ -1111,7 +1067,7 @@ export function computeDraftEngine(input: DraftEngineInput): DraftEngineSignals 
     computeTimeMs: Math.round(elapsed * 10) / 10,
     optimization,
     projectedStandings,
-    simulation,
+    simulation: cachedSimulation,
     idealRoster,
   };
 }

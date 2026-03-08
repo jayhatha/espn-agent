@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useDraftStore } from "./draft-state";
 import { computeDraftEngine } from "./engine";
-import type { DraftEngineSignals } from "./engine";
+import type { DraftEngineSignals, ForwardSimulationSignal } from "./engine";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -27,29 +27,41 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   const currentPlayerId = currentAuctionPlayer?.playerId;
   const currentPlayerName = currentAuctionPlayer?.playerName;
 
-  return useMemo(() => {
+  // Async simulation state — updated when worker completes
+  const [asyncSimulation, setAsyncSimulation] = useState<ForwardSimulationSignal | null>(null);
+
+  // Reset async simulation when the cache key changes (new pick or new nomination)
+  // so stale sim results don't persist after state transitions.
+  useEffect(() => {
+    setAsyncSimulation(null);
+  }, [allPicks.length, currentPlayerId]);
+
+  const baseSignals = useMemo(() => {
     // Only compute for auction drafts with data
     if (draftFormat !== "auction") return null;
     if (rankings.length === 0 && auctionValues.length === 0) return null;
 
-    return computeDraftEngine({
-      rankings,
-      auctionValues,
-      allPicks,
-      myRoster,
-      remainingBudget,
-      totalTeams,
-      rosterSize,
-      rosterSlots: detectedRosterSlots ?? undefined,
-      teamRosters,
-      myTeamId,
-      allTeamBudgets,
-      leagueCategories,
-      currentAuctionPlayerId: currentPlayerId,
-      currentAuctionPlayerName: currentPlayerName,
-      espnDomAuctionValues,
-      pitcherHitterSplit,
-    });
+    return computeDraftEngine(
+      {
+        rankings,
+        auctionValues,
+        allPicks,
+        myRoster,
+        remainingBudget,
+        totalTeams,
+        rosterSize,
+        rosterSlots: detectedRosterSlots ?? undefined,
+        teamRosters,
+        myTeamId,
+        allTeamBudgets,
+        leagueCategories,
+        currentAuctionPlayerId: currentPlayerId,
+        currentAuctionPlayerName: currentPlayerName,
+        espnDomAuctionValues,
+        pitcherHitterSplit,
+      },
+      setAsyncSimulation,
+    );
   }, [
     rankings,
     auctionValues,
@@ -69,4 +81,10 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     detectedRosterSlots, // Recompute when roster slots are detected for the first time
     pitcherHitterSplit, // Recompute when pitcher/hitter split preference changes
   ]);
+
+  // Merge async simulation into signals — async result takes priority when available
+  return useMemo(() => {
+    if (!baseSignals) return null;
+    return { ...baseSignals, simulation: asyncSimulation ?? baseSignals.simulation };
+  }, [baseSignals, asyncSimulation]);
 }
