@@ -785,6 +785,32 @@ export default defineContentScript({
       { skipInitialScan: statePreserved }
     );
 
+    // On same-draft reload, reconcile picks that happened during the reload window.
+    // The MutationObserver above only catches DOM mutations going forward, but picks
+    // that completed while the extension was reloading are already rendered in the DOM.
+    // Only process picks NOT already in persisted allPicks to avoid roster contamination.
+    if (statePreserved) {
+      const domPicks = collectCompletedPicksSnapshot();
+      const currentAllPicks = useDraftStore.getState().allPicks;
+      const knownPlayerIds = new Set(currentAllPicks.map(p => p.playerId));
+      const knownNames = new Set(
+        currentAllPicks.map(p => normalizePlayerName(p.playerName))
+      );
+      const missedPicks = domPicks.filter(
+        p => !knownPlayerIds.has(p.playerId) &&
+             !knownNames.has(normalizePlayerName(p.playerName))
+      );
+
+      if (missedPicks.length > 0) {
+        console.log(
+          `[ESPN Draft Assistant] Reconciliation: found ${missedPicks.length} picks missed during reload`
+        );
+        missedPicks.forEach(pick => processDetectedPick(pick));
+      } else {
+        console.log("[ESPN Draft Assistant] Reconciliation: no missed picks during reload");
+      }
+    }
+
     const refreshHandler = () => {
       refreshAssistantData();
     };
