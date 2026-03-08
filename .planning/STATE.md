@@ -463,8 +463,9 @@ None yet.
 | 49 | Parse roster size from ESPN Position Tracker DOM to fix rosterSize mismatch warning | 2026-03-06 | fc241ce | ✅ | [49-parse-roster-size-from-espn-position-tra](./quick/49-parse-roster-size-from-espn-position-tra/) |
 | 51 | Incorporate external rankings strongly into draft targets math (rank boost multiplier) | 2026-03-06 | 1c1884d | ✅ | [51-incorporate-external-rankings-into-draft-targets](./quick/51-incorporate-external-rankings-into-draft-targets/) |
 | 52 | Add pitcher/hitter percentage weight slider for ideal roster and bid recommendations | 2026-03-07 | 9c5f618 | ✅ | [52-add-pitcher-hitter-percentage-weight-sli](./quick/52-add-pitcher-hitter-percentage-weight-sli/) |
+| 53 | Move forward simulation (Monte Carlo) to Web Worker — off main thread, 200 sims restored | 2026-03-07 | d5efb30 | ✅ | [53-move-forward-simulation-monte-carlo-to-a](./quick/53-move-forward-simulation-monte-carlo-to-a/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-07 - Completed quick task 52: pitcher/hitter split slider
+Last activity: 2026-03-07 - Completed quick task 53: simulation Web Worker
 Resume file: None
