@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 31 — Mobile Draft Companion
-Plan: 01 complete — Phase 31 Plan 01 COMPLETE
-Status: Phase 31 in progress (1/3 plans) — Fastify WebSocket hub at /draft/live with role-based relay (extension fan-out, mobile control)
-Last activity: 2026-03-08 — Phase 31 Plan 01 complete (@fastify/websocket hub route created)
+Plan: 02 complete — Phase 31 Plan 02 COMPLETE
+Status: Phase 31 in progress (2/3 plans) — Extension WS relay: background SW connects to hub, DraftSidebar writes engine signals to storage, content script handles CONTROL commands
+Last activity: 2026-03-08 — Phase 31 Plan 02 complete (extension relay pipeline wired)
 
-Progress: Phase 31 in progress (1/3 plans) | WebSocket hub done
+Progress: Phase 31 in progress (2/3 plans) | Extension relay pipeline done
 
 ```
 [############                            ] 30% v2.0
@@ -159,6 +159,7 @@ Progress: Phase 31 in progress (1/3 plans) | WebSocket hub done
 | Phase 30-extension-perf-audit P01 | 5 | 2 tasks | 8 files |
 | Phase 30 P02 | 7 | 2 tasks | 7 files |
 | Phase 31 P01 | 2 | 2 tasks | 4 files |
+| Phase 31 P02 | 4 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -383,6 +384,11 @@ Recent decisions affecting v1.1 work:
 - [Phase 31 P01]: Role-based WS routing via ?role=extension or ?role=mobile query param at connection time — avoids auth complexity for local-network use
 - [Phase 31 P01]: Cache latestSnapshot as raw string so late-joining mobile clients get current state immediately on connect without double serialization
 - [Phase 31 P01]: Private LAN IP origins (192.168.x, 10.x, 172.16-31.x) added to CORS allowed list for mobile draft companion page
+- [Phase 31 P02]: Write only a mobile-relevant subset of engine signals (inflation summary, budgetCurve summary, alerts, optimization core fields, simulation outcome) to storage to keep payloads small
+- [Phase 31 P02]: 1-second debounce on storage writes prevents thrashing chrome.storage.local on every intermediate React render
+- [Phase 31 P02]: Storage-mediated bridge: React component writes to chrome.storage.local; background SW listens via onChanged — required because background SW cannot access React context directly
+- [Phase 31 P02]: Reconnect delay resets to 3s on successful WS connection preventing stuck exponential backoff
+- [Phase 31 P02]: CONTROL listener returns false synchronously since sendResponse is called inline (no async operation needed)
 
 ### Roadmap Evolution
 
