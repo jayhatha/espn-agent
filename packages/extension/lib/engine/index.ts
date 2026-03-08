@@ -488,6 +488,23 @@ function computeIdealRoster(
     remainingSlots,
   );
 
+  // Cross-validate myRoster against allPicks to discard stale persisted entries.
+  // After page reload, the team ID mismatch bug may leave myRoster populated from
+  // chrome.storage.local with players the user never actually drafted. allPicks is
+  // rebuilt from DOM on reload and is the authoritative source.
+  // Match on playerId first (exact), fall back to normalizedName (handles id=0 edge case).
+  const allPicksNormalizedNames = new Set(
+    input.allPicks.map(p => normalizeName(p.playerName))
+  );
+  const allPicksPlayerIds = new Set(
+    input.allPicks.filter(p => p.playerId > 0).map(p => p.playerId)
+  );
+  const validMyRoster = input.myRoster.filter(drafted => {
+    if (drafted.playerId > 0 && allPicksPlayerIds.has(drafted.playerId)) return true;
+    if (allPicksNormalizedNames.has(normalizeName(drafted.playerName))) return true;
+    return false;
+  });
+
   // Assign drafted players to slots using same priority logic
   const draftedSlotMap = new Map<string, number>();
   for (const [slot, count] of Object.entries(activeSlots)) {
@@ -495,7 +512,7 @@ function computeIdealRoster(
   }
 
   const draftedPlayers: IdealRosterPlayer[] = [];
-  for (const drafted of input.myRoster) {
+  for (const drafted of validMyRoster) {
     const positions = drafted.positions.length > 0 ? drafted.positions : ['UTIL'];
     const slot = findBestSlotForPositions(positions, draftedSlotMap);
     if (slot) {
