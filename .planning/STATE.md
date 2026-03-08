@@ -476,8 +476,9 @@ None yet.
 | 59 | Fix auto-bid timing: remove shouldBid gate broken by async worker, use strategy filter instead | 2026-03-08 | 0ed541a | ✅ | [59-fix-auto-bid-timing](./quick/59-fix-auto-bid-timing/) |
 | 60 | Auto-nominate players using the ESPN queue button in the players table | 2026-03-08 | 6cd54e0 | ✅ | [60-auto-nominate-players-using-the-espn-que](./quick/60-auto-nominate-players-using-the-espn-que/) |
 | 61 | Emphasize players with high PL rankings and relatively low ASV in auto-bid, especially SPs | 2026-03-08 | ff4c3b1 | ✅ | [61-emphasize-players-with-high-pl-rankings-](./quick/61-emphasize-players-with-high-pl-rankings-/) |
+| 62 | After reload, ideal roster shows locked-in players who are not on my roster | 2026-03-08 | d276475 | ✅ | [62-after-reload-ideal-roster-shows-locked-i](./quick/62-after-reload-ideal-roster-shows-locked-i/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 61: PL undervalued auto-bid path + widened SP opportunity threshold
+Last activity: 2026-03-08 - Completed quick task 62: Cross-validate myRoster against allPicks in computeIdealRoster
 Resume file: None
