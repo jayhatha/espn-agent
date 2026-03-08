@@ -397,16 +397,12 @@ export class AutoBidController {
       `button[data-player-id="${playerId}"]`
     );
 
-    if (!queueButton) {
-      console.warn(
-        `[AutoNominate] Queue button not found for ${candidateName} (ID: ${playerId}) — player may not be visible in table`
-      );
-      this.nominationAttempts++;
-      this.lastNominationTime = Date.now();
+    if (queueButton && !queueButton.disabled) {
+      this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason!);
       return;
     }
 
-    if (queueButton.disabled) {
+    if (queueButton?.disabled) {
       console.warn(
         `[AutoNominate] Queue button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`
       );
@@ -415,24 +411,127 @@ export class AutoBidController {
       return;
     }
 
-    // Step 1: Click the queue/select button to select this player for nomination
-    // ESPN shows "Queue" when it's not your turn and "Select" when it is your turn.
+    // Button not in DOM — player not visible in the table. Use ESPN's player search
+    // to filter the table, then find and click the button.
+    console.log(
+      `[AutoNominate] Player not visible in table — searching for "${candidateName}"`
+    );
+    this.searchAndNominate(candidateName, playerId, candidateReason!);
+  }
+
+  /**
+   * Click the queue/select button, then click the confirmation button.
+   */
+  private clickPlayerButton(
+    button: HTMLButtonElement,
+    candidateName: string,
+    playerId: number,
+    candidateReason: string,
+  ): void {
     this.nominationAttempts++;
     this.lastNominationTime = Date.now();
 
-    const btnText = queueButton.textContent?.trim() || "Queue";
+    const btnText = button.textContent?.trim() || "Queue";
     console.log(
       `[AutoNominate] Clicking "${btnText}" for ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`
     );
 
-    queueButton.click();
+    button.click();
 
-    // Step 2: Click the confirmation button in the bid control area to submit
-    // ESPN may require a separate "Nominate"/"Select" button click after selection.
-    // Add a short delay to let ESPN process the queue/select action.
+    // Click the confirmation button after ESPN processes the selection.
     setTimeout(() => {
       this.clickNominateButton(candidateName);
     }, 500);
+  }
+
+  /**
+   * Use ESPN's player search input to find a player not visible in the table,
+   * then click their queue/select button, and clear the search afterward.
+   */
+  private searchAndNominate(
+    candidateName: string,
+    playerId: number,
+    candidateReason: string,
+  ): void {
+    const searchInput = document.querySelector<HTMLInputElement>(
+      '.playersSearch input.form__control, input[placeholder="Player Name"]'
+    );
+
+    if (!searchInput) {
+      console.warn(
+        `[AutoNominate] Search input not found — cannot search for ${candidateName}`
+      );
+      this.nominationAttempts++;
+      this.lastNominationTime = Date.now();
+      return;
+    }
+
+    // Type the player name into the search input using React-compatible value setting
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype, 'value'
+    )?.set;
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(searchInput, candidateName);
+    } else {
+      searchInput.value = candidateName;
+    }
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    console.log(`[AutoNominate] Typed "${candidateName}" into search`);
+
+    // Wait for ESPN to filter the table, then find the button
+    setTimeout(() => {
+      const queueButton = document.querySelector<HTMLButtonElement>(
+        `button[data-player-id="${playerId}"]`
+      );
+
+      if (queueButton && !queueButton.disabled) {
+        this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason);
+      } else {
+        console.warn(
+          `[AutoNominate] Player button still not found after search for ${candidateName} (ID: ${playerId})`
+        );
+        this.nominationAttempts++;
+        this.lastNominationTime = Date.now();
+      }
+
+      // Clear the search after a delay (whether nomination succeeded or not)
+      setTimeout(() => this.clearPlayerSearch(), 1000);
+    }, 800);
+  }
+
+  /**
+   * Clear ESPN's player search input by clicking the clear button or resetting the value.
+   */
+  private clearPlayerSearch(): void {
+    // Try the clear button first
+    const clearButton = document.querySelector<HTMLElement>(
+      '.player--search--clear, .playersSearch .player--search--clear svg'
+    );
+    if (clearButton) {
+      clearButton.click();
+      console.log("[AutoNominate] Cleared player search via clear button");
+      return;
+    }
+
+    // Fallback: reset input value directly
+    const searchInput = document.querySelector<HTMLInputElement>(
+      '.playersSearch input.form__control, input[placeholder="Player Name"]'
+    );
+    if (searchInput) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype, 'value'
+      )?.set;
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(searchInput, '');
+      } else {
+        searchInput.value = '';
+      }
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log("[AutoNominate] Cleared player search via input reset");
+    }
   }
 
   /**
