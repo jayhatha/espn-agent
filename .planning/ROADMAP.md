@@ -583,7 +583,7 @@ Plans:
   2. Player name normalization uses normalizeName() (strips Jr./Sr./diacritics) not plain toLowerCase()
   3. Sidebar shows live nomination diagnostics (status, candidate, turn detection, attempts, cooldown) with force nominate button
   4. window.espnDraftAssistant.nominationDiag() available in DEV mode for console inspection
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 33-01-PLAN.md — Structured nomination logging, name normalization fix, NominationDiagnostics UI panel, force nominate button, window diagnostic exports
+- [x] 33-01-PLAN.md — Structured nomination logging, name normalization fix, NominationDiagnostics UI panel, force nominate button, window diagnostic exports

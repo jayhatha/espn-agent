@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 31 — Mobile Draft Companion
-Plan: 03 complete — Phase 31 Plan 03 COMPLETE — Phase 31 COMPLETE
-Status: Phase 31 complete (3/3 plans) — Mobile page at /draft/live: auto-detected LAN WS URL, nomination/max bid/win probability/budget/alerts, sticky control bar with auto-bid toggle, position filter, split slider
-Last activity: 2026-03-08 — Phase 31 Plan 03 complete (mobile draft companion page delivered)
+Phase: 33 — Debug Autopilot Nomination Flow
+Plan: 01 complete — Phase 33 Plan 01 COMPLETE
+Status: Phase 33 Plan 01 complete (1/1 plans) — Structured nomination logging, normalizeName fix, NominationDiagnostics panel, window.espnDraftAssistant diagnostic exports
+Last activity: 2026-03-08 — Phase 33 Plan 01 complete (autopilot nomination diagnostics delivered)
 
-Progress: Phase 31 COMPLETE (3/3 plans) | Full relay chain: Extension -> WS hub -> Mobile page
+Progress: Phase 33 COMPLETE (1/1 plans) | Nomination flow fully observable in console and sidebar
 
 ```
 [############                            ] 30% v2.0
@@ -162,6 +162,7 @@ Progress: Phase 31 COMPLETE (3/3 plans) | Full relay chain: Extension -> WS hub 
 | Phase 31 P02 | 4 | 3 tasks | 3 files |
 | Phase 31 P03 | 2 | 2 tasks | 2 files |
 | Phase 32 P01 | 3 | 2 tasks | 2 files |
+| Phase 33 P01 | 4 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -396,6 +397,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 31 P03]: WS URL defaults to ws://${window.location.hostname}:3001/draft/live?role=mobile — auto-adapts if phone opens the page via LAN IP
 - [Phase 32]: Backfill selects cheapest eligible player not most efficient — slot coverage priority over SGP/$ in emergency fill mode
 - [Phase 32]: canFillSlot is separate from findBestSlot — inverted APIs make code reuse awkward; kept distinct for clarity
+- [Phase 33]: Export normalizeName from draft-state.ts rather than duplicating the function in auto-bid-controller.ts
+- [Phase 33]: Poll getNominationDiagnostics() every 500ms in NominationDiagnostics UI since controller is not Zustand-reactive
+- [Phase 33]: Collapsible nomination diagnostics panel starts collapsed to avoid UI clutter; one-line status always visible
 
 ### Roadmap Evolution
 
@@ -422,6 +426,7 @@ Recent decisions affecting v1.1 work:
 - Phase 30 added: Extension perf and code quality audit — extension is locking up, investigate performance issues and code quality
 - Phase 31 added: Serve a mobile-friendly page that connects to the extension via websocket so I can view and control the draft from my phone on my local network
 - Phase 32 added: Ideal roster always needs to fill all spots.
+- Phase 33 added: debug autopilot nomination flow
 
 ### Pending Todos
 
@@ -519,5 +524,5 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 80: Fix autopilot nomination selectors
+Last activity: 2026-03-08 - Completed Phase 33 Plan 01: Debug autopilot nomination flow diagnostics
 Resume file: None
