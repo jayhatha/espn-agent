@@ -481,8 +481,9 @@ None yet.
 | 63 | Fix pos=? in shouldBid — match rankings by player name instead of mismatched ESPN/MLBAM IDs | 2026-03-08 | dce6c45 | ✅ | [63-fix-pos-in-shouldbid-evaluation-position](./quick/63-fix-pos-in-shouldbid-evaluation-position/) |
 | 64 | Fix ideal roster showing 20 players instead of 10 — name-based dedup in addPick and updateRoster | 2026-03-08 | c783e2e | ✅ | [64-fix-ideal-roster-showing-20-players-inst](./quick/64-fix-ideal-roster-showing-20-players-inst/) |
 | 65 | Fix ideal roster not filling all slots — add C to flex eligibility, normalize LF/CF/RF→OF | 2026-03-08 | 761494e | ✅ | [65-fix-ideal-roster-not-filling-all-roster-](./quick/65-fix-ideal-roster-not-filling-all-roster-/) |
+| 66 | Show external ranking circle next to players in ideal roster panel | 2026-03-08 | 9bc54e9 | ✅ | — |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 65: Aligned FLEX_ELIGIBILITY with FLEX_MAP (added C to DH/UTIL/BN), added LF/CF/RF→OF normalization
+Last activity: 2026-03-08 - Completed quick task 66: External ranking circle in ideal roster panel
 Resume file: None
