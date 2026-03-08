@@ -992,13 +992,12 @@ export function computeDraftEngine(
 
   if (newSimCacheKey !== simulationCacheKey || cachedSimulation === null) {
     if (
-      optimization === null ||
       input.leagueCategories.length === 0 ||
       input.teamRosters.size < 3 ||
       input.myTeamId == null
     ) {
       if (import.meta.env.DEV) console.warn(
-        `[DraftEngine] Simulation skipped: optimization=${optimization != null}, categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
+        `[DraftEngine] Simulation skipped: categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
       );
       // Reset cache when conditions not met
       cachedSimulation = null;

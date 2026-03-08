@@ -553,6 +553,39 @@ function detectTeamCount(): number | null {
  * Fallback to standard 5x5 if detection fails
  */
 function detectCategories(): Category[] | null {
+  // Strategy 0: Parse from fixedDataTable header row (most reliable for practice drafts)
+  // The header row (aria-rowindex="1") has two cell group wrappers:
+  //   fixed group (left): $, Player, Action
+  //   scrollable group (right): stat columns + ASV
+  // We read the scrollable group headers and filter out non-category columns.
+  const IGNORE_HEADERS = new Set(["$", "H/AB", "BB", "ASV", "IP"]);
+  const headerRow = document.querySelector(
+    '.fixedDataTableLayout_rowsContainer .fixedDataTableRowLayout_main[role="row"][aria-rowindex="1"]',
+  );
+  if (headerRow) {
+    const cellGroupWrappers = headerRow.querySelectorAll(
+      ".fixedDataTableCellGroupLayout_cellGroupWrapper",
+    );
+    if (cellGroupWrappers.length >= 2) {
+      const scrollableHeaders = cellGroupWrappers[1].querySelectorAll(
+        ".public_fixedDataTableCell_cellContent",
+      );
+      const categories: Category[] = [];
+      scrollableHeaders.forEach((cell) => {
+        const text = cell.textContent?.trim() || "";
+        if (text && !IGNORE_HEADERS.has(text) && text.length <= 5) {
+          categories.push(mapStatNameToCategory(text));
+        }
+      });
+      if (categories.length >= 5) {
+        console.log(
+          `[ESPN Draft Assistant] Categories detected from table header: ${categories.map((c) => c.stat_key).join(", ")}`,
+        );
+        return categories;
+      }
+    }
+  }
+
   // Strategy 1: Parse from draft board stat column headers
   const statHeaderSelectors = [
     '[class*="statHeader"]',
