@@ -418,6 +418,7 @@ Recent decisions affecting v1.1 work:
 - Phase 29 added: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
 - Phase 30 added: Extension perf and code quality audit — extension is locking up, investigate performance issues and code quality
 - Phase 31 added: Serve a mobile-friendly page that connects to the extension via websocket so I can view and control the draft from my phone on my local network
+- Phase 32 added: Ideal roster always needs to fill all spots.
 
 ### Pending Todos
 
@@ -511,8 +512,9 @@ None yet.
 | 77 | Fix extension not re-scraping roster on reload — reconciliation scan for picks missed during reload window | 2026-03-08 | 6093ade | ✅ | [77-fix-extension-not-re-scraping-roster-on-r](./quick/77-fix-extension-not-re-scraping-roster-on-r/) |
 | 78 | Fix roster detection — map grid column to team, rescan DOM on refresh button | 2026-03-08 | b509e42 | ✅ | [78-fix-roster-detection-grid-column-mapping](./quick/78-fix-roster-detection-grid-column-mapping/) |
 | 79 | Fix auto-nomination: handle "Select" button + search for non-visible players | 2026-03-08 | bb65764 | ✅ | [79-fix-auto-nomination-when-it-s-our-turn-t](./quick/79-fix-auto-nomination-when-it-s-our-turn-t/) |
+| 80 | Fix autopilot nomination select and nominate button selectors | 2026-03-08 | 1bec228 | ✅ | [80-fix-autopilot-nomination-select-and-nomi](./quick/80-fix-autopilot-nomination-select-and-nomi/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 79: Fix auto-nomination with search fallback
+Last activity: 2026-03-08 - Completed quick task 80: Fix autopilot nomination selectors
 Resume file: None
