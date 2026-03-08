@@ -479,8 +479,9 @@ None yet.
 | 61 | Emphasize players with high PL rankings and relatively low ASV in auto-bid, especially SPs | 2026-03-08 | ff4c3b1 | ✅ | [61-emphasize-players-with-high-pl-rankings-](./quick/61-emphasize-players-with-high-pl-rankings-/) |
 | 62 | After reload, ideal roster shows locked-in players who are not on my roster | 2026-03-08 | d276475 | ✅ | [62-after-reload-ideal-roster-shows-locked-i](./quick/62-after-reload-ideal-roster-shows-locked-i/) |
 | 63 | Fix pos=? in shouldBid — match rankings by player name instead of mismatched ESPN/MLBAM IDs | 2026-03-08 | dce6c45 | ✅ | [63-fix-pos-in-shouldbid-evaluation-position](./quick/63-fix-pos-in-shouldbid-evaluation-position/) |
+| 64 | Fix ideal roster showing 20 players instead of 10 — name-based dedup in addPick and updateRoster | 2026-03-08 | c783e2e | ✅ | [64-fix-ideal-roster-showing-20-players-inst](./quick/64-fix-ideal-roster-showing-20-players-inst/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 63: Fix ranking lookups to use name matching instead of mismatched player IDs
+Last activity: 2026-03-08 - Completed quick task 64: Name-based dedup prevents duplicate players from multiple DOM scan paths
 Resume file: None
