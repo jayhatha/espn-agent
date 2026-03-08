@@ -254,12 +254,29 @@ function computeRosterOptimization(
   // Build normalizedName → ASV lookup for market price override.
   // When ESPN ASV is available, use it directly as expected market price
   // instead of the SGP-based estimateMarketPrice() computation.
+  // Build playerId→normalizedName from all sources (auctionValues may be empty in practice drafts).
   const nameToAsv = new Map<string, number>();
-  if (input.espnDomAuctionValues) {
+  if (input.espnDomAuctionValues && Object.keys(input.espnDomAuctionValues).length > 0) {
+    const idToName = new Map<number, string>();
     for (const av of input.auctionValues) {
-      const asv = input.espnDomAuctionValues[av.playerId];
-      if (asv != null && asv > 0) {
-        nameToAsv.set(normalizeName(av.playerName), asv);
+      idToName.set(av.playerId, normalizeName(av.playerName));
+    }
+    for (const r of input.rankings) {
+      if (!idToName.has(r.playerId)) {
+        idToName.set(r.playerId, normalizeName(r.playerName));
+      }
+    }
+    for (const pick of input.allPicks) {
+      if (!idToName.has(pick.playerId)) {
+        idToName.set(pick.playerId, normalizeName(pick.playerName));
+      }
+    }
+    for (const [id, asv] of Object.entries(input.espnDomAuctionValues)) {
+      if (asv > 0) {
+        const name = idToName.get(Number(id));
+        if (name) {
+          nameToAsv.set(name, asv);
+        }
       }
     }
   }
@@ -505,12 +522,29 @@ function computeIdealRoster(
   // and SGP/$ efficiency sort use realistic auction costs instead of FanGraphs
   // projected values. FanGraphs dollars are preserved on the originals for
   // tier classification and sgpValue display.
+  // Build playerId→normalizedName from all sources (auctionValues may be empty in practice drafts).
   const nameToAsvIdeal = new Map<string, number>();
-  if (input.espnDomAuctionValues) {
+  if (input.espnDomAuctionValues && Object.keys(input.espnDomAuctionValues).length > 0) {
+    const idToNameIdeal = new Map<number, string>();
     for (const av of input.auctionValues) {
-      const asv = input.espnDomAuctionValues[av.playerId];
-      if (asv != null && asv > 0) {
-        nameToAsvIdeal.set(normalizeName(av.playerName), asv);
+      idToNameIdeal.set(av.playerId, normalizeName(av.playerName));
+    }
+    for (const r of input.rankings) {
+      if (!idToNameIdeal.has(r.playerId)) {
+        idToNameIdeal.set(r.playerId, normalizeName(r.playerName));
+      }
+    }
+    for (const pick of input.allPicks) {
+      if (!idToNameIdeal.has(pick.playerId)) {
+        idToNameIdeal.set(pick.playerId, normalizeName(pick.playerName));
+      }
+    }
+    for (const [id, asv] of Object.entries(input.espnDomAuctionValues)) {
+      if (asv > 0) {
+        const name = idToNameIdeal.get(Number(id));
+        if (name) {
+          nameToAsvIdeal.set(name, asv);
+        }
       }
     }
   }
