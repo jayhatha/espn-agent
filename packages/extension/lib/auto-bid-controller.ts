@@ -654,6 +654,24 @@ export class AutoBidController {
       capSource += ` → pitcher dampened ×${pitcherMultiplier.toFixed(2)} = $${autoBidCap} (raw $${rawCap})`;
     }
 
+    // Apply catcher slot dampening: when the dedicated C slot is already filled, a catcher
+    // can only go to UTIL or BN. We still want to draft utility catchers but shouldn't
+    // overpay since they're now bench-eligible only. Cut the bid cap by 50% to reflect
+    // reduced value of a second catcher slotted to UTIL/BN.
+    const playerPosition = ranking?.primaryPosition;
+    if (playerPosition === 'C') {
+      const remainingSlots = this.lastEngineSignals?.remainingSlots;
+      const catcherSlotsRemaining = remainingSlots?.['C'] ?? 0;
+      if (catcherSlotsRemaining <= 0) {
+        const rawCap = autoBidCap;
+        autoBidCap = Math.max(1, Math.ceil(autoBidCap * 0.5));
+        capSource += ` → C slot filled, catcher dampened ×0.5 = $${autoBidCap} (raw $${rawCap})`;
+        console.log(
+          `[AutoBidController] C slot filled — catcher dampening applied (0.5x): $${rawCap} → $${autoBidCap}`
+        );
+      }
+    }
+
     // Guard: price has reached or exceeded the cap
     if (currentBid >= autoBidCap) {
       console.log(
