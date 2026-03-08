@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useDraftStore } from "./draft-state";
 import { computeDraftEngine } from "./engine";
 import type { DraftEngineSignals, ForwardSimulationSignal } from "./engine";
+import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -30,10 +31,14 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   // Async simulation state — updated when worker completes
   const [asyncSimulation, setAsyncSimulation] = useState<ForwardSimulationSignal | null>(null);
 
-  // Reset async simulation when the cache key changes (new pick or new nomination)
-  // so stale sim results don't persist after state transitions.
+  // Async bid state — updated when bid optimizer worker completes
+  const [asyncBid, setAsyncBid] = useState<BidOptimizerWorkerResponse | null>(null);
+
+  // Reset async results when the cache key changes (new pick or new nomination)
+  // so stale results don't persist after state transitions.
   useEffect(() => {
     setAsyncSimulation(null);
+    setAsyncBid(null);
   }, [allPicks.length, currentPlayerId]);
 
   const baseSignals = useMemo(() => {
@@ -61,6 +66,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         pitcherHitterSplit,
       },
       setAsyncSimulation,
+      setAsyncBid,
     );
   }, [
     rankings,
@@ -82,9 +88,26 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     pitcherHitterSplit, // Recompute when pitcher/hitter split preference changes
   ]);
 
-  // Merge async simulation into signals — async result takes priority when available
+  // Merge async simulation and bid results into signals — async results take priority when available
   return useMemo(() => {
     if (!baseSignals) return null;
-    return { ...baseSignals, simulation: asyncSimulation ?? baseSignals.simulation };
-  }, [baseSignals, asyncSimulation]);
+
+    const mergedOptimization = baseSignals.optimization && asyncBid
+      ? {
+          ...baseSignals.optimization,
+          maxBid: asyncBid.maxBid,
+          expectedMarketPrice: asyncBid.expectedMarketPrice,
+          valueSurplus: asyncBid.valueSurplus,
+          shouldBid: asyncBid.shouldBid,
+          simulationEV: asyncBid.simulationEV,
+          simulationStdDev: asyncBid.simulationStdDev,
+        }
+      : baseSignals.optimization;
+
+    return {
+      ...baseSignals,
+      optimization: mergedOptimization,
+      simulation: asyncSimulation ?? baseSignals.simulation,
+    };
+  }, [baseSignals, asyncSimulation, asyncBid]);
 }

@@ -7,13 +7,13 @@ import { buildFgPlayerPool, normalizeName } from "./archetype";
 import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
-import { computeMaxBid } from "./bid-optimizer";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
-import { runMonteCarlo } from "./monte-carlo";
 import { computeExternalRankBoost } from "./rank-boost";
 import { calculateFinalRate } from "@espn-fantasy/shared";
 import { runSimulationInWorker } from "./simulation-worker-client";
+import { runBidOptimizerInWorker } from "./bid-optimizer-worker-client";
 import type { SimulationWorkerRequest, SerializedNominationInput } from "./simulation-worker";
+import type { BidOptimizerWorkerResponse } from "./bid-optimizer-worker";
 import {
   fgLeaderboardHittersData,
   fgLeaderboardPitchersData,
@@ -83,8 +83,8 @@ function findBestSlotForPositions(positions: string[], remaining: Map<string, nu
 let cachedSGPVectors: SGPVectors | null = null;
 let sgpCacheKey: number = -1;  // allPicks.length at last computation
 
-let cachedBidResult: { maxBid: ReturnType<typeof computeMaxBid>; monteCarlo: ReturnType<typeof runMonteCarlo> } | null = null;
-let bidCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length
+let cachedBidWorkerResult: BidOptimizerWorkerResponse | null = null;
+let bidWorkerCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length + '_' + split
 
 let cachedProjectedStandings: ProjectedStandingsSignal | null = null;
 let projectedStandingsCacheKey: number = -1;  // allPicks.length at last computation
@@ -282,87 +282,11 @@ function computeRosterOptimization(
   }
 
   // ----------------------------------------------------------------
-  // Bid cache: rebuild only when nomination OR pick count OR split changes
+  // Bid computation moved to Web Worker (Quick Task 58)
+  // computeMaxBid + runMonteCarlo no longer run synchronously here.
+  // Bid results arrive asynchronously via onBidComplete callback in
+  // computeDraftEngine(). This function returns placeholder bid values.
   // ----------------------------------------------------------------
-  const newBidCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}_${input.pitcherHitterSplit ?? 65}`;
-
-  let maxBidResult: ReturnType<typeof computeMaxBid> | null = null;
-  let monteCarloResult: ReturnType<typeof runMonteCarlo> | null = null;
-
-  if (newBidCacheKey === bidCacheKey && cachedBidResult !== null) {
-    maxBidResult = cachedBidResult.maxBid;
-    monteCarloResult = cachedBidResult.monteCarlo;
-  } else {
-    // Find nominated player in the available pool
-    let nominatedPlayer: PoolPlayer | undefined;
-
-    if (input.currentAuctionPlayerId != null) {
-      // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
-      const nominated = input.auctionValues.find(
-        av => av.playerId === input.currentAuctionPlayerId,
-      );
-      if (nominated) {
-        const nName = normalizeName(nominated.playerName ?? '');
-        nominatedPlayer = allPlayers.find(p => p.normalizedName === nName);
-      }
-
-      // Strategy 2: Direct name match from DOM-observed player name
-      // Handles practice drafts where ESPN player IDs don't match FG/MLBAM IDs
-      if (!nominatedPlayer && input.currentAuctionPlayerName) {
-        const domName = normalizeName(input.currentAuctionPlayerName);
-        nominatedPlayer = allPlayers.find(p => p.normalizedName === domName);
-      }
-    }
-
-    if (nominatedPlayer) {
-      // Compute max bid only when we have a real nominated player match
-      const nominatedAsv = nameToAsv.get(nominatedPlayer.normalizedName);
-      maxBidResult = computeMaxBid(
-        nominatedPlayer,
-        allPlayers,
-        sgpValues,
-        myBudget,
-        remainingSlots,
-        opponentModel,
-        inflation.inflationFactor,
-        nominatedAsv,
-      );
-
-      // Opponent budgets for Monte Carlo
-      const opponentBudgets: number[] = [];
-      for (const [, budget] of opponentModel.teamBudgets) {
-        opponentBudgets.push(budget);
-      }
-
-      // Compute my current roster SGP
-      let myCurrentRosterSGP = 0;
-      for (const drafted of input.myRoster) {
-        const draftedNorm = normalizeName(drafted.playerName);
-        const poolIdx = allPlayers.findIndex(p => p.normalizedName === draftedNorm);
-        if (poolIdx >= 0) {
-          myCurrentRosterSGP += sgpValues[poolIdx] ?? 0;
-        }
-      }
-
-      monteCarloResult = runMonteCarlo({
-        availablePlayers: allPlayers,
-        sgpValues,
-        myCurrentRoster: [],
-        myCurrentRosterSGP,
-        myBudget,
-        opponentBudgets,
-        rosterSlots: remainingSlots,
-        nominatedPlayer,
-        nominatedBid: maxBidResult.maxBid,
-        numSimulations: 200,
-      });
-    }
-
-    cachedBidResult = maxBidResult && monteCarloResult
-      ? { maxBid: maxBidResult, monteCarlo: monteCarloResult }
-      : null;
-    bidCacheKey = newBidCacheKey;
-  }
 
   // ----------------------------------------------------------------
   // Build top 5 targets proportionally split between hitters/pitchers
@@ -460,14 +384,14 @@ function computeRosterOptimization(
   console.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
 
   return {
-    maxBid: maxBidResult?.maxBid ?? 0,
-    expectedMarketPrice: maxBidResult?.expectedMarketPrice ?? 0,
-    valueSurplus: maxBidResult?.valueSurplus ?? 0,
-    shouldBid: monteCarloResult?.shouldBid ?? false,
+    maxBid: 0,
+    expectedMarketPrice: 0,
+    valueSurplus: 0,
+    shouldBid: false,
     topTargets,
     opponentPressure: opponentModel.competitionFactors,
-    simulationEV: monteCarloResult?.expectedTeamValue ?? 0,
-    simulationStdDev: monteCarloResult?.valueStdDev ?? 0,
+    simulationEV: 0,
+    simulationStdDev: 0,
     computeTimeMs: elapsed,
   };
 }
@@ -642,6 +566,7 @@ function computeIdealRoster(
 export function computeDraftEngine(
   input: DraftEngineInput,
   onSimulationComplete?: (sim: ForwardSimulationSignal) => void,
+  onBidComplete?: (bid: BidOptimizerWorkerResponse) => void,
 ): DraftEngineSignals {
   const t0 = performance.now();
 
@@ -944,6 +869,123 @@ export function computeDraftEngine(
     }
   }
 
+  // 6a. Async bid optimizer dispatch (Quick Task 58 — moved to Web Worker)
+  // Fire bid computation to worker when nominated player changes.
+  // Results arrive asynchronously via onBidComplete callback.
+  const newBidWorkerCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}_${splitValue}`;
+
+  if (newBidWorkerCacheKey !== bidWorkerCacheKey) {
+    // Find nominated player in the available pool (same two-strategy lookup as before)
+    let nominatedPlayer: PoolPlayer | undefined;
+
+    if (input.currentAuctionPlayerId != null) {
+      // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
+      const nominated = input.auctionValues.find(
+        av => av.playerId === input.currentAuctionPlayerId,
+      );
+      if (nominated) {
+        const nName = normalizeName(nominated.playerName ?? '');
+        nominatedPlayer = allPlayersOpt.find(p => p.normalizedName === nName);
+      }
+
+      // Strategy 2: Direct name match from DOM-observed player name
+      if (!nominatedPlayer && input.currentAuctionPlayerName) {
+        const domName = normalizeName(input.currentAuctionPlayerName);
+        nominatedPlayer = allPlayersOpt.find(p => p.normalizedName === domName);
+      }
+    }
+
+    if (nominatedPlayer) {
+      // Build nameToAsv lookup for ESPN ASV market price override
+      const nameToAsvBid = new Map<string, number>();
+      if (input.espnDomAuctionValues && Object.keys(input.espnDomAuctionValues).length > 0) {
+        const idToNameBid = new Map<number, string>();
+        for (const av of input.auctionValues) {
+          idToNameBid.set(av.playerId, normalizeName(av.playerName));
+        }
+        for (const r of input.rankings) {
+          if (!idToNameBid.has(r.playerId)) {
+            idToNameBid.set(r.playerId, normalizeName(r.playerName));
+          }
+        }
+        for (const pick of input.allPicks) {
+          if (!idToNameBid.has(pick.playerId)) {
+            idToNameBid.set(pick.playerId, normalizeName(pick.playerName));
+          }
+        }
+        for (const [id, asv] of Object.entries(input.espnDomAuctionValues)) {
+          if (asv > 0) {
+            const name = idToNameBid.get(Number(id));
+            if (name) nameToAsvBid.set(name, asv);
+          }
+        }
+      }
+
+      // Look up ESPN ASV by player ID first, then nameToAsv fallback
+      const nominatedAsv =
+        (input.currentAuctionPlayerId != null
+          ? input.espnDomAuctionValues?.[input.currentAuctionPlayerId]
+          : undefined)
+        ?? nameToAsvBid.get(nominatedPlayer.normalizedName)
+        ?? null;
+
+      // Opponent budgets for Monte Carlo
+      const opponentBudgets: number[] = [];
+      for (const [, budget] of opponentModelOpt.teamBudgets) {
+        opponentBudgets.push(budget);
+      }
+
+      // Compute my current roster SGP
+      let myCurrentRosterSGP = 0;
+      for (const drafted of input.myRoster) {
+        const draftedNorm = normalizeName(drafted.playerName);
+        const poolIdx = allPlayersOpt.findIndex(p => p.normalizedName === draftedNorm);
+        if (poolIdx >= 0) {
+          myCurrentRosterSGP += adjustedSgpValuesOpt[poolIdx] ?? 0;
+        }
+      }
+
+      // Serialize OpponentModel Maps -> plain objects for structured clone
+      const serializedTeamNeedsBid: Record<string, string[]> = {};
+      for (const [teamId, posSet] of opponentModelOpt.teamNeeds.entries()) {
+        serializedTeamNeedsBid[teamId] = Array.from(posSet);
+      }
+      const serializedTeamBudgetsBid: Record<string, number> = Object.fromEntries(
+        opponentModelOpt.teamBudgets.entries(),
+      );
+
+      const capturedBidKey = newBidWorkerCacheKey;
+      runBidOptimizerInWorker({
+        nominatedPlayer,
+        nominatedAsv,
+        availablePlayers: allPlayersOpt,
+        sgpValues: adjustedSgpValuesOpt,
+        budget: input.remainingBudget,
+        rosterSlots: remainingSlotsOpt,
+        inflationFactor: inflation.inflationFactor,
+        opponentModel: {
+          teamNeeds: serializedTeamNeedsBid,
+          teamBudgets: serializedTeamBudgetsBid,
+          competitionFactors: opponentModelOpt.competitionFactors,
+          leagueInflationFactor: opponentModelOpt.leagueInflationFactor,
+        },
+        myCurrentRosterSGP,
+        opponentBudgets,
+        numSimulations: 200,
+      }).then(result => {
+        cachedBidWorkerResult = result;
+        bidWorkerCacheKey = capturedBidKey;
+        onBidComplete?.(result);
+      }).catch(e => {
+        if (import.meta.env.DEV) console.warn("[DraftEngine] Bid optimizer worker failed:", e);
+      });
+    } else {
+      // No nominated player match — clear cache
+      bidWorkerCacheKey = newBidWorkerCacheKey;
+      cachedBidWorkerResult = null;
+    }
+  }
+
   // 7. Forward-looking draft simulation (Phase 28 → Phase 53: moved to Web Worker)
   // Returns cached result synchronously; fires async worker to update on next render.
   const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}_${splitValue}`;
@@ -992,8 +1034,11 @@ export function computeDraftEngine(
           const TEMPERATURE = 1.0;
 
           // Resolve nominated player index (stays on main thread — needs normalizeName + auctionValues)
+          // Use cachedBidWorkerResult.maxBid when available (async bid worker may have returned);
+          // fall back to $1 placeholder so simulation can still run decision comparison
+          const bidMaxBid = cachedBidWorkerResult?.maxBid ?? 0;
           let currentAuctionPlayerIndex: number | null = null;
-          if (input.currentAuctionPlayerId != null && optimization.maxBid > 0) {
+          if (input.currentAuctionPlayerId != null) {
             let nomIdx = -1;
 
             // Strategy 1: Match via auctionValues ID lookup -> FG pool name match
@@ -1071,7 +1116,7 @@ export function computeDraftEngine(
             teamStates: simState.teamStates,
             myTeamIndex: simState.myTeamIndex,
             currentAuctionPlayerIndex,
-            maxBid: optimization.maxBid,
+            maxBid: bidMaxBid,
             nominationInput,
             topCandidates,
             simsPerDecision: SIMS_PER_DECISION,
