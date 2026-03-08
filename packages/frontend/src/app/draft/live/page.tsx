@@ -483,7 +483,7 @@ export default function DraftLivePage() {
                 aria-label="Pitcher/hitter split"
               />
               <span className="text-[10px] text-neutral-500">
-                H {100 - splitValue} / P {splitValue}
+                P {100 - splitValue} / H {splitValue}
               </span>
             </div>
           </div>
