@@ -254,9 +254,9 @@ export default function DraftLivePage() {
               <SectionTitle>Current Nomination</SectionTitle>
               {currentPlayer ? (
                 <>
-                  <p className="text-2xl font-bold leading-tight">{currentPlayer.name}</p>
+                  <p className="text-2xl font-bold leading-tight">{currentPlayer.playerName}</p>
                   <p className="text-neutral-400 text-sm mt-0.5">
-                    {currentPlayer.position}
+                    {currentPlayer.positions?.join("/") ?? ""}
                     {currentPlayer.nominatingTeam && (
                       <span className="ml-2 text-neutral-600">
                         — nominated by {currentPlayer.nominatingTeam}

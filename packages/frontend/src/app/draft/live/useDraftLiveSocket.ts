@@ -5,9 +5,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 // ---- Types matching the extension's MobileStateSnapshot and MobileEngineSignals ----
 
 export interface CurrentAuctionPlayer {
-  id: number;
-  name: string;
-  position: string;
+  playerId?: number;
+  playerName: string;
+  positions?: string[];
   currentBid?: number;
   nominatingTeam?: string;
 }
