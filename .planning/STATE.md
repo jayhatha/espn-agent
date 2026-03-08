@@ -504,8 +504,9 @@ None yet.
 | 70 | Fix forward simulation not showing — missing cache key update when draft < 5% | 2026-03-08 | d2571de | ✅ | [70-fix-forward-simulation-not-showing-missi](./quick/70-fix-forward-simulation-not-showing-missi/) |
 | 71 | Add clearing and re-fetching my roster to refresh button | 2026-03-08 | b9f6735 | ✅ | [71-add-clearing-and-re-fetching-my-roster-t](./quick/71-add-clearing-and-re-fetching-my-roster-t/) |
 | 72 | Fix simulation breaking after reload — persist leagueCategories/myTeamId, conditional initializeDraft, remove Projected Standings section | 2026-03-08 | e34aae3 | ✅ | [72-fix-simulation-breaking-after-reload-pre](./quick/72-fix-simulation-breaking-after-reload-pre/) |
+| 73 | Fix reload adding other teams' players to roster — skip initial DOM scan on same-draft reload, add roster reconciliation to refresh | 2026-03-08 | 90eae8d | ✅ | [73-reloading-still-adds-players-from-other-](./quick/73-reloading-still-adds-players-from-other-/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 72: Persist draft state across reloads, fix simulation preconditions, remove non-simulation Projected Standings
+Last activity: 2026-03-08 - Completed quick task 73: Fix reload adding other teams' players to roster
 Resume file: None
