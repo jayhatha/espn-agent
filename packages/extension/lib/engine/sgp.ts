@@ -26,7 +26,7 @@ const SCARCITY_MULTIPLIERS: Record<string, number> = {
 };
 
 /** Pitching stat keys — used to identify pitcher-relevant categories */
-const PITCHING_STAT_KEYS = new Set(["W", "SV", "HLD", "ERA", "WHIP", "K", "SO", "QS", "IP"]);
+const PITCHING_STAT_KEYS = new Set(["W", "SV", "HLD", "ERA", "WHIP", "K", "SO", "QS", "IP", "WPCT"]);
 
 // ============================================================
 // getPlayerStat — stat extractor

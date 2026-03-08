@@ -65,10 +65,20 @@ describe("mapStatNameToCategory", () => {
     expect(category.type).toBe("COUNTING");
   });
 
-  it("should use RATE type for AVG, ERA, WHIP", () => {
+  it("should include formula_id for WPCT rate stat", () => {
+    const category = mapStatNameToCategory("WPCT");
+    expect(category.formula_id).toBe("wpct");
+    expect(category.type).toBe("RATE");
+    expect(category.direction).toBe("HIGHER_BETTER");
+    expect(category.required_components).toContain("W");
+    expect(category.required_components).toContain("L");
+  });
+
+  it("should use RATE type for AVG, ERA, WHIP, WPCT", () => {
     expect(mapStatNameToCategory("AVG").type).toBe("RATE");
     expect(mapStatNameToCategory("ERA").type).toBe("RATE");
     expect(mapStatNameToCategory("WHIP").type).toBe("RATE");
+    expect(mapStatNameToCategory("WPCT").type).toBe("RATE");
   });
 
   it("should use COUNTING type for HR, RBI, SB, W, SV, K", () => {

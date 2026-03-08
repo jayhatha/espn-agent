@@ -816,6 +816,7 @@ export function mapStatNameToCategory(statName: string): Category {
     "K": { category_id: "K", stat_key: "K", type: "COUNTING", direction: "HIGHER_BETTER", name: "Strikeouts" },
     "ERA": { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA", formula_id: "era", required_components: ["ER", "IP"] },
     "WHIP": { category_id: "WHIP", stat_key: "WHIP", type: "RATE", direction: "LOWER_BETTER", name: "WHIP", formula_id: "whip", required_components: ["IP", "H", "BB"] },
+    "WPCT": { category_id: "WPCT", stat_key: "WPCT", type: "RATE", direction: "HIGHER_BETTER", name: "Winning Percentage", formula_id: "wpct", required_components: ["W", "L"] },
   };
   return categoryMap[statName] || {
     category_id: statName,
