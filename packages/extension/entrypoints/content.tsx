@@ -251,9 +251,14 @@ export default defineContentScript({
 
     // Detect user's own team from the auction pick train
     const myTeamDetection = detectMyTeam();
+    // Grid column for my team (1-based position in pick train → grid column number).
+    // DOM-parsed picks use gridArea.column as teamId, which differs from the pick
+    // train's number prefix (e.g., column "3" vs teamId "13"). We need both for matching.
+    let myGridColumn: string | null = null;
     if (myTeamDetection) {
       useDraftStore.getState().setMyTeamId(myTeamDetection.teamId);
       useDraftStore.getState().setRemainingBudget(myTeamDetection.remainingBudget);
+      myGridColumn = myTeamDetection.gridColumn ? String(myTeamDetection.gridColumn) : null;
       console.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
     }
 
@@ -335,7 +340,8 @@ export default defineContentScript({
       const isMyPick =
         pick.teamId === currentState.myTeamId ||
         pick.teamId === "myTeam" ||
-        pick.teamName === "My Team";
+        pick.teamName === "My Team" ||
+        (myGridColumn !== null && pick.teamId === myGridColumn);
 
       if (isMyPick) {
         const alreadyInRoster = currentState.myRoster.some(
@@ -425,29 +431,49 @@ export default defineContentScript({
           }
         }
 
-        // Reconcile myRoster from allPicks to remove contamination from prior DOM scans.
-        // When state is preserved (allPicks exist), some picks may have been added to
-        // myRoster due to unreliable ESPN DOM teamId matching on a previous page load.
-        // Rebuild myRoster to only include picks whose teamId matches myTeamId.
-        if (!shouldScrapePicksFromDom) {
-          const currentState = useDraftStore.getState();
-          const myTeamId = currentState.myTeamId;
-          const myPicksFromStore = currentState.allPicks.filter(
-            (p) => p.teamId === myTeamId || p.teamId === "myTeam" || p.teamName === "My Team"
+        // Always reconcile picks from DOM — scan for picks not already in allPicks.
+        // This catches picks missed during reload or between MutationObserver gaps.
+        // addPick() and alreadyInRoster checks prevent duplicates.
+        {
+          const domPicks = collectCompletedPicksSnapshot();
+          const currentAllPicks = useDraftStore.getState().allPicks;
+          const knownPlayerIds = new Set(currentAllPicks.map(p => p.playerId));
+          const knownNames = new Set(
+            currentAllPicks.map(p => normalizePlayerName(p.playerName))
+          );
+          const missedPicks = domPicks.filter(
+            p => !knownPlayerIds.has(p.playerId) &&
+                 !knownNames.has(normalizePlayerName(p.playerName))
           );
 
-          // Only rebuild if roster count differs from filtered picks (indicates contamination)
+          if (missedPicks.length > 0) {
+            console.log(
+              `[ESPN Draft Assistant] Refresh reconciliation: found ${missedPicks.length} new picks from DOM`
+            );
+            missedPicks.forEach(pick => processDetectedPick(pick));
+          }
+        }
+
+        // Reconcile myRoster from allPicks — rebuild to match current teamId/gridColumn.
+        {
+          const currentState = useDraftStore.getState();
+          const myTeamId = currentState.myTeamId;
+          const isMyPickFilter = (p: DraftPick) =>
+            p.teamId === myTeamId ||
+            p.teamId === "myTeam" ||
+            p.teamName === "My Team" ||
+            (myGridColumn !== null && p.teamId === myGridColumn);
+          const myPicksFromStore = currentState.allPicks.filter(isMyPickFilter);
+
           if (currentState.myRoster.length !== myPicksFromStore.length) {
             console.log(
               "[ESPN Draft Assistant] Roster reconciliation: roster had",
               currentState.myRoster.length,
-              "players but only",
+              "players but",
               myPicksFromStore.length,
-              "picks match myTeamId"
+              "picks match myTeamId/gridColumn"
             );
-            // Rebuild myRoster from allPicks, preserving existing roster entries where possible
             const rebuiltRoster = myPicksFromStore.map((pick) => {
-              // Try to find existing roster entry to preserve projectedStats
               const existing = currentState.myRoster.find(
                 (r) => r.playerId === pick.playerId
               );
@@ -478,17 +504,6 @@ export default defineContentScript({
             "[ESPN Draft Assistant] Projected standings computed from stored state for",
             standings.overallStandings.length,
             "teams"
-          );
-        }
-
-        if (shouldScrapePicksFromDom) {
-          const completedPicks = collectCompletedPicksSnapshot();
-          completedPicks.forEach((pick) => processDetectedPick(pick));
-        } else {
-          console.log(
-            "[ESPN Draft Assistant] Skipping DOM pick scrape — preserved state has",
-            existingPicks.length,
-            "picks"
           );
         }
       },

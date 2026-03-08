@@ -302,6 +302,7 @@ export function detectMyTeam(): {
   teamName: string;
   teamId: string;
   remainingBudget: number;
+  gridColumn: number | null;
 } | null {
   // The own-team marker is on the .content div inside .auction-pick-component
   const ownContent = document.querySelector(".auction-pick-component--own");
@@ -329,11 +330,23 @@ export function detectMyTeam(): {
   const teamId = prefixMatch ? prefixMatch[1] : rawTeamName;
   const teamName = prefixMatch ? prefixMatch[2] : rawTeamName;
 
+  // Determine grid column from position among all pick train items.
+  // ESPN's draft board uses CSS grid where column N = the Nth team in the pick train.
+  // The teamId (prefix number like "13") does NOT match the grid column (like "3"),
+  // so we need this mapping for reliable pick-to-team matching.
+  let gridColumn: number | null = null;
+  const allItems = document.querySelectorAll(".picklist--item");
+  allItems.forEach((item, idx) => {
+    if (item.contains(ownContent) || item === ownContent || ownContent.contains(item)) {
+      gridColumn = idx + 1; // grid columns are 1-based
+    }
+  });
+
   console.log(
-    `[ESPN Draft Assistant] My team detected from pick train: "${teamName}" (id: ${teamId}, budget: $${remainingBudget})`,
+    `[ESPN Draft Assistant] My team detected from pick train: "${teamName}" (id: ${teamId}, column: ${gridColumn}, budget: $${remainingBudget})`,
   );
 
-  return { teamName, teamId, remainingBudget };
+  return { teamName, teamId, remainingBudget, gridColumn };
 }
 
 /**
