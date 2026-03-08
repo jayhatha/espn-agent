@@ -467,8 +467,9 @@ None yet.
 | 53 | Move forward simulation (Monte Carlo) to Web Worker — off main thread, 200 sims restored | 2026-03-07 | d5efb30 | ✅ | [53-move-forward-simulation-monte-carlo-to-a](./quick/53-move-forward-simulation-monte-carlo-to-a/) |
 | 54 | Auto-mode toggle: auto-bidding (+1) when shouldBid && price < maxBid, toggle in nominated banner | 2026-03-08 | 0e1a483 | ✅ | [54-auto-mode-toggle-auto-bidding-1-on-curre](./quick/54-auto-mode-toggle-auto-bidding-1-on-curre/) |
 | 55 | Use ESPN market values (ASV) for ideal roster planning instead of FanGraphs dollar values | 2026-03-08 | 9a0a517 | ✅ | [55-use-espn-market-values-asv-for-ideal-ros](./quick/55-use-espn-market-values-asv-for-ideal-ros/) |
+| 56 | Auto-bid cap: 10% over ESPN ASV market value instead of engine maxBid | 2026-03-08 | 54ba3b0 | ✅ | [56-auto-bid-cap-bid-as-high-as-needed-for-a](./quick/56-auto-bid-cap-bid-as-high-as-needed-for-a/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick tasks 54 (auto-bid) and 55 (market values ideal roster)
+Last activity: 2026-03-08 - Completed quick task 56: auto-bid cap 10% over market
 Resume file: None
