@@ -521,8 +521,9 @@ None yet.
 | 78 | Fix roster detection — map grid column to team, rescan DOM on refresh button | 2026-03-08 | b509e42 | ✅ | [78-fix-roster-detection-grid-column-mapping](./quick/78-fix-roster-detection-grid-column-mapping/) |
 | 79 | Fix auto-nomination: handle "Select" button + search for non-visible players | 2026-03-08 | bb65764 | ✅ | [79-fix-auto-nomination-when-it-s-our-turn-t](./quick/79-fix-auto-nomination-when-it-s-our-turn-t/) |
 | 80 | Fix autopilot nomination select and nominate button selectors | 2026-03-08 | 1bec228 | ✅ | [80-fix-autopilot-nomination-select-and-nomi](./quick/80-fix-autopilot-nomination-select-and-nomi/) |
+| 81 | Bug. Budget Pacing has the correct number of roster slots but ideal roster does not. | 2026-03-08 | 7a8e90e | ✅ | [81-bug-budget-pacing-has-the-correct-number](./quick/81-bug-budget-pacing-has-the-correct-number/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed Phase 33 Plan 01: Debug autopilot nomination flow diagnostics
+Last activity: 2026-03-08 - Completed quick task 81: Bug. Budget Pacing has the correct number of roster slots but ideal roster does not.
 Resume file: None
