@@ -49,7 +49,7 @@ function normalizePosition(pos: string): string {
   if (upper === "SP" || upper.includes("SP")) return "SP";
   if (upper === "RP" || upper.includes("RP")) return "RP";
   if (upper === "P") return "SP";
-  if (upper.includes("OF")) return "OF";
+  if (upper === "LF" || upper === "CF" || upper === "RF" || upper.includes("OF")) return "OF";
   return upper;
 }
 

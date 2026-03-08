@@ -62,8 +62,15 @@ const FLEX_MAP: Record<string, string[]> = {
 };
 const DEDICATED = new Set(["C", "SS", "2B", "3B", "1B", "OF", "SP", "RP"]);
 
+function normalizePos(pos: string): string {
+  const u = pos.toUpperCase();
+  if (u === "LF" || u === "CF" || u === "RF") return "OF";
+  if (u === "P") return "SP";
+  return u;
+}
+
 function findBestSlotForPositions(positions: string[], remaining: Map<string, number>): string | null {
-  const normed = positions.map(p => p.toUpperCase());
+  const normed = positions.map(normalizePos);
   for (const slot of SLOT_ORDER) {
     if ((remaining.get(slot) ?? 0) <= 0) continue;
     if (DEDICATED.has(slot)) {
