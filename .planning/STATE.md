@@ -507,8 +507,9 @@ None yet.
 | 73 | Fix reload adding other teams' players to roster — skip initial DOM scan on same-draft reload, add roster reconciliation to refresh | 2026-03-08 | 90eae8d | ✅ | [73-reloading-still-adds-players-from-other-](./quick/73-reloading-still-adds-players-from-other-/) |
 | 74 | Enhance mobile draft page — sync split, show roster, reduce WS latency (1000ms→150ms debounce) | 2026-03-08 | 717fe15 | ✅ | [74-enhance-mobile-draft-page-sync-split-fro](./quick/74-enhance-mobile-draft-page-sync-split-fro/) |
 | 75 | Fix current player name not showing on mobile — field name mismatch (name→playerName, position→positions) | 2026-03-08 | 9dd6914 | ✅ | [75-fix-current-player-name-not-showing-on-m](./quick/75-fix-current-player-name-not-showing-on-m/) |
+| 76 | Fix mobile roster not updating — cache both payload+engineSignals in background SW so every WS message is complete | 2026-03-08 | f5dfa46 | ✅ | [76-fix-mobile-page-roster-not-updating-part](./quick/76-fix-mobile-page-roster-not-updating-part/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 75: Fix current player name on mobile
+Last activity: 2026-03-08 - Completed quick task 76: Fix mobile roster not updating
 Resume file: None
