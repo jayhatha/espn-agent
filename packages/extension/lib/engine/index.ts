@@ -1200,5 +1200,6 @@ export function computeDraftEngine(
     projectedStandings,
     simulation: cachedSimulation,
     idealRoster,
+    remainingSlots: remainingSlotsOpt,
   };
 }

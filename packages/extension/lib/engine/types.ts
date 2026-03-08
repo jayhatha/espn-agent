@@ -185,6 +185,7 @@ export interface DraftEngineSignals {
   projectedStandings: ProjectedStandingsSignal | null;
   simulation: ForwardSimulationSignal | null;  // null when insufficient data or too early
   idealRoster: IdealRosterSignal | null;        // null when leagueCategories empty, allPlayers empty, or computation fails
+  remainingSlots: Record<string, number>;       // Unfilled dedicated slots per position (zero-count entries removed)
 }
 
 // ============================================================
