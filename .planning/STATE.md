@@ -373,6 +373,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 30]: Sim count 200->50: 75% CPU reduction; lower fidelity acceptable since cache prevents re-runs on same state
 - [Phase 30]: Single buildFgPlayerPool call: undraftedPlayers shared with projected standings, top-200 slice for optimizer
 - [Phase 30]: subtree:false observer: sidebar root always direct body child, global DOM observation unnecessary
+- [Phase quick-54]: AutoBidController uses full-state subscribe with manual diffing (store lacks subscribeWithSelector middleware); updateSignals() also triggers evaluateAndBid() to handle late-arriving signals
 
 ### Roadmap Evolution
 
