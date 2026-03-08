@@ -1158,6 +1158,10 @@ export function computeDraftEngine(
             if (import.meta.env.DEV) console.warn("[DraftEngine] Simulation worker failed:", e);
           });
         }
+      } else {
+        // Draft < 5% — update cache key to prevent repeated evaluation on every render
+        simulationCacheKey = newSimCacheKey;
+        if (import.meta.env.DEV) console.log('[DraftEngine] Simulation deferred — draft < 5% complete');
       }
     }
   }
