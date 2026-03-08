@@ -538,3 +538,21 @@ Plans:
 
 Plans:
 - [x] TBD (run /gsd:plan-phase 30 to break down) (completed 2026-03-07)
+
+### Phase 31: Serve a mobile-friendly page that connects to the extension via websocket so I can view and control the draft from my phone on my local network
+
+**Goal:** Mobile-friendly draft companion page that connects to the Chrome extension via a Fastify WebSocket hub, displaying live engine signals (max bid, win probability, budget, alerts) and providing control over auto-bid, position filter, and pitcher/hitter split from the phone on the local network
+**Depends on:** Phase 30
+**Requirements:** WS-HUB-01, WS-HUB-02, WS-HUB-03, WS-EXT-01, WS-EXT-02, WS-EXT-03, WS-EXT-04, MOB-01, MOB-02, MOB-03, MOB-04, MOB-05
+**Success Criteria** (what must be TRUE):
+  1. Fastify backend accepts WebSocket upgrades at /draft/live with role-based routing (extension vs mobile)
+  2. Extension background SW connects as WS client, relays state snapshots and engine signals to the hub
+  3. Control commands from the phone travel through the WS hub to the extension and apply to the Zustand store
+  4. Mobile page auto-detects LAN IP, shows live engine signals, and provides touch-optimized controls
+  5. 20-second keepalive prevents service worker sleep; auto-reconnect handles backend restarts
+**Plans:** 3 plans
+
+Plans:
+- [ ] 31-01-PLAN.md — Install @fastify/websocket, create /draft/live WebSocket hub route with fan-out relay, relax CORS for LAN
+- [ ] 31-02-PLAN.md — Wire extension: write engine signals to storage, background SW WS client with keepalive/reconnect, content script CONTROL handler
+- [ ] 31-03-PLAN.md — Mobile companion page at /draft/live with WS hook, live signal display, and touch controls (auto-bid, position filter, split)
