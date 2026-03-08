@@ -10,6 +10,7 @@ import AuctionRecommendations from "./AuctionRecommendations";
 import DraftNarrator from "./DraftNarrator";
 import DraftRecommendations from "./DraftRecommendations";
 import EngineInsights from "./EngineInsights";
+import NominationDiagnostics from "./NominationDiagnostics";
 import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
@@ -410,6 +411,9 @@ export default function DraftSidebar() {
           )}
         </div>
       )}
+
+      {/* Nomination diagnostics panel — auction only */}
+      {draftFormat === "auction" && <NominationDiagnostics />}
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto flex flex-col">
