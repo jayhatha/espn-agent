@@ -572,3 +572,18 @@ Plans:
 
 Plans:
 - [ ] 32-01-PLAN.md — Add backfill pass to optimizeRoster with TDD: failing tests for tight-budget and position-constraint scenarios, then implement backfill logic
+
+### Phase 33: debug autopilot nomination flow
+
+**Goal:** Instrument the autopilot nomination flow with structured diagnostic logging, fix the name normalization gap causing player ranking lookup failures, and add a live nomination diagnostics panel to the sidebar for real-time debugging during live drafts
+**Depends on:** Phase 32
+**Requirements:** DEBUG-NOM-01, DEBUG-NOM-02, DEBUG-NOM-03
+**Success Criteria** (what must be TRUE):
+  1. Every decision point in evaluateAndNominate() and isMyTurnToNominate() emits structured console logs
+  2. Player name normalization uses normalizeName() (strips Jr./Sr./diacritics) not plain toLowerCase()
+  3. Sidebar shows live nomination diagnostics (status, candidate, turn detection, attempts, cooldown) with force nominate button
+  4. window.espnDraftAssistant.nominationDiag() available in DEV mode for console inspection
+**Plans:** 1 plan
+
+Plans:
+- [ ] 33-01-PLAN.md — Structured nomination logging, name normalization fix, NominationDiagnostics UI panel, force nominate button, window diagnostic exports
