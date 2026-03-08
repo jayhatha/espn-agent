@@ -557,6 +557,8 @@ export class AutoBidController {
       ? state.rankings?.find((r) => r.playerName.toLowerCase() === nominatedName)
       : undefined;
     const isSP = ranking?.primaryPosition === "SP";
+    const isRP = ranking?.primaryPosition === "RP";
+    const isPitcher = isSP || isRP;
     const opportunityRankThreshold = isSP ? 100 : 50;
     const hasHighExternalRank =
       ranking?.externalRank != null && ranking.externalRank <= opportunityRankThreshold;
@@ -619,6 +621,18 @@ export class AutoBidController {
       // Opportunity: cap at market value (espnAsv is guaranteed non-null here by isBelowMarket check)
       autoBidCap = espnAsv!;
       capSource = `OPPORTUNITY, ASV $${espnAsv}`;
+    }
+
+    // Apply pitcher/hitter split dampening to bid caps for pitchers.
+    // Same formula as engine/index.ts: pitcherMultiplier = (100 - split) / 50
+    // At default split=65: pitcherMultiplier = 0.7, so a $22 IDEAL TARGET cap becomes $16.
+    // At 50/50 split: multiplier = 1.0, no change for either pitchers or hitters.
+    const pitcherHitterSplit = state.pitcherHitterSplit ?? 65;
+    if (isPitcher) {
+      const pitcherMultiplier = (100 - pitcherHitterSplit) / 50;
+      const rawCap = autoBidCap;
+      autoBidCap = Math.max(1, Math.ceil(autoBidCap * pitcherMultiplier));
+      capSource += ` → pitcher dampened ×${pitcherMultiplier.toFixed(2)} = $${autoBidCap} (raw $${rawCap})`;
     }
 
     // Guard: price has reached or exceeded the cap
