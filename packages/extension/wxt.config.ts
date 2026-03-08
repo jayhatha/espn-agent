@@ -18,7 +18,7 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ["assets/*.json", "assets/*.png", "assets/*.js", "simulation-worker.js"],
+        resources: ["assets/*.json", "assets/*.png", "assets/*.js", "simulation-worker.js", "bid-optimizer-worker.js"],
         matches: ["https://fantasy.espn.com/*"],
       },
     ],
