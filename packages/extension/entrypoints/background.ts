@@ -152,6 +152,13 @@ export default defineBackground(() => {
   });
 
   // ─── Storage Change Listener — relay state to mobile via WS ───────────────
+  // In-memory caches so every WS message always includes both payload + engineSignals.
+  // chrome.storage.onChanged only includes keys that actually changed, so partial
+  // updates would send null for the unchanged field — breaking hub's latestSnapshot cache
+  // and causing reconnecting mobile clients to lose state.
+  let cachedPayload: unknown = null;
+  let cachedEngineSignals: unknown = null;
+
   chrome.storage.local.onChanged.addListener((changes) => {
     // Only relay if WS hub is connected
     if (draftWs?.readyState !== WebSocket.OPEN) {
@@ -165,21 +172,10 @@ export default defineBackground(() => {
       return;
     }
 
-    const snapshot: {
-      type: string;
-      ts: number;
-      payload: unknown;
-      engineSignals: unknown;
-    } = {
-      type: 'STATE_SNAPSHOT',
-      ts: Date.now(),
-      payload: null,
-      engineSignals: null,
-    };
-
+    // Update in-memory caches with any changed values
     if (hasMobileState && changes['draft-mobile-state']?.newValue) {
       try {
-        snapshot.payload = JSON.parse(changes['draft-mobile-state'].newValue as string);
+        cachedPayload = JSON.parse(changes['draft-mobile-state'].newValue as string);
       } catch (err) {
         console.error('[ESPN Draft Assistant] Failed to parse draft-mobile-state:', err);
       }
@@ -187,14 +183,20 @@ export default defineBackground(() => {
 
     if (hasEngineSignals && changes['draft-engine-signals']?.newValue) {
       try {
-        snapshot.engineSignals = JSON.parse(changes['draft-engine-signals'].newValue as string);
+        cachedEngineSignals = JSON.parse(changes['draft-engine-signals'].newValue as string);
       } catch (err) {
         console.error('[ESPN Draft Assistant] Failed to parse draft-engine-signals:', err);
       }
     }
 
+    // Always send both fields so hub's latestSnapshot cache is always complete
     try {
-      draftWs.send(JSON.stringify(snapshot));
+      draftWs.send(JSON.stringify({
+        type: 'STATE_SNAPSHOT',
+        ts: Date.now(),
+        payload: cachedPayload,
+        engineSignals: cachedEngineSignals,
+      }));
     } catch (err) {
       console.error('[ESPN Draft Assistant] Failed to send STATE_SNAPSHOT:', err);
     }
