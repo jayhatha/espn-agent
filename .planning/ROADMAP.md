@@ -587,3 +587,13 @@ Plans:
 
 Plans:
 - [x] 33-01-PLAN.md — Structured nomination logging, name normalization fix, NominationDiagnostics UI panel, force nominate button, window diagnostic exports
+
+### Phase 34: Make sure we're not entirely punting categories. A test draft had no saves.
+
+**Goal:** Prevent the draft engine from completely punting active scoring categories by adding a category floor enforcement pre-pass to the ideal roster optimizer, guaranteeing at least one contributor per zero-coverage counting category (e.g., SV, HLD) via lockedPlayers injection
+**Depends on:** Phase 33
+**Requirements:** CATEGORY-FLOOR-01
+**Plans:** 1 plan
+
+Plans:
+- [ ] 34-01-PLAN.md — Create category-floor.ts utilities (zero-coverage detection, floor pick selection) and wire into computeIdealRoster as lockedPlayers pre-pass
