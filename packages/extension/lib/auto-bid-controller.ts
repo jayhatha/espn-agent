@@ -273,7 +273,17 @@ export class AutoBidController {
       }
     }
 
-    // Strategy 4: Check for an enabled Queue button in the player table
+    // Strategy 4: Check for "Select" buttons (Button--select class) in the player table
+    // ESPN changes "Queue" → "Select" when it is your turn to nominate
+    const selectButtons = document.querySelectorAll<HTMLButtonElement>(
+      "button.Button--select[data-player-id]:not([disabled])"
+    );
+    if (selectButtons.length > 0) {
+      console.log("[AutoNominate] Detected Button--select buttons — it's our turn to nominate");
+      return true;
+    }
+
+    // Strategy 5: Check for an enabled Queue button in the player table
     // If queue buttons are clickable, it likely means we can nominate
     const queueButtons = document.querySelectorAll<HTMLButtonElement>(
       "button[data-player-id]:not([disabled])"
@@ -544,6 +554,7 @@ export class AutoBidController {
   private clickNominateButton(candidateName: string): void {
     // Nominate-specific selectors (high confidence — class/testid contain "nominate")
     const specificSelectors = [
+      "button.bid-player__button",          // ESPN actual: "nominate player" confirm button
       "button.nominate-button",
       'button[class*="nominate"]',
       'button[class*="Nominate"]',
@@ -587,7 +598,7 @@ export class AutoBidController {
 
     // Fallback: scan all buttons for nomination/selection action text
     if (!nominateButton) {
-      const actionWords = ["nominate", "select player", "submit"];
+      const actionWords = ["nominate player", "nominate", "submit"];
       const allButtons = document.querySelectorAll<HTMLButtonElement>("button");
       for (const btn of allButtons) {
         const text = btn.textContent?.trim().toLowerCase() || "";
