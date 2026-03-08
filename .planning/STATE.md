@@ -509,8 +509,9 @@ None yet.
 | 75 | Fix current player name not showing on mobile — field name mismatch (name→playerName, position→positions) | 2026-03-08 | 9dd6914 | ✅ | [75-fix-current-player-name-not-showing-on-m](./quick/75-fix-current-player-name-not-showing-on-m/) |
 | 76 | Fix mobile roster not updating — cache both payload+engineSignals in background SW so every WS message is complete | 2026-03-08 | f5dfa46 | ✅ | [76-fix-mobile-page-roster-not-updating-part](./quick/76-fix-mobile-page-roster-not-updating-part/) |
 | 77 | Fix extension not re-scraping roster on reload — reconciliation scan for picks missed during reload window | 2026-03-08 | 6093ade | ✅ | [77-fix-extension-not-re-scraping-roster-on-r](./quick/77-fix-extension-not-re-scraping-roster-on-r/) |
+| 78 | Fix roster detection — map grid column to team, rescan DOM on refresh button | 2026-03-08 | b509e42 | ✅ | [78-fix-roster-detection-grid-column-mapping](./quick/78-fix-roster-detection-grid-column-mapping/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 77: Fix extension not re-scraping roster on reload
+Last activity: 2026-03-08 - Completed quick task 78: Fix roster detection grid column mapping
 Resume file: None
