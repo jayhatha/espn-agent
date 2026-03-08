@@ -1,25 +1,18 @@
-# Quick Task 79: Fix auto-nomination — "select" button variant
+# Quick Task 79: Fix auto-nomination — "select" button + player search
 
 ## Goal
-When it's the user's turn to nominate, ESPN changes "Queue" buttons to "Select" buttons.
-The auto-nomination code needs to handle this variant in both the player selection step
-and the confirmation/submit step.
+Two issues with auto-nomination:
+1. When it's the user's turn, ESPN changes "Queue" buttons to "Select" — confirmation
+   button matching only looked for "nominate" text
+2. If the player isn't visible in the scrollable table, the button can't be found at all
 
-## Root Cause
-`clickNominateButton()` only matches buttons with "nominate" text. When it's your turn,
-ESPN may show a different confirmation flow after clicking "Select" (vs "Queue"). The
-confirmation button text may not contain "nominate".
+## Fix
+1. `clickNominateButton()` broadened to match "nominate", "select", "submit", "confirm"
+2. Added `searchAndNominate()`: when queue/select button not in DOM, type the player's
+   name into ESPN's `.playersSearch input.form__control`, wait 800ms for table filter,
+   then find and click the button
+3. Added `clearPlayerSearch()`: clicks `.player--search--clear` (or resets input) after
+   nomination to restore the full player list
+4. Uses React-compatible `nativeInputValueSetter` for ESPN's controlled input
 
-## Tasks
-
-### Task 1: Update auto-nomination to handle "Select" variant
-**File:** `packages/extension/lib/auto-bid-controller.ts`
-
-1. In `clickNominateButton()`, broaden text matching to also accept "select", "submit",
-   "confirm", and other common ESPN action button labels
-2. Add selectors for common ESPN submit button patterns that appear during nomination
-3. Log which button variant was found for debugging
-
-### Verify
-- Extension builds cleanly with `npx wxt build`
-- Log output shows button detection working for "select" variant
+## Status: EXECUTED

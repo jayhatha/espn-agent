@@ -510,9 +510,9 @@ None yet.
 | 76 | Fix mobile roster not updating — cache both payload+engineSignals in background SW so every WS message is complete | 2026-03-08 | f5dfa46 | ✅ | [76-fix-mobile-page-roster-not-updating-part](./quick/76-fix-mobile-page-roster-not-updating-part/) |
 | 77 | Fix extension not re-scraping roster on reload — reconciliation scan for picks missed during reload window | 2026-03-08 | 6093ade | ✅ | [77-fix-extension-not-re-scraping-roster-on-r](./quick/77-fix-extension-not-re-scraping-roster-on-r/) |
 | 78 | Fix roster detection — map grid column to team, rescan DOM on refresh button | 2026-03-08 | b509e42 | ✅ | [78-fix-roster-detection-grid-column-mapping](./quick/78-fix-roster-detection-grid-column-mapping/) |
-| 79 | Fix auto-nomination: handle ESPN "Select" button variant when it's user's turn | 2026-03-08 | a81de55 | ✅ | [79-fix-auto-nomination-when-it-s-our-turn-t](./quick/79-fix-auto-nomination-when-it-s-our-turn-t/) |
+| 79 | Fix auto-nomination: handle "Select" button + search for non-visible players | 2026-03-08 | bb65764 | ✅ | [79-fix-auto-nomination-when-it-s-our-turn-t](./quick/79-fix-auto-nomination-when-it-s-our-turn-t/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 79: Fix auto-nomination Select button variant
+Last activity: 2026-03-08 - Completed quick task 79: Fix auto-nomination with search fallback
 Resume file: None
