@@ -67,6 +67,9 @@ interface DraftState {
   // Applied as SGP multiplier: hitters get split/50, pitchers get (100-split)/50.
   pitcherHitterSplit: number;
 
+  // Auto-bid mode (session-only, NOT persisted — resets to OFF on page reload for safety)
+  autoMode: boolean;
+
   // ESPN DOM-scraped auction values (playerId -> dollar value)
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
@@ -122,6 +125,7 @@ interface DraftState {
   setLeagueCategories: (categories: Category[]) => void;
   setDetectedRosterSlots: (slots: Record<string, number>) => void;
   setPitcherHitterSplit: (split: number) => void;
+  setAutoMode: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -145,6 +149,7 @@ export const useDraftStore = create<DraftState>()(
       teamRosters: new Map(),
       currentAuctionPlayer: null,
       pitcherHitterSplit: 65,
+      autoMode: false,
       espnDomAuctionValues: {},
       allTeamBudgets: [],
       leagueCategories: [],
@@ -299,6 +304,8 @@ export const useDraftStore = create<DraftState>()(
       setDetectedRosterSlots: (slots) => set({ detectedRosterSlots: slots }),
 
       setPitcherHitterSplit: (split) => set({ pitcherHitterSplit: Math.max(0, Math.min(100, split)) }),
+
+      setAutoMode: (enabled) => set({ autoMode: enabled }),
 
       reset: () =>
         set({
