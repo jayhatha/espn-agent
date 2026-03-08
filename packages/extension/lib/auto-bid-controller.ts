@@ -10,7 +10,8 @@ import type { DraftEngineSignals } from "./engine/types";
  *
  * Bidding strategy:
  * - Ideal roster targets (anchor/core): bid up to ESPN ASV + 10%
- * - Opportunity bids (top-50 ext rank + below market): bid up to ESPN ASV
+ * - PL Undervalued (high PL rank + low ASV): bid up to ESPN ASV + 15%
+ * - Opportunity bids (top-50 ext rank, top-100 for SP + below market): bid up to ESPN ASV
  * - Everyone else: skip
  *
  * Nomination strategy:
@@ -532,6 +533,10 @@ export class AutoBidController {
     //
     // Path 2: OPPORTUNITY bids (high external rank + below market)
     //   → bid up to ASV (at market, not above — we're getting a deal)
+    //   → SPs use wider threshold (top-100 vs top-50) because PL SP rankings are deepest
+    //
+    // Path 3: PL UNDERVALUED (high PL rank but low ASV — market mispricing)
+    //   → bid up to ASV + 15% (PL says they're better than market thinks)
     //
     // Everyone else: skip.
 
@@ -543,22 +548,44 @@ export class AutoBidController {
     const isIdealTarget =
       idealMatch != null && (idealMatch.tier === "anchor" || idealMatch.tier === "core");
 
-    // Opportunity: top-50 externally ranked player currently below market price
+    // Opportunity: high externally ranked player currently below market price
+    // SPs get wider threshold (top-100) because PL rankings are deepest for SP
     const ranking = state.rankings?.find((r) => r.playerId === playerId);
+    const isSP = ranking?.primaryPosition === "SP";
+    const opportunityRankThreshold = isSP ? 100 : 50;
     const hasHighExternalRank =
-      ranking?.externalRank != null && ranking.externalRank <= 50;
+      ranking?.externalRank != null && ranking.externalRank <= opportunityRankThreshold;
     const isBelowMarket = espnAsv != null && currentBid < espnAsv;
     const isOpportunity = hasHighExternalRank && isBelowMarket;
 
-    if (!isIdealTarget && !isOpportunity) {
+    // Path 3: PL UNDERVALUED — high PL rank but low ASV (market mispricing)
+    // SP-specific thresholds are more generous because PL SP rankings are deep and reliable
+    let isPLUndervalued = false;
+    if (ranking?.externalRank != null && espnAsv != null) {
+      const rank = ranking.externalRank;
+      if (isSP) {
+        // SP thresholds (more generous — PL SP rankings most valuable)
+        isPLUndervalued =
+          (rank <= 50 && espnAsv < 15) ||
+          (rank <= 100 && espnAsv < 10);
+      } else {
+        // General thresholds
+        isPLUndervalued =
+          (rank <= 30 && espnAsv < 20) ||
+          (rank <= 75 && espnAsv < 12);
+      }
+    }
+
+    if (!isIdealTarget && !isOpportunity && !isPLUndervalued) {
       console.log(
-        `[AutoBidController] Not an ideal roster target or opportunity — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, belowMkt=${isBelowMarket})`
+        `[AutoBidController] Not a target — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, pos=${ranking?.primaryPosition ?? "?"}, belowMkt=${isBelowMarket}, plUnderval=${isPLUndervalued})`
       );
       return;
     }
 
-    // Compute bid cap based on bid path:
+    // Compute bid cap based on bid path (priority: IDEAL > PL UNDERVALUED > OPPORTUNITY):
     // - Ideal targets: ASV + 10% (bid as much as it takes for our strategy)
+    // - PL Undervalued: ASV + 15% (PL says they're better than market thinks)
     // - Opportunities: ASV only (we're buying value, not overpaying)
     let autoBidCap: number;
     let capSource: string;
@@ -566,23 +593,27 @@ export class AutoBidController {
     if (isIdealTarget) {
       if (espnAsv != null) {
         autoBidCap = Math.ceil(espnAsv * 1.1);
-        capSource = `ideal target, ASV $${espnAsv} +10%`;
+        capSource = `IDEAL TARGET, ASV $${espnAsv} +10%`;
       } else {
         // No ASV — use optimization maxBid if worker has completed, else defer
         const maxBid = this.lastEngineSignals?.optimization?.maxBid;
         if (maxBid != null && maxBid > 0) {
           autoBidCap = maxBid;
-          capSource = `ideal target, engine maxBid $${maxBid}`;
+          capSource = `IDEAL TARGET, engine maxBid $${maxBid}`;
         } else {
           // Worker hasn't completed yet — will retry on next updateSignals() call
           console.log("[AutoBidController] Ideal target but no ASV or maxBid yet — deferring");
           return;
         }
       }
+    } else if (isPLUndervalued) {
+      // PL says they're better than market thinks — willing to go 15% above ASV
+      autoBidCap = Math.ceil(espnAsv! * 1.15);
+      capSource = `PL UNDERVALUED, rank #${ranking!.externalRank} ${isSP ? "(SP)" : ""} ASV $${espnAsv} +15%`;
     } else {
       // Opportunity: cap at market value (espnAsv is guaranteed non-null here by isBelowMarket check)
       autoBidCap = espnAsv!;
-      capSource = `opportunity, ASV $${espnAsv}`;
+      capSource = `OPPORTUNITY, ASV $${espnAsv}`;
     }
 
     // Guard: price has reached or exceeded the cap
