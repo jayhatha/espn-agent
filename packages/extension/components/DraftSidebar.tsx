@@ -50,16 +50,18 @@ export default function DraftSidebar() {
   // Debounce ref for storage writes
   const storageWriteTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Write engine signals and draft state to chrome.storage.local for background SW relay (debounced 1s)
+  // Write engine signals and draft state to chrome.storage.local for background SW relay (debounced 150ms)
   useEffect(() => {
     if (storageWriteTimeoutRef.current) {
       clearTimeout(storageWriteTimeoutRef.current);
     }
 
     storageWriteTimeoutRef.current = setTimeout(() => {
-      // Write engine signals (mobile-relevant subset)
+      const storagePayload: Record<string, string> = {};
+
+      // Engine signals (mobile-relevant subset)
       if (engineSignals) {
-        const mobileSnapshot = {
+        storagePayload["draft-engine-signals"] = JSON.stringify({
           inflation: engineSignals.inflation
             ? {
                 inflationFactor: engineSignals.inflation.inflationFactor,
@@ -93,37 +95,33 @@ export default function DraftSidebar() {
             : null,
           remainingSlots: engineSignals.remainingSlots,
           computeTimeMs: engineSignals.computeTimeMs,
-        };
-
-        chrome.storage.local
-          .set({ "draft-engine-signals": JSON.stringify(mobileSnapshot) })
-          .catch((err) => {
-            if (import.meta.env.DEV) {
-              console.warn("[DraftSidebar] Failed to write engine signals to storage:", err);
-            }
-          });
+        });
       }
 
-      // Write key draft state fields for mobile context
-      const mobileDraftState = {
+      // Key draft state fields for mobile context
+      storagePayload["draft-mobile-state"] = JSON.stringify({
         currentAuctionPlayer,
         rosterLength: myRoster.length,
+        roster: myRoster.map((p) => ({
+          playerName: p.playerName,
+          positions: p.positions,
+          cost: p.cost,
+        })),
         remainingBudget,
         autoMode,
         pitcherHitterSplit,
         draftFormat,
         picksLength: 0, // allPicks not destructured here — avoid heavy dep
         currentPick,
-      };
+      });
 
-      chrome.storage.local
-        .set({ "draft-mobile-state": JSON.stringify(mobileDraftState) })
-        .catch((err) => {
-          if (import.meta.env.DEV) {
-            console.warn("[DraftSidebar] Failed to write draft state to storage:", err);
-          }
-        });
-    }, 1000);
+      // Single write triggers one onChanged event → one WS message
+      chrome.storage.local.set(storagePayload).catch((err) => {
+        if (import.meta.env.DEV) {
+          console.warn("[DraftSidebar] Failed to write mobile state to storage:", err);
+        }
+      });
+    }, 150);
 
     return () => {
       if (storageWriteTimeoutRef.current) {
@@ -133,7 +131,7 @@ export default function DraftSidebar() {
   }, [
     engineSignals,
     currentAuctionPlayer,
-    myRoster.length,
+    myRoster,
     remainingBudget,
     autoMode,
     pitcherHitterSplit,

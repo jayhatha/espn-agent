@@ -17,9 +17,16 @@ export interface RemainingSlot {
   count: number;
 }
 
+export interface RosterPlayer {
+  playerName: string;
+  positions: string[];
+  cost?: number;
+}
+
 export interface DraftLiveState {
   currentAuctionPlayer: CurrentAuctionPlayer | null;
   myRosterCount: number;
+  roster?: RosterPlayer[];
   remainingBudget: number;
   autoMode: boolean;
   pitcherHitterSplit: number;

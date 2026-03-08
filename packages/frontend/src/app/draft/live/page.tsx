@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useDraftLiveSocket } from "./useDraftLiveSocket";
-import type { Alert, RemainingSlot, SimulationDecisionEntry } from "./useDraftLiveSocket";
+import type { Alert, RemainingSlot, RosterPlayer, SimulationDecisionEntry } from "./useDraftLiveSocket";
 
 // ---- Helpers ----
 
@@ -114,6 +114,13 @@ export default function DraftLivePage() {
 
   const { state, engineSignals, connected, sendControl } = useDraftLiveSocket(wsUrl);
 
+  // Sync split slider with extension state when it arrives
+  useEffect(() => {
+    if (state?.pitcherHitterSplit !== undefined) {
+      setSplitValue(state.pitcherHitterSplit);
+    }
+  }, [state?.pitcherHitterSplit]);
+
   const applyUrl = useCallback((url: string) => {
     localStorage.setItem(WS_URL_KEY, url);
     setWsUrl(url);
@@ -157,6 +164,7 @@ export default function DraftLivePage() {
   const alerts: Alert[] = (engineSignals?.alerts ?? []).filter((a) => a.severity >= 0.5);
   const remainingSlots: RemainingSlot[] = engineSignals?.remainingSlots ?? [];
   const autoMode = state?.autoMode ?? false;
+  const roster: RosterPlayer[] = state?.roster ?? [];
 
   // Determine if there's meaningful data
   const hasData = state !== null;
@@ -412,6 +420,33 @@ export default function DraftLivePage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- My Roster ---- */}
+          {hasData && roster.length > 0 && (
+            <SectionCard>
+              <SectionTitle>My Roster ({roster.length})</SectionTitle>
+              <div className="space-y-1">
+                {roster.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between bg-neutral-800 rounded-lg px-3 py-2"
+                  >
+                    <div>
+                      <span className="text-sm text-neutral-100">{p.playerName}</span>
+                      <span className="ml-2 text-xs text-neutral-500">
+                        {p.positions.join("/")}
+                      </span>
+                    </div>
+                    {p.cost !== undefined && (
+                      <span className="text-sm font-mono text-neutral-400">
+                        {dollar(p.cost)}
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             </SectionCard>
           )}
