@@ -1,5 +1,22 @@
-import { useDraftStore } from "./draft-state";
+import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
+
+/**
+ * Live nomination controller state — exposed via getNominationDiagnostics()
+ * and polled by the NominationDiagnostics UI panel.
+ */
+export interface NominationDiagnostics {
+  autoMode: boolean;
+  currentAuctionPlayer: string | null;
+  nominationAttempts: number;
+  maxAttempts: number;
+  cooldownRemainingMs: number;
+  lastAttemptResult: string | null;
+  lastCandidateName: string | null;
+  lastCandidateSource: 'simulation' | 'idealRoster' | null;
+  lastTurnDetectionResult: { matched: boolean; strategy: string | null; strategiesChecked: string[] };
+  isActive: boolean; // autoMode && currentAuctionPlayer == null
+}
 
 /**
  * AutoBidController - watches the Zustand store for price changes and automatically
@@ -41,6 +58,16 @@ export class AutoBidController {
   private lastNominationTime: number | null = null;
   private nominationAttempts: number = 0;
   private nominationDelayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Diagnostic state (for getNominationDiagnostics() and NominationDiagnostics UI)
+  private lastAttemptResult: string | null = null;
+  private lastCandidateName: string | null = null;
+  private lastCandidateSource: 'simulation' | 'idealRoster' | null = null;
+  private lastTurnDetection: { matched: boolean; strategy: string | null; strategiesChecked: string[] } = {
+    matched: false,
+    strategy: null,
+    strategiesChecked: [],
+  };
 
   /** Cooldown between nomination attempts (ms) */
   private static readonly NOMINATION_COOLDOWN_MS = 5000;
@@ -167,7 +194,7 @@ export class AutoBidController {
   }
 
   /**
-   * Clear all nomination-related state (timers, counters).
+   * Clear all nomination-related state (timers, counters, diagnostics).
    */
   private clearNominationState(): void {
     if (this.nominationDelayTimer != null) {
@@ -176,6 +203,47 @@ export class AutoBidController {
     }
     this.lastNominationTime = null;
     this.nominationAttempts = 0;
+    this.lastAttemptResult = null;
+    this.lastCandidateName = null;
+    this.lastCandidateSource = null;
+    this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked: [] };
+  }
+
+  /**
+   * Return current nomination controller state for diagnostic inspection.
+   * Called by NominationDiagnostics UI (polled every 500ms) and exposed on
+   * window.espnDraftAssistant.nominationDiag() in DEV mode.
+   */
+  getNominationDiagnostics(): NominationDiagnostics {
+    const state = useDraftStore.getState();
+    const now = Date.now();
+    const cooldownRemainingMs = this.lastNominationTime != null
+      ? Math.max(0, AutoBidController.NOMINATION_COOLDOWN_MS - (now - this.lastNominationTime))
+      : 0;
+
+    return {
+      autoMode: state.autoMode,
+      currentAuctionPlayer: state.currentAuctionPlayer?.playerName ?? null,
+      nominationAttempts: this.nominationAttempts,
+      maxAttempts: AutoBidController.MAX_NOMINATION_ATTEMPTS,
+      cooldownRemainingMs,
+      lastAttemptResult: this.lastAttemptResult,
+      lastCandidateName: this.lastCandidateName,
+      lastCandidateSource: this.lastCandidateSource,
+      lastTurnDetectionResult: this.lastTurnDetection,
+      isActive: state.autoMode && state.currentAuctionPlayer == null,
+    };
+  }
+
+  /**
+   * Bypass cooldown/attempt limits and immediately attempt nomination.
+   * Exposed in DEV mode via window.espnDraftAssistant.forceNominate().
+   */
+  forceNominate(): void {
+    console.log("[AutoNominate] Force nominate triggered by user");
+    this.nominationAttempts = 0;
+    this.lastNominationTime = null;
+    this.evaluateAndNominate();
   }
 
   /**
@@ -186,16 +254,27 @@ export class AutoBidController {
    * prompt or empty pick area as a simpler fallback.
    *
    * Returns true only when we are confident it is our turn. Returns false if unsure.
+   * Also updates this.lastTurnDetection with the matched strategy or all-failed result.
    */
   private isMyTurnToNominate(): boolean {
+    const strategiesChecked: string[] = [];
+
     // Strategy 1: Check for "Nominate a Player" or "Select a player" prompt text
     // ESPN shows this when it is your turn and no player is nominated
+    const s1 = "Strategy 1 (body text: 'nominate a player' / 'select a player')";
+    strategiesChecked.push(s1);
     const bodyText = document.body?.innerText || "";
-    if (/nominate\s+a\s+player/i.test(bodyText) || /select\s+a\s+player/i.test(bodyText)) {
+    const s1matched = /nominate\s+a\s+player/i.test(bodyText) || /select\s+a\s+player/i.test(bodyText);
+    console.debug(`[AutoNominate] ${s1}: ${s1matched}`);
+    if (s1matched) {
+      this.lastTurnDetection = { matched: true, strategy: s1, strategiesChecked };
+      console.log(`[AutoNominate] Turn detected via: ${s1}`);
       return true;
     }
 
     // Strategy 2: Check pick train for highlighted/active team matching our team
+    const s2 = "Strategy 2 (pick train active team: 'your'/'my turn' indicator)";
+    strategiesChecked.push(s2);
     const pickTrainSelectors = [
       ".pick-train",
       '[class*="pickTrain"]',
@@ -209,8 +288,8 @@ export class AutoBidController {
       if (pickTrain) break;
     }
 
+    let s2matched = false;
     if (pickTrain) {
-      // Look for the active/highlighted/current team card
       const activeSelectors = [
         ".active",
         '[class*="active"]',
@@ -228,78 +307,87 @@ export class AutoBidController {
       }
 
       if (activeTeam) {
-        // Check if this team matches our team name or has "your turn" indicator
         const activeText = activeTeam.textContent?.toLowerCase() || "";
-
-        // Check for explicit "your turn" indicator
         if (activeText.includes("your") || activeText.includes("my turn")) {
-          return true;
-        }
-
-        // Compare against known team names in our store
-        const state = useDraftStore.getState();
-        if (state.myTeamId) {
-          // Try to match team ID or team name against active team
-          const teamBudgets = state.allTeamBudgets;
-          // If the first entry in pick train matches our team, it's our turn
-          const firstChild = pickTrain.children[0];
-          if (firstChild === activeTeam) {
-            // The active team is first in the pick train — could be our turn
-            // Check if it matches any identifiable marker of our team
-          }
+          s2matched = true;
         }
       }
+    }
+    console.debug(`[AutoNominate] ${s2}: ${s2matched} (pickTrain found=${pickTrain != null})`);
+    if (s2matched) {
+      this.lastTurnDetection = { matched: true, strategy: s2, strategiesChecked };
+      console.log(`[AutoNominate] Turn detected via: ${s2}`);
+      return true;
     }
 
     // Strategy 3: Check if the bidding form area is in a "waiting to nominate" state
     // ESPN shows the pick area empty or with a nomination prompt when it's your turn
+    const s3 = "Strategy 3 (pickArea text or nominate button)";
+    strategiesChecked.push(s3);
     const pickArea = document.querySelector(".pickArea, [class*='pickArea']");
+    let s3matched = false;
     if (pickArea) {
       const pickAreaText = pickArea.textContent?.toLowerCase() || "";
       if (pickAreaText.includes("nominate") || pickAreaText.includes("select a player")) {
-        return true;
-      }
-      // If pick area is empty (no player selected) and has the nomination state class
-      const playerSelected = pickArea.querySelector('[data-testid="player-selected"], .player-selected');
-      if (!playerSelected && pickAreaText.trim().length < 20) {
-        // Pick area exists but no player is selected — likely waiting for nomination
-        // Only return true if we also see nomination-related UI
-        const nominateButton = document.querySelector(
-          'button[class*="nominate"], button[class*="Nominate"], [data-testid*="nominate"]'
-        );
-        if (nominateButton) {
-          return true;
+        s3matched = true;
+      } else {
+        const playerSelected = pickArea.querySelector('[data-testid="player-selected"], .player-selected');
+        if (!playerSelected && pickAreaText.trim().length < 20) {
+          const nominateButton = document.querySelector(
+            'button[class*="nominate"], button[class*="Nominate"], [data-testid*="nominate"]'
+          );
+          if (nominateButton) {
+            s3matched = true;
+          }
         }
       }
+    }
+    console.debug(`[AutoNominate] ${s3}: ${s3matched} (pickArea found=${pickArea != null})`);
+    if (s3matched) {
+      this.lastTurnDetection = { matched: true, strategy: s3, strategiesChecked };
+      console.log(`[AutoNominate] Turn detected via: ${s3}`);
+      return true;
     }
 
     // Strategy 4: Check for "Select" buttons (Button--select class) in the player table
     // ESPN changes "Queue" → "Select" when it is your turn to nominate
+    const s4 = "Strategy 4 (Button--select buttons in player table)";
+    strategiesChecked.push(s4);
     const selectButtons = document.querySelectorAll<HTMLButtonElement>(
       "button.Button--select[data-player-id]:not([disabled])"
     );
-    if (selectButtons.length > 0) {
-      console.log("[AutoNominate] Detected Button--select buttons — it's our turn to nominate");
+    const s4matched = selectButtons.length > 0;
+    console.debug(`[AutoNominate] ${s4}: ${s4matched} (count=${selectButtons.length})`);
+    if (s4matched) {
+      this.lastTurnDetection = { matched: true, strategy: s4, strategiesChecked };
+      console.log(`[AutoNominate] Turn detected via: ${s4}`);
       return true;
     }
 
     // Strategy 5: Check for an enabled Queue button in the player table
     // If queue buttons are clickable, it likely means we can nominate
+    const s5 = "Strategy 5 (enabled queue buttons, no active bidding form)";
+    strategiesChecked.push(s5);
     const queueButtons = document.querySelectorAll<HTMLButtonElement>(
       "button[data-player-id]:not([disabled])"
     );
+    let s5matched = false;
     if (queueButtons.length > 0) {
-      // Queue buttons are enabled — check if the bidding form is NOT showing an active auction
       const biddingForm = document.querySelector("form.bidding-form__default");
       const currentAmount = document.querySelector(".current-amount");
       if (!biddingForm && !currentAmount) {
-        // No active bidding form and queue buttons are available
-        // This is a reasonable signal that it's our turn to nominate
-        return true;
+        s5matched = true;
       }
     }
+    console.debug(`[AutoNominate] ${s5}: ${s5matched} (queueCount=${queueButtons.length})`);
+    if (s5matched) {
+      this.lastTurnDetection = { matched: true, strategy: s5, strategiesChecked };
+      console.log(`[AutoNominate] Turn detected via: ${s5}`);
+      return true;
+    }
 
-    // Default: not confident it is our turn
+    // No strategy matched
+    this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked };
     return false;
   }
 
@@ -315,36 +403,52 @@ export class AutoBidController {
    */
   evaluateAndNominate(): void {
     const state = useDraftStore.getState();
+    const MAX = AutoBidController.MAX_NOMINATION_ATTEMPTS;
+    const cooldownRemaining = this.lastNominationTime != null
+      ? Math.max(0, AutoBidController.NOMINATION_COOLDOWN_MS - (Date.now() - this.lastNominationTime))
+      : 0;
+
+    console.log(
+      `[AutoNominate] evaluateAndNominate() called — autoMode=${state.autoMode}, ` +
+      `auctionPlayer=${state.currentAuctionPlayer?.playerName ?? 'null'}, ` +
+      `attempts=${this.nominationAttempts}/${MAX}, cooldown=${cooldownRemaining}ms`
+    );
 
     // Guard: auto-mode must be on
-    if (!state.autoMode) return;
+    if (!state.autoMode) {
+      this.lastAttemptResult = "autoMode off";
+      return;
+    }
 
     // Guard: no active auction (we're in nomination phase)
-    if (state.currentAuctionPlayer != null) return;
+    if (state.currentAuctionPlayer != null) {
+      this.lastAttemptResult = "auction active";
+      return;
+    }
 
     // Guard: nomination attempt limit
-    if (this.nominationAttempts >= AutoBidController.MAX_NOMINATION_ATTEMPTS) {
+    if (this.nominationAttempts >= MAX) {
+      this.lastAttemptResult = `max attempts (${this.nominationAttempts}/${MAX})`;
       console.log(
-        `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS}) — waiting for state change`
+        `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${MAX}) — waiting for state change`
       );
       return;
     }
 
     // Guard: cooldown between attempts
-    if (this.lastNominationTime != null) {
-      const elapsed = Date.now() - this.lastNominationTime;
-      if (elapsed < AutoBidController.NOMINATION_COOLDOWN_MS) {
-        console.log(
-          `[AutoNominate] Cooldown active — ${Math.round((AutoBidController.NOMINATION_COOLDOWN_MS - elapsed) / 1000)}s remaining`
-        );
-        // Schedule a retry after cooldown expires
-        this.scheduleNomination(AutoBidController.NOMINATION_COOLDOWN_MS - elapsed + 100);
-        return;
-      }
+    if (cooldownRemaining > 0) {
+      this.lastAttemptResult = `cooldown active (${Math.round(cooldownRemaining / 1000)}s remaining)`;
+      console.log(
+        `[AutoNominate] Cooldown active — ${Math.round(cooldownRemaining / 1000)}s remaining`
+      );
+      // Schedule a retry after cooldown expires
+      this.scheduleNomination(cooldownRemaining + 100);
+      return;
     }
 
     // Guard: must be our turn to nominate
     if (!this.isMyTurnToNominate()) {
+      this.lastAttemptResult = "not our turn";
       console.log("[AutoNominate] Not our turn to nominate — skipping");
       return;
     }
@@ -362,8 +466,10 @@ export class AutoBidController {
       candidateName = topPick.playerName;
       candidateReason = `trap: ${topPick.reason}`;
       candidateTrapScore = topPick.trapScore;
+      this.lastCandidateName = candidateName;
+      this.lastCandidateSource = 'simulation';
       console.log(
-        `[AutoNominate] Primary pick: ${candidateName} (trapScore=${candidateTrapScore.toFixed(2)}, reason=${candidateReason})`
+        `[AutoNominate] Candidate source=simulation: ${candidateName} (trapScore=${candidateTrapScore.toFixed(2)}, reason=${candidateReason})`
       );
     }
 
@@ -374,24 +480,33 @@ export class AutoBidController {
       if (firstUndrafted) {
         candidateName = firstUndrafted.name;
         candidateReason = `ideal roster ${firstUndrafted.tier} target`;
+        this.lastCandidateName = candidateName;
+        this.lastCandidateSource = 'idealRoster';
         console.log(
-          `[AutoNominate] Fallback pick: ${candidateName} (tier=${firstUndrafted.tier}, reason=${candidateReason})`
+          `[AutoNominate] Candidate source=idealRoster: ${candidateName} (tier=${firstUndrafted.tier}, reason=${candidateReason})`
         );
       }
     }
 
     if (!candidateName) {
+      this.lastAttemptResult = "no candidates available";
       console.log("[AutoNominate] No nomination candidates available — skipping");
       return;
     }
 
     // ── Map candidate name to ESPN player ID ──
-    const candidateNameLower = candidateName.toLowerCase();
+    const normalizedCandidate = normalizeName(candidateName);
     const matchedRanking = state.rankings?.find(
-      (r) => r.playerName.toLowerCase() === candidateNameLower
+      (r) => normalizeName(r.playerName) === normalizedCandidate
+    );
+
+    console.log(
+      `[AutoNominate] Ranking lookup: candidateName="${candidateName}" normalized="${normalizedCandidate}" ` +
+      `→ matched="${matchedRanking?.playerName ?? 'NOT FOUND'}" playerId=${matchedRanking?.playerId ?? 'N/A'}`
     );
 
     if (!matchedRanking) {
+      this.lastAttemptResult = `ranking not found for "${candidateName}" (normalized: "${normalizedCandidate}")`;
       console.warn(
         `[AutoNominate] Cannot find "${candidateName}" in rankings — cannot map to ESPN player ID`
       );
@@ -413,6 +528,7 @@ export class AutoBidController {
     }
 
     if (queueButton?.disabled) {
+      this.lastAttemptResult = `button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`;
       console.warn(
         `[AutoNominate] Queue button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`
       );
@@ -442,6 +558,7 @@ export class AutoBidController {
     this.lastNominationTime = Date.now();
 
     const btnText = button.textContent?.trim() || "Queue";
+    this.lastAttemptResult = `clicked "${btnText}" button for ${candidateName}`;
     console.log(
       `[AutoNominate] Clicking "${btnText}" for ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`
     );

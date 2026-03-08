@@ -13,7 +13,7 @@ import type {
  * Lowercases, strips diacritics, removes common suffixes (Jr., Sr., II, III, IV),
  * and collapses whitespace.
  */
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name
     .trim()
     .toLowerCase()

@@ -106,6 +106,14 @@ export default defineContentScript({
           const domRosters = parseTeamRostersFromDOM();
           console.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
         },
+        // Nomination diagnostics — call during a live draft to inspect controller state
+        nominationDiag: () => autoBidController.getNominationDiagnostics(),
+        forceNominate: () => autoBidController.forceNominate(),
+        turnCheck: () => {
+          // Return the last turn detection result from the nomination controller
+          const diag = autoBidController.getNominationDiagnostics();
+          return diag.lastTurnDetectionResult;
+        },
         version: "1.0.0",
       };
       console.log(
