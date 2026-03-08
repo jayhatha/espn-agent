@@ -376,6 +376,7 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-54]: AutoBidController uses full-state subscribe with manual diffing (store lacks subscribeWithSelector middleware); updateSignals() also triggers evaluateAndBid() to handle late-arriving signals
 - [Phase quick-58]: Moved computeMaxBid + runMonteCarlo to Web Worker following simulation-worker pattern
 - [Phase quick-60]: Auto-nomination uses multi-strategy DOM detection with defensive false-by-default, 5s cooldown, 3-attempt max
+- [Phase quick-61]: Three-path auto-bid strategy: IDEAL TARGET (ASV+10%), PL UNDERVALUED (ASV+15%), OPPORTUNITY (at ASV), with SP-widened thresholds
 
 ### Roadmap Evolution
 
