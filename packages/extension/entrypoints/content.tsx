@@ -67,6 +67,31 @@ export default defineContentScript({
       draftFormat: detectedDraftFormat,
     });
 
+    // Listen for CONTROL commands from the background service worker (relayed from mobile)
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message.type !== "CONTROL") return false;
+
+      const store = useDraftStore.getState();
+
+      switch (message.action) {
+        case "SET_AUTO_MODE":
+          store.setAutoMode(message.payload as boolean);
+          break;
+        case "SET_POSITION_FILTER":
+          store.setPositionFilter(message.payload as string | null);
+          break;
+        case "TOGGLE_SIDEBAR":
+          store.toggleSidebar();
+          break;
+        case "SET_PITCHER_HITTER_SPLIT":
+          store.setPitcherHitterSplit(message.payload as number);
+          break;
+      }
+
+      sendResponse({ ok: true });
+      return false;
+    });
+
     // Expose diagnostic functions for debugging (development only)
     if (import.meta.env.DEV) {
       (window as any).espnDraftAssistant = {
