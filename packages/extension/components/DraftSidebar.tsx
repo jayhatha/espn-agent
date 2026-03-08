@@ -274,11 +274,16 @@ export default function DraftSidebar() {
             </div>
           </div>
 
-          {/* Auto-bid toggle */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-accent/20">
+        </div>
+      )}
+
+      {/* Auto-Pilot toggle — always visible during auction drafts */}
+      {draftFormat === "auction" && (
+        <div className="px-4 py-2 bg-surface-secondary border-b border-surface-tertiary">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-body-xs font-semibold text-content">Auto-Bid</span>
-              {autoMode && engineSignals?.optimization && (
+              <span className="text-body-xs font-semibold text-content">Auto-Pilot</span>
+              {autoMode && currentAuctionPlayer && engineSignals?.optimization && (
                 <span className="text-body-xs text-content-secondary">
                   (max ${engineSignals.optimization.maxBid})
                 </span>
@@ -291,7 +296,7 @@ export default function DraftSidebar() {
               }`}
               role="switch"
               aria-checked={autoMode}
-              aria-label="Toggle auto-bid"
+              aria-label="Toggle auto-pilot"
             >
               <span
                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
@@ -301,9 +306,15 @@ export default function DraftSidebar() {
             </button>
           </div>
           {autoMode && (
-            <div className="mt-1 text-body-xs text-warning">
-              Auto-bidding +1 up to engine max bid
-            </div>
+            currentAuctionPlayer ? (
+              <div className="mt-1 text-body-xs text-warning">
+                Auto-pilot: bidding +1 up to engine max bid
+              </div>
+            ) : (
+              <div className="mt-1 text-body-xs text-accent">
+                Waiting to nominate...
+              </div>
+            )
           )}
         </div>
       )}
