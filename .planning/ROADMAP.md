@@ -556,3 +556,19 @@ Plans:
 - [ ] 31-01-PLAN.md — Install @fastify/websocket, create /draft/live WebSocket hub route with fan-out relay, relax CORS for LAN
 - [ ] 31-02-PLAN.md — Wire extension: write engine signals to storage, background SW WS client with keepalive/reconnect, content script CONTROL handler
 - [ ] 31-03-PLAN.md — Mobile companion page at /draft/live with WS hook, live signal display, and touch controls (auto-bid, position filter, split)
+
+### Phase 32: Ideal roster always needs to fill all spots.
+
+**Goal:** Guarantee that optimizeRoster always fills every roster slot when eligible players exist in the pool, by adding a backfill pass after the greedy fill that uses relaxed budget constraints and force-places cheapest eligible players
+**Depends on:** Phase 31
+**Requirements:** ROSTER-FILL-01
+**Success Criteria** (what must be TRUE):
+  1. optimizeRoster returns unfilledSlots === 0 whenever the player pool contains eligible players for each remaining slot
+  2. Backfill pass uses relaxed budget constraint (no $1/slot reserve) and force-places cheapest eligible player per unfilled slot
+  3. Budget upgrade pass (Phase 4) runs after successful backfill when all slots are filled
+  4. Existing greedy fill behavior is unchanged for normal (sufficient budget) scenarios
+  5. All existing roster-optimizer tests pass without modification
+**Plans:** 1 plans
+
+Plans:
+- [ ] 32-01-PLAN.md — Add backfill pass to optimizeRoster with TDD: failing tests for tight-budget and position-constraint scenarios, then implement backfill logic
