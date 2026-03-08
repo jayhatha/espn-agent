@@ -161,6 +161,7 @@ Progress: Phase 31 COMPLETE (3/3 plans) | Full relay chain: Extension -> WS hub 
 | Phase 31 P01 | 2 | 2 tasks | 4 files |
 | Phase 31 P02 | 4 | 3 tasks | 3 files |
 | Phase 31 P03 | 2 | 2 tasks | 2 files |
+| Phase 32 P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -393,6 +394,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 31 P03]: handleSplitCommit typed as no-arg callback to be compatible with both onMouseUp and onTouchEnd event types — reads splitValue from closure dependency
 - [Phase 31 P03]: Auto-bid toggle uses red background when ON to visually signal risk of automated bidding on mobile
 - [Phase 31 P03]: WS URL defaults to ws://${window.location.hostname}:3001/draft/live?role=mobile — auto-adapts if phone opens the page via LAN IP
+- [Phase 32]: Backfill selects cheapest eligible player not most efficient — slot coverage priority over SGP/$ in emergency fill mode
+- [Phase 32]: canFillSlot is separate from findBestSlot — inverted APIs make code reuse awkward; kept distinct for clarity
 
 ### Roadmap Evolution
 

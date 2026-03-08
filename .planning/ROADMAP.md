@@ -568,7 +568,7 @@ Plans:
   3. Budget upgrade pass (Phase 4) runs after successful backfill when all slots are filled
   4. Existing greedy fill behavior is unchanged for normal (sufficient budget) scenarios
   5. All existing roster-optimizer tests pass without modification
-**Plans:** 1 plans
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 32-01-PLAN.md — Add backfill pass to optimizeRoster with TDD: failing tests for tight-budget and position-constraint scenarios, then implement backfill logic
