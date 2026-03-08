@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 30 — Extension Performance Audit
-Plan: 02 complete — Phase 30 Plan 02 COMPLETE
-Status: Phase 30 complete (2/2 plans) — 7 perf fixes: sim count 200->50, DEV-gated logs, deduplicated pool build, observer scope, equality guard, scarcity pre-group, useMemo Sets
-Last activity: 2026-03-07 — Phase 30 Plan 02 complete (extension sidebar performance optimizations applied)
+Phase: 31 — Mobile Draft Companion
+Plan: 01 complete — Phase 31 Plan 01 COMPLETE
+Status: Phase 31 in progress (1/3 plans) — Fastify WebSocket hub at /draft/live with role-based relay (extension fan-out, mobile control)
+Last activity: 2026-03-08 — Phase 31 Plan 01 complete (@fastify/websocket hub route created)
 
-Progress: Phase 30 complete (2/2 plans) | extension perf audit done
+Progress: Phase 31 in progress (1/3 plans) | WebSocket hub done
 
 ```
 [############                            ] 30% v2.0
@@ -158,6 +158,7 @@ Progress: Phase 30 complete (2/2 plans) | extension perf audit done
 | Phase 52 P01 | 8 | 2 tasks | 5 files |
 | Phase 30-extension-perf-audit P01 | 5 | 2 tasks | 8 files |
 | Phase 30 P02 | 7 | 2 tasks | 7 files |
+| Phase 31 P01 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -378,6 +379,10 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-60]: Auto-nomination uses multi-strategy DOM detection with defensive false-by-default, 5s cooldown, 3-attempt max
 - [Phase quick-61]: Three-path auto-bid strategy: IDEAL TARGET (ASV+10%), PL UNDERVALUED (ASV+15%), OPPORTUNITY (at ASV), with SP-widened thresholds
 - [Phase 64]: Used OR logic (playerId OR normalized name) for dedup to preserve backward compatibility while catching DOM-path duplicates
+- [Phase 31 P01]: @fastify/websocket must be registered before any route that uses { websocket: true } — registration order is mandatory in Fastify
+- [Phase 31 P01]: Role-based WS routing via ?role=extension or ?role=mobile query param at connection time — avoids auth complexity for local-network use
+- [Phase 31 P01]: Cache latestSnapshot as raw string so late-joining mobile clients get current state immediately on connect without double serialization
+- [Phase 31 P01]: Private LAN IP origins (192.168.x, 10.x, 172.16-31.x) added to CORS allowed list for mobile draft companion page
 
 ### Roadmap Evolution
 
@@ -402,6 +407,7 @@ Recent decisions affecting v1.1 work:
 - Phase 28 added: Forward-looking draft simulation — full draft completion Monte Carlo with standings-based decision comparison, nomination strategy, and win probability
 - Phase 29 added: Ideal roster optimizer — show the best possible roster given remaining budget, slots, and available player pool in the extension sidebar
 - Phase 30 added: Extension perf and code quality audit — extension is locking up, investigate performance issues and code quality
+- Phase 31 added: Serve a mobile-friendly page that connects to the extension via websocket so I can view and control the draft from my phone on my local network
 
 ### Pending Todos
 
