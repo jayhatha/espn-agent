@@ -8,6 +8,22 @@ import type {
   Category,
 } from "@espn-fantasy/shared";
 
+/**
+ * Normalize a player name for dedup comparison.
+ * Lowercases, strips diacritics, removes common suffixes (Jr., Sr., II, III, IV),
+ * and collapses whitespace.
+ */
+function normalizeName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export interface ProjectedOverallRow {
   team_id: number;
   teamName: string;
@@ -185,10 +201,11 @@ export const useDraftStore = create<DraftState>()(
 
       addPick: (pick) => {
         set((state) => {
+          const normalizedIncoming = normalizeName(pick.playerName);
           const existingPick = state.allPicks.find(
             (existing) =>
-              existing.playerId === pick.playerId &&
-              existing.teamId === pick.teamId &&
+              (existing.playerId === pick.playerId ||
+                normalizeName(existing.playerName) === normalizedIncoming) &&
               existing.cost === pick.cost,
           );
 
@@ -205,8 +222,11 @@ export const useDraftStore = create<DraftState>()(
 
       updateRoster: (player) => {
         set((state) => {
+          const normalizedIncoming = normalizeName(player.playerName);
           const alreadyOnRoster = state.myRoster.some(
-            (existing) => existing.playerId === player.playerId,
+            (existing) =>
+              existing.playerId === player.playerId ||
+              normalizeName(existing.playerName) === normalizedIncoming,
           );
 
           if (alreadyOnRoster) {
