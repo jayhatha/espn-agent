@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
+import { autoBidController } from "../lib/auto-bid-controller";
 import { useNarrator } from "../lib/use-narrator";
 import { useNarratorStore } from "../lib/narrator-state";
 import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
@@ -32,11 +33,19 @@ export default function DraftSidebar() {
     espnDomAuctionValues,
     pitcherHitterSplit,
     setPitcherHitterSplit,
+    autoMode,
+    setAutoMode,
   } = useDraftStore();
 
   const engineSignals = useDraftEngineSignals();
   const { requestAdvice } = useNarrator(engineSignals);
   const sessionCallCount = useNarratorStore((state) => state.sessionCallCount);
+
+  // Pipe latest engine signals into the AutoBidController so it can evaluate shouldBid/maxBid
+  // without needing to call a React hook (controller runs outside React lifecycle)
+  useEffect(() => {
+    autoBidController.updateSignals(engineSignals);
+  }, [engineSignals]);
 
   const dispatchAssistantEvent = (eventName: string, detail?: unknown) => {
     const targetWindow =
@@ -264,6 +273,38 @@ export default function DraftSidebar() {
               })()}
             </div>
           </div>
+
+          {/* Auto-bid toggle */}
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-accent/20">
+            <div className="flex items-center gap-1.5">
+              <span className="text-body-xs font-semibold text-content">Auto-Bid</span>
+              {autoMode && engineSignals?.optimization && (
+                <span className="text-body-xs text-content-secondary">
+                  (max ${engineSignals.optimization.maxBid})
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setAutoMode(!autoMode)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                autoMode ? "bg-accent" : "bg-surface-tertiary"
+              }`}
+              role="switch"
+              aria-checked={autoMode}
+              aria-label="Toggle auto-bid"
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                  autoMode ? "translate-x-[18px]" : "translate-x-[2px]"
+                }`}
+              />
+            </button>
+          </div>
+          {autoMode && (
+            <div className="mt-1 text-body-xs text-warning">
+              Auto-bidding +1 up to engine max bid
+            </div>
+          )}
         </div>
       )}
 

@@ -24,6 +24,7 @@ import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
 import { calculateProjectedStandingsFromState } from "../lib/value-calculations";
+import { autoBidController } from "../lib/auto-bid-controller";
 
 const SIDEBAR_ROOT_ID = "espn-draft-assistant-root";
 const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
@@ -519,6 +520,7 @@ export default defineContentScript({
     };
 
     mountSidebar();
+    autoBidController.start();
 
     // Observe current auction player (auction only)
     let auctionPlayerCleanup: (() => void) | null = null;
@@ -725,6 +727,7 @@ export default defineContentScript({
     window.addEventListener("beforeunload", () => {
       cleanup();
       auctionPlayerCleanup?.();
+      autoBidController.stop();
       if (auctionTableScrapeInterval) {
         clearInterval(auctionTableScrapeInterval);
       }
