@@ -500,9 +500,31 @@ function computeIdealRoster(
     return rawSgp * boost;
   });
 
+  // Build ASV overlay: replace player.dollars with ESPN ASV when available.
+  // ASV reflects actual market price, making the optimizer's budget constraint
+  // and SGP/$ efficiency sort use realistic auction costs instead of FanGraphs
+  // projected values. FanGraphs dollars are preserved on the originals for
+  // tier classification and sgpValue display.
+  const nameToAsvIdeal = new Map<string, number>();
+  if (input.espnDomAuctionValues) {
+    for (const av of input.auctionValues) {
+      const asv = input.espnDomAuctionValues[av.playerId];
+      if (asv != null && asv > 0) {
+        nameToAsvIdeal.set(normalizeName(av.playerName), asv);
+      }
+    }
+  }
+
+  const playersForOptimizer = nameToAsvIdeal.size > 0
+    ? allPlayers.map(p => {
+        const asv = nameToAsvIdeal.get(p.normalizedName);
+        return asv != null ? { ...p, dollars: asv } : p;
+      })
+    : allPlayers;
+
   // Optimizer fills remaining slots with remaining budget
   const result = optimizeRoster(
-    allPlayers,
+    playersForOptimizer,
     adjustedSgpValues,
     input.remainingBudget,
     remainingSlots,
@@ -534,15 +556,20 @@ function computeIdealRoster(
     });
   }
 
-  // Build optimizer picks with their slot assignments
+  // Build optimizer picks with their slot assignments.
+  // Match by normalizedName (not object identity) because ASV-overlaid players
+  // are spread copies and won't === the originals in allPlayers.
+  // Use the original allPlayers entry for FanGraphs dollars (tier display)
+  // and raw SGP values — ASV overlay only affects optimizer budget math.
   const optimizerPlayers: IdealRosterPlayer[] = result.roster.map((player, i) => {
-    const poolIdx = allPlayers.indexOf(player);
+    const originalPlayer = allPlayers.find(p => p.normalizedName === player.normalizedName) ?? player;
+    const poolIdx = allPlayers.indexOf(originalPlayer);
     const sgpValue = sgpValuesRaw[poolIdx] ?? 0;
     return {
       name: player.name,
       positions: player.positions,
-      dollars: player.dollars,
-      tier: classifyTier(player.dollars),
+      dollars: originalPlayer.dollars,    // FanGraphs $ for tier display (not ASV)
+      tier: classifyTier(originalPlayer.dollars),
       sgpValue,
       slot: result.slotAssignments[i] ?? "BN",
       isDrafted: false,
