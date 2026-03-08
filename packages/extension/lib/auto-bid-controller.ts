@@ -512,12 +512,16 @@ export class AutoBidController {
     // Guard: already bid at this price (prevent repeat clicks)
     if (this.lastBidPrice === currentBid) return;
 
+    // Resolve nominated player name early — needed for name-based lookups below
+    // (Rankings use FanGraphs MLBAM IDs, not ESPN player IDs, so we match by name)
+    const nominatedName = currentAuctionPlayer.playerName?.toLowerCase();
+
     // Resolve ESPN ASV with two-source fallback:
     // 1. DOM-scraped values (most accurate, scraped from ESPN fixed data table)
     // 2. Rankings API values (populated from ESPN draft board API)
     const espnAsv =
       state.espnDomAuctionValues?.[playerId] ??
-      state.rankings?.find((p) => p.playerId === playerId)?.espnAuctionValue ??
+      (nominatedName ? state.rankings?.find((r) => r.playerName.toLowerCase() === nominatedName)?.espnAuctionValue : undefined) ??
       null;
 
     // ── Strategy filter: only auto-bid on players we actually want ──
@@ -540,7 +544,6 @@ export class AutoBidController {
     //
     // Everyone else: skip.
 
-    const nominatedName = currentAuctionPlayer.playerName?.toLowerCase();
     const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
     const idealMatch = idealPlayers.find(
       (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName
@@ -550,7 +553,9 @@ export class AutoBidController {
 
     // Opportunity: high externally ranked player currently below market price
     // SPs get wider threshold (top-100) because PL rankings are deepest for SP
-    const ranking = state.rankings?.find((r) => r.playerId === playerId);
+    const ranking = nominatedName
+      ? state.rankings?.find((r) => r.playerName.toLowerCase() === nominatedName)
+      : undefined;
     const isSP = ranking?.primaryPosition === "SP";
     const opportunityRankThreshold = isSP ? 100 : 50;
     const hasHighExternalRank =
