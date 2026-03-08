@@ -66,6 +66,9 @@ export async function buildServer(): Promise<FastifyInstance> {
       ) {
         // Allow private LAN IP origins for mobile draft companion
         callback(null, true);
+      } else if (/^chrome-extension:\/\//.test(origin)) {
+        // Allow Chrome extension WebSocket connections
+        callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"), false);
       }
