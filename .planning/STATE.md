@@ -484,8 +484,9 @@ None yet.
 | 66 | Show external ranking circle next to players in ideal roster panel | 2026-03-08 | 9bc54e9 | ✅ | — |
 | 67 | Fix auto-bid overpaying for top SPs — apply pitcher dampening multiplier to ASV-based bid caps | 2026-03-08 | 7467920 | ✅ | [67-investigate-why-we-re-overpaying-for-top](./quick/67-investigate-why-we-re-overpaying-for-top/) |
 | 68 | Restore projected standings section to extension sidebar | 2026-03-08 | d974aee | ✅ | [68-restore-projected-standings-section-to-e](./quick/68-restore-projected-standings-section-to-e/) |
+| 69 | Catcher slot dampening in auto-bid — 0.5x bid cap when C slot already filled | 2026-03-08 | 0365656 | ✅ | [69-restore-guard-against-drafting-a-second-](./quick/69-restore-guard-against-drafting-a-second-/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 68: Restored projected standings with team rankings to sidebar
+Last activity: 2026-03-08 - Completed quick task 69: Catcher dampening applied when C slot filled
 Resume file: None
