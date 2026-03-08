@@ -473,8 +473,9 @@ None yet.
 | 57 | Fix expected market price not using ESPN ASV — nameToAsv now uses rankings+allPicks+auctionValues | 2026-03-08 | aa5a082 | ✅ | [57-fix-expected-market-price-not-using-espn](./quick/57-fix-expected-market-price-not-using-espn/) |
 | 58 | Move bid optimizer (computeMaxBid + runMonteCarlo) into Web Worker — off main thread | 2026-03-08 | 265a583 | ✅ | [58-move-the-bid-optimizer-into-a-worker](./quick/58-move-the-bid-optimizer-into-a-worker/) |
 | 59 | Fix auto-bid timing: remove shouldBid gate broken by async worker, use strategy filter instead | 2026-03-08 | 0ed541a | ✅ | [59-fix-auto-bid-timing](./quick/59-fix-auto-bid-timing/) |
+| 60 | Auto-nominate players using the ESPN queue button in the players table | 2026-03-08 | 6cd54e0 | ✅ | [60-auto-nominate-players-using-the-espn-que](./quick/60-auto-nominate-players-using-the-espn-que/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 59: fix auto-bid timing — removed shouldBid gate broken by async worker
+Last activity: 2026-03-08 - Completed quick task 60: auto-nominate players via ESPN queue button
 Resume file: None
