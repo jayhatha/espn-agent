@@ -3,12 +3,16 @@ import type { DraftEngineSignals } from "./engine/types";
 
 /**
  * AutoBidController - watches the Zustand store for price changes and automatically
- * clicks ESPN's "+1 bid" button when auto-bid mode is enabled and the engine says
- * shouldBid=true and currentBid < maxBid.
+ * clicks ESPN's "+1 bid" button when auto-bid mode is enabled.
+ *
+ * Bidding strategy:
+ * - Ideal roster targets (anchor/core): bid up to ESPN ASV + 10%
+ * - Opportunity bids (top-50 ext rank + below market): bid up to ESPN ASV
+ * - Everyone else: skip
  *
  * Safety guarantees:
  * - Only fires once per price level (tracks lastBidPrice)
- * - Stops when price reaches or exceeds maxBid
+ * - Stops when price reaches or exceeds bid cap
  * - Does nothing when autoMode=false
  * - Resets to OFF on page load (not persisted)
  */
@@ -111,17 +115,6 @@ export class AutoBidController {
     // Guard: already bid at this price (prevent repeat clicks)
     if (this.lastBidPrice === currentBid) return;
 
-    // Guard: must have engine signals with optimization data
-    if (this.lastEngineSignals?.optimization == null) return;
-
-    const { shouldBid, maxBid } = this.lastEngineSignals.optimization;
-
-    // Guard: engine says PASS
-    if (!shouldBid) {
-      console.log("[AutoBidController] Engine says PASS — not bidding");
-      return;
-    }
-
     // Resolve ESPN ASV with two-source fallback:
     // 1. DOM-scraped values (most accurate, scraped from ESPN fixed data table)
     // 2. Rankings API values (populated from ESPN draft board API)
@@ -130,21 +123,71 @@ export class AutoBidController {
       state.rankings?.find((p) => p.playerId === playerId)?.espnAuctionValue ??
       null;
 
-    // Guard: only auto-bid on ANCHOR players (market value > $20).
-    // "Bid as much as it takes" is reserved for anchors — core ($5-$20) and
-    // value (<$5) players aren't worth aggressive auto-bidding.
-    // Use ESPN ASV as the tier signal; fall back to engine maxBid if unavailable.
-    const tierValue = espnAsv ?? maxBid;
-    if (tierValue < 20) {
+    // ── Strategy filter: only auto-bid on players we actually want ──
+    //
+    // NOTE: We intentionally do NOT gate on optimization.shouldBid here.
+    // The bid optimizer runs in an async Web Worker, so shouldBid is false
+    // (placeholder) when the controller first evaluates after a nomination.
+    // Instead, we use our own two-path strategy filter which relies on
+    // synchronously-available idealRoster and rankings data.
+    //
+    // Path 1: IDEAL ROSTER targets (anchor/core from our suggested roster)
+    //   → bid aggressively up to ASV + 10%
+    //
+    // Path 2: OPPORTUNITY bids (high external rank + below market)
+    //   → bid up to ASV (at market, not above — we're getting a deal)
+    //
+    // Everyone else: skip.
+
+    const nominatedName = currentAuctionPlayer.playerName?.toLowerCase();
+    const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
+    const idealMatch = idealPlayers.find(
+      (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName
+    );
+    const isIdealTarget =
+      idealMatch != null && (idealMatch.tier === "anchor" || idealMatch.tier === "core");
+
+    // Opportunity: top-50 externally ranked player currently below market price
+    const ranking = state.rankings?.find((r) => r.playerId === playerId);
+    const hasHighExternalRank =
+      ranking?.externalRank != null && ranking.externalRank <= 50;
+    const isBelowMarket = espnAsv != null && currentBid < espnAsv;
+    const isOpportunity = hasHighExternalRank && isBelowMarket;
+
+    if (!isIdealTarget && !isOpportunity) {
       console.log(
-        `[AutoBidController] Player value $${tierValue} below anchor threshold ($20) — skipping`
+        `[AutoBidController] Not an ideal roster target or opportunity — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, belowMkt=${isBelowMarket})`
       );
       return;
     }
 
-    // Compute bid cap: ESPN ASV +10% when available, engine maxBid as fallback
-    const autoBidCap = espnAsv != null ? Math.ceil(espnAsv * 1.10) : maxBid;
-    const capSource = espnAsv != null ? `ESPN ASV $${espnAsv} +10%` : `engine maxBid`;
+    // Compute bid cap based on bid path:
+    // - Ideal targets: ASV + 10% (bid as much as it takes for our strategy)
+    // - Opportunities: ASV only (we're buying value, not overpaying)
+    let autoBidCap: number;
+    let capSource: string;
+
+    if (isIdealTarget) {
+      if (espnAsv != null) {
+        autoBidCap = Math.ceil(espnAsv * 1.1);
+        capSource = `ideal target, ASV $${espnAsv} +10%`;
+      } else {
+        // No ASV — use optimization maxBid if worker has completed, else defer
+        const maxBid = this.lastEngineSignals?.optimization?.maxBid;
+        if (maxBid != null && maxBid > 0) {
+          autoBidCap = maxBid;
+          capSource = `ideal target, engine maxBid $${maxBid}`;
+        } else {
+          // Worker hasn't completed yet — will retry on next updateSignals() call
+          console.log("[AutoBidController] Ideal target but no ASV or maxBid yet — deferring");
+          return;
+        }
+      }
+    } else {
+      // Opportunity: cap at market value (espnAsv is guaranteed non-null here by isBelowMarket check)
+      autoBidCap = espnAsv!;
+      capSource = `opportunity, ASV $${espnAsv}`;
+    }
 
     // Guard: price has reached or exceeded the cap
     if (currentBid >= autoBidCap) {
