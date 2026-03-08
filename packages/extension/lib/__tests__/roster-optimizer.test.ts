@@ -58,7 +58,7 @@ describe("optimizeRoster — basic SGP/$ efficiency", () => {
     expect(hasEfficient).toBe(true);
   });
 
-  it("respects budget — only fills affordable slots", () => {
+  it("backfill fills slots even when all players exceed budget", () => {
     const players: PoolPlayer[] = [
       makePlayer("Expensive1", ["OF"], 50, false),
       makePlayer("Expensive2", ["OF"], 50, false),
@@ -66,14 +66,13 @@ describe("optimizeRoster — basic SGP/$ efficiency", () => {
     ];
     const sgpValues = [5, 4, 3];
     const slots = { OF: 3 };
-    const budget = 10; // Can't afford any $50 player
+    const budget = 10; // Can't afford any $50 player via greedy, but backfill force-fills
 
     const result = optimizeRoster(players, sgpValues, budget, slots);
 
-    // No players are affordable ($50 > $10)
-    expect(result.roster).toHaveLength(0);
-    expect(result.unfilledSlots).toBe(3);
-    expect(result.budgetUsed).toBe(0);
+    // Backfill force-places cheapest eligible player ($50) regardless of budget
+    expect(result.roster).toHaveLength(3);
+    expect(result.unfilledSlots).toBe(0);
   });
 });
 
@@ -194,10 +193,11 @@ describe("optimizeRoster — budget exhaustion", () => {
     expect(result.budgetUsed).toBe(10);
   });
 
-  it("stops when reserve budget prevents adding more players", () => {
+  it("backfill fills remaining slots after greedy exhausts reserve budget", () => {
     // Budget $5, 3 players at $3 each, 3 slots
-    // First pick: maxSpend = 5 - (3-1) = 3, can afford $3
-    // After first: budget = 2, 2 slots remain. maxSpend = 2 - (2-1) = 1. Can't afford $3.
+    // Greedy: first pick $3 (maxSpend=5-2=3, fits). Budget=2, 2 slots.
+    //   Second: maxSpend=2-1=1, can't afford $3. Skip all.
+    // Backfill: force fills remaining 2 slots with $3 players.
     const players: PoolPlayer[] = [
       makePlayer("P1", ["OF"], 3, false),
       makePlayer("P2", ["OF"], 3, false),
@@ -209,11 +209,9 @@ describe("optimizeRoster — budget exhaustion", () => {
 
     const result = optimizeRoster(players, sgpValues, budget, slots);
 
-    // Can only afford 1 player ($3) and still have $1 reserve for each remaining slot
-    // Actually: first pick can spend $3 (5 - 2 = 3), leaving $2 for 2 more spots.
-    // Second pick: 2 - 1 = 1 max spend, can't afford $3.
-    expect(result.roster.length).toBeLessThanOrEqual(2);
-    expect(result.unfilledSlots).toBeGreaterThan(0);
+    // Backfill fills the remaining 2 slots after greedy fills 1
+    expect(result.roster).toHaveLength(3);
+    expect(result.unfilledSlots).toBe(0);
   });
 });
 
@@ -252,6 +250,103 @@ describe("optimizeRoster — edge cases", () => {
     // totalSGPValue should include both the locked player and SS1
     // Locked player SGP is tracked separately (passed via locked structure)
     expect(result.totalSGPValue).toBeGreaterThanOrEqual(4); // At least SS1's SGP
+  });
+});
+
+describe("optimizeRoster — backfill pass", () => {
+  it("Case A: reserve math blocks greedy fill, backfill succeeds", () => {
+    // Slots: {OF: 3}, Budget: $5
+    // Players: [$3@SGP9, $2@SGP4, $1@SGP1]
+    // Greedy: $3 player fits (maxSpend=5-2=3). Budget=2, 2 slots.
+    //   $2 player: maxSpend=2-1=1, $2>1 SKIP. $1 player: maxSpend=1-0=1, fits. Budget=1, 1 slot.
+    //   $2 player: maxSpend=1-0=1, $2>1 SKIP. Done. 1 unfilled.
+    // Backfill: 1 OF slot unfilled. Cheapest unused OF: $2 player. Force fill.
+    // Result: unfilledSlots=0, all 3 in roster.
+    const players: PoolPlayer[] = [
+      makePlayer("P3", ["OF"], 3, false),
+      makePlayer("P2", ["OF"], 2, false),
+      makePlayer("P1", ["OF"], 1, false),
+    ];
+    const sgpValues = [9, 4, 1];
+    const slots = { OF: 3 };
+    const budget = 5;
+
+    const result = optimizeRoster(players, sgpValues, budget, slots);
+
+    expect(result.roster).toHaveLength(3);
+    expect(result.unfilledSlots).toBe(0);
+  });
+
+  it("Case B: position constraint leaves unfilled slot, backfill fills it", () => {
+    // Slots: {C: 1, SS: 1, UTIL: 1}, Budget $6
+    // Players: Catcher $3 SGP=6, Shortstop $3 SGP=3, FirstBase $2 SGP=4
+    // Efficiency: Catcher=2.0, FirstBase=2.0, Shortstop=1.0
+    // Greedy: Catcher for C (maxSpend=6-2=4, fits). Budget=3.
+    //   FirstBase for UTIL (maxSpend=3-1=2, fits). Budget=1.
+    //   Shortstop for SS (maxSpend=1-0=1, $3>1 SKIP). 1 unfilled.
+    // Backfill: SS slot unfilled. Cheapest SS-eligible: Shortstop at $3. Force fill.
+    // Result: unfilledSlots=0.
+    const players: PoolPlayer[] = [
+      makePlayer("Catcher", ["C"], 3, false),
+      makePlayer("Shortstop", ["SS"], 3, false),
+      makePlayer("FirstBase", ["1B"], 2, false),
+    ];
+    const sgpValues = [6, 3, 4];
+    const slots = { C: 1, SS: 1, UTIL: 1 };
+    const budget = 6;
+
+    const result = optimizeRoster(players, sgpValues, budget, slots);
+
+    expect(result.roster).toHaveLength(3);
+    expect(result.unfilledSlots).toBe(0);
+    const hasSS = result.roster.some(p => p.name === "Shortstop");
+    expect(hasSS).toBe(true);
+  });
+
+  it("Case C: normal scenario unchanged — backfill is a no-op when greedy fills all slots", () => {
+    // Slots: {OF: 2}, Budget $100, Players: [$10@5, $5@3]
+    // Greedy fills both. Backfill pass runs but does nothing (slotsToFill===0).
+    const players: PoolPlayer[] = [
+      makePlayer("P10", ["OF"], 10, false),
+      makePlayer("P5", ["OF"], 5, false),
+    ];
+    const sgpValues = [5, 3];
+    const slots = { OF: 2 };
+    const budget = 100;
+
+    const result = optimizeRoster(players, sgpValues, budget, slots);
+
+    expect(result.roster).toHaveLength(2);
+    expect(result.unfilledSlots).toBe(0);
+  });
+
+  it("Case D: completely empty pool — backfill cannot help, slots stay unfilled", () => {
+    const result = optimizeRoster([], [], 100, { OF: 2 });
+
+    expect(result.unfilledSlots).toBe(2);
+    expect(result.roster).toHaveLength(0);
+  });
+
+  it("backfill prefers higher SGP when two players tie on price", () => {
+    // 1 unfilled OF slot after greedy. Two candidates at same $2: one with SGP=5, one with SGP=2.
+    // Budget $1 (greedy exhausted). Backfill should pick the SGP=5 one.
+    const players: PoolPlayer[] = [
+      makePlayer("Greedy", ["OF"], 1, false),
+      makePlayer("HighSGP", ["OF"], 2, false),
+      makePlayer("LowSGP", ["OF"], 2, false),
+    ];
+    const sgpValues = [10, 5, 2];
+    const slots = { OF: 2 };
+    const budget = 3; // Greedy fills 1 (maxSpend=3-1=2, picks Greedy $1). Budget=2, 1 slot.
+    // maxSpend=2-0=2. HighSGP efficiency=2.5 > LowSGP efficiency=1.0.
+    // Actually both fit greedy...let's pick a budget where only 1 fits greedy then backfill picks between tied players.
+    // Budget $2: maxSpend=2-1=1, Greedy $1 fits. Budget=1, 1 slot. HighSGP $2 > maxSpend=1. LowSGP $2 > 1. Backfill.
+    const result2 = optimizeRoster(players, sgpValues, 2, slots);
+
+    expect(result2.roster).toHaveLength(2);
+    expect(result2.unfilledSlots).toBe(0);
+    const hasHighSGP = result2.roster.some(p => p.name === "HighSGP");
+    expect(hasHighSGP).toBe(true);
   });
 });
 
