@@ -543,8 +543,9 @@ None yet.
 | 83 | Add winning category targets to ideal roster math with progress display | 2026-03-09 | baa034f | ✅ | [83-add-winning-category-targets-to-ideal-ro](./quick/83-add-winning-category-targets-to-ideal-ro/) |
 | 84 | Add toggle to recompute ideal roster to hit category targets | 2026-03-09 | 057653b | ✅ | [84-add-toggle-to-recompute-ideal-roster-to-](./quick/84-add-toggle-to-recompute-ideal-roster-to-/) |
 | 85 | Auto-populate ESPN nomination queue from engine signals | 2026-03-09 | ffb5bd3 | ✅ | [85-auto-populate-espn-nomination-queue-from](./quick/85-auto-populate-espn-nomination-queue-from/) |
+| 86 | Fix search functionality — update ESPN search bar selectors | 2026-03-09 | 0b3a69b | ✅ | [86-fix-search-functionality-update-espn-sea](./quick/86-fix-search-functionality-update-espn-sea/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 85: Auto-populate ESPN nomination queue from engine signals
+Last activity: 2026-03-09 - Completed quick task 86: Fix search functionality — update ESPN search bar selectors
 Resume file: None
