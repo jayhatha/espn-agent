@@ -448,6 +448,95 @@ function computeIdealRoster(
     return rawSgp * boost;
   });
 
+  // ---- Deficit-boost logic (when optimizeForTargets is enabled) ----
+  // Boosts SGP values of players who contribute to deficit categories relative to winning targets.
+  // Creates a new boostedSgpValues array; never modifies adjustedSgpValues.
+  let sgpValuesForOptimizer = adjustedSgpValues;
+
+  if (
+    input.optimizeForTargets &&
+    input.categoryTargets &&
+    Object.keys(input.categoryTargets).length > 0 &&
+    cachedSGPVectors &&
+    cachedHitterProjMap &&
+    cachedPitcherProjMap
+  ) {
+    // 1. Compute drafted totals per category from myRoster projections
+    const draftedTotals: Record<string, number> = {};
+    for (const drafted of input.myRoster) {
+      const nName = normalizeName(drafted.playerName);
+      const pitcher = cachedPitcherProjMap.get(nName);
+      const hitter = cachedHitterProjMap.get(nName);
+      if (pitcher) {
+        for (const [k, v] of Object.entries({ W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO })) {
+          draftedTotals[k] = (draftedTotals[k] ?? 0) + v;
+        }
+      } else if (hitter) {
+        for (const [k, v] of Object.entries({ HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB })) {
+          draftedTotals[k] = (draftedTotals[k] ?? 0) + v;
+        }
+      }
+    }
+
+    // 2. Compute deficit ratios for HIGHER_BETTER counting stat categories
+    const deficits: { statKey: string; deficitRatio: number }[] = [];
+    for (const cat of input.leagueCategories) {
+      if (cat.direction === "LOWER_BETTER") continue; // Skip ERA, WHIP
+      const target = input.categoryTargets[cat.stat_key];
+      if (target == null || target <= 0) continue;
+      const drafted = draftedTotals[cat.stat_key] ?? 0;
+      const deficitRatio = Math.max(0, 1 - drafted / target);
+      if (deficitRatio > 0.1) {
+        deficits.push({ statKey: cat.stat_key, deficitRatio });
+      }
+    }
+
+    if (deficits.length > 0) {
+      // 3. Compute per-player deficit contribution scores
+      const deficitScores = new Float64Array(allPlayers.length);
+      let maxDeficitScore = 0;
+
+      for (let i = 0; i < allPlayers.length; i++) {
+        const player = allPlayers[i];
+        const nName = player.normalizedName;
+        const pitcher = cachedPitcherProjMap.get(nName);
+        const hitter = cachedHitterProjMap.get(nName);
+        let score = 0;
+
+        for (const { statKey, deficitRatio } of deficits) {
+          const catStats = cachedSGPVectors.categoryStats[statKey];
+          if (!catStats || catStats.std === 0) continue;
+
+          let playerStatValue = 0;
+          if (hitter) {
+            const hitterStats: Record<string, number> = { HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB };
+            playerStatValue = hitterStats[statKey] ?? 0;
+          } else if (pitcher) {
+            const pitcherStats: Record<string, number> = { W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO, QS: pitcher.QS };
+            playerStatValue = pitcherStats[statKey] ?? 0;
+          }
+
+          // Normalize by category std and weight by deficit ratio
+          score += (playerStatValue / catStats.std) * deficitRatio;
+        }
+
+        deficitScores[i] = score;
+        if (score > maxDeficitScore) maxDeficitScore = score;
+      }
+
+      // 4. Boost SGP values
+      if (maxDeficitScore > 0) {
+        const DEFICIT_BOOST_FACTOR = 0.5;
+        const boosted = new Array<number>(allPlayers.length);
+        for (let i = 0; i < allPlayers.length; i++) {
+          const normalizedScore = deficitScores[i] / maxDeficitScore;
+          boosted[i] = adjustedSgpValues[i] * (1 + DEFICIT_BOOST_FACTOR * normalizedScore);
+        }
+        sgpValuesForOptimizer = boosted;
+      }
+    }
+  }
+
   // Build ASV overlay: replace player.dollars with ESPN ASV when available.
   // ASV reflects actual market price, making the optimizer's budget constraint
   // and SGP/$ efficiency sort use realistic auction costs instead of FanGraphs
@@ -490,7 +579,7 @@ function computeIdealRoster(
   // Optimizer fills remaining slots with remaining budget
   const result = optimizeRoster(
     playersForOptimizer,
-    adjustedSgpValues,
+    sgpValuesForOptimizer,
     input.remainingBudget,
     remainingSlots,
   );
@@ -1235,7 +1324,7 @@ export function computeDraftEngine(
   // 6b. Ideal roster optimizer (Phase 29)
   // Cache invalidates on allPicks.length, split change, or categoryTargets change — recomputes when a new pick is made, split changes, or targets change.
   const targetsKey = input.categoryTargets ? JSON.stringify(input.categoryTargets) : "";
-  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}_${targetsKey}`;
+  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}_${targetsKey}_${input.optimizeForTargets ? '1' : '0'}`;
   let idealRoster: IdealRosterSignal | null = null;
   if (idealRosterCacheKey !== newIdealRosterCacheKey || cachedIdealRoster === null) {
     try {
