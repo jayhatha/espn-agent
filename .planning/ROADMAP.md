@@ -600,9 +600,10 @@ Plans:
 
 ### Phase 35: Use the queue for player nominations instead of finding players on the fly
 
-**Goal:** [To be planned]
+**Goal:** Replace fragile on-the-fly player search with ESPN queue-first auto-nomination — scrape queued players from DOM, prefer queue entries over engine candidates, bypass name-to-ID mapping
 **Depends on:** Phase 34
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 35 to break down)
+- [ ] 35-01-PLAN.md — Add ESPN nomination queue scraper and Zustand store field
+- [ ] 35-02-PLAN.md — Wire queue scraper in content script, update auto-nomination to prefer queue, update diagnostics UI
