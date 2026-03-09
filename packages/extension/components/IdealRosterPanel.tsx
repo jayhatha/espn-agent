@@ -86,6 +86,47 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
           })}
         </div>
 
+        {/* Category progress bars */}
+        {idealRoster.categoryProgress && idealRoster.categoryProgress.length > 0 && (
+          <div className="mt-3 border-t border-surface-tertiary pt-2">
+            <div className="text-body-xs font-semibold text-content mb-1.5">Category Targets</div>
+            <div className="space-y-1.5">
+              {idealRoster.categoryProgress.map((cat) => {
+                const pct = Math.min(cat.percent, 100);
+                const barColor = cat.percent >= 100
+                  ? "bg-success"
+                  : cat.percent >= 80
+                  ? "bg-warning"
+                  : "bg-error";
+
+                const isRate = cat.direction === "LOWER_BETTER" || cat.statKey === "OPS" || cat.statKey === "AVG" || cat.statKey === "OBP" || cat.statKey === "SLG";
+                const projectedDisplay = isRate ? cat.projected.toFixed(3) : Math.round(cat.projected).toString();
+                const targetDisplay = isRate ? cat.target.toFixed(3) : Math.round(cat.target).toString();
+
+                return (
+                  <div key={cat.statKey}>
+                    <div className="flex items-center justify-between text-body-xs mb-0.5">
+                      <span className="text-content-secondary">{cat.statKey}</span>
+                      <span className="text-content-secondary">
+                        {projectedDisplay} / {targetDisplay}
+                        <span className={`ml-1 font-semibold ${cat.percent >= 100 ? "text-success" : cat.percent >= 80 ? "text-warning" : "text-error"}`}>
+                          {Math.round(cat.percent)}%
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-surface-tertiary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Unfilled slots notice */}
         {unfilledSlots > 0 && (
           <div className="text-body-xs text-content-secondary mt-2 border-t border-surface-tertiary pt-2">
