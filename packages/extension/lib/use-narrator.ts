@@ -16,6 +16,7 @@ import type { DraftEngineSignals } from "./engine";
 import { useNarratorStore } from "./narrator-state";
 import { useDraftStore } from "./draft-state";
 import type { NarratorPayload } from "./narrator-types";
+import { logger } from "./logger";
 
 const DEBOUNCE_MS = 1500;
 const SESSION_CAP = 120;
@@ -269,7 +270,7 @@ export function useNarrator(engineSignals: DraftEngineSignals | null): {
         // Graceful degradation: AbortError is normal (new trigger fired), ignore silently.
         // Other errors: console.warn only — don't show error to user, keep showing engine signals.
         if (err instanceof Error && err.name !== "AbortError") {
-          console.warn("[Narrator] Failed to get narration:", err);
+          logger.warn("[Narrator] Failed to get narration:", err);
         }
       } finally {
         setLoading(false);

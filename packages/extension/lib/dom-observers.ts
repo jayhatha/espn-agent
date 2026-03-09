@@ -1,4 +1,5 @@
 import type { DraftPick } from "@espn-fantasy/shared";
+import { logger } from "./logger";
 
 /**
  * ESPN Draft Board Selectors - ordered by specificity
@@ -135,7 +136,7 @@ function validateAndFindElement(
     if (element) {
       if (i > 0) {
         // Primary selector failed, but fallback succeeded
-        console.warn(
+        logger.warn(
           `[ESPN Draft Assistant] Primary ${selectorName} selector failed, using fallback #${i + 1}: "${selector}"`,
         );
       }
@@ -144,14 +145,14 @@ function validateAndFindElement(
   }
 
   // All selectors failed - log error with DOM snapshot
-  console.error(
+  logger.error(
     `[ESPN Draft Assistant] All ${selectorName} selectors failed. ESPN DOM may have changed.`,
   );
-  console.error(
+  logger.error(
     "[ESPN Draft Assistant] Document body classes:",
     document.body?.className || "none",
   );
-  console.error(
+  logger.error(
     "[ESPN Draft Assistant] Document body children count:",
     document.body?.children.length || 0,
   );
@@ -162,7 +163,7 @@ function validateAndFindElement(
       0,
       5,
     );
-    console.error(
+    logger.error(
       "[ESPN Draft Assistant] First 5 elements:",
       elements.map((el) => ({
         tag: el.tagName,
@@ -230,7 +231,7 @@ export function observeDraftBoard(
     }
 
     emittedPickKeys.add(key);
-    console.log("[ESPN Draft Assistant] Detected pick:", pick);
+    logger.log("[ESPN Draft Assistant] Detected pick:", pick);
     await onPick(pick); // Support async handlers
   };
 
@@ -245,11 +246,11 @@ export function observeDraftBoard(
           emitPick(pick);
         }
       } catch (error) {
-        console.error(
+        logger.error(
           "[ESPN Draft Assistant] Error parsing pick element:",
           error,
         );
-        console.error(
+        logger.error(
           "[ESPN Draft Assistant] Pick element structure:",
           {
             tag: pickElement.tagName,
@@ -280,7 +281,7 @@ export function observeDraftBoard(
                 await emitPick(pick);
               }
             } catch (error) {
-              console.error(
+              logger.error(
                 "[ESPN Draft Assistant] Error parsing pick from mutation:",
                 error,
                 { element: pickElement },
@@ -291,7 +292,7 @@ export function observeDraftBoard(
           try {
             await Promise.all(pickPromises);
           } catch (error) {
-            console.error(
+            logger.error(
               "[ESPN Draft Assistant] Error processing pick batch:",
               error,
             );
@@ -307,7 +308,7 @@ export function observeDraftBoard(
     }
 
     observedBoard = board;
-    console.log("[ESPN Draft Assistant] Observing draft board:", board);
+    logger.log("[ESPN Draft Assistant] Observing draft board:", board);
     observer.observe(board, {
       childList: true,
       subtree: true,
@@ -325,7 +326,7 @@ export function observeDraftBoard(
   if (existingBoard) {
     startObservingBoard(existingBoard);
   } else {
-    console.warn(
+    logger.warn(
       "[ESPN Draft Assistant] Draft board not found yet. Watching for async load.",
     );
   }
@@ -336,7 +337,7 @@ export function observeDraftBoard(
   if (!skipInitialScan) {
     scanEntireDocument();
   } else {
-    console.log("[ESPN Draft Assistant] Skipping initial DOM scan (state preserved from same-draft reload)");
+    logger.log("[ESPN Draft Assistant] Skipping initial DOM scan (state preserved from same-draft reload)");
   }
 
   const bootstrapObserver = new MutationObserver(() => {
@@ -346,7 +347,7 @@ export function observeDraftBoard(
 
     const board = findDraftBoardElement();
     if (board) {
-      console.log("[ESPN Draft Assistant] Draft board found after async load");
+      logger.log("[ESPN Draft Assistant] Draft board found after async load");
       startObservingBoard(board);
       bootstrapObserver.disconnect();
       clearTimeout(bootstrapTimeout);
@@ -362,7 +363,7 @@ export function observeDraftBoard(
 
   const bootstrapTimeout = setTimeout(() => {
     if (!observedBoard) {
-      console.warn(
+      logger.warn(
         "[ESPN Draft Assistant] Draft board still not found after waiting for page render.",
       );
     }
@@ -379,7 +380,7 @@ export function observeDraftBoard(
       scanEntireDocument();
     }, 2000);
   } else {
-    console.log("[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)");
+    logger.log("[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)");
   }
 
   // Return cleanup function
@@ -510,7 +511,7 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
         return null;
       }
 
-      console.warn(
+      logger.warn(
         "[ESPN Draft Assistant] Failed to parse player name from pick element",
         {
           element: pickElement.tagName,
@@ -624,11 +625,11 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
       positions,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "[ESPN Draft Assistant] Error parsing pick element:",
       error instanceof Error ? error.message : error,
     );
-    console.error("[ESPN Draft Assistant] Pick element details:", {
+    logger.error("[ESPN Draft Assistant] Pick element details:", {
       tag: pickElement.tagName,
       classes: pickElement.className,
       id: pickElement.id,
@@ -812,27 +813,27 @@ export function diagnoseDOMStructure(): {
   }
 
   // Log detailed diagnostics
-  console.log("[ESPN Draft Assistant] DOM Structure Diagnostic Report:");
-  console.log("  Draft Board Found:", result.draftBoardFound);
-  console.log("  Pick Rows Count:", result.pickRowsCount);
-  console.log("  Completed Picks Count:", result.completedPicksCount);
-  console.log("  Grid Elements:", gridElements.length);
-  console.log("  Selector Health:", result.selectorHealth);
+  logger.log("[ESPN Draft Assistant] DOM Structure Diagnostic Report:");
+  logger.log("  Draft Board Found:", result.draftBoardFound);
+  logger.log("  Pick Rows Count:", result.pickRowsCount);
+  logger.log("  Completed Picks Count:", result.completedPicksCount);
+  logger.log("  Grid Elements:", gridElements.length);
+  logger.log("  Selector Health:", result.selectorHealth);
 
   if (result.recommendations.length > 0) {
-    console.warn(
+    logger.warn(
       "[ESPN Draft Assistant] Recommendations:",
       result.recommendations,
     );
   } else {
-    console.log(
+    logger.log(
       "[ESPN Draft Assistant] All selectors working - DOM structure healthy",
     );
   }
 
   // Sample first few elements for manual inspection
   if (pickRows.length > 0) {
-    console.log(
+    logger.log(
       "[ESPN Draft Assistant] Sample pick row structure:",
       {
         tag: pickRows[0].tagName,
@@ -855,8 +856,8 @@ export function diagnoseDOMStructure(): {
  * Usage: testParsePick(document.querySelector('[style*="grid-area"]'))
  */
 export function testParsePick(element: Element): void {
-  console.log("[ESPN Draft Assistant] Testing pick element parsing...");
-  console.log("Element:", {
+  logger.log("[ESPN Draft Assistant] Testing pick element parsing...");
+  logger.log("Element:", {
     tag: element.tagName,
     classes: element.className,
     id: element.id,
@@ -865,9 +866,9 @@ export function testParsePick(element: Element): void {
   const result = parsePickElement(element);
 
   if (result) {
-    console.log("[ESPN Draft Assistant] Parse successful:", result);
+    logger.log("[ESPN Draft Assistant] Parse successful:", result);
   } else {
-    console.error(
+    logger.error(
       "[ESPN Draft Assistant] Parse failed - check console warnings above for details",
     );
   }
@@ -900,7 +901,7 @@ export function parseTeamRostersFromDOM(): Map<
   for (const pick of picks) {
     // Skip picks with missing teamId (should be rare with fallback logic in parsePickElement)
     if (!pick.teamId) {
-      console.warn(
+      logger.warn(
         "[ESPN Draft Assistant] Skipping pick with missing teamId:",
         pick.playerName,
       );
@@ -924,7 +925,7 @@ export function parseTeamRostersFromDOM(): Map<
     }
   }
 
-  console.log(
+  logger.log(
     `[ESPN Draft Assistant] Parsed ${teamRosters.size} team rosters from DOM (${picks.length} total picks)`,
   );
 
@@ -939,17 +940,17 @@ export function parseTeamRostersFromDOM(): Map<
 export function logRosterDiagnostics(): void {
   const rosters = parseTeamRostersFromDOM();
 
-  console.log("[ESPN Draft Assistant] Roster Diagnostic Report:");
-  console.log(`  Total teams: ${rosters.size}`);
+  logger.log("[ESPN Draft Assistant] Roster Diagnostic Report:");
+  logger.log(`  Total teams: ${rosters.size}`);
 
   if (rosters.size === 0) {
-    console.warn("  No teams found - draft may not have started");
+    logger.warn("  No teams found - draft may not have started");
     return;
   }
 
   // Log each team
   rosters.forEach((roster, teamId) => {
-    console.log(
+    logger.log(
       `  Team "${roster.teamName}" (ID: ${teamId}): ${roster.playerIds.length} players`,
     );
   });
@@ -957,10 +958,10 @@ export function logRosterDiagnostics(): void {
   // Show sample roster (first team)
   const firstTeam = Array.from(rosters.values())[0];
   if (firstTeam) {
-    console.log("\n  Sample roster (first team):");
-    console.log(`    Team: ${firstTeam.teamName}`);
-    console.log(`    Players: ${firstTeam.playerIds.length}`);
-    console.log(`    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`);
+    logger.log("\n  Sample roster (first team):");
+    logger.log(`    Team: ${firstTeam.teamName}`);
+    logger.log(`    Players: ${firstTeam.playerIds.length}`);
+    logger.log(`    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`);
   }
 }
 
@@ -1071,7 +1072,7 @@ export function parseCurrentAuctionPlayer(
       playerId,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "[ESPN Draft Assistant] Error parsing current auction player:",
       error instanceof Error ? error.message : error,
     );
@@ -1215,7 +1216,7 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
       result.set(playerId, { playerId, playerName, espnValue, position, team, asvValue });
     } catch (err) {
       // Don't let a single row failure abort the rest
-      console.warn(
+      logger.warn(
         "[ESPN Draft Assistant] scrapeESPNAuctionTable: error parsing row",
         err,
       );
@@ -1223,7 +1224,7 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
   }
 
   if (result.size > 0) {
-    console.log(
+    logger.log(
       `[ESPN Draft Assistant] scrapeESPNAuctionTable: scraped ${result.size} entries`,
     );
   }
@@ -1287,7 +1288,7 @@ export function scrapeESPNNominationQueue(): ESPNQueueEntry[] {
   }
 
   if (result.length > 0) {
-    console.log(
+    logger.log(
       `[ESPN Draft Assistant] scrapeESPNNominationQueue: found ${result.length} queued players`,
     );
   }
@@ -1317,9 +1318,9 @@ export function observeCurrentAuctionPlayer(
     lastEmittedPlayer = playerKey;
 
     if (player) {
-      console.log("[ESPN Draft Assistant] Current auction player:", player);
+      logger.log("[ESPN Draft Assistant] Current auction player:", player);
     } else {
-      console.log("[ESPN Draft Assistant] No active auction player");
+      logger.log("[ESPN Draft Assistant] No active auction player");
     }
 
     onPlayerChange(player);

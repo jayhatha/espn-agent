@@ -25,6 +25,7 @@ import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import contentStyles from "../styles/content.css?inline";
+import { logger } from "../lib/logger";
 import { calculateProjectedStandingsFromState } from "../lib/value-calculations";
 import { autoBidController } from "../lib/auto-bid-controller";
 import { normalizeName as normalizePlayerName } from "../lib/engine/normalizer";
@@ -43,7 +44,7 @@ export default defineContentScript({
   runAt: "document_idle",
 
   async main() {
-    console.log("[ESPN Draft Assistant] Content script loaded");
+    logger.log("[ESPN Draft Assistant] Content script loaded");
 
     // Parse draft metadata from page
     const leagueId = parseLeagueIdFromUrl();
@@ -52,11 +53,11 @@ export default defineContentScript({
     const detectedDraftFormat = detectDraftFormat();
 
     if (!leagueId) {
-      console.warn("[ESPN Draft Assistant] Could not parse league ID from URL");
+      logger.warn("[ESPN Draft Assistant] Could not parse league ID from URL");
       return;
     }
 
-    console.log("[ESPN Draft Assistant] Draft detected:", {
+    logger.log("[ESPN Draft Assistant] Draft detected:", {
       leagueId,
       draftFormat: detectedDraftFormat,
     });
@@ -94,11 +95,11 @@ export default defineContentScript({
         diagnoseRosters: () => {
           // Show stored state instead of parsing DOM
           const { teamRosters } = useDraftStore.getState();
-          console.log("Stored Team Rosters:", Array.from(teamRosters.entries()));
+          logger.log("Stored Team Rosters:", Array.from(teamRosters.entries()));
 
           // Also parse DOM for comparison
           const domRosters = parseTeamRostersFromDOM();
-          console.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
+          logger.log("DOM-Parsed Rosters:", Array.from(domRosters.entries()));
         },
         // Nomination diagnostics — call during a live draft to inspect controller state
         nominationDiag: () => autoBidController.getNominationDiagnostics(),
@@ -111,7 +112,7 @@ export default defineContentScript({
         },
         version: "1.0.0",
       };
-      console.log(
+      logger.log(
         "[ESPN Draft Assistant] Diagnostic tools available at window.espnDraftAssistant",
       );
     }
@@ -130,12 +131,12 @@ export default defineContentScript({
       );
 
       if (resolvedBackendLeagueId) {
-        console.log("[ESPN Draft Assistant] Using mapped backend league:", {
+        logger.log("[ESPN Draft Assistant] Using mapped backend league:", {
           espnLeagueId: leagueId,
           backendLeagueId: resolvedBackendLeagueId,
         });
       } else {
-        console.log("[ESPN Draft Assistant] No backend league mapping found", {
+        logger.log("[ESPN Draft Assistant] No backend league mapping found", {
           espnLeagueId: leagueId,
           draftPageTitle,
         });
@@ -167,14 +168,14 @@ export default defineContentScript({
     };
 
     await waitForHydration();
-    console.log("[ESPN Draft Assistant] Store hydration complete");
+    logger.log("[ESPN Draft Assistant] Store hydration complete");
 
     // Store warnings for UI display
     useDraftStore.getState().setConfigWarnings(detection.warnings);
 
     if (detection.config) {
       cachedLeagueConfig = detection.config;
-      console.log("[ESPN Draft Assistant] Config detected:", {
+      logger.log("[ESPN Draft Assistant] Config detected:", {
         confidence: detection.confidence,
         totalTeams: detection.config.totalTeams,
         categories: detection.config.categories.length,
@@ -211,7 +212,7 @@ export default defineContentScript({
         },
         budget: 260,
       };
-      console.warn("[ESPN Draft Assistant] Config detection failed, using 5x5 defaults");
+      logger.warn("[ESPN Draft Assistant] Config detection failed, using 5x5 defaults");
     }
 
     // Always initialize draft state from current URL context
@@ -245,7 +246,7 @@ export default defineContentScript({
     // existing draft session rather than starting fresh.
     const statePreserved = useDraftStore.getState().allPicks.length > 0;
 
-    console.log("[ESPN Draft Assistant] Draft state initialized", {
+    logger.log("[ESPN Draft Assistant] Draft state initialized", {
       statePreserved,
       myRoster: useDraftStore.getState().myRoster.length,
       allPicks: useDraftStore.getState().allPicks.length,
@@ -266,7 +267,7 @@ export default defineContentScript({
       useDraftStore.getState().setMyTeamId(myTeamDetection.teamId);
       useDraftStore.getState().setRemainingBudget(myTeamDetection.remainingBudget);
       myGridColumn = myTeamDetection.gridColumn ? String(myTeamDetection.gridColumn) : null;
-      console.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
+      logger.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
     }
 
     // Detect roster slots from players-table DOM (more accurate than settings panel)
@@ -287,7 +288,7 @@ export default defineContentScript({
         const retrySlots = detectRosterSlotsFromPlayersTable();
         if (retrySlots) {
           useDraftStore.getState().setDetectedRosterSlots(retrySlots.rosterSlots);
-          console.log("[ESPN Draft Assistant] Roster slots detected on retry");
+          logger.log("[ESPN Draft Assistant] Roster slots detected on retry");
         }
       }
       // Also retry position tracker detection
@@ -419,7 +420,7 @@ export default defineContentScript({
           });
           useDraftStore.getState().setRankings(rankings);
         } catch (error) {
-          console.error("[ESPN Draft Assistant] Refresh rankings failed:", error);
+          logger.error("[ESPN Draft Assistant] Refresh rankings failed:", error);
         }
 
         if (currentState.draftFormat === "auction") {
@@ -431,7 +432,7 @@ export default defineContentScript({
             });
             useDraftStore.getState().setAuctionValues(values);
           } catch (error) {
-            console.error(
+            logger.error(
               "[ESPN Draft Assistant] Refresh auction values failed:",
               error,
             );
@@ -454,7 +455,7 @@ export default defineContentScript({
           );
 
           if (missedPicks.length > 0) {
-            console.log(
+            logger.log(
               `[ESPN Draft Assistant] Refresh reconciliation: found ${missedPicks.length} new picks from DOM`
             );
             missedPicks.forEach(pick => processDetectedPick(pick));
@@ -473,7 +474,7 @@ export default defineContentScript({
           const myPicksFromStore = currentState.allPicks.filter(isMyPickFilter);
 
           if (currentState.myRoster.length !== myPicksFromStore.length) {
-            console.log(
+            logger.log(
               "[ESPN Draft Assistant] Roster reconciliation: roster had",
               currentState.myRoster.length,
               "players but",
@@ -507,7 +508,7 @@ export default defineContentScript({
         useDraftStore.getState().setProjectedStandings(standings);
 
         if (standings) {
-          console.log(
+          logger.log(
             "[ESPN Draft Assistant] Projected standings computed from stored state for",
             standings.overallStandings.length,
             "teams"
@@ -577,7 +578,7 @@ export default defineContentScript({
 
         applySidebarPosition(currentDockSide);
 
-        console.log("[ESPN Draft Assistant] Sidebar rendered");
+        logger.log("[ESPN Draft Assistant] Sidebar rendered");
       } finally {
         isMounting = false;
       }
@@ -591,7 +592,7 @@ export default defineContentScript({
       );
 
       if (!popup) {
-        console.warn("[ESPN Draft Assistant] Popout blocked by browser");
+        logger.warn("[ESPN Draft Assistant] Popout blocked by browser");
         return;
       }
 
@@ -663,7 +664,7 @@ export default defineContentScript({
           useDraftStore.getState().setEspnDomAuctionValues(valuesRecord);
         }
       } catch (err) {
-        console.error(
+        logger.error(
           "[ESPN Draft Assistant] Failed to scrape ESPN auction table:",
           err,
         );
@@ -678,7 +679,7 @@ export default defineContentScript({
       runAuctionTableScrape();
       // Re-scrape every 10 seconds to catch newly scrolled rows
       auctionTableScrapeInterval = setInterval(runAuctionTableScrape, 10_000);
-      console.log("[ESPN Draft Assistant] Started ESPN auction table scraper (10s interval)");
+      logger.log("[ESPN Draft Assistant] Started ESPN auction table scraper (10s interval)");
     };
 
     const runQueueScrape = () => {
@@ -686,7 +687,7 @@ export default defineContentScript({
         const queue = scrapeESPNNominationQueue();
         useDraftStore.getState().setEspnNominationQueue(queue);
       } catch (err) {
-        console.error("[ESPN Draft Assistant] Failed to scrape nomination queue:", err);
+        logger.error("[ESPN Draft Assistant] Failed to scrape nomination queue:", err);
       }
     };
 
@@ -694,7 +695,7 @@ export default defineContentScript({
       if (queueScrapeInterval) return; // Already running
       runQueueScrape(); // Initial scrape
       queueScrapeInterval = setInterval(runQueueScrape, 3_000);
-      console.log("[ESPN Draft Assistant] Started nomination queue scraper (3s interval)");
+      logger.log("[ESPN Draft Assistant] Started nomination queue scraper (3s interval)");
     };
 
     const startQueuePopulating = () => {
@@ -706,10 +707,10 @@ export default defineContentScript({
         try {
           autoBidController.populateQueue();
         } catch (err) {
-          console.error("[ESPN Draft Assistant] Failed to populate queue:", err);
+          logger.error("[ESPN Draft Assistant] Failed to populate queue:", err);
         }
       }, 15_000);
-      console.log("[ESPN Draft Assistant] Started queue population interval (15s)");
+      logger.log("[ESPN Draft Assistant] Started queue population interval (15s)");
     };
 
     const startPickTrainBudgetPolling = () => {
@@ -728,20 +729,20 @@ export default defineContentScript({
           // before the pick train renders, so pick train is the reliable source
           if (allBudgets.length >= 2 && allBudgets.length !== useDraftStore.getState().totalTeams) {
             useDraftStore.setState({ totalTeams: allBudgets.length });
-            console.log(`[ESPN Draft Assistant] Team count updated from pick train: ${allBudgets.length}`);
+            logger.log(`[ESPN Draft Assistant] Team count updated from pick train: ${allBudgets.length}`);
           }
           if (import.meta.env.DEV) {
-            console.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
+            logger.log("[ESPN Draft Assistant] All team budgets:", allBudgets);
           }
         }
         // Update rosterSize from Position Tracker if not yet detected
         const tracker = detectRosterSizeFromPositionTracker();
         if (tracker && tracker.rosterSize !== useDraftStore.getState().rosterSize) {
           useDraftStore.setState({ rosterSize: tracker.rosterSize });
-          console.log(`[ESPN Draft Assistant] Roster size updated from Position Tracker: ${tracker.rosterSize}`);
+          logger.log(`[ESPN Draft Assistant] Roster size updated from Position Tracker: ${tracker.rosterSize}`);
         }
       }, 5_000);
-      console.log("[ESPN Draft Assistant] Started pick train budget polling (5s interval)");
+      logger.log("[ESPN Draft Assistant] Started pick train budget polling (5s interval)");
     };
 
     if (resolvedDraftFormat === "auction") {
@@ -791,14 +792,14 @@ export default defineContentScript({
       const initialRosters = parseTeamRostersFromDOM();
       if (initialRosters.size > 0) {
         useDraftStore.getState().setAllTeamRosters(initialRosters);
-        console.log(
+        logger.log(
           "[ESPN Draft Assistant] Initialized rosters for",
           initialRosters.size,
           "teams from DOM"
         );
       }
     } catch (error) {
-      console.error("[ESPN Draft Assistant] Failed to initialize rosters:", error);
+      logger.error("[ESPN Draft Assistant] Failed to initialize rosters:", error);
     }
 
     refreshAssistantData();
@@ -825,7 +826,7 @@ export default defineContentScript({
         auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
           useDraftStore.getState().setCurrentAuctionPlayer(player);
         });
-        console.log("[ESPN Draft Assistant] Started auction player observer after delayed detection");
+        logger.log("[ESPN Draft Assistant] Started auction player observer after delayed detection");
       }
 
       // Start table scraping if not already running
@@ -869,12 +870,12 @@ export default defineContentScript({
       );
 
       if (missedPicks.length > 0) {
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Reconciliation: found ${missedPicks.length} picks missed during reload`
         );
         missedPicks.forEach(pick => processDetectedPick(pick));
       } else {
-        console.log("[ESPN Draft Assistant] Reconciliation: no missed picks during reload");
+        logger.log("[ESPN Draft Assistant] Reconciliation: no missed picks during reload");
       }
     }
 
@@ -894,7 +895,7 @@ export default defineContentScript({
       chrome.storage.local
         .set({ [SIDEBAR_DOCK_STORAGE_KEY]: requestedSide })
         .catch((error) => {
-          console.error(
+          logger.error(
             "[ESPN Draft Assistant] Failed to persist dock side:",
             error,
           );

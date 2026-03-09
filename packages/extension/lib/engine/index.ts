@@ -12,6 +12,7 @@ import { getZeroCoverageCategories, findBestFloorPick } from "./category-floor";
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { computeExternalRankBoost } from "./rank-boost";
 import { calculateFinalRate } from "@espn-fantasy/shared";
+import { logger } from "../logger";
 import { runSimulationInWorker } from "./simulation-worker-client";
 import { runBidOptimizerInWorker } from "./bid-optimizer-worker-client";
 import type { SimulationWorkerRequest, SerializedNominationInput } from "./simulation-worker";
@@ -133,7 +134,7 @@ function buildSimDraftState(
   teamDraftedComponents: Map<string, Record<string, number>> | null,
 ): SimDraftState | null {
   if (input.myTeamId == null || input.teamRosters.size < 3) {
-    if (import.meta.env.DEV) console.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
+    if (import.meta.env.DEV) logger.warn(`[DraftEngine] buildSimDraftState early exit: myTeamId=${input.myTeamId}, teamRosters.size=${input.teamRosters.size}`);
     return null;
   }
 
@@ -203,7 +204,7 @@ function buildSimDraftState(
   });
 
   if (myTeamIndex === -1) {
-    if (import.meta.env.DEV) console.warn(`[DraftEngine] buildSimDraftState: myTeamId="${input.myTeamId}" not found in teamRosters keys: [${teamIds.join(', ')}]`);
+    if (import.meta.env.DEV) logger.warn(`[DraftEngine] buildSimDraftState: myTeamId="${input.myTeamId}" not found in teamRosters keys: [${teamIds.join(', ')}]`);
     return null;
   }
 
@@ -390,7 +391,7 @@ function computeRosterOptimization(
   });
 
   const elapsed = Math.round((performance.now() - t0) * 10) / 10;
-  console.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
+  logger.debug(`[DraftEngine] Roster optimization step: ${elapsed}ms`);
 
   return {
     maxBid: 0,
@@ -602,7 +603,7 @@ function computeIdealRoster(
     );
 
     if (import.meta.env.DEV && zeroCats.length > 0) {
-      console.log(`[IdealRoster] Zero-coverage categories: ${zeroCats.join(', ')}`);
+      logger.log(`[IdealRoster] Zero-coverage categories: ${zeroCats.join(', ')}`);
     }
 
     // Track which players have been locked to avoid double-selection
@@ -624,7 +625,7 @@ function computeIdealRoster(
         );
 
         if (import.meta.env.DEV) {
-          console.log(
+          logger.log(
             `[IdealRoster] Floor pick for ${statKey}: ${floorPick.name} ($${floorPick.dollars}, ` +
             `${statKey}=${floorPick.stats[statKey] ?? floorPick.stats['SO'] ?? floorPick.stats['K'] ?? 0})`
           );
@@ -997,7 +998,7 @@ export function computeDraftEngine(
       }
       projectedStandings = cachedProjectedStandings;
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[DraftEngine] Projected standings failed:", e);
+      if (import.meta.env.DEV) logger.warn("[DraftEngine] Projected standings failed:", e);
     }
   }
 
@@ -1018,7 +1019,7 @@ export function computeDraftEngine(
     const reconciled = { ...activeSlotsOpt };
     reconciled.BN = Math.max(0, (reconciled.BN ?? 0) + diff);
     activeSlotsOpt = reconciled;
-    if (import.meta.env.DEV) console.log(
+    if (import.meta.env.DEV) logger.log(
       `[DraftEngine] Reconciled roster slots: rosterSize=${input.rosterSize}, slotTotal=${activeTotalOpt}, BN adjusted by ${diff}`,
     );
   }
@@ -1123,7 +1124,7 @@ export function computeDraftEngine(
         nameToExternalRankOpt,
       );
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[DraftEngine] Roster optimization failed:", e);
+      if (import.meta.env.DEV) logger.warn("[DraftEngine] Roster optimization failed:", e);
     }
   }
 
@@ -1235,7 +1236,7 @@ export function computeDraftEngine(
         bidWorkerCacheKey = capturedBidKey;
         onBidComplete?.(result);
       }).catch(e => {
-        if (import.meta.env.DEV) console.warn("[DraftEngine] Bid optimizer worker failed:", e);
+        if (import.meta.env.DEV) logger.warn("[DraftEngine] Bid optimizer worker failed:", e);
       });
     } else {
       // No nominated player match — clear cache
@@ -1254,7 +1255,7 @@ export function computeDraftEngine(
       input.teamRosters.size < 3 ||
       input.myTeamId == null
     ) {
-      if (import.meta.env.DEV) console.warn(
+      if (import.meta.env.DEV) logger.warn(
         `[DraftEngine] Simulation skipped: categories=${input.leagueCategories.length}, teamRosters=${input.teamRosters.size}, myTeamId=${input.myTeamId}`,
       );
       // Reset cache when conditions not met
@@ -1267,7 +1268,7 @@ export function computeDraftEngine(
         ? input.allPicks.length / totalPicksExpected
         : 0;
 
-      if (import.meta.env.DEV) console.log(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
+      if (import.meta.env.DEV) logger.log(`[DraftEngine] Simulation gate: ${input.allPicks.length}/${totalPicksExpected} picks (${(draftProgressFraction * 100).toFixed(1)}%), threshold=5%`);
 
       if (draftProgressFraction >= 0.05) {
         const simState = buildSimDraftState(
@@ -1281,11 +1282,11 @@ export function computeDraftEngine(
         );
 
         if (simState === null) {
-          if (import.meta.env.DEV) console.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
+          if (import.meta.env.DEV) logger.warn('[DraftEngine] buildSimDraftState returned null — simulation aborted');
           cachedSimulation = null;
           simulationCacheKey = newSimCacheKey;
         } else {
-          if (import.meta.env.DEV) console.log(`[DraftEngine] Firing simulation to worker: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
+          if (import.meta.env.DEV) logger.log(`[DraftEngine] Firing simulation to worker: ${simState.teamStates.length} teams, ${simState.availableIndices.size} available players, myTeamIdx=${simState.myTeamIndex}`);
 
           const SIMS_PER_DECISION = 200;
           const TEMPERATURE = 1.0;
@@ -1387,13 +1388,13 @@ export function computeDraftEngine(
             simulationCacheKey = capturedCacheKey;
             onSimulationComplete?.(result);
           }).catch(e => {
-            if (import.meta.env.DEV) console.warn("[DraftEngine] Simulation worker failed:", e);
+            if (import.meta.env.DEV) logger.warn("[DraftEngine] Simulation worker failed:", e);
           });
         }
       } else {
         // Draft < 5% — update cache key to prevent repeated evaluation on every render
         simulationCacheKey = newSimCacheKey;
-        if (import.meta.env.DEV) console.log('[DraftEngine] Simulation deferred — draft < 5% complete');
+        if (import.meta.env.DEV) logger.log('[DraftEngine] Simulation deferred — draft < 5% complete');
       }
     }
   }
@@ -1415,7 +1416,7 @@ export function computeDraftEngine(
       );
       idealRosterCacheKey = newIdealRosterCacheKey;
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[DraftEngine] Ideal roster failed:", e);
+      if (import.meta.env.DEV) logger.warn("[DraftEngine] Ideal roster failed:", e);
       cachedIdealRoster = null;
     }
   }
@@ -1423,7 +1424,7 @@ export function computeDraftEngine(
 
   const elapsed = performance.now() - t0;
   if (elapsed > 300) {
-    if (import.meta.env.DEV) console.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
+    if (import.meta.env.DEV) logger.warn(`[DraftEngine] Recompute took ${elapsed.toFixed(1)}ms -- exceeds 300ms budget`);
   }
 
   return {

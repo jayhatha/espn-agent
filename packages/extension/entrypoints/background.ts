@@ -1,6 +1,8 @@
+import { logger } from "../lib/logger";
+
 export default defineBackground(() => {
   // Background service worker for ESPN Draft Assistant
-  console.log('[ESPN Draft Assistant] Background service worker initialized');
+  logger.log('[ESPN Draft Assistant] Background service worker initialized');
 
   // ─── WebSocket Relay (mobile companion) ────────────────────────────────────
   let draftWs: WebSocket | null = null;
@@ -19,7 +21,7 @@ export default defineBackground(() => {
     draftWs = new WebSocket('ws://localhost:3001/draft/live?role=extension');
 
     draftWs.addEventListener('open', () => {
-      console.log('[ESPN Draft Assistant] WS relay connected to hub');
+      logger.log('[ESPN Draft Assistant] WS relay connected to hub');
       reconnectDelay = 3000; // reset on successful connect
 
       // 20-second keepalive ping to prevent service worker from sleeping
@@ -52,7 +54,7 @@ export default defineBackground(() => {
           );
         }
       } catch (err) {
-        console.error('[ESPN Draft Assistant] WS relay message parse error:', err);
+        logger.error('[ESPN Draft Assistant] WS relay message parse error:', err);
       }
     });
 
@@ -62,7 +64,7 @@ export default defineBackground(() => {
         keepaliveInterval = null;
       }
 
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] WS relay disconnected — reconnecting in ${reconnectDelay}ms`,
       );
 
@@ -71,7 +73,7 @@ export default defineBackground(() => {
     });
 
     draftWs.addEventListener('error', (err) => {
-      console.error('[ESPN Draft Assistant] WS relay error:', err);
+      logger.error('[ESPN Draft Assistant] WS relay error:', err);
       // close handler will schedule reconnect
     });
   }
@@ -80,9 +82,9 @@ export default defineBackground(() => {
   // Listen for extension installation
   chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-      console.log('[ESPN Draft Assistant] Extension installed successfully');
+      logger.log('[ESPN Draft Assistant] Extension installed successfully');
     } else if (details.reason === 'update') {
-      console.log('[ESPN Draft Assistant] Extension updated');
+      logger.log('[ESPN Draft Assistant] Extension updated');
     }
   });
 
@@ -107,32 +109,32 @@ export default defineBackground(() => {
         );
 
         if (!isAllowedDomain) {
-          console.warn('[ESPN Draft Assistant] SECURITY: Rejected message from unauthorized origin:', senderUrl.hostname);
+          logger.warn('[ESPN Draft Assistant] SECURITY: Rejected message from unauthorized origin:', senderUrl.hostname);
           sendResponse({ error: 'Unauthorized sender origin' });
           return false;
         }
 
         // Additional validation: verify sender is from this extension (prevents extension spoofing)
         if (sender.id && sender.id !== chrome.runtime.id) {
-          console.warn('[ESPN Draft Assistant] SECURITY: Rejected message from different extension:', sender.id);
+          logger.warn('[ESPN Draft Assistant] SECURITY: Rejected message from different extension:', sender.id);
           sendResponse({ error: 'Invalid sender extension' });
           return false;
         }
       } catch (error) {
-        console.error('[ESPN Draft Assistant] Invalid sender URL:', sender.url, error);
+        logger.error('[ESPN Draft Assistant] Invalid sender URL:', sender.url, error);
         sendResponse({ error: 'Invalid sender URL' });
         return false;
       }
     }
     // If sender.url is undefined, message is from extension page (popup, options) - allow it
 
-    console.log('[ESPN Draft Assistant] Message received:', message.type);
+    logger.log('[ESPN Draft Assistant] Message received:', message.type);
 
     if (message.type === 'GET_RANKINGS') {
       handleGetRankings(message.payload)
         .then(sendResponse)
         .catch((error) => {
-          console.error('[ESPN Draft Assistant] Error fetching rankings:', error);
+          logger.error('[ESPN Draft Assistant] Error fetching rankings:', error);
           sendResponse({ error: error.message });
         });
       return true; // Keep channel open for async response
@@ -142,7 +144,7 @@ export default defineBackground(() => {
       handleGetAuctionValues(message.payload)
         .then(sendResponse)
         .catch((error) => {
-          console.error('[ESPN Draft Assistant] Error fetching auction values:', error);
+          logger.error('[ESPN Draft Assistant] Error fetching auction values:', error);
           sendResponse({ error: error.message });
         });
       return true; // Keep channel open for async response
@@ -177,7 +179,7 @@ export default defineBackground(() => {
       try {
         cachedPayload = JSON.parse(changes['draft-mobile-state'].newValue as string);
       } catch (err) {
-        console.error('[ESPN Draft Assistant] Failed to parse draft-mobile-state:', err);
+        logger.error('[ESPN Draft Assistant] Failed to parse draft-mobile-state:', err);
       }
     }
 
@@ -185,7 +187,7 @@ export default defineBackground(() => {
       try {
         cachedEngineSignals = JSON.parse(changes['draft-engine-signals'].newValue as string);
       } catch (err) {
-        console.error('[ESPN Draft Assistant] Failed to parse draft-engine-signals:', err);
+        logger.error('[ESPN Draft Assistant] Failed to parse draft-engine-signals:', err);
       }
     }
 
@@ -198,7 +200,7 @@ export default defineBackground(() => {
         engineSignals: cachedEngineSignals,
       }));
     } catch (err) {
-      console.error('[ESPN Draft Assistant] Failed to send STATE_SNAPSHOT:', err);
+      logger.error('[ESPN Draft Assistant] Failed to send STATE_SNAPSHOT:', err);
     }
   });
   // ─── End Storage Change Listener ──────────────────────────────────────────
@@ -210,13 +212,13 @@ export default defineBackground(() => {
 async function handleGetRankings(payload: { leagueId: string }) {
   // This will be implemented in a future plan
   // For now, return empty array to allow extension to load
-  console.log('[ESPN Draft Assistant] GET_RANKINGS requested for league:', payload.leagueId);
+  logger.log('[ESPN Draft Assistant] GET_RANKINGS requested for league:', payload.leagueId);
   return { rankings: [] };
 }
 
 async function handleGetAuctionValues(payload: { leagueId: string }) {
   // This will be implemented in a future plan
   // For now, return empty array to allow extension to load
-  console.log('[ESPN Draft Assistant] GET_AUCTION_VALUES requested for league:', payload.leagueId);
+  logger.log('[ESPN Draft Assistant] GET_AUCTION_VALUES requested for league:', payload.leagueId);
   return { values: [] };
 }

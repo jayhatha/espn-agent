@@ -1,4 +1,5 @@
 import type { Category, DraftConfiguration } from "@espn-fantasy/shared";
+import { logger } from "./logger";
 
 /**
  * Detect roster slots from the ESPN players-table DOM.
@@ -59,7 +60,7 @@ export function detectRosterSlotsFromPlayersTable(): {
     return null;
   }
 
-  console.log(
+  logger.log(
     `[ESPN Draft Assistant] Roster slots detected from players-table: ${JSON.stringify(rosterSlots)} (bench: ${benchCount})`,
   );
 
@@ -110,7 +111,7 @@ export function detectRosterSizeFromPositionTracker(): {
     }
   });
 
-  console.log(
+  logger.log(
     `[ESPN Draft Assistant] Position Tracker: rosterSize=${rosterSize}, positions=[${positions.join(", ")}]`,
   );
 
@@ -135,7 +136,7 @@ export function isPracticeDraft(): boolean {
   for (const selector of headingSelectors) {
     const heading = document.querySelector(selector);
     if (heading?.textContent?.toLowerCase().includes("practice")) {
-      console.log(
+      logger.log(
         "[ESPN Draft Assistant] Practice draft detected from heading",
       );
       return true;
@@ -145,7 +146,7 @@ export function isPracticeDraft(): boolean {
   // Strategy 2: Check URL for practice indicators
   const url = window.location.href.toLowerCase();
   if (url.includes("practice") || url.includes("mock")) {
-    console.log("[ESPN Draft Assistant] Practice draft detected from URL");
+    logger.log("[ESPN Draft Assistant] Practice draft detected from URL");
     return true;
   }
 
@@ -155,7 +156,7 @@ export function isPracticeDraft(): boolean {
     bodyText.includes("practice draft") ||
     bodyText.includes("mock draft")
   ) {
-    console.log(
+    logger.log(
       "[ESPN Draft Assistant] Practice draft detected from page content",
     );
     return true;
@@ -186,7 +187,7 @@ function detectAuctionBudget(): number {
       if (budgetMatch) {
         const budgetValue = parseInt(budgetMatch[1] || budgetMatch[2], 10);
         if (budgetValue >= 100 && budgetValue <= 500) {
-          console.log(`[ESPN Draft Assistant] Auction budget detected from settings: $${budgetValue}`);
+          logger.log(`[ESPN Draft Assistant] Auction budget detected from settings: $${budgetValue}`);
           return budgetValue;
         }
       }
@@ -216,7 +217,7 @@ function detectAuctionBudget(): number {
         : null;
 
       if (totalBudget && totalBudget >= 100 && totalBudget <= 500) {
-        console.log(`[ESPN Draft Assistant] Auction budget detected from remaining display: $${totalBudget}`);
+        logger.log(`[ESPN Draft Assistant] Auction budget detected from remaining display: $${totalBudget}`);
         return totalBudget;
       }
     }
@@ -228,13 +229,13 @@ function detectAuctionBudget(): number {
   if (urlBudget) {
     const budgetValue = parseInt(urlBudget, 10);
     if (budgetValue >= 100 && budgetValue <= 500) {
-      console.log(`[ESPN Draft Assistant] Auction budget detected from URL: $${budgetValue}`);
+      logger.log(`[ESPN Draft Assistant] Auction budget detected from URL: $${budgetValue}`);
       return budgetValue;
     }
   }
 
   // Strategy 4: Default to 260 if all strategies fail
-  console.warn("[ESPN Draft Assistant] Could not detect auction budget - using default $260");
+  logger.warn("[ESPN Draft Assistant] Could not detect auction budget - using default $260");
   return 260;
 }
 
@@ -342,7 +343,7 @@ export function detectMyTeam(): {
     }
   });
 
-  console.log(
+  logger.log(
     `[ESPN Draft Assistant] My team detected from pick train: "${teamName}" (id: ${teamId}, column: ${gridColumn}, budget: $${remainingBudget})`,
   );
 
@@ -417,7 +418,7 @@ function detectTeamCount(): number | null {
     if (container) {
       const pickItems = container.querySelectorAll(".picklist--item");
       if (pickItems.length >= 2 && pickItems.length <= 20) {
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Team count detected from ${selector}: ${pickItems.length}`,
         );
         return pickItems.length;
@@ -428,7 +429,7 @@ function detectTeamCount(): number | null {
   // Fallback: count [data-testid="auction-pick"] elements (one per team)
   const auctionPicks = document.querySelectorAll('[data-testid="auction-pick"]');
   if (auctionPicks.length >= 2 && auctionPicks.length <= 20) {
-    console.log(
+    logger.log(
       `[ESPN Draft Assistant] Team count detected from auction-pick elements: ${auctionPicks.length}`,
     );
     return auctionPicks.length;
@@ -437,7 +438,7 @@ function detectTeamCount(): number | null {
   // Fallback: any .picklist--item elements on the page (no container)
   const anyPickItems = document.querySelectorAll(".picklist--item");
   if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
-    console.log(
+    logger.log(
       `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
     );
     return anyPickItems.length;
@@ -456,7 +457,7 @@ function detectTeamCount(): number | null {
     });
     if (columns.size >= 2) {
       // Reasonable team count (2-20)
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] Team count detected from grid columns: ${columns.size}`,
       );
       return columns.size;
@@ -489,7 +490,7 @@ function detectTeamCount(): number | null {
         );
       });
       if (teamOptions.length >= 2) {
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Team count detected from dropdown: ${teamOptions.length}`,
         );
         return teamOptions.length;
@@ -508,7 +509,7 @@ function detectTeamCount(): number | null {
   for (const selector of headerSelectors) {
     const teamHeaders = document.querySelectorAll(selector);
     if (teamHeaders.length >= 2) {
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] Team count detected from headers: ${teamHeaders.length}`,
       );
       return teamHeaders.length;
@@ -532,7 +533,7 @@ function detectTeamCount(): number | null {
       if (match) {
         const count = parseInt(match[1], 10);
         if (count >= 2 && count <= 20) {
-          console.log(
+          logger.log(
             `[ESPN Draft Assistant] Team count detected from text: ${count}`,
           );
           return count;
@@ -548,14 +549,14 @@ function detectTeamCount(): number | null {
   if (urlTeams) {
     const count = parseInt(urlTeams, 10);
     if (count >= 2 && count <= 20) {
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] Team count detected from URL: ${count}`,
       );
       return count;
     }
   }
 
-  console.warn(
+  logger.warn(
     "[ESPN Draft Assistant] Could not detect team count - tried grid columns, dropdowns, headers, text, and URL",
   );
   return null;
@@ -591,7 +592,7 @@ function detectCategories(): Category[] | null {
         }
       });
       if (categories.length >= 5) {
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Categories detected from table header: ${categories.map((c) => c.stat_key).join(", ")}`,
         );
         return categories;
@@ -622,7 +623,7 @@ function detectCategories(): Category[] | null {
 
       if (categories.length >= 5) {
         // Valid category set
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Categories detected from headers: ${categories.map((c) => c.stat_key).join(", ")}`,
         );
         return categories;
@@ -657,7 +658,7 @@ function detectCategories(): Category[] | null {
           .map(mapStatNameToCategory);
 
         if (categories.length >= 5) {
-          console.log(
+          logger.log(
             `[ESPN Draft Assistant] Categories detected from settings: ${categories.map((c) => c.stat_key).join(", ")}`,
           );
           return categories;
@@ -673,7 +674,7 @@ function detectCategories(): Category[] | null {
     const categoryKeys = scoringParam.split(",");
     if (categoryKeys.length >= 5) {
       const categories = categoryKeys.map(mapStatNameToCategory);
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] Categories detected from URL: ${categories.map((c) => c.stat_key).join(", ")}`,
       );
       return categories;
@@ -681,7 +682,7 @@ function detectCategories(): Category[] | null {
   }
 
   // Strategy 4: Use standard 5x5 roto defaults as fallback
-  console.warn(
+  logger.warn(
     "[ESPN Draft Assistant] Could not detect categories - using standard 5x5 defaults",
   );
   return getDefault5x5Categories();
@@ -732,7 +733,7 @@ function detectRosterSlots(): Record<string, number> | null {
         });
 
         if (Object.keys(slots).length >= 5) {
-          console.log(
+          logger.log(
             `[ESPN Draft Assistant] Roster slots detected: ${JSON.stringify(slots)}`,
           );
           return slots;
@@ -770,7 +771,7 @@ function detectRosterSlots(): Record<string, number> | null {
       }
 
       if (Object.keys(slots).length >= 5) {
-        console.log(
+        logger.log(
           `[ESPN Draft Assistant] Roster slots detected from limits: ${JSON.stringify(slots)}`,
         );
         return slots;
@@ -797,7 +798,7 @@ function detectRosterSlots(): Record<string, number> | null {
     // This gives us a rough idea but not exact slots
     // Only use if we have multiple positions
     if (Object.keys(positionCounts).length >= 5) {
-      console.log(
+      logger.log(
         `[ESPN Draft Assistant] Position distribution detected: ${JSON.stringify(positionCounts)} (using defaults for slots)`,
       );
       // We know positions exist but not exact slots - use defaults
@@ -806,7 +807,7 @@ function detectRosterSlots(): Record<string, number> | null {
   }
 
   // Strategy 4: Use standard 5x5 roster defaults
-  console.warn(
+  logger.warn(
     "[ESPN Draft Assistant] Could not detect roster slots - using standard 5x5 defaults",
   );
   return getDefault5x5Roster();

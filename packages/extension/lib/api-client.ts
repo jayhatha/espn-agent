@@ -2,6 +2,7 @@ import pitcherlistRankings from "../assets/pitcherlist-rankings.json";
 import fangraphsAuctionValues from "../assets/fangraphs-auction-values.json";
 import { isPracticeDraft } from "./draft-config-detector";
 import { normalizeName } from "./engine/normalizer";
+import { logger } from "./logger";
 
 /**
  * Throttle helper - limits function execution to once per wait period
@@ -41,7 +42,7 @@ function dedupedRequest<T>(
 ): Promise<T> {
   const existing = inflightRequests.get(key);
   if (existing) {
-    console.log(`[API Client] Deduping request: ${key}`);
+    logger.log(`[API Client] Deduping request: ${key}`);
     return existing as Promise<T>;
   }
 
@@ -297,7 +298,7 @@ function buildBundledRankings(): {
     });
   }
 
-  console.log("[API Client] Built bundled rankings:", rankings.length, "players (FG:", fgLookup.size, "+ PL-only:", merged.length - fgLookup.size, ")");
+  logger.log("[API Client] Built bundled rankings:", rankings.length, "players (FG:", fgLookup.size, "+ PL-only:", merged.length - fgLookup.size, ")");
   return { rankings, auctionValues };
 }
 
@@ -320,7 +321,7 @@ export async function getDraftBoardData(): Promise<{
   // Practice drafts don't have backend league data — skip network call entirely
   // and let callers fall back to bundled FanGraphs data
   if (isPracticeDraft()) {
-    console.log("[API Client] Practice draft — skipping backend draft board fetch");
+    logger.log("[API Client] Practice draft — skipping backend draft board fetch");
     return null;
   }
 
@@ -341,7 +342,7 @@ export async function getDraftBoardData(): Promise<{
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        console.warn("[API Client] Draft board endpoint returned", response.status);
+        logger.warn("[API Client] Draft board endpoint returned", response.status);
         return null;
       }
 
@@ -349,7 +350,7 @@ export async function getDraftBoardData(): Promise<{
       const players: ESPNDraftPlayer[] = data?.players || [];
 
       if (players.length === 0) {
-        console.warn("[API Client] Draft board endpoint returned empty players list");
+        logger.warn("[API Client] Draft board endpoint returned empty players list");
         return null;
       }
 
@@ -443,11 +444,11 @@ export async function getDraftBoardData(): Promise<{
         });
       }
 
-      console.log("[API Client] Using draft board data for rankings:", players.length, "players");
+      logger.log("[API Client] Using draft board data for rankings:", players.length, "players");
       cachedDraftBoardData = { rankings, auctionValues };
       return cachedDraftBoardData;
     } catch (error) {
-      console.warn("[API Client] getDraftBoardData failed:", error);
+      logger.warn("[API Client] getDraftBoardData failed:", error);
       cachedDraftBoardData = null;
       return null;
     }
@@ -463,14 +464,14 @@ function extractPracticeDraftHints(titleText?: string): {
   }
 
   const normalizedTitle = titleText.replace(/\?/g, "").trim();
-  console.log("[API Client] Extracting hints from title:", normalizedTitle);
+  logger.log("[API Client] Extracting hints from title:", normalizedTitle);
 
   // Pattern 1: "Practice Draft for [League Name] in [Year]"
   const practiceMatch1 = normalizedTitle.match(
     /practice\s+draft\s+for\s+(.+?)\s+in\s+(\d{4})/i,
   );
   if (practiceMatch1) {
-    console.log("[API Client] Matched pattern 1:", {
+    logger.log("[API Client] Matched pattern 1:", {
       name: practiceMatch1[1].trim(),
       season: practiceMatch1[2],
     });
@@ -485,7 +486,7 @@ function extractPracticeDraftHints(titleText?: string): {
     /(.+?)\s+practice\s+draft\s*[-–—]\s*(\d{4})/i,
   );
   if (practiceMatch2) {
-    console.log("[API Client] Matched pattern 2:", {
+    logger.log("[API Client] Matched pattern 2:", {
       name: practiceMatch2[1].trim(),
       season: practiceMatch2[2],
     });
@@ -500,7 +501,7 @@ function extractPracticeDraftHints(titleText?: string): {
     /draft\s+(\d{4})\s*[-–—]\s*(.+)/i,
   );
   if (practiceMatch3) {
-    console.log("[API Client] Matched pattern 3:", {
+    logger.log("[API Client] Matched pattern 3:", {
       season: practiceMatch3[1],
       name: practiceMatch3[2].trim(),
     });
@@ -515,7 +516,7 @@ function extractPracticeDraftHints(titleText?: string): {
   const result = {
     targetSeason: seasonMatch ? Number.parseInt(seasonMatch[1], 10) : undefined,
   };
-  console.log("[API Client] Fallback season extraction:", result);
+  logger.log("[API Client] Fallback season extraction:", result);
   return result;
 }
 
@@ -726,7 +727,7 @@ async function fetchEspnLeagueName(
     // Clean up practice draft prefixes
     return cleanPracticeDraftName(rawName);
   } catch (error) {
-    console.warn("[API Client] Failed to fetch ESPN league name:", error);
+    logger.warn("[API Client] Failed to fetch ESPN league name:", error);
     return null;
   }
 }
@@ -738,7 +739,7 @@ export async function resolveBackendLeagueId(
   try {
     // For practice drafts, skip backend league resolution - use ESPN ID directly
     if (isPracticeDraft()) {
-      console.log("[API Client] Practice draft detected - using ESPN league ID directly");
+      logger.log("[API Client] Practice draft detected - using ESPN league ID directly");
       return espnLeagueId;
     }
 
@@ -752,21 +753,21 @@ export async function resolveBackendLeagueId(
     // Try to fetch leagues - if this fails due to auth, we'll fall back
     let leagues: BackendLeagueSummary[] = [];
     try {
-      console.log("[API Client] Attempting to fetch leagues from backend...");
+      logger.log("[API Client] Attempting to fetch leagues from backend...");
       leagues = await fetchLeagues(normalizedBackendUrl, apiToken);
-      console.log(
+      logger.log(
         "[API Client] fetchLeagues returned",
         leagues.length,
         "leagues",
       );
     } catch (error) {
-      console.warn(
+      logger.warn(
         "[API Client] Could not fetch leagues (auth required or backend unavailable):",
         error,
       );
 
       // Try to get league name from ESPN API first
-      console.log("[API Client] Fetching league name from ESPN API...");
+      logger.log("[API Client] Fetching league name from ESPN API...");
       const espnLeagueName = await fetchEspnLeagueName(espnLeagueId);
 
       // Extract hints from page title as fallback
@@ -777,7 +778,7 @@ export async function resolveBackendLeagueId(
       const leagueNameForSearch = espnLeagueName || pageTitleName;
 
       if (leagueNameForSearch) {
-        console.log(
+        logger.log(
           "[API Client] Trying public search endpoint for:",
           leagueNameForSearch,
           "(source:",
@@ -792,13 +793,13 @@ export async function resolveBackendLeagueId(
         );
 
         if (searchResults.length > 0) {
-          console.log(
+          logger.log(
             "[API Client] Found leagues via public search:",
             searchResults.length,
           );
           leagues = searchResults;
         } else {
-          console.log(
+          logger.log(
             "[API Client] No results from public search, falling back to ESPN ID:",
             espnLeagueId,
           );
@@ -806,7 +807,7 @@ export async function resolveBackendLeagueId(
         }
       } else {
         // No league name available from any source
-        console.log(
+        logger.log(
           "[API Client] No league name available, falling back to ESPN league ID:",
           espnLeagueId,
         );
@@ -814,7 +815,7 @@ export async function resolveBackendLeagueId(
       }
     }
 
-    console.log("[API Client] Resolving league ID:", {
+    logger.log("[API Client] Resolving league ID:", {
       espnLeagueId,
       pageTitle,
       availableLeagues: leagues.length,
@@ -822,7 +823,7 @@ export async function resolveBackendLeagueId(
 
     // If no leagues found via auth, try public search
     if (leagues.length === 0) {
-      console.log(
+      logger.log(
         "[API Client] No leagues found via auth, trying public search...",
       );
 
@@ -837,7 +838,7 @@ export async function resolveBackendLeagueId(
       const leagueNameForSearch = espnLeagueName || pageTitleName;
 
       if (leagueNameForSearch) {
-        console.log(
+        logger.log(
           "[API Client] Trying public search endpoint for:",
           leagueNameForSearch,
           "(source:",
@@ -852,20 +853,20 @@ export async function resolveBackendLeagueId(
         );
 
         if (searchResults.length > 0) {
-          console.log(
+          logger.log(
             "[API Client] Found leagues via public search:",
             searchResults.length,
           );
           leagues = searchResults;
         } else {
-          console.log(
+          logger.log(
             "[API Client] No results from public search, falling back to ESPN ID:",
             espnLeagueId,
           );
           return espnLeagueId;
         }
       } else {
-        console.warn(
+        logger.warn(
           "[API Client] No league name available for search, using ESPN ID as fallback",
         );
         return espnLeagueId;
@@ -874,14 +875,14 @@ export async function resolveBackendLeagueId(
 
     // Re-check leagues length after potential search
     if (leagues.length === 0) {
-      console.warn(
+      logger.warn(
         "[API Client] Still no leagues found, using ESPN ID as fallback",
       );
       return espnLeagueId;
     }
 
     if (leagues.length === 1) {
-      console.log(
+      logger.log(
         "[API Client] Only one league available, using it:",
         leagues[0],
       );
@@ -892,7 +893,7 @@ export async function resolveBackendLeagueId(
       (league) => String(league.espnLeagueId) === espnLeagueId,
     );
     if (direct) {
-      console.log("[API Client] Found direct ESPN ID match:", direct);
+      logger.log("[API Client] Found direct ESPN ID match:", direct);
       return String(direct.id);
     }
 
@@ -904,7 +905,7 @@ export async function resolveBackendLeagueId(
     // Prefer ESPN API name for matching
     const targetName = espnLeagueName || pageTitleName;
 
-    console.log("[API Client] Matching hints:", {
+    logger.log("[API Client] Matching hints:", {
       espnLeagueName,
       pageTitleName,
       targetName,
@@ -930,7 +931,7 @@ export async function resolveBackendLeagueId(
       (left, right) => right.score - left.score,
     );
 
-    console.log(
+    logger.log(
       "[API Client] Scored candidates:",
       sortedCandidates.map((c) => ({
         name: c.league.name,
@@ -942,7 +943,7 @@ export async function resolveBackendLeagueId(
     const bestCandidate = sortedCandidates[0];
 
     if (bestCandidate && bestCandidate.score >= 3) {
-      console.log(
+      logger.log(
         "[API Client] Using best-scored candidate:",
         bestCandidate.league,
       );
@@ -958,7 +959,7 @@ export async function resolveBackendLeagueId(
         .sort((left, right) => right.score - left.score)[0];
 
       if (nameOnlyBest && nameOnlyBest.score >= 1) {
-        console.log("[API Client] Using name-only match:", nameOnlyBest.league);
+        logger.log("[API Client] Using name-only match:", nameOnlyBest.league);
         return String(nameOnlyBest.league.id);
       }
     }
@@ -969,10 +970,10 @@ export async function resolveBackendLeagueId(
           typeof league.season === "number" && league.season === targetSeason,
       );
 
-      console.log("[API Client] Season candidates:", seasonCandidates.length);
+      logger.log("[API Client] Season candidates:", seasonCandidates.length);
 
       if (seasonCandidates.length === 1) {
-        console.log(
+        logger.log(
           "[API Client] Using single season match:",
           seasonCandidates[0],
         );
@@ -987,17 +988,17 @@ export async function resolveBackendLeagueId(
             ? rightDate - leftDate
             : b.id - a.id;
         })[0];
-        console.log("[API Client] Using newest season match:", newest);
+        logger.log("[API Client] Using newest season match:", newest);
         return String(newest.id);
       }
     }
 
-    console.warn(
+    logger.warn(
       "[API Client] Could not resolve backend league ID via matching, using ESPN ID as fallback",
     );
     return espnLeagueId;
   } catch (error) {
-    console.error("[API Client] Error resolving backend league ID:", error);
+    logger.error("[API Client] Error resolving backend league ID:", error);
     // Even on error, try to use ESPN league ID as fallback
     return espnLeagueId;
   }
@@ -1034,15 +1035,15 @@ export async function getRankings(
     try {
       const draftBoardData = await getDraftBoardData();
       if (draftBoardData && draftBoardData.rankings.length > 0) {
-        console.log("[API Client] Using draft board data for rankings");
+        logger.log("[API Client] Using draft board data for rankings");
         return draftBoardData.rankings;
       }
     } catch (error) {
-      console.warn("[API Client] Draft board data unavailable:", error);
+      logger.warn("[API Client] Draft board data unavailable:", error);
     }
 
     // Fallback: PitcherList-only rankings (no backend needed)
-    console.log("[API Client] Using bundled PitcherList rankings (no backend required)");
+    logger.log("[API Client] Using bundled PitcherList rankings (no backend required)");
     const pitcherListData = buildBundledRankings();
     return pitcherListData.rankings;
   });
@@ -1062,15 +1063,15 @@ export async function getAuctionValues(
     try {
       const draftBoardData = await getDraftBoardData();
       if (draftBoardData && draftBoardData.auctionValues.length > 0) {
-        console.log("[API Client] Using draft board data for auction values");
+        logger.log("[API Client] Using draft board data for auction values");
         return draftBoardData.auctionValues;
       }
     } catch (error) {
-      console.warn("[API Client] Draft board data unavailable:", error);
+      logger.warn("[API Client] Draft board data unavailable:", error);
     }
 
     // Fallback: PitcherList-only auction values (no backend needed)
-    console.log("[API Client] Using bundled PitcherList auction values (no backend required)");
+    logger.log("[API Client] Using bundled PitcherList auction values (no backend required)");
     const pitcherListData = buildBundledRankings();
     return pitcherListData.auctionValues;
   });
