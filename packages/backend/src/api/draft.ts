@@ -37,7 +37,7 @@ function validateDraftConfig(params: any): {
       return { valid: false, error: "categories must be a non-empty array" };
     }
     for (const cat of categories) {
-      if (!cat.category_id || !cat.stat_key || !cat.type || !cat.direction) {
+      if (cat.category_id == null || !cat.stat_key || !cat.type || !cat.direction) {
         return { valid: false, error: "Invalid category format" };
       }
     }
@@ -1041,7 +1041,7 @@ export async function draftRoutes(app: FastifyInstance) {
       const payload = request.body as NarratorPayload;
 
       // Basic guard: require at least one meaningful signal to narrate
-      if (!payload.alerts?.length && !payload.archetype && !payload.currentAuctionPlayer) {
+      if (!payload.alerts?.length && !payload.currentAuctionPlayer) {
         return reply
           .code(400)
           .send({ error: "No meaningful signals provided" });
@@ -1055,7 +1055,7 @@ export async function draftRoutes(app: FastifyInstance) {
         return { narration, generatedAt: new Date().toISOString() };
       } catch (error) {
         request.log.error(
-          { error },
+          { err: error },
           "[DraftNarrator] Failed to generate narration",
         );
         return reply

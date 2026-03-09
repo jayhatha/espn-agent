@@ -168,7 +168,8 @@ export class DraftRankingsAgent {
     const allPitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
 
     // Batter slot keys (used for UTIL replacement level calculation)
-    const batterSlotKeys = ["C", "1B", "2B", "SS", "3B", "OF", "CI", "MI", "IF", "UTIL"];
+    // UTIL excluded — computed separately to prevent double-counting in replacement level
+    const batterSlotKeys = ["C", "1B", "2B", "SS", "3B", "OF", "CI", "MI", "IF"];
 
     // Use full type-split pools for SGP calculation
     // The scarce stat filter (>50% zeros → compare only among contributors)
@@ -501,6 +502,29 @@ export class DraftRankingsAgent {
     // Invert for LOWER_BETTER
     if (category.direction === "LOWER_BETTER") {
       sgp = -sgp;
+    }
+
+    // Dampen rate stat SGP for low-volume players (primarily RPs).
+    // In roto, a closer's elite ERA/WHIP barely moves team totals because
+    // they pitch ~60 IP vs a SP's ~180 IP. We use mean volume as the
+    // reference (pulled up by SPs to ~100 IP) and cap weight at 1.0 so
+    // SPs (above mean) keep raw SGP while RPs are reduced proportionally.
+    if (category.type === "RATE") {
+      const isPitchingRate = PITCHING_STAT_KEYS.has(category.stat_key);
+      const volumeKey = isPitchingRate ? "IP" : "AB";
+      const playerVolume = projection[volumeKey] || 0;
+
+      const poolVolumes = allProjections
+        .map((p) => p[volumeKey] || 0)
+        .filter((v) => v > 0);
+      if (poolVolumes.length > 0) {
+        const meanVolume =
+          poolVolumes.reduce((s, v) => s + v, 0) / poolVolumes.length;
+        if (meanVolume > 0) {
+          const volumeWeight = Math.min(1.0, playerVolume / meanVolume);
+          sgp *= volumeWeight;
+        }
+      }
     }
 
     return sgp;
