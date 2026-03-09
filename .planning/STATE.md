@@ -401,6 +401,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 33]: Poll getNominationDiagnostics() every 500ms in NominationDiagnostics UI since controller is not Zustand-reactive
 - [Phase 33]: Collapsible nomination diagnostics panel starts collapsed to avoid UI clutter; one-line status always visible
 - [Phase quick-83]: Used component-based math for rate stats in category progress (OPS, ERA, WHIP) consistent with existing engine patterns
+- [Phase quick-84]: 50% max deficit-boost factor for target-optimized ideal roster SGP values
 
 ### Roadmap Evolution
 
