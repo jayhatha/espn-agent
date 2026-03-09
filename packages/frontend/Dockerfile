@@ -47,6 +47,7 @@ RUN npm install -g pnpm@10
 # Copy package files
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
 COPY packages/frontend/package.json ./packages/frontend/
+COPY packages/shared/package.json ./packages/shared/
 
 # Install production dependencies
 RUN pnpm install --prod --frozen-lockfile

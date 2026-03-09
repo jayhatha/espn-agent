@@ -47,14 +47,10 @@ COPY packages/backend/package.json ./packages/backend/
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
 
-# Copy built artifacts
+# Copy built artifacts (dist only, no source)
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/src ./packages/shared/src
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
-COPY --from=builder /app/packages/backend/src ./packages/backend/src
-
-# Copy migration SQL files to dist so compiled migrate.js can find them
-RUN cp -r ./packages/backend/src/db/migrations ./packages/backend/dist/db/migrations
+COPY --from=builder /app/packages/backend/src/db/migrations ./packages/backend/dist/db/migrations
 
 # Copy startup scripts
 COPY packages/backend/scripts ./packages/backend/scripts

@@ -403,11 +403,20 @@ export class SnapshotOrchestratorAgent {
       if (transactionResult.status === "fulfilled") {
         transactionCount = transactionResult.value || 0;
       } else {
-        // Transaction fetch failed, just log a warning (non-blocking)
         this.logger?.warn(
           { error: transactionResult.reason, leagueId },
-          "Transaction fetch failed, continuing without transactions",
+          "Transaction fetch failed, marking snapshot degraded",
         );
+        const currentReasons = [...degradedReasons, "transactions_failed"];
+        await this.db
+          .updateTable("league_daily_snapshot")
+          .set({
+            is_degraded: true,
+            degraded_reasons: currentReasons,
+          })
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .execute();
       }
 
     this.logger?.info(
