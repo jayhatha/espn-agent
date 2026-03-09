@@ -544,8 +544,9 @@ None yet.
 | 84 | Add toggle to recompute ideal roster to hit category targets | 2026-03-09 | 057653b | ✅ | [84-add-toggle-to-recompute-ideal-roster-to-](./quick/84-add-toggle-to-recompute-ideal-roster-to-/) |
 | 85 | Auto-populate ESPN nomination queue from engine signals | 2026-03-09 | ffb5bd3 | ✅ | [85-auto-populate-espn-nomination-queue-from](./quick/85-auto-populate-espn-nomination-queue-from/) |
 | 86 | Fix search functionality — update ESPN search bar selectors | 2026-03-09 | 0b3a69b | ✅ | [86-fix-search-functionality-update-espn-sea](./quick/86-fix-search-functionality-update-espn-sea/) |
+| 87 | Fix search nomination: click matching player from search dropdown instead of submitting form | 2026-03-09 | 7fe5b0c | ✅ | [87-fix-search-nomination-click-matching-pla](./quick/87-fix-search-nomination-click-matching-pla/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 86: Fix search functionality — update ESPN search bar selectors
+Last activity: 2026-03-09 - Completed quick task 87: Fix search nomination — click dropdown match
 Resume file: None
