@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 35 — Use the Queue for Player Nominations
-Plan: 02 complete — Phase 35 Plan 02 COMPLETE
-Status: Phase 35 COMPLETE (2/2 plans) — Queue scraper wired in content.tsx (3s interval), queue-first nomination in evaluateAndNominate(), NominationDiagnostics updated
-Last activity: 2026-03-09 — Phase 35 Plan 02 complete (queue-first nomination integration delivered)
+Phase: 36 — Code Cleanup (verify and address CODE_REVIEW.md concerns)
+Plan: 03 complete — Phase 36 Plan 03 COMPLETE
+Status: Phase 36 IN PROGRESS (3/3 plans done) — NaN guards, debounced auction inputs, snapshot degradation symmetry, @types/node alignment, Dockerfile fixes
+Last activity: 2026-03-09 — Phase 36 Plan 03 complete (frontend/backend/infra bug fixes delivered)
 
-Progress: Phase 35 COMPLETE (2/2 plans) | Queue nominations fully integrated — ESPN queue entries preferred over engine candidates with direct playerId
+Progress: Phase 36 COMPLETE (3/3 plans) | All CODE_REVIEW.md concerns addressed (skipping security-only concerns for local dev)
 
 ```
 [############                            ] 30% v2.0
@@ -166,6 +166,9 @@ Progress: Phase 35 COMPLETE (2/2 plans) | Queue nominations fully integrated —
 | Phase 34 P01 | 3min | 2 tasks | 2 files |
 | Phase 35 P01 | 5 | 2 tasks | 2 files |
 | Phase 35 P02 | 2min | 2 tasks | 3 files |
+| Phase 36 P01 | 3min | 1 tasks | 2 files |
+| Phase 36 P02 | 2min | 1 tasks | 1 files |
+| Phase 36 P03 | 4min | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -411,6 +414,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 35]: espnNominationQueue is session-only — excluded from partialize to avoid persisting transient queue state across reloads
 - [Phase 35 P02]: Fresh scrapeESPNNominationQueue() call at nomination time (not store state) to avoid 3s polling lag
 - [Phase 35 P02]: Fall-through to engine candidates when queue player button is disabled or not visible — auto-pilot continues running
+- [Phase 36 P03]: @types/node aligned to ^22.0.0 (LTS) across all three packages — was inconsistent between ^20/^25
+- [Phase 36 P03]: Transaction failures now mark snapshot degraded with transactions_failed reason — symmetric with free agent failure handling
+- [Phase 36 P03]: Backend Dockerfile production stage ships only dist + migration SQL (no src) — reduces image size and avoids shipping unnecessary source
 - [Phase 35 P02]: JSX fragment in NominationDiagnostics enables per-source color styling for queue vs simulation/idealRoster
 - [Phase quick-85]: Cooldown lives inside populateQueue() not the interval — interval is trigger only, dedup handles rapid calls
 - [Phase quick-85]: Use 'Select' button text detection (not CSS class) for user's turn guard — more resilient to ESPN DOM changes
