@@ -414,6 +414,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 35 P02]: JSX fragment in NominationDiagnostics enables per-source color styling for queue vs simulation/idealRoster
 - [Phase quick-85]: Cooldown lives inside populateQueue() not the interval — interval is trigger only, dedup handles rapid calls
 - [Phase quick-85]: Use 'Select' button text detection (not CSS class) for user's turn guard — more resilient to ESPN DOM changes
+- [Phase quick-86]: Used InputEvent with data/inputType fields instead of plain Event for React-controlled ESPN search input compatibility
 
 ### Roadmap Evolution
 
