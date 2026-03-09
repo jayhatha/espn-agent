@@ -110,6 +110,7 @@ export default defineContentScript({
         // Nomination diagnostics — call during a live draft to inspect controller state
         nominationDiag: () => autoBidController.getNominationDiagnostics(),
         forceNominate: () => autoBidController.forceNominate(),
+        populateQueue: () => autoBidController.populateQueue(),
         turnCheck: () => {
           // Return the last turn detection result from the nomination controller
           const diag = autoBidController.getNominationDiagnostics();
@@ -647,6 +648,7 @@ export default defineContentScript({
     let auctionPlayerCleanup: (() => void) | null = null;
     let auctionTableScrapeInterval: ReturnType<typeof setInterval> | null = null;
     let queueScrapeInterval: ReturnType<typeof setInterval> | null = null;
+    let queuePopulateInterval: ReturnType<typeof setInterval> | null = null;
 
     const runAuctionTableScrape = () => {
       try {
@@ -694,6 +696,21 @@ export default defineContentScript({
       console.log("[ESPN Draft Assistant] Started nomination queue scraper (3s interval)");
     };
 
+    const startQueuePopulating = () => {
+      if (queuePopulateInterval) return; // Already running
+      // 15s interval — matches QUEUE_POPULATE_COOLDOWN_MS in AutoBidController.
+      // The internal cooldown is the real rate limiter; this interval ensures
+      // periodic triggering even when engine signals are not changing.
+      queuePopulateInterval = setInterval(() => {
+        try {
+          autoBidController.populateQueue();
+        } catch (err) {
+          console.error("[ESPN Draft Assistant] Failed to populate queue:", err);
+        }
+      }, 15_000);
+      console.log("[ESPN Draft Assistant] Started queue population interval (15s)");
+    };
+
     const startPickTrainBudgetPolling = () => {
       if (pickTrainBudgetInterval) return; // Already running
       pickTrainBudgetInterval = setInterval(() => {
@@ -732,6 +749,7 @@ export default defineContentScript({
       });
       startAuctionTableScraping();
       startQueueScraping();
+      startQueuePopulating();
       startPickTrainBudgetPolling();
     }
 
@@ -814,6 +832,9 @@ export default defineContentScript({
 
       // Start queue scraping if not already running
       startQueueScraping();
+
+      // Start queue population if not already running
+      startQueuePopulating();
 
       // Start pick train budget polling if not already running
       startPickTrainBudgetPolling();
@@ -907,6 +928,9 @@ export default defineContentScript({
       }
       if (queueScrapeInterval) {
         clearInterval(queueScrapeInterval);
+      }
+      if (queuePopulateInterval) {
+        clearInterval(queuePopulateInterval);
       }
       if (pickTrainBudgetInterval) {
         clearInterval(pickTrainBudgetInterval);
