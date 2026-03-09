@@ -415,6 +415,7 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-85]: Cooldown lives inside populateQueue() not the interval — interval is trigger only, dedup handles rapid calls
 - [Phase quick-85]: Use 'Select' button text detection (not CSS class) for user's turn guard — more resilient to ESPN DOM changes
 - [Phase quick-86]: Used InputEvent with data/inputType fields instead of plain Event for React-controlled ESPN search input compatibility
+- [Phase quick-88]: TARGET_QUEUE_SIZE set to 3 (was 10) to keep a tight queue of top candidates
 
 ### Roadmap Evolution
 
