@@ -11,6 +11,7 @@ import {
   logRosterDiagnostics,
   observeCurrentAuctionPlayer,
   scrapeESPNAuctionTable,
+  scrapeESPNNominationQueue,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -645,6 +646,7 @@ export default defineContentScript({
     // Observe current auction player (auction only)
     let auctionPlayerCleanup: (() => void) | null = null;
     let auctionTableScrapeInterval: ReturnType<typeof setInterval> | null = null;
+    let queueScrapeInterval: ReturnType<typeof setInterval> | null = null;
 
     const runAuctionTableScrape = () => {
       try {
@@ -674,6 +676,22 @@ export default defineContentScript({
       // Re-scrape every 10 seconds to catch newly scrolled rows
       auctionTableScrapeInterval = setInterval(runAuctionTableScrape, 10_000);
       console.log("[ESPN Draft Assistant] Started ESPN auction table scraper (10s interval)");
+    };
+
+    const runQueueScrape = () => {
+      try {
+        const queue = scrapeESPNNominationQueue();
+        useDraftStore.getState().setEspnNominationQueue(queue);
+      } catch (err) {
+        console.error("[ESPN Draft Assistant] Failed to scrape nomination queue:", err);
+      }
+    };
+
+    const startQueueScraping = () => {
+      if (queueScrapeInterval) return; // Already running
+      runQueueScrape(); // Initial scrape
+      queueScrapeInterval = setInterval(runQueueScrape, 3_000);
+      console.log("[ESPN Draft Assistant] Started nomination queue scraper (3s interval)");
     };
 
     const startPickTrainBudgetPolling = () => {
@@ -713,6 +731,7 @@ export default defineContentScript({
         useDraftStore.getState().setCurrentAuctionPlayer(player);
       });
       startAuctionTableScraping();
+      startQueueScraping();
       startPickTrainBudgetPolling();
     }
 
@@ -792,6 +811,9 @@ export default defineContentScript({
 
       // Start table scraping if not already running
       startAuctionTableScraping();
+
+      // Start queue scraping if not already running
+      startQueueScraping();
 
       // Start pick train budget polling if not already running
       startPickTrainBudgetPolling();
@@ -882,6 +904,9 @@ export default defineContentScript({
       autoBidController.stop();
       if (auctionTableScrapeInterval) {
         clearInterval(auctionTableScrapeInterval);
+      }
+      if (queueScrapeInterval) {
+        clearInterval(queueScrapeInterval);
       }
       if (pickTrainBudgetInterval) {
         clearInterval(pickTrainBudgetInterval);

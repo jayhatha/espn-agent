@@ -1,5 +1,6 @@
 import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
+import { scrapeESPNNominationQueue } from "./dom-observers";
 
 /**
  * Live nomination controller state — exposed via getNominationDiagnostics()
@@ -13,7 +14,7 @@ export interface NominationDiagnostics {
   cooldownRemainingMs: number;
   lastAttemptResult: string | null;
   lastCandidateName: string | null;
-  lastCandidateSource: 'simulation' | 'idealRoster' | null;
+  lastCandidateSource: 'simulation' | 'idealRoster' | 'queue' | null;
   lastTurnDetectionResult: { matched: boolean; strategy: string | null; strategiesChecked: string[] };
   isActive: boolean; // autoMode && currentAuctionPlayer == null
 }
@@ -62,7 +63,7 @@ export class AutoBidController {
   // Diagnostic state (for getNominationDiagnostics() and NominationDiagnostics UI)
   private lastAttemptResult: string | null = null;
   private lastCandidateName: string | null = null;
-  private lastCandidateSource: 'simulation' | 'idealRoster' | null = null;
+  private lastCandidateSource: 'simulation' | 'idealRoster' | 'queue' | null = null;
   private lastTurnDetection: { matched: boolean; strategy: string | null; strategiesChecked: string[] } = {
     matched: false,
     strategy: null,
@@ -465,6 +466,49 @@ export class AutoBidController {
       this.lastAttemptResult = "not our turn";
       console.log("[AutoNominate] Not our turn to nominate — skipping");
       return;
+    }
+
+    // ── Queue-first candidate selection ──
+    // Do a fresh scrape at nomination time to avoid polling lag
+    const freshQueue = scrapeESPNNominationQueue();
+    const draftedPlayerIds = new Set(state.allPicks.map(p => p.playerId));
+    const validQueueEntries = freshQueue.filter(q => !draftedPlayerIds.has(q.playerId));
+
+    if (validQueueEntries.length > 0) {
+      const top = validQueueEntries[0];
+      const queuePlayerId = top.playerId;
+      const queueCandidateName = top.playerName || `Player #${queuePlayerId}`;
+      this.lastCandidateName = queueCandidateName;
+      this.lastCandidateSource = 'queue';
+
+      console.log(
+        `[AutoNominate] Candidate source=queue: ${queueCandidateName} (ID: ${queuePlayerId}, ` +
+        `queuePosition=${top.queuePosition}, queueSize=${validQueueEntries.length})`
+      );
+
+      // Queue entries have playerId directly from DOM — skip name-to-ID mapping
+      const playerButton = document.querySelector<HTMLButtonElement>(
+        `button[data-player-id="${queuePlayerId}"]`
+      );
+
+      if (playerButton && !playerButton.disabled) {
+        this.clickPlayerButton(playerButton, queueCandidateName, queuePlayerId, 'espn-queue');
+        return;
+      }
+
+      if (playerButton?.disabled) {
+        this.lastAttemptResult = `queue button disabled for ${queueCandidateName} (ID: ${queuePlayerId})`;
+        console.warn(
+          `[AutoNominate] Queue button disabled for ${queueCandidateName} (ID: ${queuePlayerId}) — skipping to engine candidates`
+        );
+        // Don't return — fall through to engine candidate selection
+      } else {
+        // Button not in DOM — player queued but not visible in table
+        console.log(
+          `[AutoNominate] Queue player ${queueCandidateName} (ID: ${queuePlayerId}) not visible — falling back to engine candidates`
+        );
+        // Don't return — fall through to engine candidate selection
+      }
     }
 
     // ── Select nomination candidate ──
