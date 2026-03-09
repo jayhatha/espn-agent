@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 35 — Use the Queue for Player Nominations
-Plan: 01 complete — Phase 35 Plan 01 COMPLETE
-Status: Phase 35 Plan 01 complete (1/2 plans) — ESPN nomination queue scraper and Zustand session-only store field for data layer
-Last activity: 2026-03-09 — Phase 35 Plan 01 complete (queue scraper data layer delivered)
+Plan: 02 complete — Phase 35 Plan 02 COMPLETE
+Status: Phase 35 COMPLETE (2/2 plans) — Queue scraper wired in content.tsx (3s interval), queue-first nomination in evaluateAndNominate(), NominationDiagnostics updated
+Last activity: 2026-03-09 — Phase 35 Plan 02 complete (queue-first nomination integration delivered)
 
-Progress: Phase 35 IN PROGRESS (1/2 plans) | Queue data layer ready; Plan 02 will wire into content.tsx and auto-bid-controller.ts
+Progress: Phase 35 COMPLETE (2/2 plans) | Queue nominations fully integrated — ESPN queue entries preferred over engine candidates with direct playerId
 
 ```
 [############                            ] 30% v2.0
@@ -165,6 +165,7 @@ Progress: Phase 35 IN PROGRESS (1/2 plans) | Queue data layer ready; Plan 02 wil
 | Phase 33 P01 | 4 | 2 tasks | 5 files |
 | Phase 34 P01 | 3min | 2 tasks | 2 files |
 | Phase 35 P01 | 5 | 2 tasks | 2 files |
+| Phase 35 P02 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -408,6 +409,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 34]: Only enforce category floors for COUNTING+HIGHER_BETTER stats, skip rate stats (ERA, WHIP, AVG, OPS)
 - [Phase 35]: Use Dequeue button text heuristic for ESPN queue detection rather than panel container (container class unverified)
 - [Phase 35]: espnNominationQueue is session-only — excluded from partialize to avoid persisting transient queue state across reloads
+- [Phase 35 P02]: Fresh scrapeESPNNominationQueue() call at nomination time (not store state) to avoid 3s polling lag
+- [Phase 35 P02]: Fall-through to engine candidates when queue player button is disabled or not visible — auto-pilot continues running
+- [Phase 35 P02]: JSX fragment in NominationDiagnostics enables per-source color styling for queue vs simulation/idealRoster
 
 ### Roadmap Evolution
 

@@ -602,7 +602,7 @@ Plans:
 
 **Goal:** Replace fragile on-the-fly player search with ESPN queue-first auto-nomination — scrape queued players from DOM, prefer queue entries over engine candidates, bypass name-to-ID mapping
 **Depends on:** Phase 34
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 35-01-PLAN.md — Add ESPN nomination queue scraper and Zustand store field
