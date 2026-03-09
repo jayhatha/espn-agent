@@ -9,16 +9,7 @@ import {
 import { useDraftStore } from "../lib/draft-state";
 import { calculateBudgetPacing } from "../lib/value-calculations";
 import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
-
-function normalizePlayerName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(jr|sr)\.?\b/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
+import { normalizeName as normalizePlayerName } from "../lib/engine/normalizer";
 
 function formatNumber(value: unknown, digits: number): string {
   const numericValue = typeof value === "number" ? value : Number(value);

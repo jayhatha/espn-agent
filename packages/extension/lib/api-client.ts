@@ -1,6 +1,7 @@
 import pitcherlistRankings from "../assets/pitcherlist-rankings.json";
 import fangraphsAuctionValues from "../assets/fangraphs-auction-values.json";
 import { isPracticeDraft } from "./draft-config-detector";
+import { normalizeName } from "./engine/normalizer";
 
 /**
  * Throttle helper - limits function execution to once per wait period
@@ -149,19 +150,6 @@ function normalizeText(value: string): string {
     .trim();
 }
 
-/**
- * Normalize player name for PitcherList matching (same logic as draft board page).
- * Uses NFD (not NFKD) and strips everything except letters and spaces.
- * Kept separate from normalizeText which is used for league name matching.
- */
-function normalizeName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z\s]/g, "")
-    .toLowerCase()
-    .trim();
-}
 
 interface ESPNDraftPlayer {
   playerId: number;

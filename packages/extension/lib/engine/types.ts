@@ -87,6 +87,8 @@ export interface DraftAlert {
 }
 
 export interface DraftEngineInput {
+  /** ESPN league ID — used for cache isolation across multiple draft sessions. */
+  leagueId?: number | null;
   rankings: DraftRanking[];
   auctionValues: AuctionValue[];
   allPicks: DraftPick[];

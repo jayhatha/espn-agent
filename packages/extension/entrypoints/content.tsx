@@ -26,6 +26,8 @@ import DraftSidebar from "../components/DraftSidebar";
 import contentStyles from "../styles/content.css?inline";
 import { calculateProjectedStandingsFromState } from "../lib/value-calculations";
 import { autoBidController } from "../lib/auto-bid-controller";
+import { normalizeName as normalizePlayerName } from "../lib/engine/normalizer";
+import { resetEngineCache } from "../lib/engine";
 
 const SIDEBAR_ROOT_ID = "espn-draft-assistant-root";
 const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
@@ -33,16 +35,6 @@ const SIDEBAR_DOCK_STORAGE_KEY = "assistantDockSide";
 // Cache league config for auto-refresh (detected once at page load)
 let cachedLeagueConfig: DraftConfiguration | null = null;
 let configDetectionWarnings: string[] = [];
-
-function normalizePlayerName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(jr|sr)\.?\b/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
 
 
 export default defineContentScript({
@@ -241,6 +233,10 @@ export default defineContentScript({
       myTeamId: teamId ?? "user",
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
+
+    // Reset engine caches on draft initialization to prevent stale recommendations
+    // from a previous session leaking into the current draft.
+    resetEngineCache();
 
     // Detect whether state was preserved from a same-draft reload.
     // initializeDraft preserves allPicks when it detects isSameDraft, so if

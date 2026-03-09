@@ -2,16 +2,7 @@ import React, { useMemo } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import AuctionPlayerCard from "./AuctionPlayerCard";
 import { calculateBudgetPacing } from "../lib/value-calculations";
-
-function normalizePlayerName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(jr|sr)\.?\b/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
+import { normalizeName as normalizePlayerName } from "../lib/engine/normalizer";
 
 export default function AuctionRecommendations() {
   const {

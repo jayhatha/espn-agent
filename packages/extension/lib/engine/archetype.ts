@@ -17,23 +17,10 @@ import type {
   FgAuctionPitcher,
 } from "../fangraphs-data";
 import type { BuildArchetypeSignal, CategoryCeiling, PivotPlayer, PoolPlayer } from "./types";
+import { normalizeName } from "./normalizer";
 
-// ============================================================
-// normalizeName — exact copy of api-client.ts normalizeName
-// ============================================================
-
-/**
- * Normalize player name for FanGraphs matching.
- * Uses NFD decomposition to strip diacritics, removes non-letter/space chars, lowercases, trims.
- */
-export function normalizeName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z\s]/g, "")
-    .toLowerCase()
-    .trim();
-}
+// Re-export so existing callers that import normalizeName from archetype continue to work
+export { normalizeName } from "./normalizer";
 
 // ============================================================
 // buildFgPlayerPool

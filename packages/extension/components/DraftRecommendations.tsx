@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import PlayerCard from "./PlayerCard";
+import { normalizeName as normalizePlayerName } from "../lib/engine/normalizer";
 
 const POSITION_TARGETS: Record<string, number> = {
   C: 1,
@@ -22,16 +23,6 @@ const TRACKED_CATEGORY_STATS = [
   "SV",
   "K",
 ] as const;
-
-function normalizePlayerName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\b(jr|sr)\.?\b/g, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
 
 function normalizePosition(pos: string): string | null {
   const upper = pos.toUpperCase();

@@ -3,7 +3,8 @@ import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
-import { buildFgPlayerPool, normalizeName } from "./archetype";
+import { buildFgPlayerPool } from "./archetype";
+import { normalizeName } from "./normalizer";
 import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
@@ -89,19 +90,19 @@ function findBestSlotForPositions(positions: string[], remaining: Map<string, nu
 // ============================================================
 
 let cachedSGPVectors: SGPVectors | null = null;
-let sgpCacheKey: number = -1;  // allPicks.length at last computation
+let sgpCacheKey: string = '';  // leagueId + '_' + allPicks.length at last computation
 
 let cachedBidWorkerResult: BidOptimizerWorkerResponse | null = null;
-let bidWorkerCacheKey: string = '';  // currentAuctionPlayerId + '_' + allPicks.length + '_' + split
+let bidWorkerCacheKey: string = '';  // leagueId + '_' + currentAuctionPlayerId + '_' + allPicks.length + '_' + split
 
 let cachedProjectedStandings: ProjectedStandingsSignal | null = null;
-let projectedStandingsCacheKey: number = -1;  // allPicks.length at last computation
+let projectedStandingsCacheKey: string = '';  // leagueId + '_' + allPicks.length at last computation
 
 let cachedSimulation: ForwardSimulationSignal | null = null;
-let simulationCacheKey: string = '';  // allPicks.length + '_' + currentAuctionPlayerId
+let simulationCacheKey: string = '';  // leagueId + '_' + allPicks.length + '_' + currentAuctionPlayerId
 
 let cachedIdealRoster: IdealRosterSignal | null = null;
-let idealRosterCacheKey: string = '';  // allPicks.length + '_' + splitValue
+let idealRosterCacheKey: string = '';  // leagueId + '_' + allPicks.length + '_' + splitValue
 
 // Module-level projection map caches for inline team stat aggregation
 let cachedHitterProjMap: Map<string, FgHitterProjection> | null = null;
@@ -978,8 +979,9 @@ export function computeDraftEngine(
     input.leagueCategories.length > 0
   ) {
     try {
-      // Cache: only recompute when pick count changes
-      if (projectedStandingsCacheKey !== input.allPicks.length || cachedProjectedStandings === null) {
+      // Cache: only recompute when pick count or league changes
+      const newProjectedStandingsCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}`;
+      if (newProjectedStandingsCacheKey !== projectedStandingsCacheKey || cachedProjectedStandings === null) {
         cachedProjectedStandings = computeProjectedStandings(
           teamDraftedTotals,
           input.teamRosters,
@@ -991,7 +993,7 @@ export function computeDraftEngine(
           input.totalTeams,
           teamDraftedComponents ?? new Map(),
         );
-        projectedStandingsCacheKey = input.allPicks.length;
+        projectedStandingsCacheKey = newProjectedStandingsCacheKey;
       }
       projectedStandings = cachedProjectedStandings;
     } catch (e) {
@@ -1021,15 +1023,16 @@ export function computeDraftEngine(
     );
   }
 
-  // SGP cache: rebuild only when pick count changes (new pick)
-  if (sgpCacheKey !== input.allPicks.length || cachedSGPVectors === null) {
+  // SGP cache: rebuild only when pick count or league changes
+  const newSgpCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}`;
+  if (newSgpCacheKey !== sgpCacheKey || cachedSGPVectors === null) {
     cachedSGPVectors = buildSGPVectors(
       allPlayersOpt,
       input.leagueCategories,
       activeSlotsOpt,
       input.totalTeams,
     );
-    sgpCacheKey = input.allPicks.length;
+    sgpCacheKey = newSgpCacheKey;
   }
   const sgpValuesOpt = cachedSGPVectors.playerSGPs;
 
@@ -1127,7 +1130,7 @@ export function computeDraftEngine(
   // 6a. Async bid optimizer dispatch (Quick Task 58 — moved to Web Worker)
   // Fire bid computation to worker when nominated player changes.
   // Results arrive asynchronously via onBidComplete callback.
-  const newBidWorkerCacheKey = `${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}_${splitValue}`;
+  const newBidWorkerCacheKey = `${input.leagueId ?? 'unknown'}_${input.currentAuctionPlayerId ?? 'none'}_${input.allPicks.length}_${splitValue}`;
 
   if (newBidWorkerCacheKey !== bidWorkerCacheKey) {
     // Find nominated player in the available pool (same two-strategy lookup as before)
@@ -1243,7 +1246,7 @@ export function computeDraftEngine(
 
   // 7. Forward-looking draft simulation (Phase 28 → Phase 53: moved to Web Worker)
   // Returns cached result synchronously; fires async worker to update on next render.
-  const newSimCacheKey = `${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}_${splitValue}`;
+  const newSimCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}_${input.currentAuctionPlayerId ?? 'none'}_${splitValue}`;
 
   if (newSimCacheKey !== simulationCacheKey || cachedSimulation === null) {
     if (
@@ -1398,7 +1401,7 @@ export function computeDraftEngine(
   // 6b. Ideal roster optimizer (Phase 29)
   // Cache invalidates on allPicks.length, split change, or categoryTargets change — recomputes when a new pick is made, split changes, or targets change.
   const targetsKey = input.categoryTargets ? JSON.stringify(input.categoryTargets) : "";
-  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}_${targetsKey}_${input.optimizeForTargets ? '1' : '0'}`;
+  const newIdealRosterCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}_${splitValue}_${targetsKey}_${input.optimizeForTargets ? '1' : '0'}`;
   let idealRoster: IdealRosterSignal | null = null;
   if (idealRosterCacheKey !== newIdealRosterCacheKey || cachedIdealRoster === null) {
     try {
@@ -1436,4 +1439,24 @@ export function computeDraftEngine(
     idealRoster,
     remainingSlots: remainingSlotsOpt,
   };
+}
+
+/**
+ * Reset all module-level engine caches.
+ * Call at draft initialization when starting a new draft session or when the leagueId changes.
+ * Ensures stale recommendations from a previous session do not persist.
+ */
+export function resetEngineCache(): void {
+  cachedSGPVectors = null;
+  sgpCacheKey = '';
+  cachedBidWorkerResult = null;
+  bidWorkerCacheKey = '';
+  cachedProjectedStandings = null;
+  projectedStandingsCacheKey = '';
+  cachedSimulation = null;
+  simulationCacheKey = '';
+  cachedIdealRoster = null;
+  idealRosterCacheKey = '';
+  cachedHitterProjMap = null;
+  cachedPitcherProjMap = null;
 }

@@ -12,7 +12,7 @@
 import type { DraftedPlayer, Category } from "@espn-fantasy/shared";
 import type { PoolPlayer } from "./types";
 import type { FgPitcherProjection, FgHitterProjection } from "../fangraphs-data";
-import { normalizeName } from "./archetype";
+import { normalizeName } from "./normalizer";
 
 // ============================================================
 // Stat key mapping: ESPN category stat_key -> FanGraphs projection field

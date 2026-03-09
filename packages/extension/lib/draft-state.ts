@@ -8,21 +8,8 @@ import type {
   Category,
 } from "@espn-fantasy/shared";
 
-/**
- * Normalize a player name for dedup comparison.
- * Lowercases, strips diacritics, removes common suffixes (Jr., Sr., II, III, IV),
- * and collapses whitespace.
- */
-export function normalizeName(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+(jr|sr|ii|iii|iv)\.?$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// Re-export canonical normalizer so existing imports from draft-state continue to work
+export { normalizeName } from "./engine/normalizer";
 
 export interface ProjectedOverallRow {
   team_id: number;

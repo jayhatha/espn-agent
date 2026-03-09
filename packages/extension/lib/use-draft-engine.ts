@@ -6,6 +6,7 @@ import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
+    leagueId,
     rankings,
     auctionValues,
     allPicks,
@@ -50,6 +51,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
 
     return computeDraftEngine(
       {
+        leagueId,
         rankings,
         auctionValues,
         allPicks,
@@ -73,6 +75,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       setAsyncBid,
     );
   }, [
+    leagueId,
     rankings,
     auctionValues,
     allPicks,
