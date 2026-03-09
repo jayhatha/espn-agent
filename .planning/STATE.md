@@ -541,8 +541,9 @@ None yet.
 | 82 | Rearrange extension sidebar — move hitter-pitcher split underneath auto-bid toggle, use toggle switch for AI narrator | 2026-03-08 | a6967eb | ✅ | [82-rearrange-extension-sidebar-move-hitter-](./quick/82-rearrange-extension-sidebar-move-hitter-/) |
 | 83 | Add winning category targets to ideal roster math with progress display | 2026-03-09 | baa034f | ✅ | [83-add-winning-category-targets-to-ideal-ro](./quick/83-add-winning-category-targets-to-ideal-ro/) |
 | 84 | Add toggle to recompute ideal roster to hit category targets | 2026-03-09 | 057653b | ✅ | [84-add-toggle-to-recompute-ideal-roster-to-](./quick/84-add-toggle-to-recompute-ideal-roster-to-/) |
+| 85 | Auto-populate ESPN nomination queue from engine signals | 2026-03-09 | ffb5bd3 | ✅ | [85-auto-populate-espn-nomination-queue-from](./quick/85-auto-populate-espn-nomination-queue-from/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 84: Add toggle to recompute ideal roster to hit category targets
+Last activity: 2026-03-09 - Completed quick task 85: Auto-populate ESPN nomination queue from engine signals
 Resume file: None
