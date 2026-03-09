@@ -17,6 +17,8 @@ export interface NominationDiagnostics {
   lastCandidateSource: 'simulation' | 'idealRoster' | 'queue' | null;
   lastTurnDetectionResult: { matched: boolean; strategy: string | null; strategiesChecked: string[] };
   isActive: boolean; // autoMode && currentAuctionPlayer == null
+  queuePopulationCount: number; // size of queuedPlayerIds set (players we queued this session)
+  lastQueuePopulateTime: number | null; // timestamp of last queue population run
 }
 
 /**
@@ -60,6 +62,10 @@ export class AutoBidController {
   private nominationAttempts: number = 0;
   private nominationDelayTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Queue population state
+  private lastQueuePopulateTime: number | null = null;
+  private queuedPlayerIds: Set<number> = new Set();
+
   // Diagnostic state (for getNominationDiagnostics() and NominationDiagnostics UI)
   private lastAttemptResult: string | null = null;
   private lastCandidateName: string | null = null;
@@ -74,6 +80,10 @@ export class AutoBidController {
   private static readonly NOMINATION_COOLDOWN_MS = 5000;
   /** Max nomination attempts before backing off until state changes */
   private static readonly MAX_NOMINATION_ATTEMPTS = 3;
+  /** Maximum number of players to keep in ESPN's nomination queue at once */
+  private static readonly MAX_QUEUE_SIZE = 10;
+  /** Minimum time between queue population runs (ms) — prevents rapid re-clicking */
+  private static readonly QUEUE_POPULATE_COOLDOWN_MS = 15000;
 
   start(): void {
     if (this.unsubscribe) {
@@ -153,6 +163,8 @@ export class AutoBidController {
     this.prevPlayerName = undefined;
     this.prevCurrentAuctionPlayer = undefined;
     this.clearNominationState();
+    this.lastQueuePopulateTime = null;
+    this.queuedPlayerIds.clear();
     console.log("[AutoBidController] Stopped");
   }
 
@@ -171,8 +183,9 @@ export class AutoBidController {
     const state = useDraftStore.getState();
 
     if (state.autoMode && state.currentAuctionPlayer == null) {
-      // No active auction — try to nominate
+      // No active auction — try to nominate, then populate queue for upcoming rounds
       this.evaluateAndNominate();
+      this.populateQueue();
     } else {
       // Evaluate after updating signals in case we can now bid
       this.evaluateAndBid();
@@ -210,6 +223,8 @@ export class AutoBidController {
     this.lastCandidateName = null;
     this.lastCandidateSource = null;
     this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked: [] };
+    this.lastQueuePopulateTime = null;
+    this.queuedPlayerIds.clear();
   }
 
   /**
@@ -235,6 +250,8 @@ export class AutoBidController {
       lastCandidateSource: this.lastCandidateSource,
       lastTurnDetectionResult: this.lastTurnDetection,
       isActive: state.autoMode && state.currentAuctionPlayer == null,
+      queuePopulationCount: this.queuedPlayerIds.size,
+      lastQueuePopulateTime: this.lastQueuePopulateTime,
     };
   }
 
@@ -392,6 +409,166 @@ export class AutoBidController {
     // No strategy matched
     this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked };
     return false;
+  }
+
+  /**
+   * Auto-populate ESPN's nomination queue with the top engine candidates.
+   *
+   * Called periodically (every 15s via content.tsx interval) AND on every
+   * updateSignals() call when no auction is active. The internal cooldown
+   * (QUEUE_POPULATE_COOLDOWN_MS) prevents actual DOM clicks more often than
+   * every 15 seconds regardless of how often this method is called.
+   *
+   * Logic:
+   * 1. Guard: autoMode must be ON
+   * 2. Guard: cooldown must have elapsed since last run
+   * 3. Guard: must NOT be user's turn — "Select" buttons in DOM = user's turn, skip
+   * 4. Scrape current queue state to know already-queued playerIds
+   * 5. Build candidate list from engine signals (nomination strategy > ideal roster)
+   * 6. Filter out already-drafted and already-queued players
+   * 7. Map names to ESPN player IDs via rankings
+   * 8. Click "Queue" buttons for up to (MAX_QUEUE_SIZE - currentQueueSize) players
+   */
+  populateQueue(): void {
+    const state = useDraftStore.getState();
+
+    // Guard: autoMode must be on
+    if (!state.autoMode) return;
+
+    // Guard: cooldown between populate runs
+    const now = Date.now();
+    if (this.lastQueuePopulateTime != null) {
+      const elapsed = now - this.lastQueuePopulateTime;
+      if (elapsed < AutoBidController.QUEUE_POPULATE_COOLDOWN_MS) {
+        return;
+      }
+    }
+
+    // Guard: must NOT be user's turn — check for "Select" buttons in DOM
+    // When ESPN shows "Select" buttons, it IS the user's turn and evaluateAndNominate()
+    // handles the actual nomination. Don't queue-populate during this window.
+    const selectButtons = document.querySelectorAll<HTMLButtonElement>(
+      'button[data-player-id]'
+    );
+    let hasSelectButton = false;
+    for (const btn of selectButtons) {
+      const text = btn.textContent?.trim().toLowerCase() || '';
+      if (text === 'select') {
+        hasSelectButton = true;
+        break;
+      }
+    }
+    if (hasSelectButton) {
+      console.log('[AutoQueue] User\'s turn detected (Select buttons present) — skipping queue population');
+      return;
+    }
+
+    // Update cooldown timestamp now (before any async work)
+    this.lastQueuePopulateTime = now;
+
+    // Scrape current queue state to know which players are already queued
+    const currentQueue = scrapeESPNNominationQueue();
+    const alreadyQueuedIds = new Set(currentQueue.map(q => q.playerId));
+    const currentQueueSize = currentQueue.length;
+
+    const slotsToFill = AutoBidController.MAX_QUEUE_SIZE - currentQueueSize;
+    if (slotsToFill <= 0) {
+      console.log(`[AutoQueue] Queue already at max size (${currentQueueSize}/${AutoBidController.MAX_QUEUE_SIZE}) — skipping`);
+      return;
+    }
+
+    // Build candidate list from engine signals
+    // Primary: nomination strategy trap scores (already sorted by trapScore desc)
+    // Fallback: ideal roster non-drafted players
+    const draftedPlayerIds = new Set(state.allPicks.map(p => p.playerId));
+
+    type Candidate = { name: string; source: 'simulation' | 'idealRoster' };
+    const candidates: Candidate[] = [];
+
+    const nominationStrategy = this.lastEngineSignals?.simulation?.nominationStrategy;
+    if (nominationStrategy && nominationStrategy.length > 0) {
+      for (const rec of nominationStrategy) {
+        candidates.push({ name: rec.playerName, source: 'simulation' });
+      }
+    }
+
+    // Supplement with ideal roster undrafted players as fallback
+    const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
+    for (const p of idealPlayers) {
+      if (!p.isDrafted) {
+        candidates.push({ name: p.name, source: 'idealRoster' });
+      }
+    }
+
+    if (candidates.length === 0) {
+      console.log('[AutoQueue] No engine candidates available — skipping queue population');
+      return;
+    }
+
+    // Process candidates: filter, map to playerIds, click Queue buttons
+    let queued = 0;
+
+    for (const candidate of candidates) {
+      if (queued >= slotsToFill) break;
+
+      const normalizedCandidate = normalizeName(candidate.name);
+      const matchedRanking = state.rankings?.find(
+        (r) => normalizeName(r.playerName) === normalizedCandidate
+      );
+
+      if (!matchedRanking) {
+        console.debug(`[AutoQueue] No ranking match for "${candidate.name}" — skipping`);
+        continue;
+      }
+
+      const playerId = matchedRanking.playerId;
+
+      // Skip already-drafted players
+      if (draftedPlayerIds.has(playerId)) {
+        console.debug(`[AutoQueue] ${candidate.name} already drafted — skipping`);
+        continue;
+      }
+
+      // Skip already-queued players (from DOM scrape OR our session tracking)
+      if (alreadyQueuedIds.has(playerId) || this.queuedPlayerIds.has(playerId)) {
+        console.debug(`[AutoQueue] ${candidate.name} (ID: ${playerId}) already queued — skipping`);
+        continue;
+      }
+
+      // Find the Queue button for this player
+      const button = document.querySelector<HTMLButtonElement>(
+        `button[data-player-id="${playerId}"]`
+      );
+
+      if (!button) {
+        console.debug(`[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — not visible in table`);
+        continue;
+      }
+
+      if (button.disabled) {
+        console.debug(`[AutoQueue] Button disabled for ${candidate.name} (ID: ${playerId}) — skipping`);
+        continue;
+      }
+
+      const buttonText = button.textContent?.trim().toLowerCase() || '';
+      if (!buttonText.includes('queue')) {
+        // Button text is not "Queue" — it might be "Dequeue" (already queued) or something else
+        console.debug(`[AutoQueue] Button text "${buttonText}" for ${candidate.name} — not a Queue button, skipping`);
+        continue;
+      }
+
+      // Click the Queue button
+      button.click();
+      this.queuedPlayerIds.add(playerId);
+      queued++;
+      console.log(`[AutoQueue] Queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`);
+    }
+
+    if (queued > 0) {
+      console.log(`[AutoQueue] Queue population complete: added ${queued} player(s), total queued this session=${this.queuedPlayerIds.size}`);
+    } else {
+      console.log('[AutoQueue] Queue population run: no new players to queue');
+    }
   }
 
   /**
