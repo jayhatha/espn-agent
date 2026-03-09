@@ -852,35 +852,76 @@ export class AutoBidController {
 
     console.log(`[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`);
 
-    // Helper to locate the player's Select/Queue button by player ID attribute
-    const findButton = (pid: number) =>
-      document.querySelector<HTMLButtonElement>(`button[data-player-id="${pid}"]`);
+    // Poll for the search dropdown (.player--search--matches) to appear, then click the
+    // correct match button. Use recursive setTimeout (not setInterval) for clean termination.
+    const maxElapsed = 2000;
+    const pollInterval = 200;
+    const normalizedCandidate = normalizeName(candidateName);
 
-    // Wait 1200ms for ESPN's React rendering + network filter, then look for the button
-    setTimeout(() => {
-      let queueButton = findButton(playerId);
+    const pollForDropdown = (elapsed: number): void => {
+      const matchesContainer = document.querySelector('.player--search--matches');
+      const matchButtons = matchesContainer
+        ? Array.from(matchesContainer.querySelectorAll<HTMLButtonElement>('button.player--search--match'))
+        : [];
 
-      if (queueButton && !queueButton.disabled) {
-        this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason);
-        setTimeout(() => this.clearPlayerSearch(), 1000);
-        return;
-      }
-
-      // Retry once after 500ms to handle slow ESPN table re-renders
-      setTimeout(() => {
-        queueButton = findButton(playerId);
-        if (queueButton && !queueButton.disabled) {
-          this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason);
-        } else {
-          console.warn(
-            `[AutoNominate] Player button still not found after search for ${candidateName} (ID: ${playerId})`
+      if (matchButtons.length > 0) {
+        // Prefer match by ESPN player ID attribute
+        let matchButton: HTMLButtonElement | null = null;
+        if (playerId) {
+          matchButton = matchesContainer!.querySelector<HTMLButtonElement>(
+            `button.player--search--match[data-player-search-playerid="${playerId}"]`
           );
+        }
+
+        // Fallback: match by player name attribute (case-insensitive, normalized)
+        if (!matchButton) {
+          for (const btn of matchButtons) {
+            const btnName = btn.getAttribute('data-player-search-playername') ?? '';
+            if (normalizeName(btnName) === normalizedCandidate) {
+              matchButton = btn;
+              break;
+            }
+          }
+        }
+
+        if (matchButton) {
+          console.log(
+            `[AutoNominate] Clicking search match for ${candidateName} (ID: ${playerId})`
+          );
+          matchButton.click();
           this.nominationAttempts++;
           this.lastNominationTime = Date.now();
+          this.lastAttemptResult = `Clicked search dropdown match for ${candidateName}`;
+
+          // After ESPN processes the dropdown selection, click the Nominate/Select confirm button
+          setTimeout(() => {
+            this.clickNominateButton(candidateName);
+          }, 500);
+
+          // Clear the search input after the nomination flow completes
+          setTimeout(() => {
+            this.clearPlayerSearch();
+          }, 1500);
+          return;
         }
-        setTimeout(() => this.clearPlayerSearch(), 1000);
-      }, 500);
-    }, 1200);
+      }
+
+      // Keep polling if we haven't hit the timeout yet
+      if (elapsed + pollInterval < maxElapsed) {
+        setTimeout(() => pollForDropdown(elapsed + pollInterval), pollInterval);
+      } else {
+        console.warn(
+          `[AutoNominate] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`
+        );
+        this.nominationAttempts++;
+        this.lastNominationTime = Date.now();
+        this.lastAttemptResult = `No dropdown match found for ${candidateName}`;
+        this.clearPlayerSearch();
+      }
+    };
+
+    // Start polling after a short delay to give ESPN time to open the dropdown
+    setTimeout(() => pollForDropdown(0), 300);
   }
 
   /**
