@@ -91,6 +91,9 @@ interface DraftState {
   // Auto-bid mode (session-only, NOT persisted — resets to OFF on page reload for safety)
   autoMode: boolean;
 
+  // ESPN nomination queue (session-only, not persisted — changes every draft)
+  espnNominationQueue: Array<{ playerId: number; playerName: string; position: string; queuePosition: number }>;
+
   // ESPN DOM-scraped auction values (playerId -> dollar value)
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
@@ -156,6 +159,7 @@ interface DraftState {
   setDetectedRosterSlots: (slots: Record<string, number>) => void;
   setPitcherHitterSplit: (split: number) => void;
   setAutoMode: (enabled: boolean) => void;
+  setEspnNominationQueue: (queue: DraftState['espnNominationQueue']) => void;
   setCategoryTargets: (targets: Record<string, number>) => void;
   setOptimizeForTargets: (enabled: boolean) => void;
   reset: () => void;
@@ -182,6 +186,7 @@ export const useDraftStore = create<DraftState>()(
       currentAuctionPlayer: null,
       pitcherHitterSplit: 65,
       autoMode: false,
+      espnNominationQueue: [],
       espnDomAuctionValues: {},
       allTeamBudgets: [],
       leagueCategories: [],
@@ -225,6 +230,7 @@ export const useDraftStore = create<DraftState>()(
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           currentAuctionPlayer: null,
+          espnNominationQueue: [],
           projectedStandings: null,
           userRankingOverrides: {},
         });
@@ -368,6 +374,8 @@ export const useDraftStore = create<DraftState>()(
 
       setAutoMode: (enabled) => set({ autoMode: enabled }),
 
+      setEspnNominationQueue: (queue) => set({ espnNominationQueue: queue }),
+
       setCategoryTargets: (targets) => set({ categoryTargets: targets }),
 
       setOptimizeForTargets: (enabled) => set({ optimizeForTargets: enabled }),
@@ -383,6 +391,7 @@ export const useDraftStore = create<DraftState>()(
           projectedStandings: null,
           teamRosters: new Map(),
           currentAuctionPlayer: null,
+          espnNominationQueue: [],
           espnDomAuctionValues: {},
           allTeamBudgets: [],
           leagueCategories: [],
