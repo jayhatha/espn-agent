@@ -109,6 +109,7 @@ export interface DraftEngineInput {
    * At 50/50 both get 1.0x; at 65/35 hitters get 1.3x and pitchers get 0.7x.
    */
   pitcherHitterSplit?: number;
+  categoryTargets?: Record<string, number>;
 }
 
 export interface CategoryCeiling {
@@ -249,6 +250,16 @@ export interface IdealRosterSignal {
   coreCount: number;                // Count of players with dollars >= 5 and <= 20
   valueCount: number;               // Count of players with dollars < 5
   computeTimeMs: number;
+  categoryProgress?: CategoryProgress[];
+}
+
+export interface CategoryProgress {
+  statKey: string;           // e.g. "HR", "OPS", "ERA"
+  label: string;             // Display name from Category
+  target: number;            // Winning value from targets
+  projected: number;         // Sum/rate from ideal roster players
+  percent: number;           // projected/target * 100 (capped at 150 for display)
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
 }
 
 export interface MonteCarloResult {

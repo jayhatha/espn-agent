@@ -44,6 +44,11 @@ export interface ProjectedStandingsSnapshot {
   currentOverallStandings: CurrentOverallRow[];
 }
 
+export const DEFAULT_CATEGORY_TARGETS: Record<string, number> = {
+  R: 1188, HR: 348, RBI: 1132, SB: 247, OPS: 0.789,
+  K: 1619, SO: 1619, W: 107, SV: 132, ERA: 3.36, WHIP: 1.11,
+};
+
 interface DraftState {
   // Draft metadata
   leagueId: number | null;
@@ -102,6 +107,10 @@ interface DraftState {
   // null until first successful detection.
   detectedRosterSlots: Record<string, number> | null;
 
+  // Winning category targets for ideal roster progress bars.
+  // Defaults to historical winning values; user can customize.
+  categoryTargets: Record<string, number>;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -143,6 +152,7 @@ interface DraftState {
   setDetectedRosterSlots: (slots: Record<string, number>) => void;
   setPitcherHitterSplit: (split: number) => void;
   setAutoMode: (enabled: boolean) => void;
+  setCategoryTargets: (targets: Record<string, number>) => void;
   reset: () => void;
 }
 
@@ -171,6 +181,7 @@ export const useDraftStore = create<DraftState>()(
       allTeamBudgets: [],
       leagueCategories: [],
       detectedRosterSlots: null,
+      categoryTargets: DEFAULT_CATEGORY_TARGETS,
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -351,6 +362,8 @@ export const useDraftStore = create<DraftState>()(
 
       setAutoMode: (enabled) => set({ autoMode: enabled }),
 
+      setCategoryTargets: (targets) => set({ categoryTargets: targets }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -373,7 +386,7 @@ export const useDraftStore = create<DraftState>()(
     }),
     {
       name: "espn-draft-assistant-state",
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         const state = (persistedState as Partial<DraftState>) ?? {};
 
@@ -405,10 +418,20 @@ export const useDraftStore = create<DraftState>()(
             projectedStandings: null,
             teamRosters,
             leagueCategories: [],
+            categoryTargets: DEFAULT_CATEGORY_TARGETS,
           };
         }
 
-        // v3+: pass state through — merge() handles Map deserialization
+        if (version < 4) {
+          // v3 -> v4: categoryTargets added to partialize.
+          return {
+            ...state,
+            teamRosters,
+            categoryTargets: DEFAULT_CATEGORY_TARGETS,
+          };
+        }
+
+        // v4+: pass state through — merge() handles Map deserialization
         return {
           ...state,
           teamRosters,
@@ -436,6 +459,8 @@ export const useDraftStore = create<DraftState>()(
         allTeamBudgets: state.allTeamBudgets,
         // Roster slot layout detected from players-table (persisted since it doesn't change mid-draft)
         detectedRosterSlots: state.detectedRosterSlots,
+        // Winning category targets for ideal roster progress bars
+        categoryTargets: state.categoryTargets,
         // Session-stable config — set once at draft start, survives reload
         leagueCategories: state.leagueCategories,
         myTeamId: state.myTeamId,

@@ -1,4 +1,4 @@
-import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, InflationSignal, IdealRosterSignal, IdealRosterPlayer } from "./types";
+import type { DraftEngineInput, DraftEngineSignals, SGPVectors, RosterOptimizationSignal, InflationSignal, IdealRosterSignal, IdealRosterPlayer, CategoryProgress } from "./types";
 import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
@@ -573,6 +573,66 @@ function computeIdealRoster(
   const coreCount = optimizerPlayers.filter(p => p.tier === "core").length;
   const valueCount = optimizerPlayers.filter(p => p.tier === "value").length;
 
+  // Compute category progress against winning targets
+  let categoryProgress: CategoryProgress[] | undefined;
+  if (input.categoryTargets && Object.keys(input.categoryTargets).length > 0 && input.leagueCategories.length > 0 && cachedHitterProjMap && cachedPitcherProjMap) {
+    // Accumulate components across ALL players in the ideal roster (drafted + optimizer picks)
+    const components: Record<string, number> = {};
+    for (const player of players) {
+      const nName = normalizeName(player.name);
+      const pitcher = cachedPitcherProjMap.get(nName);
+      const hitter = cachedHitterProjMap.get(nName);
+      if (pitcher) {
+        for (const [k, v] of Object.entries({ W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO, IP: pitcher.IP, HA: pitcher.HA, ER: pitcher.ER, BBA: pitcher.BBA, QS: pitcher.QS, HRA: pitcher.HRA })) {
+          components[k] = (components[k] ?? 0) + v;
+        }
+      } else if (hitter) {
+        for (const [k, v] of Object.entries({ HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB, AB: hitter.AB, H: hitter.H, BB: hitter.BB, HBP: hitter.HBP, SF: hitter.SF, TB: hitter.TB, PA: hitter.PA })) {
+          components[k] = (components[k] ?? 0) + v;
+        }
+      }
+    }
+
+    categoryProgress = [];
+    for (const cat of input.leagueCategories) {
+      const target = input.categoryTargets[cat.stat_key];
+      if (target == null) continue;
+
+      let projected: number;
+      if (cat.type === "COUNTING") {
+        projected = components[cat.stat_key] ?? 0;
+      } else if (cat.type === "RATE" && cat.formula_id) {
+        try {
+          projected = calculateFinalRate(cat.formula_id, {}, components);
+          if (!isFinite(projected)) projected = 0;
+        } catch {
+          projected = 0;
+        }
+      } else {
+        continue;
+      }
+
+      let percent: number;
+      if (cat.direction === "LOWER_BETTER") {
+        // For LOWER_BETTER (ERA, WHIP), lower projected is better
+        // percent > 100 means projected is below (better than) target
+        percent = target > 0 && projected > 0 ? (target / projected) * 100 : 0;
+      } else {
+        percent = target > 0 ? (projected / target) * 100 : 0;
+      }
+      percent = Math.min(percent, 150);
+
+      categoryProgress.push({
+        statKey: cat.stat_key,
+        label: cat.name ?? cat.stat_key,
+        target,
+        projected,
+        percent,
+        direction: cat.direction,
+      });
+    }
+  }
+
   return {
     players,
     totalSGPValue: result.totalSGPValue,
@@ -582,6 +642,7 @@ function computeIdealRoster(
     coreCount,
     valueCount,
     computeTimeMs: Math.round((performance.now() - t0) * 10) / 10,
+    categoryProgress,
   };
 }
 
@@ -1172,8 +1233,9 @@ export function computeDraftEngine(
   }
 
   // 6b. Ideal roster optimizer (Phase 29)
-  // Cache invalidates on allPicks.length or split change — recomputes when a new pick is made or split changes.
-  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}`;
+  // Cache invalidates on allPicks.length, split change, or categoryTargets change — recomputes when a new pick is made, split changes, or targets change.
+  const targetsKey = input.categoryTargets ? JSON.stringify(input.categoryTargets) : "";
+  const newIdealRosterCacheKey = `${input.allPicks.length}_${splitValue}_${targetsKey}`;
   let idealRoster: IdealRosterSignal | null = null;
   if (idealRosterCacheKey !== newIdealRosterCacheKey || cachedIdealRoster === null) {
     try {
