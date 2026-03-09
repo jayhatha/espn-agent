@@ -887,27 +887,65 @@ export class AutoBidController {
             console.log(`[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId})`);
             matchButton.click();
 
-            // Wait for ESPN to process the dropdown selection, then look for the Queue button
-            setTimeout(() => {
-              const queueButton = document.querySelector<HTMLButtonElement>(
+            // Poll for the Queue button after ESPN re-renders the table following dropdown selection.
+            // ESPN may take variable time to process the selection, so a single fixed delay is unreliable.
+            const pollForQueueButton = (elapsed: number): void => {
+              console.log(`[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms) — trying selectors for ${candidateName} (ID: ${playerId})`);
+
+              // Strategy 1: direct data-player-id match by ID attribute
+              const directButton = document.querySelector<HTMLButtonElement>(
                 `button[data-player-id="${playerId}"]`
               );
-              const queueButtonText = queueButton?.textContent?.trim().toLowerCase() ?? '';
+              if (directButton && !directButton.disabled) {
+                const text = directButton.textContent?.trim().toLowerCase() ?? '';
+                if (text.includes('queue') || text.includes('select')) {
+                  directButton.click();
+                  console.log(`[AutoQueue] Clicked "${directButton.textContent?.trim()}" button for ${candidateName} after search (${elapsed}ms)`);
+                  setTimeout(() => {
+                    this.clearPlayerSearch();
+                    setTimeout(() => resolve(true), 500);
+                  }, 500);
+                  return;
+                }
+              }
 
-              if (queueButton && queueButtonText.includes('queue')) {
-                queueButton.click();
-                console.log(`[AutoQueue] Clicked Queue button for ${candidateName} after search`);
-                // Clear search and resolve true after ESPN settles
-                setTimeout(() => {
-                  this.clearPlayerSearch();
-                  setTimeout(() => resolve(true), 500);
-                }, 500);
+              // Strategy 2: scan all button[data-player-id] buttons for one matching the player ID
+              // (ESPN may re-render with different structure)
+              const allPlayerButtons = document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+              for (const btn of allPlayerButtons) {
+                if (btn.disabled) continue;
+                const btnPlayerId = btn.getAttribute('data-player-id');
+                if (btnPlayerId === String(playerId)) {
+                  const text = btn.textContent?.trim().toLowerCase() ?? '';
+                  if (text.includes('queue') || text.includes('select')) {
+                    btn.click();
+                    console.log(`[AutoQueue] Clicked "${btn.textContent?.trim()}" (scan) for ${candidateName} after search (${elapsed}ms)`);
+                    setTimeout(() => {
+                      this.clearPlayerSearch();
+                      setTimeout(() => resolve(true), 500);
+                    }, 500);
+                    return;
+                  }
+                }
+              }
+
+              // Continue polling if timeout not reached
+              if (elapsed + 300 < 3000) {
+                setTimeout(() => pollForQueueButton(elapsed + 300), 300);
               } else {
-                console.warn(`[AutoQueue] Queue button not found for ${candidateName} after dropdown click (found: "${queueButtonText}")`);
+                // Timeout — log diagnostics to help debug future failures
+                const foundButtons = document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+                const buttonSummary = Array.from(foundButtons).slice(0, 5).map(b =>
+                  `${b.getAttribute('data-player-id')}:"${b.textContent?.trim()}"`
+                ).join(', ');
+                console.warn(`[AutoQueue] Queue button not found for ${candidateName} (ID: ${playerId}) after 3000ms polling. Visible buttons: [${buttonSummary}]`);
                 this.clearPlayerSearch();
                 resolve(false);
               }
-            }, 500);
+            };
+
+            // Start polling after initial delay to give ESPN time to process the dropdown click
+            setTimeout(() => pollForQueueButton(0), 500);
             return;
           }
         }
