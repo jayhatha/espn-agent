@@ -400,6 +400,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 33]: Export normalizeName from draft-state.ts rather than duplicating the function in auto-bid-controller.ts
 - [Phase 33]: Poll getNominationDiagnostics() every 500ms in NominationDiagnostics UI since controller is not Zustand-reactive
 - [Phase 33]: Collapsible nomination diagnostics panel starts collapsed to avoid UI clutter; one-line status always visible
+- [Phase quick-83]: Used component-based math for rate stats in category progress (OPS, ERA, WHIP) consistent with existing engine patterns
 
 ### Roadmap Evolution
 
@@ -427,6 +428,8 @@ Recent decisions affecting v1.1 work:
 - Phase 31 added: Serve a mobile-friendly page that connects to the extension via websocket so I can view and control the draft from my phone on my local network
 - Phase 32 added: Ideal roster always needs to fill all spots.
 - Phase 33 added: debug autopilot nomination flow
+- Phase 34 added: Make sure we're not entirely punting categories. A test draft had no saves.
+- Phase 35 added: Use the queue for player nominations instead of finding players on the fly
 
 ### Pending Todos
 
