@@ -80,7 +80,12 @@ export default function NominationDiagnostics() {
             <span className="text-body-xs text-content-secondary w-24 shrink-0">Candidate</span>
             <span className="text-body-xs text-content text-right">
               {diag.lastCandidateName
-                ? `${diag.lastCandidateName} (${diag.lastCandidateSource ?? "unknown"})`
+                ? <>
+                    {diag.lastCandidateName}{" "}
+                    <span className={diag.lastCandidateSource === 'queue' ? 'text-positive font-semibold' : ''}>
+                      ({diag.lastCandidateSource ?? "unknown"})
+                    </span>
+                  </>
                 : "None"}
             </span>
           </div>
