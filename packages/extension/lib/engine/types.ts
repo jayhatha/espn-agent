@@ -110,6 +110,7 @@ export interface DraftEngineInput {
    */
   pitcherHitterSplit?: number;
   categoryTargets?: Record<string, number>;
+  optimizeForTargets?: boolean;
 }
 
 export interface CategoryCeiling {

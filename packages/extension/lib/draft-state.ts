@@ -111,6 +111,10 @@ interface DraftState {
   // Defaults to historical winning values; user can customize.
   categoryTargets: Record<string, number>;
 
+  // When true, ideal roster optimizer biases toward players filling category deficits.
+  // When false, optimizer uses pure SGP efficiency (default).
+  optimizeForTargets: boolean;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -153,6 +157,7 @@ interface DraftState {
   setPitcherHitterSplit: (split: number) => void;
   setAutoMode: (enabled: boolean) => void;
   setCategoryTargets: (targets: Record<string, number>) => void;
+  setOptimizeForTargets: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -182,6 +187,7 @@ export const useDraftStore = create<DraftState>()(
       leagueCategories: [],
       detectedRosterSlots: null,
       categoryTargets: DEFAULT_CATEGORY_TARGETS,
+      optimizeForTargets: false,
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -364,6 +370,8 @@ export const useDraftStore = create<DraftState>()(
 
       setCategoryTargets: (targets) => set({ categoryTargets: targets }),
 
+      setOptimizeForTargets: (enabled) => set({ optimizeForTargets: enabled }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -386,7 +394,7 @@ export const useDraftStore = create<DraftState>()(
     }),
     {
       name: "espn-draft-assistant-state",
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         const state = (persistedState as Partial<DraftState>) ?? {};
 
@@ -428,10 +436,20 @@ export const useDraftStore = create<DraftState>()(
             ...state,
             teamRosters,
             categoryTargets: DEFAULT_CATEGORY_TARGETS,
+            optimizeForTargets: false,
           };
         }
 
-        // v4+: pass state through — merge() handles Map deserialization
+        if (version < 5) {
+          // v4 -> v5: optimizeForTargets added to partialize.
+          return {
+            ...state,
+            teamRosters,
+            optimizeForTargets: false,
+          };
+        }
+
+        // v5+: pass state through — merge() handles Map deserialization
         return {
           ...state,
           teamRosters,
@@ -461,6 +479,8 @@ export const useDraftStore = create<DraftState>()(
         detectedRosterSlots: state.detectedRosterSlots,
         // Winning category targets for ideal roster progress bars
         categoryTargets: state.categoryTargets,
+        // Ideal roster optimization mode (targets vs pure SGP)
+        optimizeForTargets: state.optimizeForTargets,
         // Session-stable config — set once at draft start, survives reload
         leagueCategories: state.leagueCategories,
         myTeamId: state.myTeamId,

@@ -23,6 +23,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     detectedRosterSlots,
     pitcherHitterSplit,
     categoryTargets,
+    optimizeForTargets,
   } = useDraftStore();
 
   // Extract playerId and playerName separately — only changes on new nominations (not bid updates)
@@ -66,6 +67,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         espnDomAuctionValues,
         pitcherHitterSplit,
         categoryTargets,
+        optimizeForTargets,
       },
       setAsyncSimulation,
       setAsyncBid,
@@ -89,6 +91,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     detectedRosterSlots, // Recompute when roster slots are detected for the first time
     pitcherHitterSplit, // Recompute when pitcher/hitter split preference changes
     categoryTargets, // Recompute when category targets change
+    optimizeForTargets, // Recompute when optimize-for-targets toggle changes
   ]);
 
   // Merge async simulation and bid results into signals — async results take priority when available
