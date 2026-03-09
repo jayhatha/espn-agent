@@ -593,7 +593,16 @@ Plans:
 **Goal:** Prevent the draft engine from completely punting active scoring categories by adding a category floor enforcement pre-pass to the ideal roster optimizer, guaranteeing at least one contributor per zero-coverage counting category (e.g., SV, HLD) via lockedPlayers injection
 **Depends on:** Phase 33
 **Requirements:** CATEGORY-FLOOR-01
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 34-01-PLAN.md — Create category-floor.ts utilities (zero-coverage detection, floor pick selection) and wire into computeIdealRoster as lockedPlayers pre-pass
+
+### Phase 35: Use the queue for player nominations instead of finding players on the fly
+
+**Goal:** [To be planned]
+**Depends on:** Phase 34
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 35 to break down)

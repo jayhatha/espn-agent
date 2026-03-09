@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 33 — Debug Autopilot Nomination Flow
-Plan: 01 complete — Phase 33 Plan 01 COMPLETE
-Status: Phase 33 Plan 01 complete (1/1 plans) — Structured nomination logging, normalizeName fix, NominationDiagnostics panel, window.espnDraftAssistant diagnostic exports
-Last activity: 2026-03-08 — Phase 33 Plan 01 complete (autopilot nomination diagnostics delivered)
+Phase: 34 — Category Floor Enforcement
+Plan: 01 complete — Phase 34 Plan 01 COMPLETE
+Status: Phase 34 Plan 01 complete (1/1 plans) — Pre-pass floor enforcement in ideal roster optimizer prevents full-punt draft scenarios for SV, HLD, and other counting categories
+Last activity: 2026-03-08 — Phase 34 Plan 01 complete (category floor enforcement delivered)
 
-Progress: Phase 33 COMPLETE (1/1 plans) | Nomination flow fully observable in console and sidebar
+Progress: Phase 34 COMPLETE (1/1 plans) | Zero-coverage counting categories get force-locked floor picks
 
 ```
 [############                            ] 30% v2.0
@@ -163,6 +163,7 @@ Progress: Phase 33 COMPLETE (1/1 plans) | Nomination flow fully observable in co
 | Phase 31 P03 | 2 | 2 tasks | 2 files |
 | Phase 32 P01 | 3 | 2 tasks | 2 files |
 | Phase 33 P01 | 4 | 2 tasks | 5 files |
+| Phase 34 P01 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -402,6 +403,8 @@ Recent decisions affecting v1.1 work:
 - [Phase 33]: Collapsible nomination diagnostics panel starts collapsed to avoid UI clutter; one-line status always visible
 - [Phase quick-83]: Used component-based math for rate stats in category progress (OPS, ERA, WHIP) consistent with existing engine patterns
 - [Phase quick-84]: 50% max deficit-boost factor for target-optimized ideal roster SGP values
+- [Phase 34]: Used lockedPlayers parameter of optimizeRoster for floor enforcement instead of modifying optimizer internals
+- [Phase 34]: Only enforce category floors for COUNTING+HIGHER_BETTER stats, skip rate stats (ERA, WHIP, AVG, OPS)
 
 ### Roadmap Evolution
 
