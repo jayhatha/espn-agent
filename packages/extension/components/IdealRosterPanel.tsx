@@ -1,5 +1,6 @@
 import React from "react";
 import type { IdealRosterSignal } from "../lib/engine/types";
+import { useDraftStore } from "../lib/draft-state";
 
 interface IdealRosterPanelProps {
   idealRoster: IdealRosterSignal | null;
@@ -28,6 +29,9 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
   const draftedCount = players.filter(p => p.isDrafted).length;
   const tierSummary = buildTierSummary(anchorCount, coreCount, valueCount);
 
+  const optimizeForTargets = useDraftStore(s => s.optimizeForTargets);
+  const setOptimizeForTargets = useDraftStore(s => s.setOptimizeForTargets);
+
   return (
     <details className="group">
       <summary className="px-3 py-2 cursor-pointer flex items-center justify-between bg-surface-secondary hover:bg-surface-tertiary/50 select-none border-t border-surface-tertiary">
@@ -37,6 +41,21 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
             {draftedCount}/{players.length} filled
             {tierSummary && ` \u00b7 ${tierSummary}`}
           </span>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOptimizeForTargets(!optimizeForTargets);
+            }}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 transition-colors ${
+              optimizeForTargets
+                ? "bg-accent text-content-inverse"
+                : "bg-surface-tertiary text-content-secondary hover:bg-surface-tertiary/80"
+            }`}
+            title={optimizeForTargets ? "Optimizing for category targets \u2014 click to use pure SGP" : "Using pure SGP efficiency \u2014 click to optimize for category targets"}
+          >
+            TGT
+          </button>
         </div>
         <span className="text-body-xs text-content-secondary group-open:rotate-180 transition-transform flex-shrink-0">&#9662;</span>
       </summary>
