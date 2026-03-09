@@ -526,8 +526,9 @@ None yet.
 | 80 | Fix autopilot nomination select and nominate button selectors | 2026-03-08 | 1bec228 | ✅ | [80-fix-autopilot-nomination-select-and-nomi](./quick/80-fix-autopilot-nomination-select-and-nomi/) |
 | 81 | Bug. Budget Pacing has the correct number of roster slots but ideal roster does not. | 2026-03-08 | 7a8e90e | ✅ | [81-bug-budget-pacing-has-the-correct-number](./quick/81-bug-budget-pacing-has-the-correct-number/) |
 | 82 | Rearrange extension sidebar — move hitter-pitcher split underneath auto-bid toggle, use toggle switch for AI narrator | 2026-03-08 | a6967eb | ✅ | [82-rearrange-extension-sidebar-move-hitter-](./quick/82-rearrange-extension-sidebar-move-hitter-/) |
+| 83 | Add winning category targets to ideal roster math with progress display | 2026-03-09 | baa034f | ✅ | [83-add-winning-category-targets-to-ideal-ro](./quick/83-add-winning-category-targets-to-ideal-ro/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-08 - Completed quick task 82: Rearrange extension sidebar — move hitter-pitcher split underneath auto-bid toggle, use toggle switch for AI narrator
+Last activity: 2026-03-09 - Completed quick task 83: Add winning category targets to ideal roster math with progress display
 Resume file: None
