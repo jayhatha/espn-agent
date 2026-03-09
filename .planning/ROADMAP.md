@@ -612,7 +612,7 @@ Plans:
 
 **Goal:** Fix verified correctness bugs (UTIL double-count, falsy category_id, stale engine caches, diverging normalizers), add robustness improvements (error boundaries, DEV-gated logger), and resolve frontend/infrastructure issues (NaN guards, debounce, Dockerfile fixes, @types/node alignment) from CODE_REVIEW.md findings -- security items excluded per local dev scope
 **Depends on:** Phase 35
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 36-01-PLAN.md — Fix correctness bugs: UTIL double-count (B-02), falsy category_id (B-12), engine cache isolation (E-02), normalizer consolidation (E-12)
