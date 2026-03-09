@@ -546,8 +546,9 @@ None yet.
 | 85 | Auto-populate ESPN nomination queue from engine signals | 2026-03-09 | ffb5bd3 | ✅ | [85-auto-populate-espn-nomination-queue-from](./quick/85-auto-populate-espn-nomination-queue-from/) |
 | 86 | Fix search functionality — update ESPN search bar selectors | 2026-03-09 | 0b3a69b | ✅ | [86-fix-search-functionality-update-espn-sea](./quick/86-fix-search-functionality-update-espn-sea/) |
 | 87 | Fix search nomination: click matching player from search dropdown instead of submitting form | 2026-03-09 | 7fe5b0c | ✅ | [87-fix-search-nomination-click-matching-pla](./quick/87-fix-search-nomination-click-matching-pla/) |
+| 88 | Keep ~3 players in ESPN queue — search and queue top engine candidates when queue is low | 2026-03-09 | edffb40 | ✅ | [88-keep-3-players-in-espn-queue-search-and-](./quick/88-keep-3-players-in-espn-queue-search-and-/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 87: Fix search nomination — click dropdown match
+Last activity: 2026-03-09 - Completed quick task 88: Keep ~3 players in ESPN queue via search
 Resume file: None
