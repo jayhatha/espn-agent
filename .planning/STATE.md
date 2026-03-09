@@ -445,6 +445,7 @@ Recent decisions affecting v1.1 work:
 - Phase 33 added: debug autopilot nomination flow
 - Phase 34 added: Make sure we're not entirely punting categories. A test draft had no saves.
 - Phase 35 added: Use the queue for player nominations instead of finding players on the fly
+- Phase 36 added: Code cleanup — verify and address concerns from CODE_REVIEW.md (skip security concerns, app not deployed)
 
 ### Pending Todos
 
@@ -547,8 +548,9 @@ None yet.
 | 86 | Fix search functionality — update ESPN search bar selectors | 2026-03-09 | 0b3a69b | ✅ | [86-fix-search-functionality-update-espn-sea](./quick/86-fix-search-functionality-update-espn-sea/) |
 | 87 | Fix search nomination: click matching player from search dropdown instead of submitting form | 2026-03-09 | 7fe5b0c | ✅ | [87-fix-search-nomination-click-matching-pla](./quick/87-fix-search-nomination-click-matching-pla/) |
 | 88 | Keep ~3 players in ESPN queue — search and queue top engine candidates when queue is low | 2026-03-09 | edffb40 | ✅ | [88-keep-3-players-in-espn-queue-search-and-](./quick/88-keep-3-players-in-espn-queue-search-and-/) |
+| 89 | Fix queue button clicking after search — polling loop replaces single-wait | 2026-03-09 | f2c05fd | ✅ | [89-fix-queue-button-clicking-after-search-n](./quick/89-fix-queue-button-clicking-after-search-n/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 88: Keep ~3 players in ESPN queue via search
+Last activity: 2026-03-09 - Completed quick task 89: Fix queue button clicking after search
 Resume file: None
