@@ -80,8 +80,8 @@ export class AutoBidController {
   private static readonly NOMINATION_COOLDOWN_MS = 5000;
   /** Max nomination attempts before backing off until state changes */
   private static readonly MAX_NOMINATION_ATTEMPTS = 3;
-  /** Maximum number of players to keep in ESPN's nomination queue at once */
-  private static readonly MAX_QUEUE_SIZE = 10;
+  /** Target number of players to keep in ESPN's nomination queue at once */
+  private static readonly TARGET_QUEUE_SIZE = 3;
   /** Minimum time between queue population runs (ms) — prevents rapid re-clicking */
   private static readonly QUEUE_POPULATE_COOLDOWN_MS = 15000;
 
@@ -427,9 +427,9 @@ export class AutoBidController {
    * 5. Build candidate list from engine signals (nomination strategy > ideal roster)
    * 6. Filter out already-drafted and already-queued players
    * 7. Map names to ESPN player IDs via rankings
-   * 8. Click "Queue" buttons for up to (MAX_QUEUE_SIZE - currentQueueSize) players
+   * 8. Click "Queue" buttons for up to (TARGET_QUEUE_SIZE - currentQueueSize) players
    */
-  populateQueue(): void {
+  async populateQueue(): Promise<void> {
     const state = useDraftStore.getState();
 
     // Guard: autoMode must be on
@@ -471,9 +471,9 @@ export class AutoBidController {
     const alreadyQueuedIds = new Set(currentQueue.map(q => q.playerId));
     const currentQueueSize = currentQueue.length;
 
-    const slotsToFill = AutoBidController.MAX_QUEUE_SIZE - currentQueueSize;
+    const slotsToFill = AutoBidController.TARGET_QUEUE_SIZE - currentQueueSize;
     if (slotsToFill <= 0) {
-      console.log(`[AutoQueue] Queue already at max size (${currentQueueSize}/${AutoBidController.MAX_QUEUE_SIZE}) — skipping`);
+      console.log(`[AutoQueue] Queue already at target size (${currentQueueSize}/${AutoBidController.TARGET_QUEUE_SIZE}) — skipping`);
       return;
     }
 
@@ -541,7 +541,15 @@ export class AutoBidController {
       );
 
       if (!button) {
-        console.debug(`[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — not visible in table`);
+        console.debug(`[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — searching via search bar`);
+        const searchQueued = await this.searchAndQueue(candidate.name, playerId);
+        if (searchQueued) {
+          this.queuedPlayerIds.add(playerId);
+          queued++;
+          console.log(`[AutoQueue] Search-queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`);
+          // Give ESPN time to settle before next search
+          await new Promise(r => setTimeout(r, 500));
+        }
         continue;
       }
 
@@ -804,6 +812,119 @@ export class AutoBidController {
     setTimeout(() => {
       this.clickNominateButton(candidateName);
     }, 500);
+  }
+
+  /**
+   * Use ESPN's player search input to find a player not visible in the table,
+   * click their dropdown match, wait for the Queue button to appear, click it,
+   * then clear the search. Returns true if successfully queued, false otherwise.
+   */
+  private searchAndQueue(candidateName: string, playerId: number): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const searchInput = document.querySelector<HTMLInputElement>(
+        '.playersSearch input.form__control, input[placeholder="Player Name"]'
+      );
+
+      if (!searchInput) {
+        console.warn(`[AutoQueue] Search input not found — cannot search for ${candidateName}`);
+        resolve(false);
+        return;
+      }
+
+      // Use last name for search — ESPN search works better with just the surname
+      const nameParts = candidateName.trim().split(/\s+/);
+      const searchTerm = nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
+
+      // Focus the input before typing so ESPN's React app registers the interaction
+      searchInput.focus();
+
+      // Type the search term into the search input using React-compatible value setting
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype, 'value'
+      )?.set;
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(searchInput, searchTerm);
+      } else {
+        searchInput.value = searchTerm;
+      }
+      searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: searchTerm, inputType: 'insertText' }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: searchTerm.slice(-1) }));
+
+      console.log(`[AutoQueue] Typed "${searchTerm}" into search (from "${candidateName}")`);
+
+      const maxElapsed = 2000;
+      const pollInterval = 200;
+      const normalizedCandidate = normalizeName(candidateName);
+
+      const pollForDropdown = (elapsed: number): void => {
+        const matchesContainer = document.querySelector('.player--search--matches');
+        const matchButtons = matchesContainer
+          ? Array.from(matchesContainer.querySelectorAll<HTMLButtonElement>('button.player--search--match'))
+          : [];
+
+        if (matchButtons.length > 0) {
+          // Prefer match by ESPN player ID attribute
+          let matchButton: HTMLButtonElement | null = null;
+          if (playerId) {
+            matchButton = matchesContainer!.querySelector<HTMLButtonElement>(
+              `button.player--search--match[data-player-search-playerid="${playerId}"]`
+            );
+          }
+
+          // Fallback: match by player name attribute (case-insensitive, normalized)
+          if (!matchButton) {
+            for (const btn of matchButtons) {
+              const btnName = btn.getAttribute('data-player-search-playername') ?? '';
+              if (normalizeName(btnName) === normalizedCandidate) {
+                matchButton = btn;
+                break;
+              }
+            }
+          }
+
+          if (matchButton) {
+            console.log(`[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId})`);
+            matchButton.click();
+
+            // Wait for ESPN to process the dropdown selection, then look for the Queue button
+            setTimeout(() => {
+              const queueButton = document.querySelector<HTMLButtonElement>(
+                `button[data-player-id="${playerId}"]`
+              );
+              const queueButtonText = queueButton?.textContent?.trim().toLowerCase() ?? '';
+
+              if (queueButton && queueButtonText.includes('queue')) {
+                queueButton.click();
+                console.log(`[AutoQueue] Clicked Queue button for ${candidateName} after search`);
+                // Clear search and resolve true after ESPN settles
+                setTimeout(() => {
+                  this.clearPlayerSearch();
+                  setTimeout(() => resolve(true), 500);
+                }, 500);
+              } else {
+                console.warn(`[AutoQueue] Queue button not found for ${candidateName} after dropdown click (found: "${queueButtonText}")`);
+                this.clearPlayerSearch();
+                resolve(false);
+              }
+            }, 500);
+            return;
+          }
+        }
+
+        // Keep polling if we haven't hit the timeout yet
+        if (elapsed + pollInterval < maxElapsed) {
+          setTimeout(() => pollForDropdown(elapsed + pollInterval), pollInterval);
+        } else {
+          console.warn(`[AutoQueue] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`);
+          this.clearPlayerSearch();
+          resolve(false);
+        }
+      };
+
+      // Start polling after a short delay to give ESPN time to open the dropdown
+      setTimeout(() => pollForDropdown(0), 300);
+    });
   }
 
   /**
