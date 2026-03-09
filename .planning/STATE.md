@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 36 — Code Cleanup (verify and address CODE_REVIEW.md concerns)
-Plan: 03 complete — Phase 36 Plan 03 COMPLETE
-Status: Phase 36 IN PROGRESS (3/3 plans done) — NaN guards, debounced auction inputs, snapshot degradation symmetry, @types/node alignment, Dockerfile fixes
-Last activity: 2026-03-09 — Phase 36 Plan 03 complete (frontend/backend/infra bug fixes delivered)
+Plan: 01 complete — Phase 36 Plan 01 COMPLETE
+Status: Phase 36 IN PROGRESS (2/3 plans done) — UTIL double-count fixed, category_id=0 validation fixed, normalizer consolidated, engine cache isolation with leagueId
+Last activity: 2026-03-09 — Phase 36 Plan 01 complete (backend + extension correctness bugs B-02, B-12, E-02, E-12 fixed)
 
-Progress: Phase 36 COMPLETE (3/3 plans) | All CODE_REVIEW.md concerns addressed (skipping security-only concerns for local dev)
+Progress: Phase 36 IN PROGRESS (2/3 plans) | Plan 01 and 03 complete, Plan 02 pending
 
 ```
 [############                            ] 30% v2.0
@@ -169,6 +169,7 @@ Progress: Phase 36 COMPLETE (3/3 plans) | All CODE_REVIEW.md concerns addressed 
 | Phase 36 P01 | 3min | 1 tasks | 2 files |
 | Phase 36 P02 | 2min | 1 tasks | 1 files |
 | Phase 36 P03 | 4min | 2 tasks | 14 files |
+| Phase 36 P01 | 5 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -422,6 +423,8 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-85]: Use 'Select' button text detection (not CSS class) for user's turn guard — more resilient to ESPN DOM changes
 - [Phase quick-86]: Used InputEvent with data/inputType fields instead of plain Event for React-controlled ESPN search input compatibility
 - [Phase quick-88]: TARGET_QUEUE_SIZE set to 3 (was 10) to keep a tight queue of top candidates
+- [Phase 36]: NFKD + strip-all-non-alphanumeric chosen as canonical normalizer for extension — more aggressive than NFD, better fuzzy matching, single source of truth in lib/engine/normalizer.ts
+- [Phase 36]: Engine cache keys include leagueId to prevent cross-session stale recommendations — resetEngineCache() called at draft init in content.tsx
 
 ### Roadmap Evolution
 
