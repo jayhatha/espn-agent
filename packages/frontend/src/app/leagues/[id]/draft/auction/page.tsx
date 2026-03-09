@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -50,14 +50,26 @@ export default function AuctionValuationPage() {
   const leagueId = params.id as string;
   const [position, setPosition] = useState<string>("ALL");
   const [budget, setBudget] = useState<number>(260);
+  const [debouncedBudget, setDebouncedBudget] = useState<number>(260);
   const [minBid, setMinBid] = useState<number>(1);
+  const [debouncedMinBid, setDebouncedMinBid] = useState<number>(1);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedBudget(budget), 500);
+    return () => clearTimeout(t);
+  }, [budget]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMinBid(minBid), 500);
+    return () => clearTimeout(t);
+  }, [minBid]);
 
   const { data, isLoading, error, refetch } = useQuery<AuctionValuationsResponse>({
-    queryKey: ["draft-auction", leagueId, position, budget, minBid],
+    queryKey: ["draft-auction", leagueId, position, debouncedBudget, debouncedMinBid],
     queryFn: async () => {
       const positionParam = position !== "ALL" ? `&position=${position}` : "";
       const response = await api.get(
-        `/api/leagues/${leagueId}/draft/auction?budget=${budget}&minBid=${minBid}&limit=300${positionParam}`,
+        `/api/leagues/${leagueId}/draft/auction?budget=${debouncedBudget}&minBid=${debouncedMinBid}&limit=300${positionParam}`,
       );
       return response;
     },
@@ -93,7 +105,10 @@ export default function AuctionValuationPage() {
               max="500"
               step="10"
               value={budget}
-              onChange={(e) => setBudget(parseInt(e.target.value, 10))}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) setBudget(val);
+              }}
               className="w-24"
             />
           </div>
@@ -112,7 +127,10 @@ export default function AuctionValuationPage() {
               max="5"
               step="1"
               value={minBid}
-              onChange={(e) => setMinBid(parseInt(e.target.value, 10))}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) setMinBid(val);
+              }}
               className="w-20"
             />
           </div>
@@ -143,6 +161,13 @@ export default function AuctionValuationPage() {
             className="inline-flex items-center px-4 py-2 border border-neutral-300 rounded-lg text-body-sm font-medium text-content bg-white hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
           >
             View Draft Rankings
+          </Link>
+
+          <Link
+            href={`/leagues/${leagueId}/draft/auction/validate`}
+            className="inline-flex items-center px-4 py-2 border border-neutral-300 rounded-lg text-body-sm font-medium text-content bg-white hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
+          >
+            Validate vs ESPN
           </Link>
         </div>
 

@@ -163,7 +163,10 @@ export default function MovesPage() {
   // Load team from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) setSelectedTeamId(parseInt(stored, 10));
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) setSelectedTeamId(parsed);
+    }
   }, [leagueId]);
 
   // Fetch teams

@@ -45,10 +45,10 @@ export function TeamSelector({
 
     const stored = localStorage.getItem(`league_${leagueId}_team`);
     if (stored) {
-      onSelect(parseInt(stored, 10));
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) onSelect(parsed);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, autoDetectedTeamId]);
+  }, [leagueId, autoDetectedTeamId, onSelect]);
 
   if (loading) {
     return (

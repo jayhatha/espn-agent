@@ -85,7 +85,8 @@ export default function StandingsPage() {
   useEffect(() => {
     const stored = localStorage.getItem(`league_${leagueId}_team`);
     if (stored) {
-      setSelectedTeamId(parseInt(stored, 10));
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) setSelectedTeamId(parsed);
     }
   }, [leagueId]);
 
