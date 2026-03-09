@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 34 — Category Floor Enforcement
-Plan: 01 complete — Phase 34 Plan 01 COMPLETE
-Status: Phase 34 Plan 01 complete (1/1 plans) — Pre-pass floor enforcement in ideal roster optimizer prevents full-punt draft scenarios for SV, HLD, and other counting categories
-Last activity: 2026-03-08 — Phase 34 Plan 01 complete (category floor enforcement delivered)
+Phase: 35 — Use the Queue for Player Nominations
+Plan: 01 complete — Phase 35 Plan 01 COMPLETE
+Status: Phase 35 Plan 01 complete (1/2 plans) — ESPN nomination queue scraper and Zustand session-only store field for data layer
+Last activity: 2026-03-09 — Phase 35 Plan 01 complete (queue scraper data layer delivered)
 
-Progress: Phase 34 COMPLETE (1/1 plans) | Zero-coverage counting categories get force-locked floor picks
+Progress: Phase 35 IN PROGRESS (1/2 plans) | Queue data layer ready; Plan 02 will wire into content.tsx and auto-bid-controller.ts
 
 ```
 [############                            ] 30% v2.0
@@ -164,6 +164,7 @@ Progress: Phase 34 COMPLETE (1/1 plans) | Zero-coverage counting categories get 
 | Phase 32 P01 | 3 | 2 tasks | 2 files |
 | Phase 33 P01 | 4 | 2 tasks | 5 files |
 | Phase 34 P01 | 3min | 2 tasks | 2 files |
+| Phase 35 P01 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -405,6 +406,8 @@ Recent decisions affecting v1.1 work:
 - [Phase quick-84]: 50% max deficit-boost factor for target-optimized ideal roster SGP values
 - [Phase 34]: Used lockedPlayers parameter of optimizeRoster for floor enforcement instead of modifying optimizer internals
 - [Phase 34]: Only enforce category floors for COUNTING+HIGHER_BETTER stats, skip rate stats (ERA, WHIP, AVG, OPS)
+- [Phase 35]: Use Dequeue button text heuristic for ESPN queue detection rather than panel container (container class unverified)
+- [Phase 35]: espnNominationQueue is session-only — excluded from partialize to avoid persisting transient queue state across reloads
 
 ### Roadmap Evolution
 
