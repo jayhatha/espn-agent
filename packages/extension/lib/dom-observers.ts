@@ -1231,6 +1231,70 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
   return result;
 }
 
+export interface ESPNQueueEntry {
+  playerId: number;
+  playerName: string;
+  position: string;
+  queuePosition: number;
+}
+
+/**
+ * Scrape ESPN's nomination queue — players the user has queued for nomination.
+ *
+ * ESPN DOM evidence:
+ * - When a player is queued: their row's button[data-player-id] shows "Dequeue" text
+ * - Variants: "dequeue", "deselect", "remove" (ESPN may differ by state)
+ * - When not queued: shows "Queue" (not user's turn) or "Select" (user's turn)
+ *
+ * Returns ordered list of queued players (order matches DOM order, which may
+ * match queue insertion order).
+ */
+export function scrapeESPNNominationQueue(): ESPNQueueEntry[] {
+  const result: ESPNQueueEntry[] = [];
+  const dequeueVariants = ["dequeue", "deselect", "remove"];
+
+  const allPlayerButtons = document.querySelectorAll<HTMLButtonElement>(
+    "button[data-player-id]",
+  );
+
+  let queuePosition = 0;
+  for (const btn of Array.from(allPlayerButtons)) {
+    const text = btn.textContent?.trim().toLowerCase() || "";
+    const isDequeued = dequeueVariants.some((v) => text.includes(v));
+    if (!isDequeued) {
+      continue;
+    }
+
+    const playerIdStr = btn.getAttribute("data-player-id");
+    if (!playerIdStr) {
+      continue;
+    }
+    const playerId = parseInt(playerIdStr, 10);
+    if (!playerId || isNaN(playerId)) {
+      continue;
+    }
+
+    // Get player name and position from the closest row container
+    const row = btn.closest(".fixedDataTableRowLayout_main, [role='row']");
+    const playerName =
+      row?.querySelector("a.player-news[title]")?.getAttribute("title")?.trim() ||
+      "";
+    const position =
+      row?.querySelector(".positionPill")?.textContent?.trim() || "";
+
+    result.push({ playerId, playerName, position, queuePosition });
+    queuePosition++;
+  }
+
+  if (result.length > 0) {
+    console.log(
+      `[ESPN Draft Assistant] scrapeESPNNominationQueue: found ${result.length} queued players`,
+    );
+  }
+
+  return result;
+}
+
 /**
  * Observes ESPN auction draft page for current player up for bid
  * Returns cleanup function to disconnect observer
