@@ -14,6 +14,7 @@ import NominationDiagnostics from "./NominationDiagnostics";
 import PositionScarcityAlerts from "./PositionScarcityAlerts";
 import RosterSummary from "./RosterSummary";
 import SnakeTurnPairs from "./SnakeTurnPairs";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 
 export default function DraftSidebar() {
@@ -411,28 +412,50 @@ export default function DraftSidebar() {
       )}
 
       {/* Nomination diagnostics panel — auction only */}
-      {draftFormat === "auction" && <NominationDiagnostics />}
+      {draftFormat === "auction" && (
+        <ErrorBoundary sectionName="Nomination Diagnostics">
+          <NominationDiagnostics />
+        </ErrorBoundary>
+      )}
 
       {/* Main content area */}
       <div className="flex-1 overflow-y-auto flex flex-col">
         {draftFormat === "auction" ? (
           <>
             {/* AI Advisor -- narrator above data-dense engine signals */}
-            <DraftNarrator
-              onAskAdvice={requestAdvice}
-              sessionCallCount={sessionCallCount}
-            />
-            <AuctionBudgetTracker engineSignals={engineSignals} />
-            <EngineInsights engineSignals={engineSignals} />
-            <PositionScarcityAlerts />
-            <AuctionRecommendations />
+            <ErrorBoundary sectionName="AI Narrator">
+              <DraftNarrator
+                onAskAdvice={requestAdvice}
+                sessionCallCount={sessionCallCount}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Auction Budget Tracker">
+              <AuctionBudgetTracker engineSignals={engineSignals} />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Engine Insights">
+              <EngineInsights engineSignals={engineSignals} />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Position Scarcity Alerts">
+              <PositionScarcityAlerts />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Auction Recommendations">
+              <AuctionRecommendations />
+            </ErrorBoundary>
           </>
         ) : (
           <>
-            <RosterSummary />
-            <PositionScarcityAlerts />
-            <SnakeTurnPairs />
-            <DraftRecommendations />
+            <ErrorBoundary sectionName="Roster Summary">
+              <RosterSummary />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Position Scarcity Alerts">
+              <PositionScarcityAlerts />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Snake Turn Pairs">
+              <SnakeTurnPairs />
+            </ErrorBoundary>
+            <ErrorBoundary sectionName="Draft Recommendations">
+              <DraftRecommendations />
+            </ErrorBoundary>
           </>
         )}
       </div>

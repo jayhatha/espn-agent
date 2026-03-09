@@ -23,6 +23,7 @@ import {
 import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets, detectRosterSlotsFromPlayersTable, detectRosterSizeFromPositionTracker } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import contentStyles from "../styles/content.css?inline";
 import { calculateProjectedStandingsFromState } from "../lib/value-calculations";
 import { autoBidController } from "../lib/auto-bid-controller";
@@ -567,9 +568,11 @@ export default defineContentScript({
 
         reactRootInstance = createRoot(reactRoot);
         reactRootInstance.render(
-          <div className="h-full bg-surface text-content font-sans">
-            <DraftSidebar />
-          </div>,
+          <ErrorBoundary sectionName="Draft Sidebar">
+            <div className="h-full bg-surface text-content font-sans">
+              <DraftSidebar />
+            </div>
+          </ErrorBoundary>,
         );
 
         applySidebarPosition(currentDockSide);
@@ -624,9 +627,11 @@ export default defineContentScript({
 
       popoutRootInstance = createRoot(mountNode);
       popoutRootInstance.render(
-        <div className="h-full bg-surface text-content font-sans">
-          <DraftSidebar />
-        </div>,
+        <ErrorBoundary sectionName="Draft Sidebar (Popout)">
+          <div className="h-full bg-surface text-content font-sans">
+            <DraftSidebar />
+          </div>
+        </ErrorBoundary>,
       );
 
       popup.addEventListener("beforeunload", () => {
