@@ -607,3 +607,14 @@ Plans:
 Plans:
 - [ ] 35-01-PLAN.md — Add ESPN nomination queue scraper and Zustand store field
 - [ ] 35-02-PLAN.md — Wire queue scraper in content script, update auto-nomination to prefer queue, update diagnostics UI
+
+### Phase 36: Code cleanup — verify and address concerns from CODE_REVIEW.md, skip security concerns that don't apply to local development (app is not deployed)
+
+**Goal:** Fix verified correctness bugs (UTIL double-count, falsy category_id, stale engine caches, diverging normalizers), add robustness improvements (error boundaries, DEV-gated logger), and resolve frontend/infrastructure issues (NaN guards, debounce, Dockerfile fixes, @types/node alignment) from CODE_REVIEW.md findings -- security items excluded per local dev scope
+**Depends on:** Phase 35
+**Plans:** 3 plans
+
+Plans:
+- [ ] 36-01-PLAN.md — Fix correctness bugs: UTIL double-count (B-02), falsy category_id (B-12), engine cache isolation (E-02), normalizer consolidation (E-12)
+- [ ] 36-02-PLAN.md — Extension robustness: React error boundaries (E-10), DEV-gated logger replacing 257 console statements (E-13)
+- [ ] 36-03-PLAN.md — Frontend fixes (F-01 NaN guard, F-04 stale closure, F-05 debounce), backend snapshot degradation (B-08), infrastructure (I-01, I-02, I-04)
