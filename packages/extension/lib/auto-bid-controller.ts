@@ -832,6 +832,9 @@ export class AutoBidController {
     const nameParts = candidateName.trim().split(/\s+/);
     const searchTerm = nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
 
+    // Focus the input before typing so ESPN's React app registers the interaction
+    searchInput.focus();
+
     // Type the search term into the search input using React-compatible value setting
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype, 'value'
@@ -841,40 +844,57 @@ export class AutoBidController {
     } else {
       searchInput.value = searchTerm;
     }
-    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    // Dispatch InputEvent (carries data/inputType) which React's synthetic event system uses,
+    // followed by a change event and a keyup event for handlers that listen for keyboard events
+    searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: searchTerm, inputType: 'insertText' }));
     searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+    searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: searchTerm.slice(-1) }));
 
     console.log(`[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`);
 
-    // Wait for ESPN to filter the table, then find the button
+    // Helper to locate the player's Select/Queue button by player ID attribute
+    const findButton = (pid: number) =>
+      document.querySelector<HTMLButtonElement>(`button[data-player-id="${pid}"]`);
+
+    // Wait 1200ms for ESPN's React rendering + network filter, then look for the button
     setTimeout(() => {
-      const queueButton = document.querySelector<HTMLButtonElement>(
-        `button[data-player-id="${playerId}"]`
-      );
+      let queueButton = findButton(playerId);
 
       if (queueButton && !queueButton.disabled) {
         this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason);
-      } else {
-        console.warn(
-          `[AutoNominate] Player button still not found after search for ${candidateName} (ID: ${playerId})`
-        );
-        this.nominationAttempts++;
-        this.lastNominationTime = Date.now();
+        setTimeout(() => this.clearPlayerSearch(), 1000);
+        return;
       }
 
-      // Clear the search after a delay (whether nomination succeeded or not)
-      setTimeout(() => this.clearPlayerSearch(), 1000);
-    }, 800);
+      // Retry once after 500ms to handle slow ESPN table re-renders
+      setTimeout(() => {
+        queueButton = findButton(playerId);
+        if (queueButton && !queueButton.disabled) {
+          this.clickPlayerButton(queueButton, candidateName, playerId, candidateReason);
+        } else {
+          console.warn(
+            `[AutoNominate] Player button still not found after search for ${candidateName} (ID: ${playerId})`
+          );
+          this.nominationAttempts++;
+          this.lastNominationTime = Date.now();
+        }
+        setTimeout(() => this.clearPlayerSearch(), 1000);
+      }, 500);
+    }, 1200);
   }
 
   /**
    * Clear ESPN's player search input by clicking the clear button or resetting the value.
    */
   private clearPlayerSearch(): void {
-    // Try the clear button first
-    const clearButton = document.querySelector<HTMLElement>(
-      '.player--search--clear, .playersSearch .player--search--clear svg'
-    );
+    // Try the clear button first — also try the SVG child as a fallback click target
+    let clearButton = document.querySelector<HTMLElement>('.player--search--clear');
+    if (!clearButton) {
+      const clearSvg = document.querySelector<SVGElement>('div.player--search--clear svg');
+      if (clearSvg) {
+        clearButton = clearSvg.parentElement as HTMLElement;
+      }
+    }
     if (clearButton) {
       clearButton.click();
       console.log("[AutoNominate] Cleared player search via clear button");
@@ -886,6 +906,8 @@ export class AutoBidController {
       '.playersSearch input.form__control, input[placeholder="Player Name"]'
     );
     if (searchInput) {
+      // Focus before clearing so React registers the interaction
+      searchInput.focus();
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype, 'value'
       )?.set;
@@ -894,7 +916,8 @@ export class AutoBidController {
       } else {
         searchInput.value = '';
       }
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      // InputEvent with deleteContentBackward mirrors what a user pressing Ctrl+A+Delete would do
+      searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteContentBackward' }));
       searchInput.dispatchEvent(new Event('change', { bubbles: true }));
       console.log("[AutoNominate] Cleared player search via input reset");
     }
