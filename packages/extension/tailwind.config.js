@@ -24,6 +24,7 @@ export default {
         'body': ['1rem', { lineHeight: '1.6' }],
         'body-sm': ['0.875rem', { lineHeight: '1.5' }],
         'caption': ['0.75rem', { lineHeight: '1.5', letterSpacing: '0.02em' }],
+        'body-xs': ['0.6875rem', { lineHeight: '1.4' }],
         // Data-specific (tables, stats)
         'data': ['0.8125rem', { lineHeight: '1.4', fontFamily: 'ui-monospace' }],
       },

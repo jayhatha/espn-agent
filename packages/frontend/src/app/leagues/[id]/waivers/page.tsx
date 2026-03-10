@@ -141,8 +141,6 @@ export default function WaiversPage() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [sortBy, setSortBy] = useState<string>("pct_owned");
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
-  const [recPage, setRecPage] = useState(1);
-  const RECS_PER_PAGE = 10;
 
   // Load selected team from localStorage
   useEffect(() => {
