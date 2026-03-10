@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 37 — App Performance Audit (verify and fix issues from PERFORMANCE_AUDIT.md)
-Plan: 01 complete
-Status: 37-01 COMPLETE — DB pool max 25, worker concurrency 3, Promise.all projections, espnTeamIdToDbId reuse, DLQ 7d, LRU 2000, useMemo standings matrices, staleTime 5min (B-04, B-05, B-06, B-07, B-16, F-01, F-02, I-04, I-05)
-Last activity: 2026-03-09 — Phase 37 Plan 01 complete (8 quick-win performance fixes)
+Plan: 02 complete
+Status: 37-02 COMPLETE — Batch player upserts, injury events, roster snapshots (B-01), batch projection inserts in 500-row chunks (B-02), batch free-agent upsert (B-03); ~2,100+ individual DB queries reduced to ~10 total
+Last activity: 2026-03-09 — Phase 37 Plan 02 complete (N+1 batch query elimination: B-01, B-02, B-03)
 
-Progress: Phase 37 in progress (1/? plans done)
+Progress: Phase 37 in progress (2/6 plans done)
 
 ```
 [############                            ] 30% v2.0
@@ -173,6 +173,7 @@ Progress: Phase 37 in progress (1/? plans done)
 | Phase 36 P02 | 8 | 2 tasks | 11 files |
 | Phase 37 P05 | 2 | 2 tasks | 2 files |
 | Phase 37 P01 | 8 | 2 tasks | 7 files |
+| Phase 37 P02 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -436,6 +437,7 @@ Recent decisions affecting v1.1 work:
 - [Phase 37-01]: espnTeamIdToDbId declared before transaction block so it survives closure scope and can be reused at step 8 without per-team re-queries
 - [Phase 37-01]: DLQ 7 days sufficient for post-incident analysis — 30 days was over-provisioned storage overhead
 - [Phase 37-01]: useMemo on standings matrix builders keyed on data — prevents expensive Map rebuilds on every React render
+- [Phase 37]: Batch insert pattern: pre-fetch all rows before loop, collect mutations in arrays, batch INSERT after loop with sql excluded syntax for ON CONFLICT (B-01, B-02, B-03)
 
 ### Roadmap Evolution
 
