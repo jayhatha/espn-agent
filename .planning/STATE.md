@@ -180,6 +180,7 @@ _Updated: 2026-02-27 after quick task 19 completion_
 | Phase 37 P06 | 3 | 2 tasks | 5 files |
 | Phase 38 P02 | 3 | 2 tasks | 5 files |
 | Phase 38 P01 | 4 | 2 tasks | 4 files |
+| Phase 38 P03 | 8 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -456,6 +457,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 38]: BidVerdict card placed between nominated player banner and auto-pilot toggle in DraftSidebar, auction-only, null-guard on currentAuctionPlayer+optimization
 - [Phase 38]: Player cards (Auction and Snake) default to collapsed compact view; expand on click to show full stats
 - [Phase 38]: Inline SVG chevrons used in player cards instead of lucide-react (not installed in extension package)
+- [Phase 38]: Used CSS group-hover Tooltip pattern — no useState, no portal, works without JS hydration in Next.js App Router
+- [Phase 38]: Waiver grouping: deltaPoints threshold 0.3 filters noise, Best Overall fallback for recs without dominant category impact
+- [Phase 38]: Removed waiver pagination when switching to grouped layout — grouping provides sufficient visual hierarchy
 
 ### Roadmap Evolution
 
