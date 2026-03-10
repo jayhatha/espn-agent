@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { DraftRanking } from "@espn-fantasy/shared";
 import {
   calculateAVG,
@@ -32,6 +32,7 @@ export default function PlayerCard({
   rank,
   isAtTurn,
 }: PlayerCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const { currentPick, myTeamId, totalTeams, allPicks, draftFormat } =
     useDraftStore();
 
@@ -81,88 +82,127 @@ export default function PlayerCard({
   return (
     <div
       className={`
-        p-3 hover:bg-accent-light cursor-pointer transition-colors
+        hover:bg-accent-light cursor-pointer transition-colors
         ${isAtTurn ? "bg-warning-light border-l-2 border-warning" : ""}
       `}
+      onClick={() => setIsExpanded(!isExpanded)}
     >
-      {/* Player name and positions */}
-      <div className="flex justify-between items-start mb-1">
-        <div className="flex-1">
-          <div className="font-semibold text-content">{player.playerName}</div>
-          <div className="text-caption text-content-tertiary">
-            {player.positions.join(", ")} • Tier {player.tier}
-            {player.adp && (
-              <span className="ml-2 text-content-secondary">
-                ADP: {formatNumber(player.adp, 1)}
-              </span>
+      {!isExpanded ? (
+        /* Compact single-row view */
+        <div className="flex items-center gap-2 px-3 py-2">
+          {/* Rank */}
+          <div className="text-sm font-semibold text-content shrink-0 w-7 text-center">
+            #{rank}
+          </div>
+
+          {/* Player name */}
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-content text-sm truncate">{player.playerName}</div>
+          </div>
+
+          {/* Position */}
+          <div className="text-caption text-content-tertiary shrink-0">
+            {player.positions.join("/")}
+          </div>
+
+          {/* VBD score as primary value */}
+          <div className="text-caption text-content-secondary shrink-0">
+            VBD {formatNumber(player.vbdScore, 1)}
+          </div>
+
+          {/* Expand chevron */}
+          <svg className="w-4 h-4 text-content-tertiary shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4,6 8,10 12,6" />
+          </svg>
+        </div>
+      ) : (
+        /* Expanded full view */
+        <div className="p-3">
+          {/* Player name and positions */}
+          <div className="flex justify-between items-start mb-1">
+            <div className="flex-1">
+              <div className="font-semibold text-content">{player.playerName}</div>
+              <div className="text-caption text-content-tertiary">
+                {player.positions.join(", ")} • Tier {player.tier}
+                {player.adp && (
+                  <span className="ml-2 text-content-secondary">
+                    ADP: {formatNumber(player.adp, 1)}
+                  </span>
+                )}
+              </div>
+
+              {/* Value indicator badge */}
+              {valueIndicator.severity !== "fair" && (
+                <span
+                  className={`inline-block mt-1 text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
+                  title={`VBD rank ${rank} vs ADP ${player.adp ?? "N/A"}`}
+                >
+                  {valueIndicator.label}
+                </span>
+              )}
+            </div>
+            <div className="text-right flex items-start gap-1">
+              <div>
+                <div className="text-sm font-semibold text-content">#{rank}</div>
+                <div className="text-caption text-content-tertiary">
+                  VBD: {formatNumber(player.vbdScore, 1)}
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-content-tertiary mt-0.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4,10 8,6 12,10" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Picks until turn indicator */}
+          {picksUntilMyTurn !== null && picksUntilMyTurn <= 5 && (
+            <div className="mt-1 text-xs bg-warning-light text-warning px-2 py-1 rounded inline-block">
+              {picksUntilMyTurn} pick{picksUntilMyTurn !== 1 ? "s" : ""} until your
+              turn
+            </div>
+          )}
+
+          {/* Projected stats (abbreviated) */}
+          <div className="text-data text-content-secondary mt-2 flex gap-3">
+            {/* Counting stats - read directly */}
+            {player.projectedStats.HR && (
+              <span>HR: {player.projectedStats.HR}</span>
+            )}
+            {player.projectedStats.RBI && (
+              <span>RBI: {player.projectedStats.RBI}</span>
+            )}
+            {player.projectedStats.SB && (
+              <span>SB: {player.projectedStats.SB}</span>
+            )}
+            {player.projectedStats.W && <span>W: {player.projectedStats.W}</span>}
+            {player.projectedStats.SV && (
+              <span>SV: {player.projectedStats.SV}</span>
+            )}
+
+            {/* Rate stats - calculated from components */}
+            {player.projectedStats.AB > 0 && (
+              <>
+                <span>
+                  AVG: {formatNumber(calculateAVG(player.projectedStats), 3)}
+                </span>
+                <span>
+                  OPS: {formatNumber(calculateOPS(player.projectedStats), 3)}
+                </span>
+              </>
+            )}
+            {player.projectedStats.IP > 0 && (
+              <>
+                <span>
+                  ERA: {formatNumber(calculateERA(player.projectedStats), 2)}
+                </span>
+                <span>
+                  WHIP: {formatNumber(calculateWHIP(player.projectedStats), 2)}
+                </span>
+              </>
             )}
           </div>
-
-          {/* Value indicator badge */}
-          {valueIndicator.severity !== "fair" && (
-            <span
-              className={`inline-block mt-1 text-xs px-2 py-1 rounded border ${colorClasses.bg} ${colorClasses.text} ${colorClasses.border}`}
-              title={`VBD rank ${rank} vs ADP ${player.adp ?? "N/A"}`}
-            >
-              {valueIndicator.label}
-            </span>
-          )}
-        </div>
-        <div className="text-right">
-          <div className="text-sm font-semibold text-content">#{rank}</div>
-          <div className="text-caption text-content-tertiary">
-            VBD: {formatNumber(player.vbdScore, 1)}
-          </div>
-        </div>
-      </div>
-
-      {/* Picks until turn indicator */}
-      {picksUntilMyTurn !== null && picksUntilMyTurn <= 5 && (
-        <div className="mt-1 text-xs bg-warning-light text-warning px-2 py-1 rounded inline-block">
-          {picksUntilMyTurn} pick{picksUntilMyTurn !== 1 ? "s" : ""} until your
-          turn
         </div>
       )}
-
-      {/* Projected stats (abbreviated) */}
-      <div className="text-data text-content-secondary mt-2 flex gap-3">
-        {/* Counting stats - read directly */}
-        {player.projectedStats.HR && (
-          <span>HR: {player.projectedStats.HR}</span>
-        )}
-        {player.projectedStats.RBI && (
-          <span>RBI: {player.projectedStats.RBI}</span>
-        )}
-        {player.projectedStats.SB && (
-          <span>SB: {player.projectedStats.SB}</span>
-        )}
-        {player.projectedStats.W && <span>W: {player.projectedStats.W}</span>}
-        {player.projectedStats.SV && (
-          <span>SV: {player.projectedStats.SV}</span>
-        )}
-
-        {/* Rate stats - calculated from components */}
-        {player.projectedStats.AB > 0 && (
-          <>
-            <span>
-              AVG: {formatNumber(calculateAVG(player.projectedStats), 3)}
-            </span>
-            <span>
-              OPS: {formatNumber(calculateOPS(player.projectedStats), 3)}
-            </span>
-          </>
-        )}
-        {player.projectedStats.IP > 0 && (
-          <>
-            <span>
-              ERA: {formatNumber(calculateERA(player.projectedStats), 2)}
-            </span>
-            <span>
-              WHIP: {formatNumber(calculateWHIP(player.projectedStats), 2)}
-            </span>
-          </>
-        )}
-      </div>
     </div>
   );
 }
