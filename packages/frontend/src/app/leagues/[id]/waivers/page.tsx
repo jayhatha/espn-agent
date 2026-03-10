@@ -102,6 +102,8 @@ export default function WaiversPage() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [sortBy, setSortBy] = useState<string>("pct_owned");
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
+  const [recPage, setRecPage] = useState(1);
+  const RECS_PER_PAGE = 10;
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -394,7 +396,15 @@ export default function WaiversPage() {
             </CardContent>
           ) : aiData && aiData.recommendations.length > 0 ? (
             <CardContent className="space-y-4 sm:space-y-6">
-              {aiData.recommendations.map((rec, idx) => (
+              {(() => {
+                const paginatedRecs = aiData.recommendations.slice(
+                  (recPage - 1) * RECS_PER_PAGE,
+                  recPage * RECS_PER_PAGE
+                );
+                const totalRecPages = Math.ceil(aiData.recommendations.length / RECS_PER_PAGE);
+                return (
+                  <>
+                    {paginatedRecs.map((rec, idx) => (
                 <div
                   key={`${rec.addPlayerId}-${rec.dropPlayerId}`}
                   className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
@@ -403,7 +413,7 @@ export default function WaiversPage() {
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
                     <div className="flex items-center space-x-3 sm:space-x-4">
                       <span className="flex-shrink-0 inline-flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-accent text-content-inverse font-bold text-base sm:text-lg shadow-card">
-                        #{idx + 1}
+                        #{(recPage - 1) * RECS_PER_PAGE + idx + 1}
                       </span>
 
                       {/* Overall Impact */}
@@ -470,6 +480,30 @@ export default function WaiversPage() {
                     renderLegalityWarning(rec.legalityIssues)}
                 </div>
               ))}
+                    {totalRecPages > 1 && (
+                      <div className="flex items-center justify-center gap-4 pt-4">
+                        <button
+                          onClick={() => setRecPage(p => Math.max(1, p - 1))}
+                          disabled={recPage === 1}
+                          className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm text-muted-foreground">
+                          Page {recPage} of {totalRecPages}
+                        </span>
+                        <button
+                          onClick={() => setRecPage(p => Math.min(totalRecPages, p + 1))}
+                          disabled={recPage === totalRecPages}
+                          className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </CardContent>
           ) : (
             <CardContent className="py-12 text-center">

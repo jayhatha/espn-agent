@@ -252,21 +252,29 @@ export class ProjectionsIngestAgent {
     let hasPitchers = hasCompletePitchers;
 
     if (!hasBatters || !hasPitchers) {
-      // Check DB for existing projections with batter vs pitcher indicators
+      // Check DB for existing projections — count batters vs pitchers in application code
+      // to avoid JSONB field extraction with inline casts forcing PostgreSQL to parse every row
       const existingProjections = await this.db
         .selectFrom("player_projection as pp")
-        .select([
-          sql<string>`COUNT(pp.player_id)`.as("count"),
-          sql<string>`SUM(CASE WHEN (pp.stat_components_json->>'IP')::float > 0 AND COALESCE((pp.stat_components_json->>'AB')::float, 0) = 0 THEN 1 ELSE 0 END)`.as("pitcher_count"),
-          sql<string>`SUM(CASE WHEN (pp.stat_components_json->>'AB')::float > 0 THEN 1 ELSE 0 END)`.as("batter_count"),
-        ])
+        .select(["pp.stat_components_json"])
         .where("pp.projections_run_id", "=", projectionsRun.id)
-        .executeTakeFirst();
+        .execute();
 
-      if (existingProjections) {
-        hasBatters = hasBatters || Number(existingProjections.batter_count) > 0;
-        hasPitchers = hasPitchers || Number(existingProjections.pitcher_count) > 0;
+      let batterCount = 0;
+      let pitcherCount = 0;
+      for (const proj of existingProjections) {
+        const stats = proj.stat_components_json as Record<string, unknown>;
+        const ip = parseFloat(String(stats?.IP ?? 0));
+        const ab = parseFloat(String(stats?.AB ?? 0));
+        if (ip > 0 && ab === 0) {
+          pitcherCount++;
+        } else if (ab > 0) {
+          batterCount++;
+        }
       }
+
+      hasBatters = hasBatters || batterCount > 0;
+      hasPitchers = hasPitchers || pitcherCount > 0;
     }
 
     const staleness = hasBatters && hasPitchers ? "fresh" : "stale";
