@@ -148,16 +148,17 @@ export function calculateCategorySGP(
 ): number {
   if (allPlayerValues.length === 0) return 0;
 
-  // Calculate mean
-  const sum = allPlayerValues.reduce((acc, val) => acc + val, 0);
-  const mean = sum / allPlayerValues.length;
-
-  // Calculate population standard deviation
-  const squaredDiffs = allPlayerValues.map((val) => Math.pow(val - mean, 2));
-  const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / allPlayerValues.length;
+  const n = allPlayerValues.length;
+  let sum = 0;
+  let sumSq = 0;
+  for (const val of allPlayerValues) {
+    sum += val;
+    sumSq += val * val;
+  }
+  const mean = sum / n;
+  const variance = sumSq / n - mean * mean;
   const stdDev = Math.sqrt(variance);
 
-  // Avoid division by zero
   if (stdDev === 0) return 0;
 
   return (statValue - mean) / stdDev;
