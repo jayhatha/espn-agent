@@ -2,6 +2,7 @@ import { type AxiosInstance } from "axios";
 import crypto from "crypto";
 import type { Logger } from "pino";
 import { LRUCache } from "lru-cache";
+import pLimit from "p-limit";
 import { createRetryableAxios } from "../utils/retry.js";
 import {
   ESPNLeagueResponseSchema,
@@ -18,15 +19,21 @@ import {
  * caches responses, and detects schema drift
  */
 
-// Throttle helper - ensures minimum 2s between ESPN API calls
+// Serialize all ESPN API calls through a single-concurrency queue
+// to prevent concurrent callers from bypassing the 2-second throttle.
+const espnThrottle = pLimit(1);
 let lastEspnCall = 0;
-async function throttleEspnCall() {
-  const now = Date.now();
-  const timeSinceLastCall = now - lastEspnCall;
-  if (timeSinceLastCall < 2000) {
-    await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastCall));
-  }
-  lastEspnCall = Date.now();
+
+async function throttledEspnCall<T>(fn: () => Promise<T>): Promise<T> {
+  return espnThrottle(async () => {
+    const now = Date.now();
+    const timeSinceLastCall = now - lastEspnCall;
+    if (timeSinceLastCall < 2000) {
+      await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastCall));
+    }
+    lastEspnCall = Date.now();
+    return fn();
+  });
 }
 
 export interface ESPNAuthCookies {
@@ -496,21 +503,7 @@ export class ESPNAdapter {
         "Fetching ESPN league data",
       );
 
-      await throttleEspnCall();
-
-      let response;
-      try {
-        response = await this.client.get(url, {
-          params,
-          headers,
-        });
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after'] || 60;
-          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
-        }
-        throw error;
-      }
+      const response = await throttledEspnCall(() => this.client.get(url, { params, headers }));
 
       // Check if ESPN returned HTML instead of JSON (auth issue)
       if (
@@ -636,21 +629,7 @@ export class ESPNAdapter {
         "Fetching ESPN free agents",
       );
 
-      await throttleEspnCall();
-
-      let response;
-      try {
-        response = await this.client.get(url, {
-          params,
-          headers,
-        });
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after'] || 60;
-          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
-        }
-        throw error;
-      }
+      const response = await throttledEspnCall(() => this.client.get(url, { params, headers }));
 
       if (response.status !== 200) {
         throw new Error(
@@ -730,21 +709,7 @@ export class ESPNAdapter {
         "Fetching ESPN transactions",
       );
 
-      await throttleEspnCall();
-
-      let response;
-      try {
-        response = await this.client.get(url, {
-          params,
-          headers,
-        });
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after'] || 60;
-          this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
-        }
-        throw error;
-      }
+      const response = await throttledEspnCall(() => this.client.get(url, { params, headers }));
 
       if (response.status !== 200) {
         throw new Error(
@@ -902,18 +867,7 @@ export class ESPNAdapter {
           "Fetching ESPN pre-draft auction values batch",
         );
 
-        await throttleEspnCall();
-
-        let response;
-        try {
-          response = await this.client.get(url, { params, headers });
-        } catch (error: any) {
-          if (error.response?.status === 429) {
-            const retryAfter = error.response.headers['retry-after'] || 60;
-            this.logger?.warn({ retryAfter }, "ESPN rate limit hit - backing off");
-          }
-          throw error;
-        }
+        const response = await throttledEspnCall(() => this.client.get(url, { params, headers }));
 
         if (response.status !== 200) {
           throw new Error(`ESPN API returned status ${response.status}`);
@@ -1099,9 +1053,7 @@ export class ESPNAdapter {
           "Fetching global draft data batch",
         );
 
-        await throttleEspnCall();
-
-        const response = await this.client.get(url, { params, headers });
+        const response = await throttledEspnCall(() => this.client.get(url, { params, headers }));
 
         if (response.status !== 200) {
           throw new Error(`ESPN API returned status ${response.status}`);
