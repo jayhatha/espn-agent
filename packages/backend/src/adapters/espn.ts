@@ -284,7 +284,7 @@ export class ESPNAdapter {
     };
     this.logger = logger;
     this.cache = new LRUCache<string, { data: unknown; expiresAt: number }>({
-      max: 500,              // Maximum 500 cached responses
+      max: 2000,             // Maximum 2000 cached responses
       ttl: 1000 * 60 * 60,   // 1 hour TTL
       updateAgeOnGet: true,  // Refresh TTL on access
       updateAgeOnHas: false, // Don't refresh on has() checks

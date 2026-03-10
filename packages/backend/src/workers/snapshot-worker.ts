@@ -64,7 +64,7 @@ const worker = new Worker<SnapshotJobData>(
       throw error;
     }
   },
-  { connection: connection as any },
+  { connection: connection as any, concurrency: 3 },
 );
 
 worker.on("completed", (job) => {
@@ -88,7 +88,7 @@ worker.on("failed", async (job, err) => {
         failedAt: new Date().toISOString(),
       },
       {
-        removeOnComplete: { age: 86400 * 30 }, // Keep 30 days for analysis
+        removeOnComplete: { age: 86400 * 7 }, // Keep 7 days for analysis
       },
     );
 

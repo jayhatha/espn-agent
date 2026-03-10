@@ -10,7 +10,10 @@ export function createDb(connectionString: string): Kysely<Database> {
   const dialect = new PostgresDialect({
     pool: new Pool({
       connectionString,
-      max: 10,
+      max: 25,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+      maxUses: 7500,
     }),
   });
 

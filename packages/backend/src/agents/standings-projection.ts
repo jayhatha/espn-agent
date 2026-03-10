@@ -80,19 +80,12 @@ export class StandingsProjectionAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    // Compute projections for each team
-    const teamProjections: TeamProjection[] = [];
-
-    for (const team of teams) {
-      const projection = await this.computeTeamProjection(
-        leagueId,
-        snapshotDate,
-        team.id,
-        projectionsRunId,
-        categories,
-      );
-      teamProjections.push(projection);
-    }
+    // Compute projections for each team in parallel
+    const teamProjections = await Promise.all(
+      teams.map(team =>
+        this.computeTeamProjection(leagueId, snapshotDate, team.id, projectionsRunId, categories)
+      )
+    );
 
     // Rank teams by category and compute roto points
     await this.rankAndStore(
