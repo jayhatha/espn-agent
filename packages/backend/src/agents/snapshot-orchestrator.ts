@@ -1,6 +1,7 @@
 import type { Logger } from "pino";
-import type { Kysely } from "kysely";
+import { type Kysely, sql } from "kysely";
 import type { Database } from "../db/schema.js";
+import type { RosterStatus } from "../../../shared/dist/index.js";
 import crypto from "crypto";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, ESPN_STAT_MAP } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
@@ -257,6 +258,8 @@ export class SnapshotOrchestratorAgent {
     }
 
     // 6. Begin transaction and write snapshot (with error boundary)
+    // Declare map outside transaction so it can be reused at step 8 without re-querying
+    const espnTeamIdToDbId = new Map<number, number>();
     try {
       await this.db.transaction().execute(async (trx) => {
         // Write snapshot
@@ -283,7 +286,6 @@ export class SnapshotOrchestratorAgent {
           .execute();
 
         // Write teams and collect DB team IDs
-        const espnTeamIdToDbId = new Map<number, number>();
         for (const team of normalized.teams) {
           const result = await trx
             .insertInto("team")
@@ -363,21 +365,10 @@ export class SnapshotOrchestratorAgent {
     }
 
       // 8. Fetch free agents and transactions in parallel (non-blocking)
-      // Build espnTeamIdToDbId map outside the transaction for use here
-      const teamIdMap = new Map<number, number>();
-      for (const team of normalized.teams) {
-        const dbTeam = await this.db
-          .selectFrom("team")
-          .select("id")
-          .where("league_id", "=", leagueId)
-          .where("espn_team_id", "=", team.id)
-          .executeTakeFirst();
-        if (dbTeam) teamIdMap.set(team.id, dbTeam.id);
-      }
-
+      // Reuse espnTeamIdToDbId populated during transaction (B-04: no re-querying needed)
       const [freeAgentResult, transactionResult] = await Promise.allSettled([
         this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate),
-        this.fetchAndStoreTransactions(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate, teamIdMap),
+        this.fetchAndStoreTransactions(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate, espnTeamIdToDbId),
       ]);
 
       // If free agent fetch failed, mark snapshot as degraded
@@ -439,6 +430,42 @@ export class SnapshotOrchestratorAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
+    // Step 1: Pre-fetch ALL existing players in a single query
+    const allPlayerIds = teams.flatMap(t => t.roster.map(e => e.espnPlayerId));
+    const existingPlayers = allPlayerIds.length > 0
+      ? await trx.selectFrom("player").select(["id", "injury_status"]).where("id", "in", allPlayerIds).execute()
+      : [];
+    const existingPlayerMap = new Map(existingPlayers.map(p => [p.id, p.injury_status]));
+
+    // Step 2: Collect all rows into arrays instead of inserting per-player
+    const playerRows: Array<{
+      id: number;
+      name: string;
+      mlb_team: string | null;
+      positions: string[];
+      injury_status: string | null;
+      injury_updated_at: Date | undefined;
+      created_at: Date;
+    }> = [];
+
+    const injuryEventRows: Array<{
+      player_id: number;
+      event_date: string;
+      injury_status: string;
+      notes: string;
+      created_at: Date;
+    }> = [];
+
+    const rosterSnapshotRows: Array<{
+      league_id: number;
+      snapshot_date: string;
+      team_id: number;
+      player_id: number;
+      roster_status: RosterStatus;
+      roster_slot: string;
+      acquisition_type: string | null;
+    }> = [];
+
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
@@ -446,84 +473,79 @@ export class SnapshotOrchestratorAgent {
       for (const entry of team.roster) {
         // Normalize injury status from ESPN
         const injuryStatus = this.normalizeInjuryStatus(entry.injuryStatus);
+        const previousInjuryStatus = existingPlayerMap.get(entry.espnPlayerId);
+        const isNewPlayer = !existingPlayerMap.has(entry.espnPlayerId);
 
-        // Check if player exists to detect injury status changes
-        const existingPlayer = await trx
-          .selectFrom("player")
-          .select(["id", "injury_status"])
-          .where("id", "=", entry.espnPlayerId)
-          .executeTakeFirst();
+        // Collect player row
+        playerRows.push({
+          id: entry.espnPlayerId,
+          name: entry.name,
+          mlb_team: entry.mlbTeam,
+          positions: entry.positions,
+          injury_status: injuryStatus,
+          injury_updated_at: injuryStatus ? new Date() : undefined,
+          created_at: new Date(),
+        });
 
-        // Upsert player with injury status
-        const playerResult = await trx
-          .insertInto("player")
-          .values({
-            id: entry.espnPlayerId,
-            name: entry.name,
-            mlb_team: entry.mlbTeam,
-            positions: entry.positions,
-            injury_status: injuryStatus,
-            injury_updated_at: injuryStatus ? new Date() : undefined,
+        // Collect injury event if status changed or new player with injury
+        if (!isNewPlayer && previousInjuryStatus !== injuryStatus) {
+          injuryEventRows.push({
+            player_id: entry.espnPlayerId,
+            event_date: snapshotDate,
+            injury_status: injuryStatus || 'HEALTHY',
+            notes: `Status changed from ${previousInjuryStatus || 'HEALTHY'} to ${injuryStatus || 'HEALTHY'}`,
             created_at: new Date(),
-          })
-          .onConflict((oc) =>
-            oc.column("id").doUpdateSet({
-              name: entry.name,
-              mlb_team: entry.mlbTeam,
-              positions: entry.positions,
-              injury_status: injuryStatus,
-              injury_updated_at: injuryStatus ? new Date() : undefined,
-            }),
-          )
-          .returning("id")
-          .executeTakeFirstOrThrow();
-
-        // Track injury status changes in injury_event table
-        if (existingPlayer && existingPlayer.injury_status !== injuryStatus) {
-          // Status changed - record event
-          await trx
-            .insertInto("injury_event")
-            .values({
-              player_id: playerResult.id,
-              event_date: snapshotDate,
-              injury_status: injuryStatus || 'HEALTHY',
-              notes: `Status changed from ${existingPlayer.injury_status || 'HEALTHY'} to ${injuryStatus || 'HEALTHY'}`,
-              created_at: new Date(),
-            })
-            .execute();
+          });
 
           this.logger?.debug(
-            { playerId: playerResult.id, playerName: entry.name, oldStatus: existingPlayer.injury_status, newStatus: injuryStatus },
+            { playerId: entry.espnPlayerId, playerName: entry.name, oldStatus: previousInjuryStatus, newStatus: injuryStatus },
             "Injury status changed"
           );
-        } else if (!existingPlayer && injuryStatus) {
-          // New player with injury status - record event
-          await trx
-            .insertInto("injury_event")
-            .values({
-              player_id: playerResult.id,
-              event_date: snapshotDate,
-              injury_status: injuryStatus,
-              notes: `Initial injury status: ${injuryStatus}`,
-              created_at: new Date(),
-            })
-            .execute();
+        } else if (isNewPlayer && injuryStatus) {
+          injuryEventRows.push({
+            player_id: entry.espnPlayerId,
+            event_date: snapshotDate,
+            injury_status: injuryStatus,
+            notes: `Initial injury status: ${injuryStatus}`,
+            created_at: new Date(),
+          });
         }
 
-        // Write roster snapshot
-        await trx
-          .insertInto("team_roster_snapshot")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            player_id: playerResult.id,
-            roster_status: entry.rosterStatus,
-            roster_slot: entry.rosterSlot,
-            acquisition_type: entry.acquisitionType,
-          })
-          .execute();
+        // Collect roster snapshot row
+        rosterSnapshotRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          player_id: entry.espnPlayerId,
+          roster_status: entry.rosterStatus,
+          roster_slot: entry.rosterSlot,
+          acquisition_type: entry.acquisitionType,
+        });
       }
+    }
+
+    // Step 3: Batch insert all rows
+    // Players (batch upsert with ON CONFLICT)
+    if (playerRows.length > 0) {
+      await trx.insertInto("player").values(playerRows)
+        .onConflict(oc => oc.column("id").doUpdateSet({
+          name: sql`excluded.name`,
+          mlb_team: sql`excluded.mlb_team`,
+          positions: sql`excluded.positions`,
+          injury_status: sql`excluded.injury_status`,
+          injury_updated_at: sql`excluded.injury_updated_at`,
+        }))
+        .execute();
+    }
+
+    // Injury events (simple batch insert, no conflict)
+    if (injuryEventRows.length > 0) {
+      await trx.insertInto("injury_event").values(injuryEventRows).execute();
+    }
+
+    // Roster snapshots (batch insert)
+    if (rosterSnapshotRows.length > 0) {
+      await trx.insertInto("team_roster_snapshot").values(rosterSnapshotRows).execute();
     }
 
     const totalPlayers = teams.reduce((sum, t) => sum + t.roster.length, 0);
