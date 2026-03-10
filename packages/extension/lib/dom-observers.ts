@@ -354,11 +354,23 @@ export function observeDraftBoard(
     }
   });
 
-  if (!observedBoard && document.body) {
-    bootstrapObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+  if (!observedBoard) {
+    // Try narrower containers first — ESPN draft boards use these patterns.
+    // Observing a narrower container reduces mutation events on ESPN's DOM-heavy pages.
+    const bootstrapTarget =
+      document.querySelector('.draft-board') ||
+      document.querySelector('[class*="DraftBoard"]') ||
+      document.querySelector('.players-table') ||
+      document.querySelector('[class*="playersTable"]') ||
+      document.getElementById('draft-content') ||
+      document.body;
+
+    if (bootstrapTarget) {
+      bootstrapObserver.observe(bootstrapTarget, {
+        childList: true,
+        subtree: true,
+      });
+    }
   }
 
   const bootstrapTimeout = setTimeout(() => {
@@ -378,7 +390,7 @@ export function observeDraftBoard(
   if (!skipInitialScan) {
     periodicScan = setInterval(() => {
       scanEntireDocument();
-    }, 2000);
+    }, 5000);
   } else {
     logger.log("[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)");
   }
@@ -1355,9 +1367,16 @@ export function observeCurrentAuctionPlayer(
     checkCurrentPlayer();
   });
 
-  // Observe body for changes (auction UI updates frequently)
-  if (document.body) {
-    observer.observe(document.body, {
+  // Try narrower container for auction UI — reduces mutation events vs. observing document.body.
+  // Falls back to document.body if none of the known ESPN auction selectors match.
+  const auctionContainer =
+    document.querySelector('[class*="auction"]') ||
+    document.querySelector('[class*="Auction"]') ||
+    document.querySelector('.player-card') ||
+    document.body;
+
+  if (auctionContainer) {
+    observer.observe(auctionContainer, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -1365,15 +1384,9 @@ export function observeCurrentAuctionPlayer(
     });
   }
 
-  // Periodic check as safety net (ESPN may update without DOM mutations)
-  const periodicCheck = setInterval(() => {
-    checkCurrentPlayer();
-  }, 2000);
-
-  // Return cleanup function
+  // Return cleanup function — no setInterval to clear (MutationObserver + 200ms debounce is sufficient)
   return () => {
     observer.disconnect();
-    clearInterval(periodicCheck);
     if (debounceTimeout) {
       clearTimeout(debounceTimeout);
     }
