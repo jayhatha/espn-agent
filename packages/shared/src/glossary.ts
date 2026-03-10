@@ -1,0 +1,16 @@
+export const GLOSSARY: Record<string, string> = {
+  sgp: "Standings Gain Points — how many points in the standings a player's stats are projected to earn your team.",
+  vbd: "Value Based Drafting — a player's projected stats compared to a baseline replacement-level player at the same position.",
+  "roto-points": "Roto Points — your team's rank in each category summed together. Higher total = higher finish.",
+  inflation: "Inflation Factor — how much auction prices have risen because remaining budget exceeds remaining player value in the pool.",
+  "surplus-value": "Surplus Value — the difference between a player's projected value and their expected cost. Positive surplus = bargain.",
+  "max-bid": "Max Bid — the highest price you can pay for this player while still filling your roster within budget.",
+  "expected-market-price": "Expected Market Price — what opponents are likely to bid based on league-wide budget and need patterns.",
+  "win-probability": "Win Probability — Monte Carlo simulation estimate of your chance to finish in the top 3 given current roster and available players.",
+  "budget-pressure": "Budget Pressure — how constrained your remaining budget is relative to roster slots still needed.",
+  "scarcity-index": "Scarcity Index — how thin the remaining player pool is at a given position. Higher = fewer quality options left.",
+  whip: "WHIP — Walks + Hits per Inning Pitched. Lower is better.",
+  era: "ERA — Earned Run Average per 9 innings. Lower is better.",
+  ops: "OPS — On-base Plus Slugging. Combines getting on base with hitting for power.",
+  "shapley-impact": "Shapley Impact — a game theory metric measuring how much a player contributes to your team's marginal standings improvement across all categories.",
+};

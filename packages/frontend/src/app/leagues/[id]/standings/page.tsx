@@ -15,6 +15,7 @@ import {
   formatStatValue,
   getRankColor,
 } from "@/components/league/CategoryStatsTable";
+import { Term } from "@/components/ui/Term";
 import { cn } from "@/lib/cn";
 
 interface Category {
@@ -207,7 +208,7 @@ export default function StandingsPage() {
                     </th>
                   ))}
                   <th className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider font-bold">
-                    Total
+                    <Term id="roto-points">Total</Term>
                   </th>
                 </tr>
               </thead>

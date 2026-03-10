@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ArrowRight, ExternalLink, FileText, AlertTriangle, ChevronDown } from "lucide-react";
+import { ArrowRight, ExternalLink, AlertTriangle, ChevronDown } from "lucide-react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -17,6 +17,7 @@ import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PlayerRow } from "@/components/league/PlayerRow";
 import { getESPNFreeAgentsUrl } from "@/lib/espn-links";
 import { cn } from "@/lib/cn";
+import { Term } from "@/components/ui/Term";
 
 interface WaiverRecommendation {
   addPlayerId: number;
@@ -419,7 +420,7 @@ export default function WaiversPage() {
                       {/* Overall Impact */}
                       <div>
                         <div className="text-data font-medium text-content-secondary">
-                          Projected Gain
+                          <Term id="roto-points">Projected Gain</Term>
                         </div>
                         <div className="text-h4 font-bold text-positive">
                           {rec.deltaOverallPoints > 0 ? "+" : ""}
@@ -506,34 +507,12 @@ export default function WaiversPage() {
               })()}
             </CardContent>
           ) : (
-            <CardContent className="py-12 text-center">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-surface-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-content-tertiary" />
-              </div>
-              <Heading level={3} className="text-base sm:text-lg mb-2">
-                No Waiver Recommendations Available
-              </Heading>
-              <div className="text-data text-content-secondary space-y-2 mb-6">
-                <p>This could mean:</p>
-                <ul className="list-disc list-inside text-left inline-block space-y-1">
-                  <li>No free agents are currently available</li>
-                  <li>
-                    All available players would hurt your team's standings
-                  </li>
-                  <li>
-                    Projections haven't been uploaded by administrator yet
-                  </li>
-                  <li>A snapshot needs to be created</li>
-                </ul>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Link
-                  href={`/leagues/${leagueId}`}
-                  className="inline-flex items-center justify-center px-4 py-2 text-body-sm font-medium rounded-lg text-content-inverse bg-accent hover:bg-accent-hover"
-                >
-                  Refresh League Data
-                </Link>
-              </div>
+            <CardContent className="py-8">
+              <ErrorAlert
+                variant="info"
+                message="No waiver recommendations available. Upload FanGraphs projections to generate personalized recommendations."
+                action={{ label: "Upload Projections", href: "/admin" }}
+              />
             </CardContent>
           )}
         </Card>
