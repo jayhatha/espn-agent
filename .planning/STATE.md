@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 37 — App Performance Audit (verify and fix issues from PERFORMANCE_AUDIT.md)
-Plan: 06 complete (all 6/6 complete)
-Status: 37-06 COMPLETE — Turbo tsconfig cache invalidation (I-02), Next.js compress+no source maps (I-03), single-pass SGP formula (B-14), app-code batter/pitcher detection (B-15), waivers pagination 10/page (F-03)
-Last activity: 2026-03-09 — Phase 37 Plan 06 complete (infrastructure, shared formula, backend JSONB elimination, and frontend pagination)
+Phase: 37 — App Performance Audit — VERIFIED COMPLETE
+Plan: All 6/6 plans executed and verified (21/21 issues confirmed)
+Status: Phase 37 VERIFIED — All performance issues fixed across backend DB, frontend React, extension DOM, and infrastructure
+Last activity: 2026-03-09 — Phase 37 verified complete (18 commits, 21 issues, 0 failures)
 
-Progress: Phase 37 COMPLETE (6/6 plans done)
+Progress: Phase 37 VERIFIED COMPLETE
 
 ```
 [############                            ] 30% v2.0
@@ -478,6 +478,7 @@ Recent decisions affecting v1.1 work:
 - Phase 35 added: Use the queue for player nominations instead of finding players on the fly
 - Phase 36 added: Code cleanup — verify and address concerns from CODE_REVIEW.md (skip security concerns, app not deployed)
 - Phase 37 added: App performance audit — verify and fix issues from PERFORMANCE_AUDIT.md
+- Phase 38 added: UX audit and fixes — confirm and evaluate suggestions from UX_REVIEW.md before implementing
 
 ### Pending Todos
 
@@ -581,8 +582,9 @@ None yet.
 | 87 | Fix search nomination: click matching player from search dropdown instead of submitting form | 2026-03-09 | 7fe5b0c | ✅ | [87-fix-search-nomination-click-matching-pla](./quick/87-fix-search-nomination-click-matching-pla/) |
 | 88 | Keep ~3 players in ESPN queue — search and queue top engine candidates when queue is low | 2026-03-09 | edffb40 | ✅ | [88-keep-3-players-in-espn-queue-search-and-](./quick/88-keep-3-players-in-espn-queue-search-and-/) |
 | 89 | Fix queue button clicking after search — polling loop replaces single-wait | 2026-03-09 | f2c05fd | ✅ | [89-fix-queue-button-clicking-after-search-n](./quick/89-fix-queue-button-clicking-after-search-n/) |
+| 90 | Fix auto-nominate queue button selectors — use .action-btn class to avoid matching non-action elements | 2026-03-10 | 464d787 | ✅ | [90-fix-auto-nominate-queue-button-selector-](./quick/90-fix-auto-nominate-queue-button-selector-/) |
 
 ## Session Continuity
 
-Last activity: 2026-03-09 - Completed quick task 89: Fix queue button clicking after search
+Last activity: 2026-03-10 - Completed quick task 90: Fix auto-nominate queue button selectors
 Resume file: None
