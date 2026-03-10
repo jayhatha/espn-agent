@@ -171,6 +171,7 @@ Progress: Phase 36 COMPLETE (3/3 plans done)
 | Phase 36 P03 | 4min | 2 tasks | 14 files |
 | Phase 36 P01 | 5 | 2 tasks | 14 files |
 | Phase 36 P02 | 8 | 2 tasks | 11 files |
+| Phase 37 P05 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -427,6 +428,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 36]: NFKD + strip-all-non-alphanumeric chosen as canonical normalizer for extension — more aggressive than NFD, better fuzzy matching, single source of truth in lib/engine/normalizer.ts
 - [Phase 36]: Engine cache keys include leagueId to prevent cross-session stale recommendations — resetEngineCache() called at draft init in content.tsx
 - [Phase 36]: ErrorBoundary wraps each sidebar section independently; logger.ts gates log/warn/debug/info behind import.meta.env.DEV
+- [Phase 37]: Bootstrap observer tries narrow ESPN draft containers before falling back to document.body
+- [Phase 37]: Removed setInterval from observeCurrentAuctionPlayer — MutationObserver with debounce is sufficient
+- [Phase 37]: PitcherList ranking maps cached at module level with hash invalidation; last-name fallback uses O(1) index
 
 ### Roadmap Evolution
 
@@ -457,6 +461,7 @@ Recent decisions affecting v1.1 work:
 - Phase 34 added: Make sure we're not entirely punting categories. A test draft had no saves.
 - Phase 35 added: Use the queue for player nominations instead of finding players on the fly
 - Phase 36 added: Code cleanup — verify and address concerns from CODE_REVIEW.md (skip security concerns, app not deployed)
+- Phase 37 added: App performance audit — verify and fix issues from PERFORMANCE_AUDIT.md
 
 ### Pending Todos
 
