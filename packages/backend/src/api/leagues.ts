@@ -350,6 +350,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .selectAll("league")
         .where("team.user_id", "=", request.user.userId)
         .orderBy("league.created_at", "desc")
+        .limit(100)
         .execute();
 
       return { leagues };

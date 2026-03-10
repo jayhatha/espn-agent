@@ -20,7 +20,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // List available free agents
   app.get<{
     Params: { leagueId: string };
-    Querystring: { snapshotDate?: string; limit?: string; sortBy?: string; position?: string };
+    Querystring: { snapshotDate?: string; limit?: string; offset?: string; sortBy?: string; position?: string };
   }>(
     "/api/leagues/:leagueId/free-agents",
     {
@@ -29,8 +29,9 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const { snapshotDate, limit, sortBy, position } = request.query;
+      const { snapshotDate, limit, offset, sortBy, position } = request.query;
       const maxPlayers = limit ? parseInt(limit, 10) : 200;
+      const pageOffset = offset ? parseInt(offset, 10) : 0;
       const positionFilter = position?.split(",").map((p) => p.trim()).filter(Boolean) || [];
 
       // Get latest snapshot date if not provided
@@ -90,7 +91,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         });
 
         if (espnFreeAgents.length === 0) {
-          return { freeAgents: [], snapshotDate: date };
+          return { freeAgents: [], snapshotDate: date, pagination: { limit: maxPlayers, offset: pageOffset, total: 0 } };
         }
 
         // Apply position filter if specified
@@ -190,7 +191,19 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           enriched.sort((a, b) => a.playerName.localeCompare(b.playerName));
         }
 
-        return { freeAgents: enriched, snapshotDate: date };
+        // Apply offset-based pagination
+        const total = enriched.length;
+        enriched = enriched.slice(pageOffset, pageOffset + maxPlayers);
+
+        return {
+          freeAgents: enriched,
+          snapshotDate: date,
+          pagination: {
+            limit: maxPlayers,
+            offset: pageOffset,
+            total,
+          },
+        };
       } catch (error) {
         request.log.error({ error }, "Failed to fetch free agents");
         return reply.code(500).send({

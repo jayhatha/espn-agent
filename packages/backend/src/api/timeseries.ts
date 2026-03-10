@@ -13,6 +13,7 @@ interface TimeSeriesQuery {
   to?: string;
   teamIds?: string; // comma-separated
   season?: string; // year filter
+  limit?: string; // max rows to return (default 1000)
 }
 
 export async function timeSeriesRoutes(app: FastifyInstance) {
@@ -69,7 +70,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, season } = request.query;
+      const { from, to, teamIds, season, limit } = request.query;
 
       let query = db
         .selectFrom("team_daily_overall")
@@ -94,7 +95,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("team_id", "in", ids);
       }
 
-      const series = await query.orderBy("snapshot_date", "asc").execute();
+      const queryLimit = limit ? parseInt(limit, 10) : 1000;
+      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
 
       return { series };
     },
@@ -112,7 +114,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, categoryId, season } = request.query;
+      const { from, to, teamIds, categoryId, season, limit } = request.query;
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -142,7 +144,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("team_id", "in", ids);
       }
 
-      const series = await query.orderBy("snapshot_date", "asc").execute();
+      const queryLimit = limit ? parseInt(limit, 10) : 1000;
+      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
 
       return { series };
     },
@@ -160,7 +163,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, categoryId, season } = request.query;
+      const { from, to, teamIds, categoryId, season, limit } = request.query;
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -196,7 +199,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("team_id", "in", ids);
       }
 
-      const series = await query.orderBy("snapshot_date", "asc").execute();
+      const queryLimit = limit ? parseInt(limit, 10) : 1000;
+      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
 
       return { series };
     },
@@ -214,7 +218,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, season } = request.query;
+      const { from, to, teamIds, season, limit } = request.query;
 
       let query = db
         .selectFrom("team_daily_projected_overall")
@@ -239,7 +243,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("team_id", "in", ids);
       }
 
-      const series = await query.orderBy("snapshot_date", "asc").execute();
+      const queryLimit = limit ? parseInt(limit, 10) : 1000;
+      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
 
       return { series };
     },
