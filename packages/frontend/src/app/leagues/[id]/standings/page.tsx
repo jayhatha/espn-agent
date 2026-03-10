@@ -365,15 +365,12 @@ export default function StandingsPage() {
             </>
           ) : viewMode === "current" && !currentMatrix ? (
             <Card>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Heading level={4} className="text-body-sm font-medium text-content mb-1">
-                    No current standings available
-                  </Heading>
-                  <p className="text-body-sm text-content-secondary">
-                    Current standings will appear after you create a snapshot.
-                  </p>
-                </div>
+              <CardContent className="py-4">
+                <ErrorAlert
+                  variant="info"
+                  message="Projected standings unavailable. Trigger a snapshot to compute projections."
+                  action={{ label: "Refresh Data", href: `/leagues/${leagueId}` }}
+                />
               </CardContent>
             </Card>
           ) : null}
@@ -413,46 +410,24 @@ export default function StandingsPage() {
             </>
           ) : viewMode === "projected" && !projectedMatrix ? (
             <Card>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Heading level={4} className="text-body-sm font-medium text-content mb-1">
-                    No projected standings available
-                  </Heading>
-                  <p className="text-body-sm text-content-secondary">
-                    Projected standings will appear after projections are uploaded
-                    and a snapshot is created. Contact your administrator if
-                    projections are needed.
-                  </p>
-                </div>
+              <CardContent className="py-4">
+                <ErrorAlert
+                  variant="info"
+                  message="Projected standings unavailable. Trigger a snapshot to compute projections."
+                  action={{ label: "Upload Projections", href: "/admin" }}
+                />
               </CardContent>
             </Card>
           ) : null}
         </>
       ) : (
         <Card>
-          <CardContent>
-            <div className="text-center py-12">
-              <svg
-                className="mx-auto h-12 w-12 text-content-tertiary"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-              <Heading level={4} className="mt-2 text-body-sm font-medium text-content mb-1">
-                No standings available
-              </Heading>
-              <p className="text-body-sm text-content-secondary">
-                Standings will appear after you create a snapshot.
-              </p>
-            </div>
+          <CardContent className="py-4">
+            <ErrorAlert
+              variant="info"
+              message="Projected standings unavailable. Trigger a snapshot to compute projections."
+              action={{ label: "Refresh Data", href: `/leagues/${leagueId}` }}
+            />
           </CardContent>
         </Card>
       )}

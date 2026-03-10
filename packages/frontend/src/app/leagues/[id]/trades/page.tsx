@@ -864,12 +864,11 @@ export default function TradesPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-content-secondary">
-                <p>No beneficial trade opportunities found at this time.</p>
-                <p className="text-body-sm mt-2">
-                  Try the manual trade builder to evaluate specific proposals.
-                </p>
-              </div>
+              <ErrorAlert
+                variant="info"
+                message="No trade recommendations available. Upload projections data to analyze potential trades."
+                action={{ label: "Upload Projections", href: "/admin" }}
+              />
             )}
           </CardContent>
         </Card>

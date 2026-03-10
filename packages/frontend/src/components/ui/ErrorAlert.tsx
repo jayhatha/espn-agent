@@ -9,6 +9,7 @@ interface ErrorAlertProps {
   onRetry?: () => void;
   variant?: "error" | "warning" | "info";
   backLink?: { href: string; label: string };
+  action?: { label: string; href?: string; onClick?: () => void };
 }
 
 const variantStyles = {
@@ -19,6 +20,8 @@ const variantStyles = {
     button:
       "text-negative hover:text-negative border-negative-border hover:bg-negative-light",
     icon: "text-negative",
+    actionButton:
+      "bg-negative text-white hover:bg-red-700",
   },
   warning: {
     container: "bg-warning-light border border-warning-border",
@@ -27,6 +30,8 @@ const variantStyles = {
     button:
       "text-warning hover:text-warning border-warning-border hover:bg-warning-light",
     icon: "text-warning",
+    actionButton:
+      "bg-warning text-white hover:bg-amber-600",
   },
   info: {
     container: "bg-info-light border border-info-border",
@@ -34,6 +39,8 @@ const variantStyles = {
     message: "text-info",
     button: "text-info hover:text-info border-info-border hover:bg-info-light",
     icon: "text-info",
+    actionButton:
+      "bg-accent text-content-inverse hover:bg-accent-hover",
   },
 };
 
@@ -48,6 +55,7 @@ export function ErrorAlert({
   onRetry,
   variant = "error",
   backLink,
+  action,
 }: ErrorAlertProps) {
   const styles = variantStyles[variant];
   const Icon = variantIcons[variant];
@@ -77,6 +85,28 @@ export function ErrorAlert({
                 )}
               >
                 Retry
+              </button>
+            )}
+            {action && action.href && (
+              <Link
+                href={action.href}
+                className={cn(
+                  "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  styles.actionButton
+                )}
+              >
+                {action.label}
+              </Link>
+            )}
+            {action && !action.href && action.onClick && (
+              <button
+                onClick={action.onClick}
+                className={cn(
+                  "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  styles.actionButton
+                )}
+              >
+                {action.label}
               </button>
             )}
             {backLink && (

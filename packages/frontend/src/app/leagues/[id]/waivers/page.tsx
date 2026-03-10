@@ -87,6 +87,44 @@ interface EvaluationResult {
 
 type ViewMode = "ai" | "manual";
 
+function groupByTopCategory(
+  recs: WaiverRecommendation[]
+): { category: string; recs: WaiverRecommendation[] }[] {
+  const groups: Record<string, WaiverRecommendation[]> = {};
+
+  for (const rec of recs) {
+    const topCat = rec.categoryImpacts
+      ?.filter((ci) => Math.abs(ci.deltaPoints) > 0.3)
+      .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
+
+    const groupKey = topCat ? topCat.categoryName : "Best Overall";
+    if (!groups[groupKey]) groups[groupKey] = [];
+    groups[groupKey].push(rec);
+  }
+
+  return Object.entries(groups)
+    .map(([category, recs]) => ({ category, recs }))
+    .sort((a, b) => {
+      if (a.category === "Best Overall") return 1;
+      if (b.category === "Best Overall") return -1;
+      const avgA =
+        a.recs.reduce((sum, r) => {
+          const top = r.categoryImpacts?.sort(
+            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints)
+          )[0];
+          return sum + (top?.deltaPoints ?? 0);
+        }, 0) / a.recs.length;
+      const avgB =
+        b.recs.reduce((sum, r) => {
+          const top = r.categoryImpacts?.sort(
+            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints)
+          )[0];
+          return sum + (top?.deltaPoints ?? 0);
+        }, 0) / b.recs.length;
+      return avgB - avgA;
+    });
+}
+
 export default function WaiversPage() {
   const params = useParams();
   const leagueId = params.id as string;
@@ -396,115 +434,98 @@ export default function WaiversPage() {
               <ErrorAlert message={(aiError as Error).message} />
             </CardContent>
           ) : aiData && aiData.recommendations.length > 0 ? (
-            <CardContent className="space-y-4 sm:space-y-6">
-              {(() => {
-                const paginatedRecs = aiData.recommendations.slice(
-                  (recPage - 1) * RECS_PER_PAGE,
-                  recPage * RECS_PER_PAGE
-                );
-                const totalRecPages = Math.ceil(aiData.recommendations.length / RECS_PER_PAGE);
-                return (
-                  <>
-                    {paginatedRecs.map((rec, idx) => (
-                <div
-                  key={`${rec.addPlayerId}-${rec.dropPlayerId}`}
-                  className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
-                >
-                  {/* Header with Rank and Delta */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                    <div className="flex items-center space-x-3 sm:space-x-4">
-                      <span className="flex-shrink-0 inline-flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-accent text-content-inverse font-bold text-base sm:text-lg shadow-card">
-                        #{(recPage - 1) * RECS_PER_PAGE + idx + 1}
-                      </span>
-
-                      {/* Overall Impact */}
-                      <div>
-                        <div className="text-data font-medium text-content-secondary">
-                          <Term id="roto-points">Projected Gain</Term>
-                        </div>
-                        <div className="text-h4 font-bold text-positive">
-                          {rec.deltaOverallPoints > 0 ? "+" : ""}
-                          {rec.deltaOverallPoints.toFixed(1)} pts
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled
-                        title="Waiver claim execution coming soon"
-                      >
-                        Add to Queue
-                      </Button>
-                      {espnLeagueId && season && (
-                        <a
-                          href={getESPNFreeAgentsUrl(espnLeagueId, season)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center px-3 h-8 bg-positive text-white rounded-md hover:bg-emerald-700 font-medium text-body-sm gap-2"
+            <CardContent className="space-y-8">
+              {groupByTopCategory(aiData.recommendations).map((group, groupIdx) => (
+                <div key={group.category} className="mb-2">
+                  <h3 className="text-h4 font-semibold text-content mb-3 flex items-center gap-2">
+                    {group.category}
+                    <span className="text-caption text-content-secondary font-normal">
+                      ({group.recs.length} {group.recs.length === 1 ? "recommendation" : "recommendations"})
+                    </span>
+                  </h3>
+                  <div className="space-y-4">
+                    {group.recs.map((rec, idx) => {
+                      const globalIdx = groupIdx * 100 + idx;
+                      return (
+                        <div
+                          key={`${rec.addPlayerId}-${rec.dropPlayerId}`}
+                          className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
                         >
-                          Add on ESPN
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
+                          {/* Header with Rank and Delta */}
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                            <div className="flex items-center space-x-3 sm:space-x-4">
+                              <span className="flex-shrink-0 inline-flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-accent text-content-inverse font-bold text-base sm:text-lg shadow-card">
+                                #{globalIdx + 1}
+                              </span>
+
+                              {/* Overall Impact */}
+                              <div>
+                                <div className="text-data font-medium text-content-secondary">
+                                  <Term id="roto-points">Projected Gain</Term>
+                                </div>
+                                <div className="text-h4 font-bold text-positive">
+                                  {rec.deltaOverallPoints > 0 ? "+" : ""}
+                                  {rec.deltaOverallPoints.toFixed(1)} pts
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                disabled
+                                title="Waiver claim execution coming soon"
+                              >
+                                Add to Queue
+                              </Button>
+                              {espnLeagueId && season && (
+                                <a
+                                  href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center px-3 h-8 bg-positive text-white rounded-md hover:bg-emerald-700 font-medium text-body-sm gap-2"
+                                >
+                                  Add on ESPN
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Swap Visualization */}
+                          {renderSwapVisualization(
+                            rec.dropPlayerName,
+                            rec.addPlayerName,
+                          )}
+
+                          {/* Explanation */}
+                          <p className="text-data text-content-secondary mb-3 leading-relaxed">
+                            {rec.explanation}
+                          </p>
+
+                          {/* Category Breakdown */}
+                          {rec.categoryImpacts.length > 0 && (
+                            <details className="group">
+                              <summary className="cursor-pointer text-body-sm font-medium text-accent hover:text-accent-hover flex items-center py-2">
+                                <span>View Category Breakdown</span>
+                                <ChevronDown className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" />
+                              </summary>
+                              {renderCategoryImpactTable(rec.categoryImpacts)}
+                            </details>
+                          )}
+
+                          {/* Legality Issues */}
+                          {!rec.isLegal &&
+                            rec.legalityIssues &&
+                            rec.legalityIssues.length > 0 &&
+                            renderLegalityWarning(rec.legalityIssues)}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {/* Swap Visualization */}
-                  {renderSwapVisualization(
-                    rec.dropPlayerName,
-                    rec.addPlayerName,
-                  )}
-
-                  {/* Explanation */}
-                  <p className="text-data text-content-secondary mb-3 leading-relaxed">
-                    {rec.explanation}
-                  </p>
-
-                  {/* Category Breakdown */}
-                  {rec.categoryImpacts.length > 0 && (
-                    <details className="group">
-                      <summary className="cursor-pointer text-body-sm font-medium text-accent hover:text-accent-hover flex items-center py-2">
-                        <span>View Category Breakdown</span>
-                        <ChevronDown className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" />
-                      </summary>
-                      {renderCategoryImpactTable(rec.categoryImpacts)}
-                    </details>
-                  )}
-
-                  {/* Legality Issues */}
-                  {!rec.isLegal &&
-                    rec.legalityIssues &&
-                    rec.legalityIssues.length > 0 &&
-                    renderLegalityWarning(rec.legalityIssues)}
                 </div>
               ))}
-                    {totalRecPages > 1 && (
-                      <div className="flex items-center justify-center gap-4 pt-4">
-                        <button
-                          onClick={() => setRecPage(p => Math.max(1, p - 1))}
-                          disabled={recPage === 1}
-                          className="px-3 py-1 text-sm border rounded disabled:opacity-50"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-sm text-muted-foreground">
-                          Page {recPage} of {totalRecPages}
-                        </span>
-                        <button
-                          onClick={() => setRecPage(p => Math.min(totalRecPages, p + 1))}
-                          disabled={recPage === totalRecPages}
-                          className="px-3 py-1 text-sm border rounded disabled:opacity-50"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
             </CardContent>
           ) : (
             <CardContent className="py-8">
