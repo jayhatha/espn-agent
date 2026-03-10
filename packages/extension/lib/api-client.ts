@@ -303,6 +303,16 @@ function buildBundledRankings(): {
 }
 
 /**
+ * Cached ranking lookup maps — built once when draft data first loads, invalidated when data changes.
+ * Avoids rebuilding Maps from ~500-entry arrays on every getDraftBoardData call.
+ */
+let cachedPitcherMap: Map<string, PitcherListRanking> | null = null;
+let cachedHitterMap: Map<string, PitcherListRanking> | null = null;
+let cachedRelieverMap: Map<string, PitcherListRanking> | null = null;
+let cachedLastNameIndex: Map<string, { ranking: PitcherListRanking; source: string }> | null = null;
+let cachedRankingsHash: string | null = null;
+
+/**
  * Cached draft board data — ESPN player pool is static during a draft session.
  * Fetched once at draft start, reused for all subsequent calls.
  */
@@ -354,19 +364,52 @@ export async function getDraftBoardData(): Promise<{
         return null;
       }
 
-      // Build PitcherList lookup maps (same approach as draft board page matchPlayers)
-      const pitcherMap = new Map<string, PitcherListRanking>();
-      for (const ext of pitcherlistRankings.pitchers as PitcherListRanking[]) {
-        pitcherMap.set(normalizeName(ext.playerName), ext);
+      // Build PitcherList lookup maps — cached at module level and only rebuilt when rankings data changes.
+      // ESPN draft sessions always use the same bundled rankings, so maps are built at most once.
+      const rankingsHash = `${pitcherlistRankings.pitchers.length}-${pitcherlistRankings.hitters.length}-${pitcherlistRankings.relievers.length}`;
+
+      if (rankingsHash !== cachedRankingsHash) {
+        // Rebuild maps when rankings data changes (e.g., new bundle deployed mid-session)
+        cachedPitcherMap = new Map<string, PitcherListRanking>();
+        for (const ext of pitcherlistRankings.pitchers as PitcherListRanking[]) {
+          cachedPitcherMap.set(normalizeName(ext.playerName), ext);
+        }
+        cachedHitterMap = new Map<string, PitcherListRanking>();
+        for (const ext of pitcherlistRankings.hitters as PitcherListRanking[]) {
+          cachedHitterMap.set(normalizeName(ext.playerName), ext);
+        }
+        cachedRelieverMap = new Map<string, PitcherListRanking>();
+        for (const ext of pitcherlistRankings.relievers as PitcherListRanking[]) {
+          cachedRelieverMap.set(normalizeName(ext.playerName), ext);
+        }
+
+        // Pre-build last-name fallback index for O(1) lookup instead of O(n) loop per miss
+        cachedLastNameIndex = new Map();
+        for (const [key, val] of cachedPitcherMap) {
+          const lastName = key.split(" ").pop() || "";
+          if (lastName.length > 3 && !cachedLastNameIndex.has(lastName)) {
+            cachedLastNameIndex.set(lastName, { ranking: val, source: "PL" });
+          }
+        }
+        for (const [key, val] of cachedRelieverMap) {
+          const lastName = key.split(" ").pop() || "";
+          if (lastName.length > 3 && !cachedLastNameIndex.has(lastName)) {
+            cachedLastNameIndex.set(lastName, { ranking: val, source: "CM" });
+          }
+        }
+        for (const [key, val] of cachedHitterMap) {
+          const lastName = key.split(" ").pop() || "";
+          if (lastName.length > 3 && !cachedLastNameIndex.has(lastName)) {
+            cachedLastNameIndex.set(lastName, { ranking: val, source: "PL" });
+          }
+        }
+
+        cachedRankingsHash = rankingsHash;
       }
-      const hitterMap = new Map<string, PitcherListRanking>();
-      for (const ext of pitcherlistRankings.hitters as PitcherListRanking[]) {
-        hitterMap.set(normalizeName(ext.playerName), ext);
-      }
-      const relieverMap = new Map<string, PitcherListRanking>();
-      for (const ext of pitcherlistRankings.relievers as PitcherListRanking[]) {
-        relieverMap.set(normalizeName(ext.playerName), ext);
-      }
+
+      const pitcherMap = cachedPitcherMap!;
+      const hitterMap = cachedHitterMap!;
+      const relieverMap = cachedRelieverMap!;
 
       const rankings: PlayerRanking[] = [];
       const auctionValues: AuctionValue[] = [];
@@ -389,34 +432,14 @@ export async function getDraftBoardData(): Promise<{
           matchSource = "PL";
         }
 
-        // Try last name fallback
-        if (!match) {
+        // Try last name fallback using pre-built index (O(1) vs previous O(n) loops)
+        if (!match && cachedLastNameIndex) {
           const lastName = normalized.split(" ").pop() || "";
           if (lastName.length > 3) {
-            for (const [key, val] of pitcherMap) {
-              if (key.endsWith(lastName) && !key.startsWith(lastName)) {
-                match = val;
-                matchSource = "PL";
-                break;
-              }
-            }
-            if (!match) {
-              for (const [key, val] of relieverMap) {
-                if (key.endsWith(lastName) && !key.startsWith(lastName)) {
-                  match = val;
-                  matchSource = "CM";
-                  break;
-                }
-              }
-            }
-            if (!match) {
-              for (const [key, val] of hitterMap) {
-                if (key.endsWith(lastName) && !key.startsWith(lastName)) {
-                  match = val;
-                  matchSource = "PL";
-                  break;
-                }
-              }
+            const fallback = cachedLastNameIndex.get(lastName);
+            if (fallback) {
+              match = fallback.ranking;
+              matchSource = fallback.source;
             }
           }
         }
