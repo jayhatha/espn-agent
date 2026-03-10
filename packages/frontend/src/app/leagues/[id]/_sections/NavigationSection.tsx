@@ -1,16 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  TableIcon,
-  TrendingUpIcon,
-  PlusIcon,
-  ArrowRightLeftIcon,
-  BarChart3Icon,
-  ClipboardListIcon,
-  ActivityIcon,
-  DollarSignIcon,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Container } from "@/components/ui/Container";
 
 interface NavigationSectionProps {
@@ -18,71 +9,98 @@ interface NavigationSectionProps {
 }
 
 export function NavigationSection({ leagueId }: NavigationSectionProps) {
-  const quickLinks = [
+  const pathname = usePathname();
+
+  const primaryLinks = [
+    {
+      href: `/leagues/${leagueId}`,
+      label: "Overview",
+      exact: true,
+    },
     {
       href: `/leagues/${leagueId}/standings`,
-      icon: <TableIcon className="h-4 w-4" />,
       label: "Standings",
+      exact: false,
     },
     {
-      href: `/leagues/${leagueId}/trends`,
-      icon: <TrendingUpIcon className="h-4 w-4" />,
-      label: "Trends",
+      href: `/leagues/${leagueId}/moves`,
+      label: "Roster Moves",
+      exact: false,
     },
+  ];
+
+  const secondaryLinks = [
     {
       href: `/leagues/${leagueId}/waivers`,
-      icon: <PlusIcon className="h-4 w-4" />,
       label: "Waivers",
     },
     {
       href: `/leagues/${leagueId}/trades`,
-      icon: <ArrowRightLeftIcon className="h-4 w-4" />,
       label: "Trade Analyzer",
     },
     {
-      href: `/leagues/${leagueId}/moves`,
-      icon: <BarChart3Icon className="h-4 w-4" />,
-      label: "Move Impact",
+      href: `/leagues/${leagueId}/trends`,
+      label: "Trends",
     },
     {
       href: `/leagues/${leagueId}/lineup`,
-      icon: <ClipboardListIcon className="h-4 w-4" />,
       label: "Lineup Optimizer",
     },
     {
       href: `/leagues/${leagueId}/streaming`,
-      icon: <ActivityIcon className="h-4 w-4" />,
       label: "Streaming Pitchers",
-    },
-    {
-      href: `/leagues/${leagueId}/draft/rankings`,
-      icon: <BarChart3Icon className="h-4 w-4" />,
-      label: "Draft Rankings",
-    },
-    {
-      href: `/leagues/${leagueId}/draft/auction`,
-      icon: <DollarSignIcon className="h-4 w-4" />,
-      label: "Auction Values",
     },
   ];
 
+  const isActive = (href: string, exact: boolean) => {
+    if (exact) {
+      return pathname === href;
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
-    <section className="bg-surface-tertiary py-8">
+    <section className="bg-surface-tertiary py-6">
       <Container size="wide">
-        <h2 className="text-body font-medium text-content-secondary uppercase tracking-wider mb-4">
-          Quick Access
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-          {quickLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-md text-body-sm font-medium text-content hover:bg-accent-light hover:text-content transition-colors"
-            >
-              {link.icon}
-              {link.label}
-            </Link>
-          ))}
+        {/* Primary tier — larger text, horizontal row */}
+        <div className="flex items-center gap-1 mb-3">
+          {primaryLinks.map((link) => {
+            const active = isActive(link.href, link.exact);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={
+                  active
+                    ? "px-4 py-2 rounded-md text-body font-semibold bg-accent text-content-inverse transition-colors"
+                    : "px-4 py-2 rounded-md text-body font-semibold text-content hover:bg-accent-light hover:text-content transition-colors"
+                }
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </div>
+        {/* Divider */}
+        <div className="border-t border-neutral-200 mb-3" />
+        {/* Secondary tier — smaller text, wrapping row */}
+        <div className="flex flex-wrap items-center gap-1">
+          {secondaryLinks.map((link) => {
+            const active = isActive(link.href, false);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={
+                  active
+                    ? "px-3 py-1.5 rounded text-body-sm font-medium bg-accent text-content-inverse transition-colors"
+                    : "px-3 py-1.5 rounded text-body-sm text-content-secondary hover:bg-accent-light hover:text-content transition-colors"
+                }
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
       </Container>
     </section>

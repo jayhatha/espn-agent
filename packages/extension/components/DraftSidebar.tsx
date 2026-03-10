@@ -7,6 +7,7 @@ import { useNarratorStore } from "../lib/narrator-state";
 import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
 import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
+import BidVerdict from "./BidVerdict";
 import DraftNarrator from "./DraftNarrator";
 import DraftRecommendations from "./DraftRecommendations";
 import EngineInsights from "./EngineInsights";
@@ -349,6 +350,13 @@ export default function DraftSidebar() {
           </div>
 
         </div>
+      )}
+
+      {/* BidVerdict — consolidated bid/pass decision card, auction only */}
+      {draftFormat === "auction" && (
+        <ErrorBoundary sectionName="Bid Verdict">
+          <BidVerdict engineSignals={engineSignals} />
+        </ErrorBoundary>
       )}
 
       {/* Auto-Pilot toggle — always visible during auction drafts */}
