@@ -618,3 +618,17 @@ Plans:
 - [ ] 36-01-PLAN.md — Fix correctness bugs: UTIL double-count (B-02), falsy category_id (B-12), engine cache isolation (E-02), normalizer consolidation (E-12)
 - [ ] 36-02-PLAN.md — Extension robustness: React error boundaries (E-10), DEV-gated logger replacing 257 console statements (E-13)
 - [ ] 36-03-PLAN.md — Frontend fixes (F-01 NaN guard, F-04 stale closure, F-05 debounce), backend snapshot degradation (B-08), infrastructure (I-01, I-02, I-04)
+
+### Phase 37: App performance audit — verify and fix issues from PERFORMANCE_AUDIT.md
+
+**Goal:** Resolve 21 verified performance issues across backend DB queries, frontend rendering, extension DOM observation, and infrastructure configuration to eliminate N+1 patterns, reduce latency, and fix extension lockups
+**Depends on:** Phase 36
+**Plans:** 6 plans
+
+Plans:
+- [ ] 37-01-PLAN.md — Quick wins: DB pool increase, worker concurrency, Promise.all projections, team ID map reuse, useMemo standings, staleTime increase, DLQ retention, LRU cache
+- [ ] 37-02-PLAN.md — N+1 query elimination: batch roster inserts, batch projection inserts, batch free-agent upserts
+- [ ] 37-03-PLAN.md — Missing indexes, free-agent pagination, timeseries/league query limits
+- [ ] 37-04-PLAN.md — ESPN adapter resilience: p-limit throttle mutex, clean up redundant 429 handling
+- [ ] 37-05-PLAN.md — Extension DOM performance: narrow observers, eliminate duplicate polling, cache ranking maps
+- [ ] 37-06-PLAN.md — Infrastructure + code quality: Turbo cache config, Next.js optimizations, single-pass SGP, JSONB query fix, waivers pagination
