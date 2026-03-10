@@ -623,12 +623,32 @@ Plans:
 
 **Goal:** Resolve 21 verified performance issues across backend DB queries, frontend rendering, extension DOM observation, and infrastructure configuration to eliminate N+1 patterns, reduce latency, and fix extension lockups
 **Depends on:** Phase 36
-**Plans:** 6/6 plans complete
+**Plans:** 6/6 plans complete — completed 2026-03-09
 
 Plans:
-- [ ] 37-01-PLAN.md — Quick wins: DB pool increase, worker concurrency, Promise.all projections, team ID map reuse, useMemo standings, staleTime increase, DLQ retention, LRU cache
-- [ ] 37-02-PLAN.md — N+1 query elimination: batch roster inserts, batch projection inserts, batch free-agent upserts
-- [ ] 37-03-PLAN.md — Missing indexes, free-agent pagination, timeseries/league query limits
-- [ ] 37-04-PLAN.md — ESPN adapter resilience: p-limit throttle mutex, clean up redundant 429 handling
-- [ ] 37-05-PLAN.md — Extension DOM performance: narrow observers, eliminate duplicate polling, cache ranking maps
-- [ ] 37-06-PLAN.md — Infrastructure + code quality: Turbo cache config, Next.js optimizations, single-pass SGP, JSONB query fix, waivers pagination
+- [x] 37-01-PLAN.md — Quick wins: DB pool increase, worker concurrency, Promise.all projections, team ID map reuse, useMemo standings, staleTime increase, DLQ retention, LRU cache — completed 2026-03-09
+- [x] 37-02-PLAN.md — N+1 query elimination: batch roster inserts, batch projection inserts, batch free-agent upserts — completed 2026-03-09
+- [x] 37-03-PLAN.md — Missing indexes, free-agent pagination, timeseries/league query limits — completed 2026-03-09
+- [x] 37-04-PLAN.md — ESPN adapter resilience: p-limit throttle mutex, clean up redundant 429 handling — completed 2026-03-09
+- [x] 37-05-PLAN.md — Extension DOM performance: narrow observers, eliminate duplicate polling, cache ranking maps — completed 2026-03-09
+- [x] 37-06-PLAN.md — Infrastructure + code quality: Turbo cache config, Next.js optimizations, single-pass SGP, JSONB query fix, waivers pagination — completed 2026-03-09
+
+### Phase 38: UX audit and fixes — confirm and evaluate suggestions from UX_REVIEW.md before implementing
+
+**Goal:** Fix verified UX gaps across frontend and extension: BidVerdict decision card, compact player cards, hierarchical navigation, actionable empty states, waiver grouping by impact category, analytical tooltips with shared glossary, and design token cleanup
+**Depends on:** Phase 37
+**Requirements:** ENHANCEMENT
+**Success Criteria** (what must be TRUE):
+  1. Extension sidebar shows consolidated BidVerdict card with bid/pass verdict, max bid, market price, and narrator rationale during auction drafts
+  2. Extension player cards default to compact view with expand/collapse toggle
+  3. Frontend navigation shows two-tier hierarchy (primary tabs + secondary links) with active state
+  4. Empty states in waivers, trades, and standings pages provide actionable CTAs (Upload Projections, Refresh Data)
+  5. Waiver recommendations are grouped by top impact category instead of flat list
+  6. Analytical terms show tooltip definitions on hover via shared glossary
+  7. Design token gaps (body-xs, text-muted-foreground) are fixed
+**Plans:** 3 plans
+
+Plans:
+- [ ] 38-01-PLAN.md — BidVerdict card and compact player cards (extension)
+- [ ] 38-02-PLAN.md — Hierarchical navigation and actionable empty states (frontend)
+- [ ] 38-03-PLAN.md — Waiver grouping, tooltips/glossary, and design token fixes (frontend + shared)
