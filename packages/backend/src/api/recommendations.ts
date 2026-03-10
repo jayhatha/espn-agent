@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
 import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
@@ -106,22 +107,24 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         const espnPlayerIds = espnFreeAgents.map((fa) => fa.playerId);
 
-        // Upsert free agent players into the player table
-        for (const fa of espnFreeAgents) {
+        // Upsert free agent players into the player table in a single batch insert
+        if (espnFreeAgents.length > 0) {
+          const playerRows = espnFreeAgents.map(fa => ({
+            id: fa.playerId,
+            name: fa.name,
+            mlb_team: fa.mlbTeam,
+            positions: fa.positions,
+            created_at: new Date(),
+          }));
+
           await db
             .insertInto("player")
-            .values({
-              id: fa.playerId,
-              name: fa.name,
-              mlb_team: fa.mlbTeam,
-              positions: fa.positions,
-              created_at: new Date(),
-            })
+            .values(playerRows)
             .onConflict((oc) =>
               oc.column("id").doUpdateSet({
-                name: fa.name,
-                mlb_team: fa.mlbTeam,
-                positions: fa.positions,
+                name: sql`excluded.name`,
+                mlb_team: sql`excluded.mlb_team`,
+                positions: sql`excluded.positions`,
               }),
             )
             .execute();

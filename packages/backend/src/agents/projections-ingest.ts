@@ -330,6 +330,12 @@ export class ProjectionsIngestAgent {
     let fuzzyMatches = 0;
     let totalProcessed = 0;
 
+    const projectionRows: Array<{
+      projections_run_id: number;
+      player_id: number;
+      stat_components_json: StatComponents;
+    }> = [];
+
     for (const row of rows) {
       const playerName = this.getPlayerName(row);
       if (!playerName) continue;
@@ -395,14 +401,21 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
-      // Upsert projection — merge JSONB on conflict to preserve pitcher data for two-way players
+      // Collect projection row for batch insert
+      projectionRows.push({
+        projections_run_id: projectionsRunId,
+        player_id: matchResult.playerId,
+        stat_components_json: components,
+      });
+    }
+
+    // Batch insert all projection rows in chunks of 500 to stay under PostgreSQL parameter limits
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < projectionRows.length; i += CHUNK_SIZE) {
+      const chunk = projectionRows.slice(i, i + CHUNK_SIZE);
       await this.db
         .insertInto("player_projection")
-        .values({
-          projections_run_id: projectionsRunId,
-          player_id: matchResult.playerId,
-          stat_components_json: components,
-        })
+        .values(chunk)
         .onConflict((oc) =>
           oc.columns(["projections_run_id", "player_id"]).doUpdateSet({
             stat_components_json: sql`player_projection.stat_components_json || excluded.stat_components_json`,
@@ -460,6 +473,12 @@ export class ProjectionsIngestAgent {
     let fuzzyMatches = 0;
     let totalProcessed = 0;
 
+    const projectionRows: Array<{
+      projections_run_id: number;
+      player_id: number;
+      stat_components_json: StatComponents;
+    }> = [];
+
     for (const row of rows) {
       const playerName = this.getPlayerName(row);
       if (!playerName) continue;
@@ -515,14 +534,21 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
-      // Upsert projection — merge JSONB on conflict to preserve batter data for two-way players
+      // Collect projection row for batch insert
+      projectionRows.push({
+        projections_run_id: projectionsRunId,
+        player_id: matchResult.playerId,
+        stat_components_json: components,
+      });
+    }
+
+    // Batch insert all projection rows in chunks of 500 to stay under PostgreSQL parameter limits
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < projectionRows.length; i += CHUNK_SIZE) {
+      const chunk = projectionRows.slice(i, i + CHUNK_SIZE);
       await this.db
         .insertInto("player_projection")
-        .values({
-          projections_run_id: projectionsRunId,
-          player_id: matchResult.playerId,
-          stat_components_json: components,
-        })
+        .values(chunk)
         .onConflict((oc) =>
           oc.columns(["projections_run_id", "player_id"]).doUpdateSet({
             stat_components_json: sql`player_projection.stat_components_json || excluded.stat_components_json`,
