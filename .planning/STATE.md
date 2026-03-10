@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 36 — Code Cleanup (verify and address CODE_REVIEW.md concerns)
-Plan: 02 complete — Phase 36 COMPLETE (all 3 plans done)
-Status: Phase 36 COMPLETE — UTIL double-count fixed, category_id=0 validation fixed, normalizer consolidated, engine cache isolation with leagueId, ErrorBoundary per sidebar section, DEV-gated logger (E-10, E-13)
-Last activity: 2026-03-09 — Phase 36 Plan 02 complete (ErrorBoundary + DEV-gated logger, E-10 + E-13 fixed)
+Phase: 37 — App Performance Audit (verify and fix issues from PERFORMANCE_AUDIT.md)
+Plan: 01 complete
+Status: 37-01 COMPLETE — DB pool max 25, worker concurrency 3, Promise.all projections, espnTeamIdToDbId reuse, DLQ 7d, LRU 2000, useMemo standings matrices, staleTime 5min (B-04, B-05, B-06, B-07, B-16, F-01, F-02, I-04, I-05)
+Last activity: 2026-03-09 — Phase 37 Plan 01 complete (8 quick-win performance fixes)
 
-Progress: Phase 36 COMPLETE (3/3 plans done)
+Progress: Phase 37 in progress (1/? plans done)
 
 ```
 [############                            ] 30% v2.0
@@ -172,6 +172,7 @@ Progress: Phase 36 COMPLETE (3/3 plans done)
 | Phase 36 P01 | 5 | 2 tasks | 14 files |
 | Phase 36 P02 | 8 | 2 tasks | 11 files |
 | Phase 37 P05 | 2 | 2 tasks | 2 files |
+| Phase 37 P01 | 8 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -431,6 +432,10 @@ Recent decisions affecting v1.1 work:
 - [Phase 37]: Bootstrap observer tries narrow ESPN draft containers before falling back to document.body
 - [Phase 37]: Removed setInterval from observeCurrentAuctionPlayer — MutationObserver with debounce is sufficient
 - [Phase 37]: PitcherList ranking maps cached at module level with hash invalidation; last-name fallback uses O(1) index
+- [Phase 37-01]: Pool max 25 sized for Promise.all parallelism — 12 teams * 4 queries = 48 peak, 25 covers typical 6-10 team leagues
+- [Phase 37-01]: espnTeamIdToDbId declared before transaction block so it survives closure scope and can be reused at step 8 without per-team re-queries
+- [Phase 37-01]: DLQ 7 days sufficient for post-incident analysis — 30 days was over-provisioned storage overhead
+- [Phase 37-01]: useMemo on standings matrix builders keyed on data — prevents expensive Map rebuilds on every React render
 
 ### Roadmap Evolution
 
