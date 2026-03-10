@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 37 — App Performance Audit (verify and fix issues from PERFORMANCE_AUDIT.md)
-Plan: 03 complete (all 6/6 complete)
-Status: 37-03 COMPLETE — SQL migration 017 with two composite indexes (B-13), offset pagination on free-agent endpoint (B-08), default LIMIT 1000 on timeseries endpoints (B-10), LIMIT 100 on league list (B-17)
-Last activity: 2026-03-10 — Phase 37 Plan 03 complete (missing indexes + query limits: B-08, B-10, B-13, B-17)
+Plan: 06 complete (all 6/6 complete)
+Status: 37-06 COMPLETE — Turbo tsconfig cache invalidation (I-02), Next.js compress+no source maps (I-03), single-pass SGP formula (B-14), app-code batter/pitcher detection (B-15), waivers pagination 10/page (F-03)
+Last activity: 2026-03-09 — Phase 37 Plan 06 complete (infrastructure, shared formula, backend JSONB elimination, and frontend pagination)
 
 Progress: Phase 37 COMPLETE (6/6 plans done)
 
@@ -175,6 +175,7 @@ Progress: Phase 37 COMPLETE (6/6 plans done)
 | Phase 37 P01 | 8 | 2 tasks | 7 files |
 | Phase 37 P02 | 3 | 2 tasks | 3 files |
 | Phase 37 P03 | 2 | 2 tasks | 4 files |
+| Phase 37 P06 | 3 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -441,6 +442,11 @@ Recent decisions affecting v1.1 work:
 - [Phase 37]: Batch insert pattern: pre-fetch all rows before loop, collect mutations in arrays, batch INSERT after loop with sql excluded syntax for ON CONFLICT (B-01, B-02, B-03)
 - [Phase 37]: Migration 017 uses .sql format matching all 16 existing migrations (not .ts Kysely format as plan suggested)
 - [Phase 37]: Timeseries limit defaults to 1000 rows but configurable via ?limit=N — keeps endpoints flexible while preventing runaway queries
+- [Phase 37-04]: p-limit(1) mutex serializes all ESPN API calls through single-concurrency queue; lastEspnCall timestamp read/written only inside queue callback eliminating TOCTOU race (B-11)
+- [Phase 37-04]: Redundant 429 catch blocks removed from all throttledEspnCall sites; axios-retry in createRetryableAxios handles 429 with Retry-After header support (B-12)
+- [Phase 37-06]: Single-pass SGP variance uses sumSq/n - mean^2 formulation — eliminates intermediate squaredDiffs array and second pass over allPlayerValues
+- [Phase 37-06]: Batter/pitcher classification moved to application code — SELECT stat_components_json rows and classify with parseFloat, avoids JSONB inline casts that force PostgreSQL to parse all row blobs
+- [Phase 37-06]: Waivers recommendations paginated with IIFE pattern in JSX to keep slice/totalPages computation adjacent to render without extracting a component
 
 ### Roadmap Evolution
 
