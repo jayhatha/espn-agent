@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -99,18 +99,13 @@ export default function StandingsPage() {
     },
   });
 
-  const buildCurrentMatrix = () => {
+  const currentMatrix = useMemo(() => {
     if (!data) return null;
-    const { categories, currentCategoryStandings, currentOverallStandings } =
-      data;
-    if (!currentOverallStandings || currentOverallStandings.length === 0)
-      return null;
+    const { categories, currentCategoryStandings, currentOverallStandings } = data;
+    if (!currentOverallStandings || currentOverallStandings.length === 0) return null;
     if (!currentCategoryStandings) return null;
 
-    const teamCategoryMap = new Map<
-      number,
-      Map<string, CurrentCategoryStanding>
-    >();
+    const teamCategoryMap = new Map<number, Map<string, CurrentCategoryStanding>>();
     for (const cs of currentCategoryStandings) {
       if (!teamCategoryMap.has(cs.team_id)) {
         teamCategoryMap.set(cs.team_id, new Map());
@@ -118,14 +113,10 @@ export default function StandingsPage() {
       teamCategoryMap.get(cs.team_id)!.set(cs.category_id, cs);
     }
 
-    return {
-      categories,
-      overallStandings: currentOverallStandings,
-      teamCategoryMap,
-    };
-  };
+    return { categories, overallStandings: currentOverallStandings, teamCategoryMap };
+  }, [data]);
 
-  const buildProjectedMatrix = () => {
+  const projectedMatrix = useMemo(() => {
     if (!data) return null;
     const { categories, categoryStandings, overallStandings } = data;
     if (overallStandings.length === 0) return null;
@@ -139,10 +130,7 @@ export default function StandingsPage() {
     }
 
     return { categories, overallStandings, teamCategoryMap };
-  };
-
-  const currentMatrix = data ? buildCurrentMatrix() : null;
-  const projectedMatrix = data ? buildProjectedMatrix() : null;
+  }, [data]);
 
   const hasCurrentData = currentMatrix !== null;
   const hasProjectedData = projectedMatrix !== null;
