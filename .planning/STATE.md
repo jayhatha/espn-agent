@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 37 — App Performance Audit — VERIFIED COMPLETE
-Plan: All 6/6 plans executed and verified (21/21 issues confirmed)
-Status: Phase 37 VERIFIED — All performance issues fixed across backend DB, frontend React, extension DOM, and infrastructure
-Last activity: 2026-03-09 — Phase 37 verified complete (18 commits, 21 issues, 0 failures)
+Phase: 38 — UX Audit and Fixes — In Progress
+Plan: 1/3 complete (38-01 done)
+Status: Phase 38 In Progress — BidVerdict card and player card expand/collapse implemented
+Last activity: 2026-03-10 — 38-01 complete (2 tasks, BidVerdict + compact player cards)
 
-Progress: Phase 37 VERIFIED COMPLETE
+Progress: Phase 38 In Progress (1/3 plans complete)
 
 ```
 [############                            ] 30% v2.0
@@ -179,6 +179,7 @@ _Updated: 2026-02-27 after quick task 19 completion_
 | Phase 37 P03 | 2 | 2 tasks | 4 files |
 | Phase 37 P06 | 3 | 2 tasks | 5 files |
 | Phase 38 P02 | 3 | 2 tasks | 5 files |
+| Phase 38 P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -452,6 +453,9 @@ Recent decisions affecting v1.1 work:
 - [Phase 37-06]: Waivers recommendations paginated with IIFE pattern in JSX to keep slice/totalPages computation adjacent to render without extracting a component
 - [Phase 38]: Active route detection uses exact match for Overview and prefix match for all other navigation links
 - [Phase 38]: ErrorAlert action prop uses variant-appropriate button colors; standings Refresh Data CTA links to league overview since no snapshot mutation on that page
+- [Phase 38]: BidVerdict card placed between nominated player banner and auto-pilot toggle in DraftSidebar, auction-only, null-guard on currentAuctionPlayer+optimization
+- [Phase 38]: Player cards (Auction and Snake) default to collapsed compact view; expand on click to show full stats
+- [Phase 38]: Inline SVG chevrons used in player cards instead of lucide-react (not installed in extension package)
 
 ### Roadmap Evolution
 

@@ -646,7 +646,7 @@ Plans:
   5. Waiver recommendations are grouped by top impact category instead of flat list
   6. Analytical terms show tooltip definitions on hover via shared glossary
   7. Design token gaps (body-xs, text-muted-foreground) are fixed
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 38-01-PLAN.md — BidVerdict card and compact player cards (extension)
