@@ -1266,9 +1266,12 @@ export function scrapeESPNNominationQueue(): ESPNQueueEntry[] {
   const result: ESPNQueueEntry[] = [];
   const dequeueVariants = ["dequeue", "deselect", "remove"];
 
-  const allPlayerButtons = document.querySelectorAll<HTMLButtonElement>(
-    "button[data-player-id]",
-  );
+  const allPlayerButtons = (() => {
+    const specific = document.querySelectorAll<HTMLButtonElement>("button.action-btn[data-player-id]");
+    return specific.length > 0
+      ? specific
+      : document.querySelectorAll<HTMLButtonElement>("button[data-player-id]");
+  })();
 
   let queuePosition = 0;
   for (const btn of Array.from(allPlayerButtons)) {

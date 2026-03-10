@@ -3,6 +3,25 @@ import type { DraftEngineSignals } from "./engine/types";
 import { scrapeESPNNominationQueue } from "./dom-observers";
 import { logger } from "./logger";
 
+/** Find an action button for a specific player, preferring .action-btn class */
+function findActionButton(playerId: string | number): HTMLButtonElement | null {
+  return (
+    document.querySelector<HTMLButtonElement>(
+      `button.action-btn[data-player-id="${playerId}"]`
+    ) ??
+    document.querySelector<HTMLButtonElement>(
+      `button[data-player-id="${playerId}"]`
+    )
+  );
+}
+
+/** Find all action buttons, preferring .action-btn class */
+function findAllActionButtons(): NodeListOf<HTMLButtonElement> {
+  const buttons = document.querySelectorAll<HTMLButtonElement>('button.action-btn[data-player-id]');
+  if (buttons.length > 0) return buttons;
+  return document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+}
+
 /**
  * Live nomination controller state — exposed via getNominationDiagnostics()
  * and polled by the NominationDiagnostics UI panel.
@@ -448,9 +467,7 @@ export class AutoBidController {
     // Guard: must NOT be user's turn — check for "Select" buttons in DOM
     // When ESPN shows "Select" buttons, it IS the user's turn and evaluateAndNominate()
     // handles the actual nomination. Don't queue-populate during this window.
-    const selectButtons = document.querySelectorAll<HTMLButtonElement>(
-      'button[data-player-id]'
-    );
+    const selectButtons = findAllActionButtons();
     let hasSelectButton = false;
     for (const btn of selectButtons) {
       const text = btn.textContent?.trim().toLowerCase() || '';
@@ -537,9 +554,7 @@ export class AutoBidController {
       }
 
       // Find the Queue button for this player
-      const button = document.querySelector<HTMLButtonElement>(
-        `button[data-player-id="${playerId}"]`
-      );
+      const button = findActionButton(playerId);
 
       if (!button) {
         logger.debug(`[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — searching via search bar`);
@@ -673,9 +688,7 @@ export class AutoBidController {
       );
 
       // Queue entries have playerId directly from DOM — skip name-to-ID mapping
-      const playerButton = document.querySelector<HTMLButtonElement>(
-        `button[data-player-id="${queuePlayerId}"]`
-      );
+      const playerButton = findActionButton(queuePlayerId);
 
       if (playerButton && !playerButton.disabled) {
         this.clickPlayerButton(playerButton, queueCandidateName, queuePlayerId, 'espn-queue');
@@ -762,9 +775,7 @@ export class AutoBidController {
     const playerId = matchedRanking.playerId;
 
     // ── Find and click the select/queue button for this player ──
-    const playerButton = document.querySelector<HTMLButtonElement>(
-      `button[data-player-id="${playerId}"]`
-    );
+    const playerButton = findActionButton(playerId);
 
     if (playerButton && !playerButton.disabled) {
       this.clickPlayerButton(playerButton, candidateName, playerId, candidateReason!);
@@ -894,9 +905,7 @@ export class AutoBidController {
               logger.log(`[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms) — trying selectors for ${candidateName} (ID: ${playerId})`);
 
               // Strategy 1: direct data-player-id match by ID attribute
-              const directButton = document.querySelector<HTMLButtonElement>(
-                `button[data-player-id="${playerId}"]`
-              );
+              const directButton = findActionButton(playerId);
               if (directButton && !directButton.disabled) {
                 const text = directButton.textContent?.trim().toLowerCase() ?? '';
                 if (text.includes('queue') || text.includes('select')) {
@@ -912,7 +921,7 @@ export class AutoBidController {
 
               // Strategy 2: scan all button[data-player-id] buttons for one matching the player ID
               // (ESPN may re-render with different structure)
-              const allPlayerButtons = document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+              const allPlayerButtons = findAllActionButtons();
               for (const btn of allPlayerButtons) {
                 if (btn.disabled) continue;
                 const btnPlayerId = btn.getAttribute('data-player-id');
@@ -935,7 +944,7 @@ export class AutoBidController {
                 setTimeout(() => pollForQueueButton(elapsed + 300), 300);
               } else {
                 // Timeout — log diagnostics to help debug future failures
-                const foundButtons = document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+                const foundButtons = findAllActionButtons();
                 const buttonSummary = Array.from(foundButtons).slice(0, 5).map(b =>
                   `${b.getAttribute('data-player-id')}:"${b.textContent?.trim()}"`
                 ).join(', ');
