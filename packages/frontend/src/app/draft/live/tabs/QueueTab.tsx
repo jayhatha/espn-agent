@@ -3,33 +3,20 @@
 import type {
   DraftLiveState,
   EngineSignals,
+  ControlActionMap,
+  ControlActionName,
+  NominationQueueEntry,
 } from "../useDraftLiveSocket";
-
-// ---- Local types for queue/nomination features ----
-// These may not yet exist on DraftLiveState (Plan 03 may add them).
-// We extend via intersection to access optional queue/nomination fields.
-
-export interface NominationQueueEntry {
-  playerId: number;
-  playerName: string;
-  position?: string;
-}
-
-/** Extended state fields that the extension may relay for queue features */
-interface QueueExtendedState {
-  autoNominateMode?: boolean;
-  skippedPlayerIds?: number[];
-  espnNominationQueue?: NominationQueueEntry[];
-}
-
-type ExtendedDraftLiveState = DraftLiveState & QueueExtendedState;
 
 // ---- Props ----
 
 interface QueueTabProps {
   state: DraftLiveState | null;
   engineSignals: EngineSignals | null;
-  sendControl: (action: string, payload?: unknown) => void;
+  sendControl: <A extends ControlActionName>(
+    action: A,
+    ...args: ControlActionMap[A] extends undefined ? [] : [ControlActionMap[A]]
+  ) => void;
   extensionConnected: boolean;
 }
 
@@ -65,15 +52,12 @@ export default function QueueTab({
   sendControl,
   extensionConnected,
 }: QueueTabProps) {
-  // Cast to extended state to access optional queue fields
-  const extState = state as ExtendedDraftLiveState | null;
-
   const currentPlayer = state?.currentAuctionPlayer ?? null;
   const autoMode = state?.autoMode ?? false;
-  const autoNominateMode = extState?.autoNominateMode ?? false;
-  const skippedPlayerIds = extState?.skippedPlayerIds ?? [];
+  const autoNominateMode = state?.autoNominateMode ?? false;
+  const skippedPlayerIds = state?.skippedPlayerIds ?? [];
   const nominationQueue: NominationQueueEntry[] =
-    extState?.espnNominationQueue ?? [];
+    state?.espnNominationQueue ?? [];
   const budgetPressure =
     engineSignals?.budgetCurve?.budgetPressure ?? 0;
 
@@ -101,10 +85,10 @@ export default function QueueTab({
         <button
           type="button"
           onClick={() => {
-            if (hasCurrentPlayer) {
+            if (currentPlayer?.playerId !== undefined) {
               sendControl("SKIP_PLAYER", {
-                playerId: currentPlayer!.playerId,
-                playerName: currentPlayer!.playerName,
+                playerId: currentPlayer.playerId!,
+                playerName: currentPlayer.playerName,
               });
             }
           }}
