@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDraftLiveSocket } from "./useDraftLiveSocket";
 import type { Alert, RemainingSlot, RosterPlayer, SimulationDecisionEntry } from "./useDraftLiveSocket";
+import QueueTab from "./tabs/QueueTab";
+import { StrategyTab } from "./tabs/StrategyTab";
 
 // ---- Helpers ----
 
@@ -98,12 +100,15 @@ function defaultWsUrl(): string {
   return `ws://${window.location.hostname}:3001/draft/live?role=mobile`;
 }
 
+type TabId = "live" | "strategy" | "queue";
+
 export default function DraftLivePage() {
   const [wsUrl, setWsUrl] = useState<string>("");
   const [inputUrl, setInputUrl] = useState<string>("");
   const [urlExpanded, setUrlExpanded] = useState(false);
   const [positionFilter, setPositionFilter] = useState<string>("All");
   const [splitValue, setSplitValue] = useState<number>(50);
+  const [activeTab, setActiveTab] = useState<TabId>("live");
 
   // Initialize on mount (client only — window.location)
   useEffect(() => {
@@ -208,6 +213,31 @@ export default function DraftLivePage() {
         )}
       </header>
 
+      {/* ---- Tab Bar ---- */}
+      {hasData && (
+        <nav className="bg-neutral-950 border-b border-neutral-800 px-4">
+          <div className="max-w-lg mx-auto flex">
+            {(["live", "strategy", "queue"] as const).map((tab) => {
+              const labels: Record<TabId, string> = { live: "Live", strategy: "Strategy", queue: "Queue" };
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 min-h-[44px] text-sm font-semibold uppercase tracking-wider transition-colors ${
+                    activeTab === tab
+                      ? "text-white border-b-2 border-blue-500"
+                      : "text-neutral-500 hover:text-neutral-300"
+                  }`}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
+
       {/* ---- Main Content ---- */}
       <main className="flex-1 overflow-y-auto pb-24">
         <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
@@ -248,8 +278,26 @@ export default function DraftLivePage() {
             </SectionCard>
           )}
 
+          {/* ---- Strategy Tab ---- */}
+          {activeTab === "strategy" && hasData && (
+            <StrategyTab
+              engineSignals={engineSignals as Parameters<typeof StrategyTab>[0]["engineSignals"]}
+              simulation={(engineSignals?.simulation ?? null) as Parameters<typeof StrategyTab>[0]["simulation"]}
+            />
+          )}
+
+          {/* ---- Queue Tab ---- */}
+          {activeTab === "queue" && hasData && (
+            <QueueTab
+              state={state}
+              engineSignals={engineSignals}
+              sendControl={sendControl}
+              extensionConnected={connected}
+            />
+          )}
+
           {/* ---- Current Nomination ---- */}
-          {hasData && (
+          {activeTab === "live" && hasData && (
             <SectionCard>
               <SectionTitle>Current Nomination</SectionTitle>
               {currentPlayer ? (
@@ -325,7 +373,7 @@ export default function DraftLivePage() {
           )}
 
           {/* ---- Win Probability ---- */}
-          {hasData && simulation && (
+          {activeTab === "live" && hasData && simulation && (
             <SectionCard>
               <SectionTitle>Win Probability</SectionTitle>
               {simulation.winProbability ? (
@@ -381,7 +429,7 @@ export default function DraftLivePage() {
           )}
 
           {/* ---- Budget & Inflation ---- */}
-          {hasData && (
+          {activeTab === "live" && hasData && (
             <SectionCard>
               <SectionTitle>Budget & Inflation</SectionTitle>
               <div className="space-y-3">
@@ -425,7 +473,7 @@ export default function DraftLivePage() {
           )}
 
           {/* ---- My Roster ---- */}
-          {hasData && roster.length > 0 && (
+          {activeTab === "live" && hasData && roster.length > 0 && (
             <SectionCard>
               <SectionTitle>My Roster ({roster.length})</SectionTitle>
               <div className="space-y-1">
@@ -452,7 +500,7 @@ export default function DraftLivePage() {
           )}
 
           {/* ---- Alerts ---- */}
-          {hasData && alerts.length > 0 && (
+          {activeTab === "live" && hasData && alerts.length > 0 && (
             <SectionCard>
               <SectionTitle>Alerts</SectionTitle>
               <div className="space-y-2">
