@@ -38,6 +38,9 @@ export default function DraftSidebar() {
     setPitcherHitterSplit,
     autoMode,
     setAutoMode,
+    espnNominationQueue,
+    autoNominateMode,
+    skippedPlayerIds,
   } = useDraftStore();
 
   const engineSignals = useDraftEngineSignals();
@@ -98,6 +101,38 @@ export default function DraftSidebar() {
             : null,
           remainingSlots: engineSignals.remainingSlots,
           computeTimeMs: engineSignals.computeTimeMs,
+          idealRoster: engineSignals.idealRoster
+            ? {
+                players: engineSignals.idealRoster.players.map((p) => ({
+                  name: p.name,
+                  positions: p.positions,
+                  dollars: p.dollars,
+                  tier: p.tier,
+                  slot: p.slot,
+                  isDrafted: p.isDrafted,
+                  externalRank: p.externalRank,
+                })),
+                totalSGPValue: engineSignals.idealRoster.totalSGPValue,
+                budgetUsed: engineSignals.idealRoster.budgetUsed,
+                unfilledSlots: engineSignals.idealRoster.unfilledSlots,
+                anchorCount: engineSignals.idealRoster.anchorCount,
+                coreCount: engineSignals.idealRoster.coreCount,
+                valueCount: engineSignals.idealRoster.valueCount,
+                categoryProgress: engineSignals.idealRoster.categoryProgress,
+              }
+            : null,
+          scarcity: engineSignals.scarcity
+            ? engineSignals.scarcity
+                .filter((s) => s.scarcityIndex > 0.3)
+                .map((s) => ({
+                  position: s.position,
+                  supply: s.supply,
+                  demand: s.demand,
+                  tierDropValue: s.tierDropValue,
+                  scarcityIndex: s.scarcityIndex,
+                }))
+            : null,
+          // TODO: wire BuildArchetypeSignal when available
         });
       }
 
@@ -116,6 +151,9 @@ export default function DraftSidebar() {
         draftFormat,
         picksLength: 0, // allPicks not destructured here — avoid heavy dep
         currentPick,
+        espnNominationQueue,
+        autoNominateMode,
+        skippedPlayerIds,
       });
 
       // Single write triggers one onChanged event → one WS message
@@ -140,6 +178,9 @@ export default function DraftSidebar() {
     pitcherHitterSplit,
     draftFormat,
     currentPick,
+    espnNominationQueue,
+    autoNominateMode,
+    skippedPlayerIds,
   ]);
 
   const dispatchAssistantEvent = (eventName: string, detail?: unknown) => {
