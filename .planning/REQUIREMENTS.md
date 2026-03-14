@@ -24,9 +24,9 @@ Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roa
 
 ### Mobile Command Center
 
-- [ ] **MOB-01**: Mobile page displays category progress with targets for all scoring categories
-- [ ] **MOB-02**: Mobile page displays ideal roster with tier badges and locked player indicators
-- [ ] **MOB-03**: Mobile page displays win probability, build archetype, and scarcity alerts
+- [x] **MOB-01**: Mobile page displays category progress with targets for all scoring categories
+- [x] **MOB-02**: Mobile page displays ideal roster with tier badges and locked player indicators
+- [x] **MOB-03**: Mobile page displays win probability, build archetype, and scarcity alerts
 - [ ] **MOB-04**: Mobile page has auto-bid toggle with visual risk indicator
 - [x] **MOB-05**: Mobile page has auto-nominate toggle control
 - [ ] **MOB-06**: Mobile page has hitter/pitcher split slider control
@@ -84,9 +84,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NOM-04 | Phase 40 | Complete |
 | NOM-05 | Phase 40 | Complete |
 | NOM-06 | Phase 40 | Complete |
-| MOB-01 | Phase 41 | Pending |
-| MOB-02 | Phase 41 | Pending |
-| MOB-03 | Phase 41 | Pending |
+| MOB-01 | Phase 41 | Complete |
+| MOB-02 | Phase 41 | Complete |
+| MOB-03 | Phase 41 | Complete |
 | MOB-04 | Phase 41 | Pending |
 | MOB-05 | Phase 41 | Complete |
 | MOB-06 | Phase 41 | Pending |

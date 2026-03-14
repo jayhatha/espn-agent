@@ -42,6 +42,7 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
 - [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
 - [v3.0 start]: `motion@^12.36.0` is the only new production dependency for v3.0 (swipe gesture animations on mobile)
+- [Phase 41]: Defined types locally in Strategy tab components for parallel development with Plan 41-03
 
 ### Pending Todos
 
