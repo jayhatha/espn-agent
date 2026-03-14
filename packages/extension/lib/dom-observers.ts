@@ -2,6 +2,32 @@ import type { DraftPick } from "@espn-fantasy/shared";
 import { logger } from "./logger";
 
 /**
+ * Find the first matching element from an ordered selector list.
+ * Returns the matching element and logs a warning if a fallback (non-primary) selector matched.
+ *
+ * @param selectors - Array of CSS selectors, ordered from most to least preferred
+ * @param context - Optional context label for log messages
+ */
+export function findFirstMatchingSelector(
+  selectors: { selector: string; label: string; confirmed: boolean }[],
+  context: string,
+): Element | null {
+  for (const { selector, label, confirmed } of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      if (!confirmed) {
+        logger.warn(
+          `[ESPN Draft Assistant] ${context}: using UNTESTED selector "${selector}" (${label}) — update SELECTOR-MAP if this works`,
+        );
+      }
+      return el;
+    }
+  }
+  logger.warn(`[ESPN Draft Assistant] ${context}: all selectors failed`);
+  return null;
+}
+
+/**
  * ESPN Draft Board Selectors - ordered by specificity
  *
  * ESPN's draft board structure (as of 2026):
@@ -65,7 +91,7 @@ const COMPLETED_PICK_SELECTORS = [
   '[style*="grid-area"]:has([class*="player"])',
 
   // Fallback: Any cell with player name elements (defensive)
-  ':has(.playerName)',
+  ":has(.playerName)",
   ':has([class*="playerName"])',
 ].join(", ");
 
@@ -250,14 +276,11 @@ export function observeDraftBoard(
           "[ESPN Draft Assistant] Error parsing pick element:",
           error,
         );
-        logger.error(
-          "[ESPN Draft Assistant] Pick element structure:",
-          {
-            tag: pickElement.tagName,
-            classes: pickElement.className,
-            childCount: pickElement.children.length,
-          },
-        );
+        logger.error("[ESPN Draft Assistant] Pick element structure:", {
+          tag: pickElement.tagName,
+          classes: pickElement.className,
+          childCount: pickElement.children.length,
+        });
         // Continue observing despite extraction failure
       }
     });
@@ -337,7 +360,9 @@ export function observeDraftBoard(
   if (!skipInitialScan) {
     scanEntireDocument();
   } else {
-    logger.log("[ESPN Draft Assistant] Skipping initial DOM scan (state preserved from same-draft reload)");
+    logger.log(
+      "[ESPN Draft Assistant] Skipping initial DOM scan (state preserved from same-draft reload)",
+    );
   }
 
   const bootstrapObserver = new MutationObserver(() => {
@@ -358,11 +383,11 @@ export function observeDraftBoard(
     // Try narrower containers first — ESPN draft boards use these patterns.
     // Observing a narrower container reduces mutation events on ESPN's DOM-heavy pages.
     const bootstrapTarget =
-      document.querySelector('.draft-board') ||
+      document.querySelector(".draft-board") ||
       document.querySelector('[class*="DraftBoard"]') ||
-      document.querySelector('.players-table') ||
+      document.querySelector(".players-table") ||
       document.querySelector('[class*="playersTable"]') ||
-      document.getElementById('draft-content') ||
+      document.getElementById("draft-content") ||
       document.body;
 
     if (bootstrapTarget) {
@@ -392,7 +417,9 @@ export function observeDraftBoard(
       scanEntireDocument();
     }, 5000);
   } else {
-    logger.log("[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)");
+    logger.log(
+      "[ESPN Draft Assistant] Periodic DOM scan disabled (state preserved from same-draft reload)",
+    );
   }
 
   // Return cleanup function
@@ -503,7 +530,7 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
 
     // Try parent containers for team data attributes
     const parentTeamEl = pickElement.closest(
-      '[data-team-name], [data-owner-name], [data-team-id]',
+      "[data-team-name], [data-owner-name], [data-team-id]",
     );
 
     const teamName =
@@ -547,7 +574,8 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
     const pickNumber = parseInt(
       pickElement.getAttribute("data-pick-number") ||
         pickElement.getAttribute("data-pick") ||
-        pickElement.querySelector(".pickNumber, [class*='pickNumber']")
+        pickElement
+          .querySelector(".pickNumber, [class*='pickNumber']")
           ?.textContent?.replace(/\D/g, "") ||
         "0",
       10,
@@ -602,8 +630,7 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
     );
 
     // Compute pick number from multiple sources (priority order)
-    const computedPickNumber =
-      pickNumber || (gridArea ? gridArea.row : 0);
+    const computedPickNumber = pickNumber || (gridArea ? gridArea.row : 0);
 
     // Strategy 10: Generate intelligent team name fallbacks
     let finalTeamName = teamName;
@@ -753,7 +780,11 @@ export function detectDraftFormat(): "snake" | "auction" {
   }
 
   // Strategy: Nomination-related text patterns
-  if (/up for bid|current (offer|nomination)|place.*bid|nominating|pre-draft val/i.test(draftBoardText)) {
+  if (
+    /up for bid|current (offer|nomination)|place.*bid|nominating|pre-draft val/i.test(
+      draftBoardText,
+    )
+  ) {
     return "auction";
   }
 
@@ -845,19 +876,16 @@ export function diagnoseDOMStructure(): {
 
   // Sample first few elements for manual inspection
   if (pickRows.length > 0) {
-    logger.log(
-      "[ESPN Draft Assistant] Sample pick row structure:",
-      {
-        tag: pickRows[0].tagName,
-        classes: pickRows[0].className,
-        id: pickRows[0].id,
-        attributes: Array.from(pickRows[0].attributes).map((attr) => ({
-          name: attr.name,
-          value: attr.value.slice(0, 50),
-        })),
-        childrenCount: pickRows[0].children.length,
-      },
-    );
+    logger.log("[ESPN Draft Assistant] Sample pick row structure:", {
+      tag: pickRows[0].tagName,
+      classes: pickRows[0].className,
+      id: pickRows[0].id,
+      attributes: Array.from(pickRows[0].attributes).map((attr) => ({
+        name: attr.name,
+        value: attr.value.slice(0, 50),
+      })),
+      childrenCount: pickRows[0].children.length,
+    });
   }
 
   return result;
@@ -973,7 +1001,9 @@ export function logRosterDiagnostics(): void {
     logger.log("\n  Sample roster (first team):");
     logger.log(`    Team: ${firstTeam.teamName}`);
     logger.log(`    Players: ${firstTeam.playerIds.length}`);
-    logger.log(`    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`);
+    logger.log(
+      `    Player IDs: ${firstTeam.playerIds.slice(0, 5).join(", ")}${firstTeam.playerIds.length > 5 ? "..." : ""}`,
+    );
   }
 }
 
@@ -990,12 +1020,13 @@ export function logRosterDiagnostics(): void {
  *     img src="/players/full/42404.png" → player ID
  */
 const CURRENT_AUCTION_PLAYER_SELECTORS = [
-  // Primary: ESPN's actual auction selectors (verified 2026)
+  // CONFIRMED (Phase 39 Group 4): ESPN test ID — most stable
   '[data-testid="player-selected"]',
+  // CONFIRMED (Phase 39 Group 4): class selector
   ".player-selected",
+  // CONFIRMED (Phase 39 Group 4): auction UI container
   ".pickArea",
-
-  // Fallback: Broader patterns
+  // UNTESTED — generic fallbacks, deprioritized
   '[class*="currentPlayer"]',
   '[class*="activePlayer"]',
   '[data-testid*="current-player"]',
@@ -1016,22 +1047,24 @@ export function parseCurrentAuctionPlayer(
   playerElement: Element,
 ): CurrentAuctionPlayer | null {
   try {
-    // ESPN uses .playerinfo__playername for the nominated player's name
+    // CONFIRMED (Phase 39 Group 4): .playerinfo__playername
+    // CONFIRMED (Phase 39 Group 4): [class*="playername"] — broader fallback
     const playerNameEl =
       playerElement.querySelector(".playerinfo__playername") ||
       playerElement.querySelector('[class*="playername"]') ||
-      playerElement.querySelector('[class*="playerName"]');
+      playerElement.querySelector('[class*="playerName"]'); // UNTESTED — generic fallback
 
     const playerName = playerNameEl?.textContent?.trim();
     if (!playerName) {
       return null;
     }
 
-    // ESPN uses .current-amount with text like "Current offer: $1"
+    // CONFIRMED (Phase 39 Group 4): .current-amount
+    // CONFIRMED (Phase 39 Group 4): [class*="current-amount"] — broader fallback
     const bidEl =
       playerElement.querySelector(".current-amount") ||
       playerElement.querySelector('[class*="current-amount"]') ||
-      playerElement.querySelector('[class*="currentBid"]');
+      playerElement.querySelector('[class*="currentBid"]'); // UNTESTED — generic fallback
 
     let currentBid: number | undefined;
     const bidText = bidEl?.textContent || "";
@@ -1040,7 +1073,8 @@ export function parseCurrentAuctionPlayer(
       currentBid = parseInt(bidMatch[1], 10);
     }
 
-    // ESPN uses .playerinfo__playerpos for position (e.g., "RF")
+    // CONFIRMED (Phase 39 Group 4): .playerinfo__playerpos
+    // CONFIRMED (Phase 39 Group 4): [class*="playerpos"] — broader fallback
     const positionEl =
       playerElement.querySelector(".playerinfo__playerpos") ||
       playerElement.querySelector('[class*="playerpos"]');
@@ -1052,7 +1086,7 @@ export function parseCurrentAuctionPlayer(
       .map((part) => part.trim())
       .filter(Boolean);
 
-    // Extract player ID from headshot URL: /players/full/42404.png
+    // CONFIRMED (Phase 39 Group 4): img[src*="/players/full/"] for player ID extraction
     let playerId: number | undefined;
     const headshotImg = playerElement.querySelector(
       'img[src*="/players/full/"]',
@@ -1217,7 +1251,9 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
           ".public_fixedDataTableCell_cellContent",
         );
         if (scrollableCells.length > 0) {
-          const lastCellText = scrollableCells[scrollableCells.length - 1]?.textContent?.trim() || "";
+          const lastCellText =
+            scrollableCells[scrollableCells.length - 1]?.textContent?.trim() ||
+            "";
           const asvMatch = lastCellText.match(/^\$(\d+(?:\.\d+)?)/);
           if (asvMatch) {
             asvValue = parseFloat(asvMatch[1]);
@@ -1225,7 +1261,14 @@ export function scrapeESPNAuctionTable(): Map<number, ESPNAuctionTableEntry> {
         }
       }
 
-      result.set(playerId, { playerId, playerName, espnValue, position, team, asvValue });
+      result.set(playerId, {
+        playerId,
+        playerName,
+        espnValue,
+        position,
+        team,
+        asvValue,
+      });
     } catch (err) {
       // Don't let a single row failure abort the rest
       logger.warn(
@@ -1263,38 +1306,44 @@ export interface ESPNQueueEntry {
  * match queue insertion order).
  */
 export function scrapeESPNNominationQueue(): ESPNQueueEntry[] {
-  const result: ESPNQueueEntry[] = [];
+  // Selector priority (Phase 39 SELECTOR-MAP Group 6):
+  // CONFIRMED: button.action-btn[data-player-id] — primary, most specific
+  // CONFIRMED: button[data-player-id]            — fallback, may match non-action buttons
+  const specificButtons = document.querySelectorAll<HTMLButtonElement>(
+    "button.action-btn[data-player-id]",
+  );
+  const allPlayerButtons: NodeListOf<HTMLButtonElement> =
+    specificButtons.length > 0
+      ? specificButtons
+      : document.querySelectorAll<HTMLButtonElement>("button[data-player-id]");
+
+  // UNTESTED button text values: "dequeue" | "deselect" | "remove"
+  // These need live verification — ESPN may use different text in 2026
+  // Extend this array if live testing reveals additional variants
   const dequeueVariants = ["dequeue", "deselect", "remove"];
 
-  const allPlayerButtons = (() => {
-    const specific = document.querySelectorAll<HTMLButtonElement>("button.action-btn[data-player-id]");
-    return specific.length > 0
-      ? specific
-      : document.querySelectorAll<HTMLButtonElement>("button[data-player-id]");
-  })();
-
+  const result: ESPNQueueEntry[] = [];
   let queuePosition = 0;
+
   for (const btn of Array.from(allPlayerButtons)) {
     const text = btn.textContent?.trim().toLowerCase() || "";
     const isDequeued = dequeueVariants.some((v) => text.includes(v));
-    if (!isDequeued) {
-      continue;
-    }
+    if (!isDequeued) continue;
 
     const playerIdStr = btn.getAttribute("data-player-id");
-    if (!playerIdStr) {
-      continue;
-    }
+    if (!playerIdStr) continue;
     const playerId = parseInt(playerIdStr, 10);
-    if (!playerId || isNaN(playerId)) {
-      continue;
-    }
+    if (!playerId || isNaN(playerId)) continue;
 
-    // Get player name and position from the closest row container
+    // CONFIRMED (Phase 39 Group 5): .fixedDataTableRowLayout_main[role='row'] for row context
+    // CONFIRMED (Phase 39 Group 5): a.player-news[title] for player name
+    // CONFIRMED (Phase 39 Group 5): .positionPill for position
     const row = btn.closest(".fixedDataTableRowLayout_main, [role='row']");
     const playerName =
-      row?.querySelector("a.player-news[title]")?.getAttribute("title")?.trim() ||
-      "";
+      row
+        ?.querySelector("a.player-news[title]")
+        ?.getAttribute("title")
+        ?.trim() || "";
     const position =
       row?.querySelector(".positionPill")?.textContent?.trim() || "";
 
@@ -1324,7 +1373,9 @@ export function observeCurrentAuctionPlayer(
   let debounceTimeout: number | null = null;
 
   const emitPlayerChange = (player: CurrentAuctionPlayer | null) => {
-    const playerKey = player ? `${player.playerName}:${player.currentBid ?? ""}` : null;
+    const playerKey = player
+      ? `${player.playerName}:${player.currentBid ?? ""}`
+      : null;
 
     if (playerKey === lastEmittedPlayer) {
       return;
@@ -1350,7 +1401,9 @@ export function observeCurrentAuctionPlayer(
 
     // Debounce: ESPN may refresh DOM rapidly during bidding
     debounceTimeout = window.setTimeout(() => {
-      const playerContainer = document.querySelector(CURRENT_AUCTION_PLAYER_SELECTORS);
+      const playerContainer = document.querySelector(
+        CURRENT_AUCTION_PLAYER_SELECTORS,
+      );
 
       if (!playerContainer) {
         emitPlayerChange(null);
@@ -1372,10 +1425,11 @@ export function observeCurrentAuctionPlayer(
 
   // Try narrower container for auction UI — reduces mutation events vs. observing document.body.
   // Falls back to document.body if none of the known ESPN auction selectors match.
+  // UNTESTED: auction container selectors — need live verification
   const auctionContainer =
     document.querySelector('[class*="auction"]') ||
     document.querySelector('[class*="Auction"]') ||
-    document.querySelector('.player-card') ||
+    document.querySelector(".player-card") ||
     document.body;
 
   if (auctionContainer) {
@@ -1383,7 +1437,7 @@ export function observeCurrentAuctionPlayer(
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'data-player-id', 'data-bid'],
+      attributeFilter: ["class", "data-player-id", "data-bid"],
     });
   }
 
