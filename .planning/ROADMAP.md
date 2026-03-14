@@ -56,7 +56,12 @@ Plans:
   3. Search-and-queue flow reliably types into ESPN's search input (using `InputEvent` + `nativeInputValueSetter` pattern, not plain `Event`) and clicks the queue button within the polling timeout
   4. `clearNominationState()` is the single reset path for all nomination state fields, called by both `stop()` and error recovery paths
   5. Nomination diagnostics panel in the extension sidebar shows live, accurate state matching the reworked flow
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 40-01-PLAN.md — Reorganize dom-observers.ts selector constants with CONFIRMED-first ordering and fallback hierarchy
+- [ ] 40-02-PLAN.md — Consolidate isMyTurnToNominate() to primary/fallback tiers and establish clearNominationState() as single reset path
+- [ ] 40-03-PLAN.md — Extract typeIntoSearchInput() helper and add named search polling timeout constants
+- [ ] 40-04-PLAN.md — Update NominationDiagnostics panel with turnStrategyType, fallback warning badge, and queue state
 
 ### Phase 41: Mobile Command Center
 **Goal**: Mobile page is a full draft control terminal showing all engine signals and accepting queue, autopilot, and nomination commands from the phone
@@ -78,5 +83,5 @@ Phases execute in numeric order: 39 → 40 → 41
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 39. DevTools Setup | v3.0 | 0/TBD | Not started | - |
-| 40. Auto-Nomination Rework | v3.0 | 0/TBD | Not started | - |
+| 40. Auto-Nomination Rework | v3.0 | 0/4 | Ready to execute | - |
 | 41. Mobile Command Center | v3.0 | 0/TBD | Not started | - |
