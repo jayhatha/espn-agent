@@ -28,15 +28,15 @@ Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roa
 - [ ] **MOB-02**: Mobile page displays ideal roster with tier badges and locked player indicators
 - [ ] **MOB-03**: Mobile page displays win probability, build archetype, and scarcity alerts
 - [ ] **MOB-04**: Mobile page has auto-bid toggle with visual risk indicator
-- [ ] **MOB-05**: Mobile page has auto-nominate toggle control
+- [x] **MOB-05**: Mobile page has auto-nominate toggle control
 - [ ] **MOB-06**: Mobile page has hitter/pitcher split slider control
 - [ ] **MOB-07**: Mobile page has force-nominate button to trigger immediate nomination from phone
-- [ ] **MOB-08**: Mobile page has skip-player button to exclude current player from engine recommendations
+- [x] **MOB-08**: Mobile page has skip-player button to exclude current player from engine recommendations
 - [ ] **MOB-09**: Mobile page displays current nomination queue and allows reordering
 - [ ] **MOB-10**: Mobile page uses tabbed/sectioned responsive layout optimized for phone screens
 - [ ] **MOB-11**: Mobile page uses Screen Wake Lock API to prevent screen dimming during draft
 - [x] **MOB-12**: Mobile page shows extension connection status with reconnect handling
-- [ ] **MOB-13**: WebSocket CONTROL actions are typed as a union (not `action: string`)
+- [x] **MOB-13**: WebSocket CONTROL actions are typed as a union (not `action: string`)
 - [x] **MOB-14**: Extension relays connection status to mobile via EXTENSION_STATUS message type
 
 ## Future Requirements
@@ -88,15 +88,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOB-02 | Phase 41 | Pending |
 | MOB-03 | Phase 41 | Pending |
 | MOB-04 | Phase 41 | Pending |
-| MOB-05 | Phase 41 | Pending |
+| MOB-05 | Phase 41 | Complete |
 | MOB-06 | Phase 41 | Pending |
 | MOB-07 | Phase 41 | Pending |
-| MOB-08 | Phase 41 | Pending |
+| MOB-08 | Phase 41 | Complete |
 | MOB-09 | Phase 41 | Pending |
 | MOB-10 | Phase 41 | Pending |
 | MOB-11 | Phase 41 | Pending |
 | MOB-12 | Phase 41 | Complete |
-| MOB-13 | Phase 41 | Pending |
+| MOB-13 | Phase 41 | Complete |
 | MOB-14 | Phase 41 | Complete |
 
 **Coverage:**

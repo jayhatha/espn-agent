@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 Phase: 41 of 41 (Mobile Command Center)
 Plan: 2 of 5 in current phase
 Status: Executing
-Last activity: 2026-03-14 — Completed 41-02 EXTENSION_STATUS broadcast
+Last activity: 2026-03-14 — Completed 41-01 CONTROL handlers and store fields
 
 Progress: [##░░░░░░░░] 8% (v3.0)
 
@@ -36,6 +36,7 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 - [40-02]: Strategy 4 (Button--select) runs before Strategy 3 (pickArea) as primary tier; UNTESTED fallbacks emit logger.warn; clearNominationState() is single reset path
 - [40-03]: typeIntoSearchInput() shared helper eliminates duplicated React input typing; 5 named timeout constants replace magic numbers in search polling
 - [40-04]: Used text-content-secondary for timestamps (text-content-muted not in design system); strategy tier badge pattern established
+- [41-01]: skippedPlayerIds as array (not Set) for Zustand persist compatibility; reorderQueue store-only (DOM drag deferred); scarcity relay filtered to scarcityIndex > 0.3
 - [41-02]: Used satisfies ExtensionStatusMessage for type safety on mobile join send; broadcastToMobile helper pattern for hub-to-mobile fan-out
 - [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
@@ -55,5 +56,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Completed 41-02-PLAN.md (EXTENSION_STATUS broadcast)
+Stopped at: Completed 41-01-PLAN.md (CONTROL handlers and store fields)
 Resume file: None
