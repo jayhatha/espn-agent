@@ -73,7 +73,13 @@ Plans:
   3. User can trigger Force Nominate, Skip Player, toggle auto-bid, toggle auto-nominate, and adjust hitter/pitcher split from the phone without touching the laptop
   4. Mobile page displays category progress with targets, ideal roster with tier badges, win probability, build archetype, and scarcity alerts using data already flowing through the WS relay
   5. Screen wake lock prevents phone screen from dimming during a live draft, and the page uses a tabbed/sectioned layout legible on a 375px phone screen
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 41-01-PLAN.md — Extension: typed CONTROL handlers, new store fields, expanded relay payload
+- [ ] 41-02-PLAN.md — Backend hub: EXTENSION_STATUS broadcast to mobile clients
+- [ ] 41-03-PLAN.md — Frontend: typed sendControl, tabbed layout shell, wake lock, connection banner, LiveTab
+- [ ] 41-04-PLAN.md — Frontend: StrategyTab with category progress, ideal roster, archetype, scarcity
+- [ ] 41-05-PLAN.md — Frontend: QueueTab with force nominate, skip player, auto-nominate, queue display
 
 ## Progress
 
@@ -82,6 +88,6 @@ Phases execute in numeric order: 39 → 40 → 41
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 39. DevTools Setup | v3.0 | 0/TBD | Not started | - |
-| 40. Auto-Nomination Rework | 4/4 | Complete   | 2026-03-14 | - |
-| 41. Mobile Command Center | v3.0 | 0/TBD | Not started | - |
+| 39. DevTools Setup | v3.0 | 0/2 | Not started | - |
+| 40. Auto-Nomination Rework | v3.0 | 4/4 | Complete | 2026-03-14 |
+| 41. Mobile Command Center | v3.0 | 0/5 | Not started | - |
