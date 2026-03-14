@@ -80,15 +80,6 @@ export default function DraftLivePage() {
   // Determine if there's meaningful data
   const hasData = state !== null;
 
-  // Adapter for QueueTab which uses untyped sendControl signature
-  const sendControlUntyped = useCallback(
-    (action: string, payload?: unknown) => {
-      // Cast through the typed sendControl - at runtime it just sends JSON
-      (sendControl as (action: string, payload?: unknown) => void)(action, payload);
-    },
-    [sendControl]
-  );
-
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col">
       {/* ---- Sticky Header ---- */}
@@ -159,7 +150,7 @@ export default function DraftLivePage() {
           <QueueTab
             state={state}
             engineSignals={engineSignals}
-            sendControl={sendControlUntyped}
+            sendControl={sendControl}
             extensionConnected={extensionConnected}
           />
         )}
