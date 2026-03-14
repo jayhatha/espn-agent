@@ -1,240 +1,214 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-02-19
+**Analysis Date:** 2026-03-13
 
 ## Naming Patterns
 
 **Files:**
-- Backend agents: camelCase (e.g., `trade-recommendation.ts`, `snapshot-orchestrator.ts`)
-- API routes: camelCase (e.g., `leagues.ts`, `recommendations.ts`)
-- Frontend pages: camelCase with bracket notation for dynamic routes (e.g., `[id]/page.tsx`, `connect/page.tsx`)
-- Utilities: camelCase (e.g., `feature-flags.ts`, `encryption.ts`)
+- Backend agents: `kebab-case` (e.g., `trade-recommendation.ts`, `snapshot-orchestrator.ts`)
+- Frontend pages: `kebab-case` with brackets for dynamic routes (e.g., `[id].tsx`, `connect/page.tsx`)
+- Test files: `__tests__` directory (separate from source, co-located per feature)
+- Test naming: same filename with `.test.ts` suffix (e.g., `trade-recommendation.test.ts`)
 
 **Functions:**
-- Async methods: camelCase (e.g., `executeSnapshot`, `analyzeTradeImpact`, `fetchLeague`)
-- Private methods: camelCase with leading underscore (e.g., `_cleanCsv`, `_getPlayerName`, `_matchPlayer`)
-- Agent methods: clear action verbs (e.g., `executeSnapshot`, `ingestBattersprojections`, `findBestMatch`)
+- camelCase for all functions and methods (e.g., `executeSnapshot()`, `normalizeLeagueData()`)
+- Private methods use underscore prefix rarely; typically private via TypeScript `private` keyword
+- Async functions named normally without `async_` prefix
 
 **Variables:**
-- Camel case throughout (e.g., `leagueId`, `snapshotDate`, `espnTeamId`)
-- Database IDs keep underscore suffix in paths: `league_id`, `team_id` (mapped to `leagueId`, `teamId` in code)
-- Acronyms: spelled out unless universally recognized (e.g., `snapshotDate` not `snapshotDt`)
+- camelCase for all local variables and parameters (e.g., `leagueId`, `espnAuth`, `freeAgents`)
+- Constants in UPPER_SNAKE_CASE: `PITCHING_STAT_KEYS`, `POSITION_SCARCITY`
+- Destructured parameters: camelCase (e.g., `{ leagueId, season, espnAuth }`)
 
-**Types & Interfaces:**
-- PascalCase for all types and interfaces (e.g., `TradeRecommendationAgent`, `ESPNAuthCookies`, `ProjectionCSVRow`)
-- Type names descriptive: `ProposedTrade`, `CategoryImpact`, `ValidationReport` (not abbreviated)
-- Response interfaces suffixed with intent: `TradeImpactAnalysis`, `WaiverRecommendation`, `ESPNLeagueData`
-
-**Constants:**
-- UPPER_SNAKE_CASE for magic numbers and static strings in adapters (e.g., ESPN stat IDs)
-- Environment variables: `UPPER_SNAKE_CASE` (e.g., `PORT`, `REDIS_URL`, `JWT_SECRET`)
+**Types:**
+- PascalCase for all interfaces and type aliases (e.g., `ProposedTrade`, `TradeImpactAnalysis`, `ESPNAuthCookies`)
+- Generic type parameters: single capital letter or descriptive PascalCase (e.g., `<T>`, `<Database>`)
+- Union types and enums: PascalCase (e.g., `ProjectionStaleness = "fresh" | "stale" | "missing"`)
 
 ## Code Style
 
 **Formatting:**
-- No global ESLint/Prettier config detected at root level
-- Backend: Linting available via `lint: "eslint src --ext .ts"` (package.json)
-- Frontend: ESLint config inherited via `eslint-config-next`
-- Indentation: 2 spaces (observed in all source files)
-- Line length: No explicit limit, but most lines stay under 120 characters
+- ESLint configured for backend (`packages/backend/package.json`) with TypeScript support
+- Frontend uses Next.js linting (`eslint-config-next`)
+- No Prettier config found; ESLint acts as primary formatter
+- Target: ES2022 (backend), ES2020 (frontend)
+- Tabs/spacing: ESLint enforced, consistent throughout
 
 **Linting:**
-- Backend uses: `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`
-- Frontend uses: ESLint with Next.js config (`eslint-config-next`)
-- Run: `npm run lint` in packages/backend (lints `src` directory only)
+- `eslint` with `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser`
+- Run: `npm run lint` (per-package)
+- Strict TypeScript settings across all packages:
+  - `strict: true` in tsconfig.json
+  - `noUnusedLocals: true`
+  - `noUnusedParameters: true`
+  - `noImplicitReturns: true`
+  - `noFallthroughCasesInSwitch: true`
 
-**TypeScript:**
-- Backend: `strict: false` in tsconfig (line 11 of packages/backend/tsconfig.json) - relaxed type checking
-- Frontend: `strict: true` in tsconfig (line 10 of packages/frontend/tsconfig.json) - strict mode enforced
-- Backend declares: `"noUnusedLocals": false`, `"noUnusedParameters": false`, `"noImplicitReturns": false`
-- All files use `"module": "ESNext"` and `"moduleResolution": "bundler"`
+**Module system:**
+- ES modules (type: "module" in package.json)
+- Explicit `.js` extensions on relative imports: `import { db } from "../db/connection.js"`
+- Path aliases in frontend: `@/*` maps to `./src/*` (configured in `tsconfig.json`)
 
 ## Import Organization
 
 **Order:**
-1. Node.js built-ins (`import crypto from "crypto"`)
-2. Third-party packages (`import axios from "axios"`, `import { parse } from "csv-parse/sync"`)
-3. Type imports from packages (`import type { Logger } from "pino"`, `import type { Kysely } from "kysely"`)
-4. Internal absolute imports (`import { getDb } from "../db/connection.js"`)
-5. Relative imports for adjacent modules (`import { ESPNAdapter } from "../adapters/espn.js"`)
+1. Type imports: `import type { ... } from "package"`
+2. External packages: `import { Logger } from "pino"`
+3. Internal relative imports: `import { getDb } from "../db/connection.js"`
+4. Unused imports removed (ESLint enforces)
 
 **Path Aliases:**
-- Frontend: `@/*` → `./src/*` (configured in `packages/frontend/tsconfig.json`)
-- Usage: `import { api } from "@/lib/api"`, `import { ProtectedRoute } from "@/components/ProtectedRoute"`
-- Backend: No path aliases configured; uses relative paths throughout
+- Frontend only: `@/lib/api`, `@/components/ui/Button`
+- Backend uses relative paths with full `.js` extensions
+- Shared package imported as `@espn-fantasy/shared` or with relative path
 
-**File Extensions:**
-- Backend: `.js` extensions in import paths (e.g., `"../db/connection.js"`, `"../adapters/espn.js"`)
-- This is for ESM compatibility; actual files are `.ts`
-- Frontend: Import paths without extensions (e.g., `import { api } from "@/lib/api"`)
+**Module exports:**
+- Named exports preferred: `export function getRecommendations(...)`
+- Type exports marked explicitly: `export type ProposedTrade = { ... }`
+- Index files (barrel exports) used sparingly in shared: `packages/shared/src/index.ts`
+- Default exports avoided (named exports only)
 
 ## Error Handling
 
 **Patterns:**
-- Agents use Pino logger for structured logging: `this.logger?.info()`, `this.logger?.warn()`, `this.logger?.error()`
-- Logger is optional: injected via constructor, checked with optional chaining before use
-- Example from `snapshot-orchestrator.ts`:
-  ```typescript
-  this.logger?.info({ leagueId, snapshotDate }, "Starting snapshot job");
-  // ... later ...
-  } catch (error) {
-    this.logger?.error(
-      { error, leagueId, snapshotDate },
-      "Snapshot orchestration failed"
-    );
-    throw error;
-  }
-  ```
-- API endpoints use explicit try/catch with Fastify reply codes:
-  ```typescript
-  try {
-    // operation
-  } catch (err) {
-    return reply.code(400).send({ error: "message" });
-  }
-  ```
-- No error swallowing: errors are logged with context and re-thrown or sent to client
-- Validation errors use descriptive messages: `"No snapshot found for league ${leagueId} on ${snapshotDate}"`
+- Try-catch with `await` for async operations
+- Errors propagated up (agents don't swallow errors silently)
+- Early returns for validation failures (no exception throwing for invalid input)
+- Type-safe error construction: errors include context object
 
-**Data Validation:**
-- Request body validation via TypeScript interfaces attached to Fastify request
-- Example: `FastifyRequest<{ Body: ConnectLeagueBody }>`
-- No runtime validation library detected (no Zod usage in route handlers, though Zod is a dependency)
-- Database errors: use `.executeTakeFirstOrThrow()` to fail loudly on missing data
+**Example patterns:**
+```typescript
+// Validation error - early return
+const validation = ConnectLeagueSchema.safeParse(request.body);
+if (!validation.success) {
+  return reply.code(400).send({ error: "Validation failed", details: validation.error.errors });
+}
+
+// Async operation - try-catch
+try {
+  await espnAdapter.fetchLeague({ leagueId, season });
+} catch (error) {
+  request.log.error({ error }, "Failed to fetch league");
+  return reply.code(500).send({ error: "Failed to fetch league" });
+}
+```
+
+**Error context:**
+- Include relevant IDs: `{ leagueId, teamId, snapshotDate }`
+- Never log secrets (ESPN cookies, auth tokens)
+- Provide user-friendly messages in replies (technical details in server logs only)
 
 ## Logging
 
-**Framework:** Pino (HTTP-structured logging with optional pretty-printing)
-- Version: `"pino": "^8.17.2"`
-- Pretty printer: `pino-pretty` for development
-- Server setup in `packages/backend/src/index.ts`:
-  ```typescript
-  logger: {
-    level: process.env.LOG_LEVEL || "info",
-    transport: process.env.NODE_ENV === "development"
-      ? { target: "pino-pretty", options: { ... } }
-      : undefined,
-  }
-  ```
+**Framework:** Pino (structured logging)
+- Optional logger passed to agent constructors: `constructor(private db, private logger?: Logger)`
+- Logger used via optional chaining: `this.logger?.info(...)`
 
 **Patterns:**
-- Info level: Workflow entry/exit (e.g., "Starting snapshot job", "Snapshot data written")
-- Debug level: Intermediate steps (e.g., "Using cached identity mapping")
-- Warn level: Recoverable issues (e.g., "Could not auto-detect user's team")
-- Error level: Failures with context (e.g., "Snapshot orchestration failed", error object attached)
-- Context objects passed as first argument: `logger.info({ leagueId, playerId }, "message")`
-- Avoid logging: ESPN auth cookies, tokens, secrets
+```typescript
+// Info: operation start/completion
+this.logger?.info({ leagueId, snapshotDate }, "Starting snapshot job");
+
+// Warn: degraded state or minor issues
+this.logger?.warn({ swid }, "Could not auto-detect user's team");
+
+// Error: exception or critical failure
+this.logger?.error({ error }, "Failed to batch insert players");
+```
+
+**Guidelines:**
+- Always include context object first: `{ leagueId, teamId }`
+- Message is second parameter: descriptive, present tense
+- Never log full error objects inline; use `{ error }` in context
+- Do NOT log ESPN cookies, `SWID`, `espn_s2`, or JWT tokens
 
 ## Comments
 
 **When to Comment:**
-- JSDoc-style block comments above agent classes and public methods
-- Example from `espn.ts`:
-  ```typescript
-  /**
-   * ESPN Adapter Agent
-   * Per AGENTS.md §1
-   *
-   * Fetches and normalizes ESPN league data, handles auth cookies,
-   * caches responses, and detects schema drift
-   */
-  ```
-- Inline comments for non-obvious logic (e.g., "Strip UTF-8 BOM and normalize column headers")
-- No comments for obvious code (e.g., `const id = parseInt(request.params.id, 10)`)
+- Block comments above non-obvious logic sections (e.g., SQL queries, complex math)
+- Line comments for "why", not "what" (code should express intent)
+- Disable ESLint rules only with explanation: `// @ts-expect-error reserved for future standings-based scoring`
 
 **JSDoc/TSDoc:**
-- Used on agent class constructors and public methods
-- Format: Describe behavior, params in separate lines
-- Example from `projections-ingest.ts`:
-  ```typescript
-  /**
-   * Match a FanGraphs player to a database player using identity resolution
-   * @returns player ID if matched, null otherwise
-   */
-  private async matchPlayer(
-    playerName: string,
-    team?: string,
-    positions?: string[],
-  ): Promise<number | null>
-  ```
+- Used for public agent class methods (e.g., `executeSnapshot()`)
+- Format: `/** Doc comment */` above function
+- Include purpose, parameters if not self-documenting, return type
+- Not required for simple getters/setters
+
+**Example:**
+```typescript
+/**
+ * Execute daily snapshot job
+ *
+ * Fetches ESPN data, archives raw payload, normalizes to schema,
+ * writes snapshot tables, computes projections, returns status.
+ */
+async executeSnapshot(options: SnapshotJobOptions): Promise<void> { ... }
+```
 
 ## Function Design
 
 **Size:**
-- Most agent methods 40-100 lines (moderate size, readable)
-- Breaking point: Extract to private methods when logic is distinct (e.g., `_cleanCsv`, `_getPlayerName`)
+- Prefer functions under 50 lines (except agents with complex orchestration)
+- Break long chains into named intermediate variables
+- Extract loops and conditionals into helper functions
 
 **Parameters:**
-- Explicit over implicit: Pass context objects rather than relying on class state
-- Options objects for complex workflows (e.g., `SnapshotJobOptions`, `ESPNFetchOptions`)
-- Destructure parameters in method signature: `{ leagueId, snapshotDate, espnAuth, forceFresh }`
+- Prefer object parameters over 3+ positional args: `{ leagueId, teamId, snapshotDate }`
+- Required params first, optional params in object (or make entire param object)
+- Use type annotations: no implicit `any`
 
 **Return Values:**
-- Async methods return Promises of specific types (e.g., `Promise<TradeImpactAnalysis>`)
-- Error handling: throw or return reply with error status (no silent null returns)
-- Agents mark degraded state via database flags, not return values
+- Return early to reduce nesting: `if (!value) return;`
+- Async functions always return Promise: `async fn(): Promise<void>`
+- No implicit `undefined` returns; use explicit void or return value
 
-**Visibility:**
-- Agent classes: Single public method per responsibility (e.g., `executeSnapshot`, `analyzeTradeImpact`)
-- Constructor is public; supporting methods are private
-- Database dependency injected: `constructor(private db: Kysely<Database>, private logger?: Logger)`
+**Example:**
+```typescript
+async getRecommendations(
+  leagueId: number,
+  teamId: number,
+  options?: { maxRecommendations?: number }
+): Promise<WaiverRecommendation[]> {
+  const { maxRecommendations = 10 } = options || {};
+
+  // Fetch data
+  const roster = await db.selectFrom("team_roster_snapshot")...;
+  if (!roster.length) {
+    this.logger?.warn({ leagueId, teamId }, "Empty roster");
+    return [];
+  }
+
+  // Process and return
+  return recommendations;
+}
+```
 
 ## Module Design
 
-**Exports:**
-- Agent classes: Export the class and its interface types
-- Example from `trade-recommendation.ts`:
-  ```typescript
-  export interface ProposedTrade { ... }
-  export interface CategoryImpact { ... }
-  export class TradeRecommendationAgent { ... }
-  ```
-- API routes: Export a single async function (e.g., `export async function leaguesRoutes(app: FastifyInstance)`)
-- Adapters: Export class and all request/response interfaces
+**Agent Classes:**
+- Single responsibility: one agent per file (e.g., `TradeRecommendationAgent`)
+- Constructor accepts `Kysely<Database>` and optional `Logger`
+- Public methods: primary entry points (e.g., `analyzeProposedTrade()`)
+- Private methods: helpers prefixed with underscore if needed, or just `private` keyword
+
+**API Route Handlers:**
+- Organized in `packages/backend/src/api/*.ts` per resource (leagues, projections, etc.)
+- Function exported from each file: `export async function leaguesRoutes(app: FastifyInstance)`
+- Use Zod schemas for validation (`packages/backend/src/utils/validation.ts`)
+- Early returns for error cases (no exception flow)
+
+**Type Definitions:**
+- Shared types in `packages/shared/src/types.ts` (exported via index)
+- Database schema types in `packages/backend/src/db/schema.ts`
+- API request/response types co-located in route files
+- Interface names reflect purpose: `ProposedTrade`, `TradeImpactAnalysis`
 
 **Barrel Files:**
-- Shared package exports types from `packages/shared/src/index.d.ts`
-- No barrel files in backend (each module imports directly)
-- Frontend: Uses `@/lib/api` and `@/contexts/AuthContext` as named imports
+- Used only in shared: `packages/shared/src/index.ts` exports all public types and functions
+- Agents imported directly: `import { TradeRecommendationAgent } from "../agents/trade-recommendation.js"`
+- Avoids wildcard imports; explicit imports preferred
 
-**Module Boundaries:**
-- Clear separation: `adapters/` (external APIs), `agents/` (business logic), `api/` (routes), `db/` (persistence)
-- Agents depend on adapters and database; adapters know nothing of agents
-- Routes instantiate agents and adapters, orchestrate responses
+---
 
-## Database Conventions
-
-**Column Names:**
-- snake_case throughout (e.g., `league_id`, `snapshot_date`, `espn_league_id`)
-- Suffix ID fields: `_id` (e.g., `league_id`, `player_id`, `team_id`)
-- Dates: `_date` for DATE columns, `_at` for TIMESTAMP columns
-- JSONB columns suffix with `_json` (e.g., `settings_json`, `stat_components_json`)
-
-**TypeScript Mapping:**
-- Database types defined in `packages/shared/src/types.ts`
-- Imported into `packages/backend/src/db/schema.ts`
-- Route handlers receive database rows and convert to response objects if needed
-
-## Frontend Conventions
-
-**Component Naming:**
-- PascalCase for React components
-- Context providers: `AuthProvider`, `AuthContext` (paired)
-- Pages follow Next.js App Router: `page.tsx`, `layout.tsx`
-- Dynamic segments: `[id]/page.tsx`, `[id]/trades/page.tsx`
-
-**Hook Usage:**
-- `useQuery` from TanStack React Query for data fetching
-- Queries keyed by resource + params (e.g., `["leagues"]`, `["league", leagueId]`)
-- Error boundaries via `error` state from `useQuery`
-- Loading state: `isLoading` boolean with skeleton UI
-
-**Context Pattern:**
-- Auth stored in context with methods: `login()`, `signup()`, `logout()`, `loginWithGoogle()`, `loginWithGitHub()`
-- Token stored in `localStorage` under `auth_token`
-- API calls check token and redirect to login on 401
-
-**Styling:**
-- Tailwind CSS classes inline (no CSS modules or styled-components)
-- Responsive design: `sm:`, `md:`, `lg:` breakpoints
-- Spacing via Tailwind scale (e.g., `px-4`, `py-6`, `gap-4`)
+*Convention analysis: 2026-03-13*

@@ -1,219 +1,211 @@
 # External Integrations
 
-**Analysis Date:** 2026-02-19
+**Analysis Date:** 2026-03-13
 
 ## APIs & External Services
 
 **ESPN Fantasy Baseball API:**
-- Service: ESPN's fantasy baseball API (read-only public + private league data)
-- What it's used for: Fetching league standings, team rosters, scoring categories, transaction history
-- SDK/Client: Axios HTTP client
-- Base URL: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb`
-- Implementation: `packages/backend/src/adapters/espn.ts` (ESPNAdapter class)
-- Auth: Cookie-based (SWID + espn_s2 cookies for private leagues)
-  - SWID and espn_s2 stored in plaintext in database `league.espn_auth_cookies` (JSONB) — design doc flags this requires encryption
-  - Cookies extracted from request and passed via `ESPNAuthCookies` interface
-- Known gaps: No retry/backoff on failures, in-memory cache only (not Redis-backed), free agent pool never populated
+- Service: ESPN Fantasy Baseball (lm-api-reads.fantasy.espn.com)
+- SDK: Custom ESPNAdapter (`packages/backend/src/adapters/espn.ts`)
+- Auth: SWID + espn_s2 cookies (from user's ESPN login session)
+- Methods: Read league standings, team rosters, free agents, transaction history, player stats
+- Rate limiting: 2-second throttle per CLAUDE.md, single-concurrency queue via p-limit
+- Known gaps: Free agent pool never fetched (always empty), no retry/backoff strategy
 
-**Slack API:**
-- Service: Slack workspace integration and messaging
-- What it's used for: Send daily standings reports, approval workflows for trades/waivers, notifications
-- SDK/Client: axios (raw HTTP for OAuth, event routing)
-- OAuth Endpoints:
-  - Start: `https://slack.com/oauth/v2/authorize` (user redirected here)
-  - Callback: Local route `/slack/oauth/callback` exchanges code for token
-  - Token exchange: `https://slack.com/api/oauth.v2.access`
-- Auth: Slack app credentials (client ID, client secret)
-  - Signing secret used for HMAC signature verification of webhook requests
-  - Bot tokens and webhook URLs stored encrypted in database `slack_installation` table
-- Scopes: `chat:write`, `im:write`, `commands`
-- Webhook verification: HMAC-SHA256 signature validation with 5-minute timestamp window (`packages/backend/src/utils/slack-verify.ts`)
-- Implementation routes: `packages/backend/src/api/slack.ts`
-- Feature flag: `FEATURE_SLACK_ENABLED` (disabled by default)
+**MLB Stats API:**
+- Service: MLB Official Stats API (statsapi.mlb.com)
+- SDK: Custom MLBStatsApiAdapter (`packages/backend/src/adapters/mlb-statsapi.ts`)
+- Auth: None (public API)
+- Methods: MLB game schedule, player metadata, live game scores
+- Used for: Schedule-aware draft timing, injury tracking
 
-**Google OAuth 2.0:**
-- Service: Google authentication provider
-- What it's used for: User login via Google account
-- Strategy: passport-google-oauth20
-- Implementation: `packages/backend/src/api/auth-oauth.ts`
-- Required env vars:
-  - `GOOGLE_CLIENT_ID`
-  - `GOOGLE_CLIENT_SECRET`
-  - `GOOGLE_CALLBACK_URL`
-- Callback route: Generates JWT and redirects to frontend with token
-- Enabled when both Google and GitHub credentials are configured
+**OpenAI API:**
+- Service: OpenAI (api.openai.com)
+- SDK: openai 6.25.0
+- Auth: `OPENAI_API_KEY` environment variable
+- Methods: LLM completions for draft narration
+- Feature: DraftNarratorAgent generates tactical commentary in extension
+- Notes: Per-request instantiation; constructor throws if API key missing
 
-**GitHub OAuth 2.0:**
-- Service: GitHub authentication provider
-- What it's used for: User login via GitHub account
-- Strategy: passport-github2
-- Implementation: `packages/backend/src/api/auth-oauth.ts`
-- Required env vars:
-  - `GITHUB_CLIENT_ID`
-  - `GITHUB_CLIENT_SECRET`
-  - `GITHUB_CALLBACK_URL`
-- Callback route: Generates JWT and redirects to frontend with token
-- Enabled when both GitHub and Google credentials are configured
+**Slack:**
+- OAuth: Slack OAuth v2 (slack.com/oauth/v2/authorize)
+- Token exchange: https://slack.com/api/oauth.v2.access
+- API calls:
+  - https://slack.com/api/chat.postMessage - Send messages to channels/DMs
+  - https://slack.com/api/chat.update - Edit messages
+  - https://slack.com/api/conversations.open - Open DMs with users
+- Auth: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI`
+- Verification: HMAC-SHA256 signature verification via `SLACK_SIGNING_SECRET`
+- Feature-flagged: `FEATURE_SLACK_ENABLED` environment variable
+- Routes: `POST /slack/oauth/start`, `GET /slack/oauth/callback`
+- Worker: SlackApprovalWorker processes approval workflows via response_url webhooks
+- Use case: League notifications, draft updates, waiver/trade approvals
+
+**GitHub OAuth:**
+- Service: GitHub OAuth (github.com)
+- SDK: passport-github2 0.1.12
+- Auth: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`
+- Routes: Handled by setupOAuth in `packages/backend/src/api/auth-oauth.ts`
+- Use case: User authentication/signup
+
+**Google OAuth:**
+- Service: Google OAuth 2.0
+- SDK: passport-google-oauth20 2.0.0
+- Auth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
+- Routes: Handled by setupOAuth in `packages/backend/src/api/auth-oauth.ts`
+- Use case: User authentication/signup
 
 ## Data Storage
 
 **Databases:**
-- PostgreSQL 12+
-  - Connection: `DATABASE_URL` env var (required)
-  - Client: pg driver wrapped by Kysely ORM
-  - Connection pooling: Max 10 connections per pool (`packages/backend/src/db/connection.ts`)
-  - Migrations: SQL files in `packages/backend/src/db/migrations/` (001-006 implemented)
-  - Tables: 16+ tables for leagues, teams, players, daily snapshots, projections, transactions, users, Slack integrations
-
-**Redis:**
-- Purpose: Job queue backend for BullMQ, optional caching
-- Connection: `REDIS_URL` env var (optional; Fastify redis plugin only registered if present)
-- Client: IORedis (native driver)
-- Queues:
-  - `snapshots` - Daily league snapshot jobs (`packages/backend/src/workers/snapshot-worker.ts`)
-  - `morning-report` - Daily standing reports
-  - `slack-approval` - Pending trade/waiver approvals with Slack callbacks
-- Usage: Background processing, not real-time caching
+- **PostgreSQL 15** - Primary relational database
+  - Connection: `DATABASE_URL` (required, format: `postgresql://user:pass@host:port/db`)
+  - Client: Kysely ORM with pg dialect
+  - Schema: 16 tables managed via SQL migrations
+  - Connection pooling: pg.Pool (max 25, timeout 5s connect, 30s idle, 7500 max uses)
 
 **File Storage:**
-- Local filesystem only - CSV projections uploaded via multipart form to `POST /api/projections/upload`
-- Processed in-memory (csv-parse) and stored to database (`projections_run`, `player_projection` tables)
-- No cloud storage integration (S3, GCS, etc.)
+- Local filesystem only - No S3/cloud storage integration
+- CSV uploads: Stored transiently via @fastify/multipart for projections ingest
+- User data persistence: PostgreSQL only
 
 **Caching:**
-- Redis (when REDIS_URL configured) - primarily for BullMQ job queue
-- In-memory ESPN response cache (not Redis-backed, lost on restart)
-- Next.js built-in caching for static assets and ISR
+- **Redis 7** - Optional distributed cache
+  - Connection: `REDIS_URL` (optional, defaults to no Redis)
+  - Use cases:
+    - Rate limiting storage (via @fastify/redis + @fastify/rate-limit)
+    - Job queue (BullMQ for background workers)
+    - Session data (if implemented)
+  - In-memory fallback: Rate limiting uses in-memory state if Redis unavailable
+  - ESPN API responses: Cached in-process via LRU-cache (lru-cache 11.2.6)
 
 ## Authentication & Identity
 
-**Auth Provider:**
-- Hybrid approach:
-  - Local auth: Email + password signup/login with bcrypt hashing (`packages/backend/src/api/auth.ts`)
-  - OAuth: Google and GitHub via Passport strategies (`packages/backend/src/api/auth-oauth.ts`)
+**Primary Auth:**
+- Method: JWT (via @fastify/jwt)
+- Token storage: Signed httpOnly cookie named `accessToken`
+- Token lifetime: 15 minutes (expiresIn: "15m")
+- Refresh flow: `/api/auth/refresh` endpoint for token rotation
+- CORS: Credentials mode enabled for cookie transmission
 
-**JWT Token Management:**
-- Token generation: Fastify JWT plugin configured with secret from `JWT_SECRET` env var
-- Default expiration: 7 days (configurable via `JWT_EXPIRATION`)
-- Signature verification: `server.decorate('authenticate', authenticate)` middleware
-- Implementation: `packages/backend/src/middleware/auth.ts`
+**Provider Strategies:**
+- GitHub OAuth (passport-github2)
+- Google OAuth (passport-google-oauth20)
+- Custom login/signup (implementation in `packages/backend/src/api/auth.ts`)
 
-**User Data:**
-- Storage: `users` table (userId, email, passwordHash, oauthProvider, createdAt)
-- Credentials: Passwords hashed with bcryptjs (cost factor 10)
-- OAuth linking: Same table stores `oauth_provider` field (google/github/local)
+**User Identity:**
+- Database: `user` table (inferred from auth routes)
+- Team context: `user_team_id` - Maps user to their selected team per league (via `localStorage` key `league_${leagueId}_team` on frontend)
 
-**ESPN Auth:**
-- ESPN SWID and espn_s2 cookies stored per league (plaintext in `league.espn_auth_cookies`)
-- Used for private league API access
-- Security gap: Stored plaintext (design doc flags as requiring encryption)
+**Secrets Management:**
+- OAuth secrets: Environment variables only
+- ESPN cookies: Stored in plaintext in database (CLAUDE.md notes this should be encrypted-at-rest)
+- Encryption utility: `encryptToken()` function in `packages/backend/src/utils/encryption.ts` (partially implemented)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Not detected - no Sentry, Rollbar, or similar integration
+- Not detected - No Sentry, Rollbar, or similar integration
 
 **Logs:**
-- Pino structured logging (backend) with optional pretty printing in development
-- Log level controlled by `LOG_LEVEL` env var (default: info)
-- pino-pretty transport for human-readable output in dev
-- Worker and internal services also use Pino
+- Pino (8.17.2) - Structured JSON logging
+  - Pretty printing in development (pino-pretty)
+  - JSON output in production
+  - Log level: Configurable via `LOG_LEVEL` env var (defaults to `info`)
+  - Includes: Request/response logs, database queries (via Kysely), worker events
 
-**Health Checks:**
-- GET `/health` endpoint returns `{ status: "ok", timestamp: ISO string }`
-- Docker HEALTHCHECK: Polls `http://localhost:3001/health` every 30s (backend) and `http://localhost:3000/health` (frontend)
+**Metrics:**
+- Not detected - No Prometheus, StatsD, or CloudWatch integration
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Railway.app (deployment platform)
-- Config files: `railway.backend.json`, `railway.frontend.json`, `railway.workers.json`
-- Docker containers orchestrated via Railway
+- Docker Compose - Local/staging deployments
+  - Production compose: `docker-compose.yml`
+  - Dev compose: `docker-compose.dev.yml`
+  - All services: PostgreSQL, Redis, Backend, Worker, Frontend
+
+**Container Images:**
+- Base: Node.js (via Turbo/Dockerfile logic)
+- Frontend: Next.js production build
+- Backend/Worker: Node.js runtime executing TypeScript dist
+
+**Database Migrations:**
+- Manual SQL via `packages/backend/src/db/migrate.ts`
+- Run command: `pnpm migrate` (defined in backend package.json)
+- Location: `packages/backend/src/db/migrations/` (numbered SQL files)
 
 **CI Pipeline:**
-- Not detected - no GitHub Actions, GitLab CI, or similar workflows in `.github/` directory
-
-**Local Development:**
-- docker-compose.dev.yml for PostgreSQL + Redis services
+- Not detected - No GitHub Actions, CircleCI, or similar config
 
 ## Environment Configuration
 
-**Required env vars:**
-- `DATABASE_URL` - PostgreSQL connection string (e.g., `postgresql://user:pass@localhost/db`)
-- `REDIS_URL` - Redis connection (optional; Fastify plugin only if present)
-- `PORT` - Backend API port (default: 3001)
-- `HOST` - Backend bind address (default: 0.0.0.0)
-- `NODE_ENV` - development/production (affects logging format)
-- `LOG_LEVEL` - Pino log level (default: info)
-- `FRONTEND_URL` - Frontend origin for CORS and OAuth redirects (default: http://localhost:3000)
-- `JWT_SECRET` - JWT signing secret (development default exists; must override in production)
-- `JWT_EXPIRATION` - JWT token expiration (default: 7d)
+**Required env vars for Core Functionality:**
+- `DATABASE_URL` - PostgreSQL connection (blocking)
+- `OPENAI_API_KEY` - OpenAI API key (required for draft narration only; throws on per-request instantiation)
 
-**OAuth (Google & GitHub):**
-- `GOOGLE_CLIENT_ID` - Google OAuth app ID
-- `GOOGLE_CLIENT_SECRET` - Google OAuth app secret
-- `GOOGLE_CALLBACK_URL` - Google OAuth callback URL (e.g., http://localhost:3001/auth/google/callback)
-- `GITHUB_CLIENT_ID` - GitHub OAuth app ID
-- `GITHUB_CLIENT_SECRET` - GitHub OAuth app secret
-- `GITHUB_CALLBACK_URL` - GitHub OAuth callback URL (e.g., http://localhost:3001/auth/github/callback)
+**Required for OAuth:**
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` - Google OAuth
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL` - GitHub OAuth
 
-**Slack Integration:**
-- `SLACK_CLIENT_ID` - Slack app ID
-- `SLACK_CLIENT_SECRET` - Slack app secret
-- `SLACK_REDIRECT_URI` - Slack OAuth redirect URI (e.g., http://localhost:3001/slack/oauth/callback)
-- `SLACK_SIGNING_SECRET` - Slack request signature verification secret
-- `SLACK_ENCRYPTION_KEY` - 64 hex characters (32 bytes) for AES-256-GCM encryption
-  - Generate: `openssl rand -hex 32`
-  - Used to encrypt bot tokens and webhook URLs in `slack_installation` table
-- `FEATURE_SLACK_ENABLED` - Enable Slack integration (default: false)
+**Required for Slack Integration:**
+- `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_REDIRECT_URI` - Slack OAuth
+- `SLACK_SIGNING_SECRET` - Slack request verification (only if `FEATURE_SLACK_ENABLED=true`)
 
-**Frontend:**
-- `NEXT_PUBLIC_API_URL` - Public API endpoint for frontend clients (default: http://localhost:3001)
-- `NEXT_TELEMETRY_DISABLED` - Disable Next.js telemetry (set to 1 in production)
+**Optional Infrastructure:**
+- `REDIS_URL` - Redis connection (optional; if missing, rate limiting uses in-memory state)
+- `NODE_ENV` - Defaults to `development`
+- `LOG_LEVEL` - Defaults to `info`
+- `PORT` - Defaults to 3001
+- `HOST` - Defaults to 0.0.0.0
+- `FRONTEND_URL` - Defaults to http://localhost:3000
+- `NEXT_PUBLIC_API_URL` - Defaults to http://localhost:3001
 
-**Internal/Admin:**
-- `INTERNAL_JOB_TOKEN` - Token for internal job trigger endpoints (optional)
-
-**Secrets location:**
-- Environment variables via `.env` file (not committed, `.env.example` is empty)
-- Docker Compose overrides via `.env.railway`
-- Railway.app secrets management (production)
+**Secrets Location:**
+- Environment files: `.env`, `.env.railway` (Railway.app deployment)
+- Do NOT read `.env` in code review (contains secrets)
+- Suggested: Move to secret manager (Vault, 1Password, AWS Secrets) for production
 
 ## Webhooks & Callbacks
 
-**Incoming:**
-- `POST /slack/events` - Slack Event API subscriptions (app mentions, messages, shortcuts)
-  - Signature verification via `slackVerifyPreHandler` middleware
-  - Requires `SLACK_SIGNING_SECRET` env var
-- `GET /slack/oauth/callback` - Slack OAuth redirect endpoint (from user authorization)
-- `GET /auth/google/callback` - Google OAuth callback (from Passport)
-- `GET /auth/github/callback` - GitHub OAuth callback (from Passport)
-- `POST /api/leagues/:id/snapshot` - Manual snapshot trigger endpoint
+**Incoming Webhooks:**
+- Slack Slash Commands: Event handler in `packages/backend/src/api/slack.ts`
+  - Verification: HMAC-SHA256 signature (via `slackVerifyPreHandler`)
+  - Payload: Form-encoded, requires raw body parsing
+  - Use case: Interactive approvals, league commands
 
-**Outgoing:**
-- Slack message/DM sends via `axios.post` to Slack API (`chat.postMessage`, `conversations.open`, etc.)
-- Job queue callbacks processed by workers (`packages/backend/src/workers/`)
-  - morning-report-worker sends daily standings
-  - slack-approval-worker handles trade/waiver approval flows
+**Outgoing Webhooks:**
+- Slack response_url: SlackApprovalWorker posts back to response_url (ephemeral interaction responses)
+  - Location: `packages/backend/src/workers/slack-approval-worker.ts`
+  - Method: POST via axios
+- ESPN Event Callbacks: Not implemented (would require ESPN webhook registration)
 
-## Worker Architecture
+## WebSocket Connections
 
-**Background Jobs (BullMQ + Redis):**
-- `snapshots` queue: Daily league snapshot capture and processing
-  - Worker: `packages/backend/src/workers/snapshot-worker.ts`
-  - Schedule: Daily at 03:00 league timezone (manual or scheduled)
-  - Retry: 3 attempts with exponential backoff
+**Live Draft Monitoring:**
+- WebSocket plugin: @fastify/websocket (registered in `packages/backend/src/index.ts`)
+- Route: Likely draft-live routes (`packages/backend/src/api/draft-live.ts`)
+- Use case: Real-time updates to Chrome extension during live drafts
+- CORS: Allows chrome-extension:// and private LAN IPs for mobile companion
 
-- `morning-report` queue: Daily standings reports
-  - Worker: `packages/backend/src/workers/morning-report-worker.ts`
+## Data Ingestion
 
-- `slack-approval` queue: Pending trade/waiver approval workflows
-  - Worker: `packages/backend/src/workers/slack-approval-worker.ts`
+**FanGraphs Projections:**
+- Method: Manual CSV upload via multipart form
+- Route: `POST /api/projections/upload`
+- Parser: csv-parse library
+- Storage: Parsed into `projections_run` and `player_projection` tables
+- Update flow: Failed ingest re-triggers snapshot for dependent leagues
 
-**Connection Management:**
-- Each worker creates its own Redis connection via IORedis
-- Graceful shutdown on SIGTERM (closes worker and connection)
+**ESPN League Data:**
+- Method: Polling (snapshot-worker on cron)
+- Frequency: Daily (via node-cron in worker)
+- Scope: Full league refresh including rosters, standings, transactions
+
+**MLB Game Data:**
+- Method: On-demand via MLBStatsApiAdapter
+- Used for: Schedule-aware draft timing, injury tracking
 
 ---
 
-*Integration audit: 2026-02-19*
+*Integration audit: 2026-03-13*

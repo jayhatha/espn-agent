@@ -1,316 +1,289 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-02-23
+**Analysis Date:** 2026-03-13
 
 ## Tech Debt
 
-**Free Agent Pool Never Populated:**
-- Issue: `ESPNAdapter.fetchFreeAgents()` is implemented (lines 518-616) but never called during snapshot orchestration. Waiver and trade recommendation agents use empty fallbacks.
-- Files: `packages/backend/src/adapters/espn.ts`, `packages/backend/src/agents/waiver-recommendation.ts` (lines 84-105), `packages/backend/src/agents/snapshot-orchestrator.ts`
-- Impact: Free agent availability is incorrect; waiver recommendations and trade candidates cannot assess replacement-level players
-- Fix approach: Wire `fetchFreeAgents()` into `SnapshotOrchestratorAgent.executeSnapshot()` and store results in a persistent table for consistent access
+**Free Agent Pool Never Fetched from ESPN:**
+- Issue: `packages/backend/src/adapters/espn.ts` has `fetchFreeAgents()` method (line 579-676) but ESPN free agents endpoint is ineffective or unreliable. Method returns empty arrays in practice.
+- Files: `packages/backend/src/adapters/espn.ts`, `packages/backend/src/api/recommendations.ts` (lines 84-94)
+- Impact: Waiver recommendations and trade analysis work with incomplete player pools. Free agent suggestions are not data-driven.
+- Fix approach: Verify ESPN free agents endpoint parameters, implement fallback to fetch unrostered players, or implement manual free agent list management.
 
-**PlayerIdentityResolution Not Wired into Projections Ingest:**
-- Issue: `ProjectionsIngestAgent` instantiates `PlayerIdentityResolutionAgent` (line 54) but uses SQL ILIKE matching as primary path. Fuzzy matching is secondary only.
-- Files: `packages/backend/src/agents/projections-ingest.ts` (lines 47-54, 72-110)
-- Impact: Player name mismatches during CSV ingest fail silently, resulting in missing projections for misspelled or nickname variations
-- Fix approach: Make fuzzy matching via `PlayerIdentityResolutionAgent` the primary path in `matchPlayer()` before ILIKE fallback
+**PlayerIdentityResolutionAgent Disconnected from Projections Ingest:**
+- Issue: `packages/backend/src/agents/player-identity.ts` provides fuzzy name matching with confidence scores, but `packages/backend/src/agents/projections-ingest.ts` (line 388, 521) has duplicate fuzzy matching logic instead of using the agent.
+- Files: `packages/backend/src/agents/projections-ingest.ts`, `packages/backend/src/agents/player-identity.ts`
+- Impact: Code duplication, inconsistent matching thresholds (FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.95 hardcoded in ingest), missed opportunity for shared identity mapping table optimization.
+- Fix approach: Refactor projections ingest to exclusively use PlayerIdentityResolutionAgent for matching, eliminate inline fuzzy matching logic.
 
-**Frontend API Client Library Unused:**
-- Issue: `packages/frontend/src/lib/api.ts` provides typed API wrapper but is never imported. All pages hardcode `http://localhost:3001` fetch calls.
-- Files: `packages/frontend/src/lib/api.ts` (402 lines), all page files in `packages/frontend/src/app/`
-- Impact: API endpoint URLs scattered across 8+ page files; changes require edits in multiple places; breaks in production without NEXT_PUBLIC_API_URL env var
-- Fix approach: Replace all hardcoded fetch calls with imports from `api.ts`; consolidate API logic
+**Frontend API Client Library Never Used:**
+- Issue: `packages/frontend/src/lib/api.ts` provides TypeScript-first API client using TanStack Query, but all pages hardcode `localhost:3001` directly (e.g., `packages/frontend/src/lib/constants.ts` line 13).
+- Files: `packages/frontend/src/lib/api.ts`, all `packages/frontend/src/app/*/page.tsx` files
+- Impact: No centralized error handling, no request deduplication, duplicate API logic across pages, harder to maintain.
+- Fix approach: Migrate all pages to use `packages/frontend/src/lib/api.ts` client, remove hardcoded URLs.
 
-**Hardcoded Default Secrets in Development:**
-- Issue: JWT_SECRET defaults to `"development-secret-change-in-production"` and COOKIE_SECRET falls back to same
-- Files: `packages/backend/src/index.ts` (lines 71-79)
-- Impact: Development/staging instances have weak secrets unless explicitly set; production instances silently use weak default if ENCRYPTION_KEY not set
-- Fix approach: Fail at startup if JWT_SECRET missing in production; make encryption optional with graceful degradation
+**No Shared Frontend Components:**
+- Issue: Frontend UI components are duplicated across multiple pages (e.g., team cards, stat tables, loading states).
+- Files: Multiple files in `packages/frontend/src/app/`
+- Impact: Inconsistent styling, harder to maintain, harder to implement design changes globally.
+- Fix approach: Extract common components to `packages/frontend/src/components/`, establish shared layout patterns.
 
-**Slack OAuth State Token Not Validated (CSRF):**
-- Issue: State token generated but not persisted or validated on callback. OAuth callback accepts any state value.
-- Files: `packages/backend/src/api/slack.ts` (lines 32, 77 marked with TODOs)
-- Impact: CSRF vulnerability; attacker can trick user into authorizing malicious app by crafting OAuth callback URL
-- Fix approach: Store state in Redis with 5-minute expiration; validate on callback before token exchange
+**Recharts Library Installed But Not Used:**
+- Issue: Recharts is in `package.json` but trends page renders HTML tables instead of charts (line 6-7 of CLAUDE.md).
+- Files: All trend/chart rendering in frontend
+- Impact: Dependency bloat, missed visualization features for trends and projections.
+- Fix approach: Either implement chart visualizations or remove recharts from dependencies.
 
-**Rate Stat Adjustments in Trade Analysis Incomplete:**
-- Issue: `TradeRecommendationAgent` computes category impact using counting stats only. Rate stats (ERA, WHIP, AVG) use current snapshot values with no trade adjustment simulation.
-- Files: `packages/backend/src/agents/trade-recommendation.ts` (entire file, 1272 lines)
-- Impact: Trade impact analysis underestimates value of pitchers in ERA/WHIP leagues and batters in AVG leagues; fairness scores misleading
-- Fix approach: Implement component-based rate stat recalculation using `calculateFinalRate()` from shared types for both teams in trade scenarios
+**Home Page Routes to Non-existent Endpoints:**
+- Issue: Home page links to `/projections`, `/waivers`, `/trends` which are 404s. Correct routes are under `/leagues/[id]/...`.
+- Files: `packages/frontend/src/app/page.tsx` (assumed)
+- Impact: Poor UX, users cannot navigate to features from homepage.
+- Fix approach: Update homepage navigation to use `/leagues/[id]/...` routes or redirect to first available league.
 
-**Transaction Ingestion Missing from Snapshot Orchestrator:**
-- Issue: `SnapshotOrchestratorAgent` fetches ESPN data and has transaction parsing logic, but never stores to `league_transaction_event` table
-- Files: `packages/backend/src/agents/snapshot-orchestrator.ts` (1122 lines), `packages/backend/src/adapters/espn.ts` (transaction parsing lines 680-720)
-- Impact: Trade/waiver history is incomplete; transaction-based reports cannot distinguish acquisition history; timeline annotations empty
-- Fix approach: Add transaction ingest loop to `SnapshotOrchestratorAgent.executeSnapshot()` after ESPN fetch
+**Hardcoded Localhost URLs Across Codebase:**
+- Issue: Multiple hardcoded `localhost:3001` and `localhost:3000` URLs instead of environment variables.
+- Files:
+  - `packages/extension/entrypoints/background.ts` (line 21)
+  - `packages/frontend/src/lib/constants.ts` (line 13)
+  - `packages/backend/src/index.ts` (line 52)
+  - `packages/backend/src/workers/slack-approval-worker.ts` (line 19)
+  - `packages/backend/src/db/migrate.ts` (line 31) - includes plaintext credentials
+  - `packages/extension/lib/api-client.ts` (line 135)
+  - `packages/extension/entrypoints/popup/index.tsx` (lines 12, 67, 201)
+- Impact: Development-only code may be deployed to production, environment-specific configuration scattered.
+- Fix approach: Centralize all environment-aware URLs, ensure fallbacks are tested in production.
 
-**No Job Lock for Concurrent Snapshots:**
-- Issue: If BullMQ job retry or manual trigger fires while snapshot already running, multiple workers can execute simultaneously for same league/date
-- Files: `packages/backend/src/agents/snapshot-orchestrator.ts`, workers/background jobs registry
-- Impact: Duplicate rows in daily snapshot tables; inconsistent state across snapshot runs; double-counting stats
-- Fix approach: Use Redis-based distributed lock or PostgreSQL advisory lock before starting snapshot
+**ESPN DOM Selectors Are Placeholders/Brittle:**
+- Issue: `packages/extension/lib/dom-observers.ts` (lines 1-50) uses broad CSS selectors that target ESPN's JSX-generated class names (e.g., `.jsx-XXXXX`). These may change with ESPN site updates.
+- Files: `packages/extension/lib/dom-observers.ts`, `packages/extension/lib/draft-config-detector.ts`
+- Impact: Extension breaks when ESPN updates their DOM structure, no graceful degradation.
+- Fix approach: Add fallback selectors, implement observer pattern for DOM mutation detection, add logging to track which selectors are matching, implement selector validation on every draft session start.
 
-**ESPN Adapter Retry/Backoff Missing:**
-- Issue: `ESPNAdapter` uses `createRetryableAxios()` from `packages/backend/src/utils/retry.ts` but retry wrapper not applied to all HTTP calls
-- Files: `packages/backend/src/adapters/espn.ts` (lines 1-50), `packages/backend/src/utils/retry.ts` (37 lines with retry logic)
-- Impact: Single transient ESPN API error (timeout, 503) causes entire snapshot job to fail; ESPN rate limiting (429) not handled gracefully
-- Fix approach: Apply retry wrapper consistently to all ESPN adapter HTTP calls; add circuit breaker for repeated errors
+**Type Casting with `any` Throughout Codebase:**
+- Issue: Excessive use of `as any` and `request: any` casts in backend API routes (50+ instances).
+- Files: `packages/backend/src/api/`, `packages/backend/src/workers/`, `packages/backend/src/agents/`
+- Impact: Loses TypeScript safety, harder to catch errors at compile time, makes refactoring dangerous.
+- Fix approach: Create proper Fastify request/reply type definitions, avoid casting by improving type annotations.
 
 ## Known Bugs
 
-**Injury Data Always Empty:**
-- Symptoms: `MorningReportAgent` marks injury alerts as TODO; positions array returned as empty; injury_event table never populated
-- Files: `packages/backend/src/agents/morning-report.ts` (lines 162, 179)
-- Trigger: Any call to morning report generation
-- Workaround: None; feature not yet implemented
+**Extension Hard Stops on 429 Rate Limiting:**
+- Symptoms: Extension becomes unresponsive when ESPN returns 429 (Too Many Requests)
+- Files: `packages/backend/src/adapters/espn.ts` (throttle implementation at lines 22-37), test at `packages/backend/src/adapters/__tests__/espn.test.ts` (line 67)
+- Trigger: Multiple extension instances + frequent ESPN API calls, or ESPN rate limit drops
+- Workaround: Manual extension restart, wait for ESPN rate limit reset
+- Root cause: No exponential backoff strategy, only fixed 2-second throttle between calls
+- Fix approach: Implement axios-retry with exponential backoff, respect Retry-After headers, queue requests when rate limited.
 
-**Draft Recommendations Returns Placeholder:**
-- Symptoms: GET `/api/leagues/:id/draft/recommendations` returns stub response with no actual rankings
-- Files: `packages/backend/src/api/recommendations.ts` (line 962)
-- Trigger: Any draft recommendation request
-- Workaround: Chrome extension has local draft assistant but not backend-integrated
+**Trade Recommendation Missing Rate Stat Adjustments:**
+- Symptoms: Trade impact analysis shows incorrect ERA/WHIP changes when trading pitchers
+- Files: `packages/backend/src/agents/trade-recommendation.ts` (line 97 in CLAUDE.md notes "rate stat adjustments not fully implemented")
+- Trigger: Analyze any trade involving pitchers in rate stat categories
+- Root cause: Code only adjusts counting stats (K, W, SV) but not ERA/WHIP components (ER, IP, H, BB)
+- Fix approach: Implement component-based rate stat adjustment (subtract traded-away pitcher components, add received pitcher components, recalculate rate), add test coverage for pitcher trades.
 
-**Chrome Extension Cannot Detect User Team ID:**
-- Symptoms: Draft sidebar shows all team rankings without filtering to logged-in user's team
-- Files: `packages/extension/entrypoints/content.tsx` (line 97), relies on URL teamId query parameter
-- Trigger: Draft page load when teamId not in URL query string
-- Workaround: Manual team ID configuration or detection from page DOM
+**User Team ID Detection Not Implemented in Extension:**
+- Symptoms: Extension cannot automatically detect user's team in draft, requires manual configuration
+- Files: `packages/extension/lib/draft-config-detector.ts`, extension settings
+- Impact: User friction during draft setup, potential errors if wrong team selected
+- Fix approach: Implement DOM scraping for team ID from ESPN draft page, store in session, validate on page load.
 
-**DOM Selectors Are Placeholders:**
-- Symptoms: Extension components may not find ESPN draft board elements if ESPN updates page structure
-- Files: `packages/extension/lib/dom-observers.ts` (451 lines of selector logic)
-- Trigger: ESPN redesign or element ID changes
-- Workaround: Manual selector updates required; no automated validation or fallback
+**Waiver Delta Simulation Hardcoded to 0.5:**
+- Symptoms: All waiver recommendations show identical point delta regardless of impact
+- Files: `packages/backend/src/agents/waiver-recommendation.ts` (line 84 in CLAUDE.md)
+- Trigger: Request any waiver recommendations
+- Root cause: Simulation returns hardcoded 0.5 instead of actual projected standings impact
+- Fix approach: Use StandingsProjectionAgent to simulate add/drop and compute actual delta overall points.
 
 ## Security Considerations
 
-**ESPN Auth Cookies Stored in Plaintext at Rest:**
-- Risk: If database is compromised, attacker gains full ESPN account access for all leagues with stored SWID/espn_s2 cookies
-- Files: `packages/backend/src/db/schema.ts` (league table columns), `packages/backend/src/adapters/espn.ts` (lines 306-307 constructs cookie header)
-- Current mitigation: Database encryption via host-level controls (if any); credentials sent over HTTPS in flight
+**ESPN Auth Cookies Stored in Plaintext (Old Pattern):**
+- Risk: If database is compromised, ESPN auth cookies are exposed
+- Files: `packages/backend/src/api/leagues.ts` (lines 125-130 assume old plaintext storage), though newer code uses encryption
+- Current mitigation: Encryption utility exists at `packages/backend/src/utils/encryption.ts` (AES-256-GCM), but migration incomplete
 - Recommendations:
-  - Encrypt `espn_swid` and `espn_s2` before storage using `encryptToken()` already available in `packages/backend/src/utils/encryption.ts`
-  - Require `ENCRYPTION_KEY` env var; fail startup if missing
-  - Decrypt only when needed for API calls; clear from memory after use
-  - Consider expiring stored cookies and requiring fresh auth flow quarterly
+  - Audit all ESPN credential storage to verify encryption is applied
+  - Set ENCRYPTION_KEY in production environment
+  - Implement data migration to encrypt existing plaintext credentials
+  - Add decryption validation on league fetch (already in place at `packages/backend/src/api/recommendations.ts` line 67-80)
 
-**Slack OAuth State Token Not Persisted:**
-- Risk: CSRF attack; attacker can trick user into authorizing malicious Slack app, gaining workspace access and ability to impersonate user
-- Files: `packages/backend/src/api/slack.ts` (lines 30-45 generate state, 77 validate state with TODO)
-- Current mitigation: None; state is generated but not stored or validated
+**JWT Secret Hardcoded to Insecure Default:**
+- Risk: Development default `"development-secret-change-in-production"` may be used in production
+- Files: `packages/backend/src/index.ts` (line 89)
+- Current mitigation: Uses `process.env.JWT_SECRET ||` pattern with fallback
 - Recommendations:
-  - Implement Redis store for state tokens with 5-minute TTL
-  - Reject callback if state not found in Redis
-  - Log failed state validations for security monitoring
+  - Verify production deployment sets JWT_SECRET env var
+  - Add startup validation to reject insecure defaults in production
 
-**Default JWT Secret Hardcoded:**
-- Risk: If `process.env.JWT_SECRET` not set, uses public default string; any JWT tool can forge tokens for any user
-- Files: `packages/backend/src/index.ts` (line 79)
-- Current mitigation: String is marked "development-secret-change-in-production" which is obvious but not enforced
+**Chrome Extension Uses Session Auth via Browser Cookies:**
+- Risk: Works for local dev but incompatible with production (no way to authenticate extension to backend service)
+- Files: `packages/extension/entrypoints/popup/index.tsx` (line 160), extension auth implementation
+- Impact: Extension cannot be published to Chrome Web Store without API token system
 - Recommendations:
-  - Require `JWT_SECRET` env var at startup if `NODE_ENV=production`
-  - Fail fast rather than silently using weak default
-  - Enforce minimum 32-character length
+  - Implement OAuth2 token endpoint for extension auth
+  - Store tokens in Chrome's secure storage (chrome.storage.session)
+  - Add token refresh logic
+  - Test against production API endpoints
 
-**Extension Uses Session Cookies for Auth:**
-- Risk: Extension cannot authenticate to backend without user being logged in on frontend; no service-to-service auth; no API token system
-- Files: `packages/extension/lib/api-client.ts` (entire file, 1054 lines), uses session cookies for auth
-- Current mitigation: Works in local dev; production requires frontend user session
-- Recommendations:
-  - Implement API token system with long-lived tokens for extension registration
-  - Generate tokens with limited scope (e.g., read-only, specific league)
-  - Support token rotation and expiration
+**Slack Webhook URLs and Bot Tokens Stored Encrypted:**
+- Risk: Tokens are encrypted in database, but ENCRYPTION_KEY leakage would expose all Slack integration credentials
+- Files: `packages/backend/src/api/slack.ts` (lines 144-172)
+- Current mitigation: Encryption utility in place
+- Recommendations: Consider using Slack's secret rotation API, add logging for token refresh events
 
 ## Performance Bottlenecks
 
-**Transaction-Impact Agent Complexity at 1451 Lines:**
-- Problem: `packages/backend/src/agents/transaction-impact.ts` is monolithic; computes replacement players, impact scoring, and projections in single class
-- Cause: All transaction analysis logic bundled without separation of concerns
-- Improvement path:
-  - Extract replacement player logic to separate `ReplacementPlayerAgent`
-  - Extract impact scoring to separate class
-  - Cache replacement player pool per position to avoid recomputation per transaction
-  - Use result memoization for frequently called scoring functions
+**Large Monolithic Agent Files:**
+- Problem: Individual agent files have high line counts, making them hard to understand and test
+- Files:
+  - `packages/backend/src/agents/transaction-impact.ts` (1451 lines)
+  - `packages/extension/lib/auto-bid-controller.ts` (1639 lines)
+  - `packages/extension/lib/engine/index.ts` (1463 lines)
+  - `packages/backend/src/adapters/espn.ts` (1331 lines)
+  - `packages/backend/src/agents/snapshot-orchestrator.ts` (1384 lines)
+- Impact: Cognitive load during development, harder to locate bugs, larger test files
+- Improvement path: Break into smaller focused modules (e.g., separate logic for rate stat calculation from trade analysis), improve test organization.
 
-**Large Frontend Pages Lack Code Splitting (1194 lines):**
-- Problem: `packages/frontend/src/app/leagues/[id]/moves/page.tsx` contains all charts, tables, filters in single component
-- Files: Multiple page files in `packages/frontend/src/app/leagues/[id]/` (moves, waivers, trades all 800+ lines)
-- Cause: All UI logic in single page component; no component extraction or lazy loading
-- Improvement path:
-  - Extract reusable components (data tables, chart wrappers, filter UI)
-  - Use Next.js `lazy()` with Suspense for below-fold components
-  - Implement route-based code splitting via dynamic imports
+**No Parallel Free Agent + Transaction Fetch:**
+- Problem: `packages/backend/src/agents/snapshot-orchestrator.ts` (line 369) uses `Promise.allSettled()` but main snapshot workflow blocks on ESPN fetch before starting parallel work
+- Impact: Snapshot can take 5-10 seconds when ESPN has latency
+- Improvement path: Start free agent + transaction fetches immediately after initial ESPN fetch, before writing to database.
 
-**No Caching for ESPN API Responses:**
-- Problem: `ESPNAdapter` has in-memory cache only; if server restarts or multiple replicas run, ESPN gets re-fetched
-- Files: `packages/backend/src/adapters/espn.ts` (line 58 note "in-memory cache")
-- Cause: Redis available via `@fastify/redis` but not used for ESPN response caching
-- Improvement path:
-  - Add Redis cache layer in `ESPNAdapter.fetchLeague()` with 15-minute TTL
-  - Key by `leagueId:season:scoringPeriodId`
-  - Implement cache invalidation on manual snapshot trigger
+**In-Memory ESPN Cache (Not Redis):**
+- Problem: `packages/backend/src/adapters/espn.ts` (line 4) uses `LRUCache` instead of shared Redis cache
+- Impact: Multiple backend instances cannot share cached ESPN responses, unnecessary redundant API calls
+- Improvement path: Move cache to Redis, set 5-minute TTL on league data.
 
-**PlayerIdentityResolution Fuzzy Match on Every Ingest:**
-- Problem: `ProjectionsIngestAgent.matchPlayer()` calls fuzzy matching for every unmatched player row; no batch optimization
-- Files: `packages/backend/src/agents/projections-ingest.ts` (lines 100-110)
-- Cause: Player matching is per-row inside CSV parse loop; no pre-indexing
-- Improvement path:
-  - Pre-build fuzzy index once per ingest (use `fuse.js` or similar)
-  - Batch-query identity map for all new names upfront
-  - Cache confidence scores to avoid recomputation within single ingest
+**No Request Deduplication in Frontend:**
+- Problem: Multiple requests to same endpoint in parallel (e.g., standings page + sidebar both fetch team data)
+- Files: All frontend pages
+- Impact: Increased backend load, unnecessary transfers
+- Improvement path: Use TanStack Query's built-in request deduplication (migrate to `packages/frontend/src/lib/api.ts` client).
 
 ## Fragile Areas
 
-**ESPN Adapter Response Parsing Assumes Stable Structure:**
-- Files: `packages/backend/src/adapters/espn.ts` (normalizeLeagueData at lines 750+)
-- Why fragile: Assumes nested object structure matches ESPN API contract; single ESPN change breaks normalization silently
-- Safe modification:
-  - Add null-coalescing operators (`?.` chains)
-  - Check array existence before accessing elements
-  - Log warnings for unexpected structure deviations
-  - Store raw response in `league_raw_payload` for debugging
-- Test coverage: No unit tests for ESPN normalization; integration tests only
+**Snapshot Orchestrator with No Job Lock:**
+- Files: `packages/backend/src/agents/snapshot-orchestrator.ts`
+- Why fragile: If multiple snapshot jobs trigger simultaneously (e.g., manual + scheduled), both write to database concurrently, causing race conditions
+- Safe modification: Always acquire distributed lock before writing snapshots (use Redis SETNX or BullMQ job lock)
+- Test coverage: No test for concurrent snapshot execution
+- Known issues: `packages/backend/src/agents/__tests__/snapshot-orchestrator.test.ts` only tests happy path
 
-**SnapshotOrchestratorAgent Missing Error Boundaries:**
-- Files: `packages/backend/src/agents/snapshot-orchestrator.ts` (1122 lines)
-- Why fragile: If any step fails (ESPN fetch, parse, write), subsequent steps may use stale data or crash; no rollback
-- Safe modification:
-  - Wrap each major step in try-catch
-  - Mark snapshot as degraded on partial failures
-  - Don't overwrite successful prior state on partial failure
-  - Store error details in degraded_reasons for debugging
-- Test coverage: Only integration tests exist; no unit tests for error paths
+**Rate Stat Component Math:**
+- Files: `packages/shared/src/formulas.ts`, all agents using `calculateFinalRate()`
+- Why fragile: Component math depends on correct extraction of IR, H, BB, IP, ER etc. from ESPN data. Missing or incorrect components silently produce wrong rates.
+- Safe modification: Always validate component presence before rate calculation, return null if components incomplete
+- Test coverage: Limited test cases for edge cases (0 IP pitchers, 0 AB batters)
 
-**Empty Array Check Not Enforced:**
-- Files: Multiple agents and API routes (20+ instances found)
-- Why fragile: Kysely generates invalid SQL for `.where("col", "in", [])` causing runtime query failures
-- Safe modification: Audit all `.where("col", "in", array)` calls; add `if (array.length > 0)` guard per CLAUDE.md pattern
-- Test coverage: No pattern test; grep found instances in transaction-impact, waiver-recommendation, draft-rankings
+**ESPN API Response Schema Validation:**
+- Files: `packages/backend/src/utils/espn-schemas.ts`, `packages/backend/src/adapters/espn.ts`
+- Why fragile: ESPN API can return schema variations (missing fields, renamed fields). No runtime validation catches these until downstream processing fails.
+- Safe modification: Use strict Zod schema validation on ESPN responses, reject if validation fails, mark league as degraded
+- Test coverage: No test for schema drift detection
 
-**ESPN Lineup Slot Mapping May Drift:**
-- Files: `packages/extension/lib/api-client.ts` (lines 31-45 ESPN_LINEUP_SLOT_MAP)
-- Why fragile: Hardcoded slot ID mappings; if ESPN changes slot IDs, position detection breaks silently
-- Safe modification:
-  - Add validation to detect unknown slot IDs
-  - Log warnings for unmapped slots
-  - Fetch slot mapping from `/api/leagues/:id/status` which provides ESPN settings
-  - Add fallback detection from ESPN DOM
-- Test coverage: No tests for slot ID detection
+**Empty Array Guards in Kysely Queries:**
+- Files: Multiple locations use `.where("id", "in", array)` without checking array.length
+- Why fragile: Kysely generates invalid SQL for empty arrays (`WHERE id IN ()` is syntax error)
+- Safe modification: Always check `if (array.length === 0) return []` before using `.where("col", "in", array)`
+- Test coverage: `packages/backend/src/agents/__tests__/empty-array-guards.test.ts` verifies guards exist but coverage is incomplete
+
+**DOM Selector Fragility in Extension:**
+- Files: `packages/extension/lib/dom-observers.ts` (1418 lines), `packages/extension/lib/draft-config-detector.ts` (872 lines)
+- Why fragile: All selectors target ESPN DOM structure which changes with site updates. Fallback selectors are broad/non-specific.
+- Safe modification: Add mutation observer to detect when selectors fail, implement selector self-healing with logging
+- Test coverage: No integration tests against real ESPN DOM
 
 ## Scaling Limits
 
-**Projections are Global, Not League-Specific:**
-- Current capacity: Single `projections_run` table shared across all leagues
-- Limit: If 100+ leagues all upload different CSV versions same day, queries grow unbounded; performance degrades
-- Scaling path:
-  - Add `league_id` column to `projections_run` (make composite key with date)
-  - Partition `player_projection` table by league_id
-  - Archive old projection runs after 90 days
-  - Add index on (league_id, as_of_date)
+**BullMQ Redis Job Queues Single Connection:**
+- Current capacity: Default queue concurrency = 3 workers per queue
+- Limit: Each backend instance has its own queue connection; no job distribution across instances
+- Scaling path: Implement shared BullMQ connection pool, route jobs through single Redis queue, allow multiple backend instances to consume
 
-**In-Memory Snapshot State:**
-- Current capacity: Snapshot orchestrator loads entire league data into memory before writing
-- Limit: 1000+ player leagues hit Node.js memory limits; process crashes during processing
-- Scaling path:
-  - Stream player/team data via batch inserts (chunks of 100)
-  - Use database cursors for large result sets
-  - Implement pagination in ESPN fetch
-  - Monitor heap usage; add warnings at 80% threshold
+**Database Connection Pool:**
+- Current capacity: Kysely default connection pool (likely 10-20 connections)
+- Limit: Under heavy load (many concurrent leagues), connections may exhaust
+- Scaling path: Configure `pool.min` and `pool.max` in Kysely options, monitor connection usage, consider read replicas for reporting queries
 
-**No Connection Pooling Configuration:**
-- Current capacity: Kysely default pool size (10 connections)
-- Limit: 20+ concurrent requests cause queue backlog; queries timeout
-- Scaling path:
-  - Configure pool size in `connection.ts` based on instance count
-  - Implement request-level transaction boundaries
-  - Add query timeout warnings
-  - Consider PgBouncer for multi-instance deployments
+**ESPN API Rate Limit (2 Requests/Second):**
+- Current capacity: 2 reqs/sec throttle implemented
+- Limit: If supporting >100 leagues with daily snapshots, throttle becomes bottleneck
+- Scaling path: Implement request batching (multi-league queries), use ESPN's bulk endpoint if available, move to async task queue with exponential backoff
 
 ## Dependencies at Risk
 
-**Recharts Installed But Unused:**
-- Risk: Maintenance burden; no value being delivered
-- Impact: Trends page renders tables instead of charts; users cannot visualize season progression
-- Migration plan: Either remove from `package.json` or implement actual charts in `packages/frontend/src/app/leagues/[id]/trends/page.tsx`
+**axios-retry Configuration Incomplete:**
+- Risk: Retry strategy may not handle all ESPN failure modes (429, timeouts, network errors)
+- Files: `packages/backend/src/adapters/espn.ts` (line 6), retry configuration
+- Impact: Failed ESPN fetches mark league degraded, user sees stale data
+- Migration plan: Audit retry logic against ESPN API error catalog, add exponential backoff, implement circuit breaker pattern
 
-**axios-retry Uses Defaults:**
-- Risk: Retry policy (3 attempts with exponential backoff) may not suit all endpoints; ESPN rate limiting may need different strategy
-- Impact: Some failures retry 3x (9s total wait) while others fail fast; inconsistent behavior
-- Migration plan: Make retry policy configurable per endpoint; implement circuit breaker for repeated failures
+**Kysely Migration System:**
+- Risk: No migration rollback strategy documented, no way to safely revert schema changes
+- Files: `packages/backend/src/db/migrations/`
+- Impact: Schema mistakes are hard to undo in production
+- Migration plan: Document rollback procedure, add down migrations, test against staging
 
-**Player CSV Parser (csv-parse) No Validation:**
-- Risk: Malformed CSVs cause silent errors; rows drop without logging
-- Impact: Projections appear incomplete but error is invisible to user
-- Migration plan: Add validation report to `ProjectionsIngestAgent`; return detailed unmatch report to frontend
+**TypeScript Version Pinning:**
+- Risk: Monorepo may have incompatible TS versions across packages (shared vs backend vs frontend)
+- Files: Multiple `tsconfig.json`, `packages/*/package.json`
+- Impact: Type errors only caught in certain packages, harder to use shared types
+- Migration plan: Pin TypeScript version in root `pnpm-workspace.yaml`, ensure all packages use same version
 
 ## Missing Critical Features
 
-**DraftAssistantAgent Not Implemented in Backend:**
-- Problem: Chrome extension has local draft ranking logic but cannot scale to multiple users/leagues without backend
-- Blocks: Auction valuation, snake tier drafting, real-time rankings across users
-- Impact: Extension works in isolation; no data sharing; cannot power live draft assistant
+**Transaction Ingestion Not Implemented:**
+- Problem: ESPN transactions (trades, waivers, drops) are fetched but not parsed into `league_transaction_event` table
+- Blocks: Transaction timeline analysis, trade history, waiver history
+- Files: `packages/backend/src/adapters/espn.ts` (fetchTransactions method exists but unused), `packages/backend/src/agents/snapshot-orchestrator.ts` (line 90 notes this gap)
 
-**Transaction Impact Analysis Not Wired to Recommendations:**
-- Problem: `TransactionImpactAgent` computes WPA but results are not surfaced in `/api/leagues/:id/teams/:teamId/trades/recommendations`
-- Blocks: Trade fairness scoring is hardcoded; cannot compare actual ROS value impact
-- Impact: Trade recommendations use simplified projected points, missing contextual nuance
+**DraftAssistantAgent Not Implemented (Chrome Extension Built Separately):**
+- Problem: Backend has no agent for draft recommendations; extension implements its own deterministic draft engine
+- Blocks: Sharing draft logic between web and extension, using backend projections in extension
+- Files: Entire `packages/extension/lib/` contains duplicate draft logic
 
-**Team Injury Status Not Tracked:**
-- Problem: No `injury_event` table; `MorningReportAgent` cannot surface out/day-to-day players
-- Blocks: Cannot flag trades involving injured players; cannot simulate full-squad scenarios
-- Impact: Users unaware of roster health risks; recommendations may include injured players
+**Time Series Endpoints Missing:**
+- Problem: `category-total` and `projected-category` time series endpoints not implemented
+- Blocks: Historical tracking of category performance and projections
+- Files: `packages/backend/src/api/timeseries.ts`
 
-**Waiver Priority / Claim Status Not Stored:**
-- Problem: No `league_waiver_claim` table; API cannot return which teams have pending claims
-- Blocks: Waiver recommendations cannot factor in competing claims; add recommendations may be invalid
-- Impact: UI shows stale waiver status; user adds player already claimed by another team
+**Activity Feed Parsing:**
+- Problem: ESPN activity feed (trades, waivers, injuries) never fetched or parsed
+- Blocks: Daily transaction notifications, injury alerts
+- Files: None (feature not started)
 
 ## Test Coverage Gaps
 
-**Integration Tests Minimal (2 Test Files):**
-- What's not tested: Agent orchestration, end-to-end snapshot flows, ESPN adapter error handling, database transactions
-- Files: Only `packages/backend/src/agents/__tests__/trade-recommendation.test.ts` has meaningful test coverage (638 lines)
-- Risk: Regression in core snapshot logic can silently corrupt data; no regression protection
-- Priority: High - Add tests for:
-  - Snapshot orchestrator with mock ESPN adapter (both success and error cases)
-  - Transaction ingest and deduplication
-  - Rate stat calculation edge cases (0 denominators, negative values)
-  - Empty roster / free agent list handling
-  - Database transaction rollback scenarios
+**ESPN Adapter Integration Tests:**
+- What's not tested: Real ESPN API responses (only mocked), schema drift detection
+- Files: `packages/backend/src/adapters/__tests__/espn.test.ts` (only happy path mocks)
+- Risk: Breaking changes to ESPN API discovered in production
+- Priority: High - ESPN integration is critical path
 
-**Frontend Components Not Tested:**
-- What's not tested: Data fetching, error states, localStorage persistence, TanStack Query cache invalidation
-- Files: No `.test.tsx` files in `packages/frontend/src/app/leagues/[id]/`
-- Risk: UI bugs go undetected until production; broken components degrade user experience
-- Priority: Medium - Add tests for:
-  - League selection and persistence flow
-  - Trade impact calculation in moves page
-  - Waiver recommendations sorting and filtering
-  - Responsive layout on mobile
-  - Token refresh middleware
+**Trade Recommendation Rate Stat Accuracy:**
+- What's not tested: Pitcher trades with rate stat impacts, component adjustment correctness
+- Files: `packages/backend/src/agents/__tests__/trade-recommendation.test.ts` (line 957) - 957 lines but missing pitcher scenarios
+- Risk: Users get incorrect trade recommendations for pitchers
+- Priority: High - impacts user decisions
 
-**Extension Logic Not Tested:**
-- What's not tested: DOM observer reliability, draft state persistence, player name normalization, ranking application
-- Files: `packages/extension/lib/api-client.ts` (1054 lines), `packages/extension/lib/dom-observers.ts` (451 lines) - no tests
-- Risk: DOM changes break extension silently; users get stale or wrong rankings
-- Priority: High - Add tests for:
-  - Player name matching (accents, Jr/Sr, suffixes)
-  - Draft state Zustand store (persistence, hydration, recovery)
-  - DOM observer resilience to ESPN structure changes
-  - Value calculations edge cases
+**Extension DOM Observer Robustness:**
+- What's not tested: Selector failures, ESPN DOM variations, fallback selector matching
+- Files: `packages/extension/lib/__tests__/` has 0 integration tests for DOM observers
+- Risk: Extension silently fails to detect picks/budget/rosters
+- Priority: High - extension is primary user interface
 
-**Database Migration Tests Missing:**
-- What's not tested: Schema changes don't corrupt existing data; migrations are idempotent
-- Files: `packages/backend/src/db/migrations/` (6+ migration files)
-- Risk: Production migration fails mid-way; rollback needed; potential data loss
-- Priority: High - Implement:
-  - Schema validation tests (up + down)
-  - Data integrity checks (foreign keys, constraints preserved)
-  - Rollback scenarios
-  - Backward compatibility verification
+**Encryption Key Rotation:**
+- What's not tested: Decryption of tokens encrypted with old keys, migration between keys
+- Files: `packages/backend/src/utils/encryption.ts` - no rotation logic
+- Risk: Token compromise requires full re-encryption (downtime)
+- Priority: Medium - affects credential security
+
+**Concurrent Snapshot Execution:**
+- What's not tested: Two snapshots running simultaneously, database consistency
+- Files: `packages/backend/src/agents/__tests__/snapshot-orchestrator.test.ts`
+- Risk: Data corruption, duplicate projections
+- Priority: Medium - affects data consistency
 
 ---
 
-*Concerns audit: 2026-02-23*
+*Concerns audit: 2026-03-13*

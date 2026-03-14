@@ -1,328 +1,304 @@
 # Architecture
 
-**Analysis Date:** 2025-02-23
+**Analysis Date:** 2026-03-13
 
 ## Pattern Overview
 
-**Overall:** Three-tier layered architecture with agent-based business logic and adapter pattern for external integrations.
+**Overall:** Layered monorepo with agent-driven backend business logic, API-centric frontend state management, and isolated Chrome extension for live draft automation.
 
 **Key Characteristics:**
-- **Monorepo Structure:** Turbo + pnpm with 4 packages sharing types via `packages/shared`
-- **Backend:** Fastify REST API, Kysely ORM on PostgreSQL, BullMQ job queue on Redis, Pino logging
-- **Frontend:** Next.js 14 App Router, TanStack Query v5, React Context for auth, localStorage for state
-- **Extension:** WXT-based Chrome extension with Shadow DOM UI, Zustand store, content script messaging bridge
-- **Entrypoints:** Backend server (`index.ts`), snapshot worker (`workers/snapshot-worker.ts`), Next.js pages, Chrome extension content script
+- Agent pattern encapsulates discrete business responsibilities (snapshot, projections, standings, waivers, trades, drafts)
+- Database-driven state with daily snapshots and time-series tracking
+- Async job queue (BullMQ + Redis) for background work
+- Frontend uses TanStack Query for server state and Zustand for local UI state
+- Extension uses DOM observation and WebSocket subscription for live draft signals
 
 ## Layers
 
-**Presentation Layer:**
-- Purpose: User-facing browser interfaces
-- Location: `packages/frontend/src/app/` (Next.js pages), `packages/extension/entrypoints/` (Chrome UI)
-- Contains: Page components, layouts, forms (login/signup/connect league), navigation component
-- Depends on: API client (`lib/api.ts`), AuthContext, TanStack Query, utility libraries
-- Used by: Browser (port 3000), Chrome extension popup/sidebar
-
-**API/Route Layer:**
-- Purpose: HTTP request handling, route definitions, authentication, authorization
-- Location: `packages/backend/src/api/`, `packages/backend/src/middleware/`
-- Contains: Route modules (auth.ts, leagues.ts, projections.ts, recommendations.ts, timeseries.ts, draft.ts, slack.ts, admin.ts, transaction-impact.ts) and auth middleware
-- Key endpoints:
-  - `/api/auth/*` - Login, register, refresh, OAuth callbacks
-  - `/api/leagues/*` - League CRUD, connect ESPN, manual snapshot trigger
-  - `/api/projections/*` - CSV upload, list projection runs
-  - `/api/leagues/:id/timeseries/*` - Historical snapshots over time
-  - `/api/leagues/:id/teams/:teamId/*` - Waivers, trades, lineup, streaming recommendations
-  - `/api/slack/*` - Slack events, commands, installation
-- Depends on: Agents, database, Fastify server instance, middleware
-- Used by: Frontend, extension, Slack integration, other services
-
-**Business Logic Layer (Agents):**
-- Purpose: Domain-specific operations with single responsibility principle
-- Location: `packages/backend/src/agents/`
-- Agent inventory:
-  - `snapshot-orchestrator.ts` - Orchestrates daily snapshot: fetch ESPN → archive → normalize → write snapshot tables → compute projections
-  - `standings-projection.ts` - Computes projected final standings using component math and Roto points
-  - `projections-ingest.ts` - Parses FanGraphs CSV, validates required components, stores player projections
-  - `player-identity.ts` - Fuzzy name matching with confidence scoring (currently disconnected from ingest flow)
-  - `waiver-recommendation.ts` - Simulates add/drop scenarios, ranks by delta points
-  - `trade-recommendation.ts` - Analyzes proposed trades, generates 1-for-1 trade candidates
-  - `morning-report.ts` - Generates daily Slack reports with action recommendations
-  - `auction-valuation.ts` - Computes auction values for draft using scarcity analysis
-  - `draft-rankings.ts` - Generates player rankings for snake draft with value scores
-  - `lineup-optimizer.ts` - Optimizes daily lineup for streaming categories
-  - `streaming-pitcher.ts` - Identifies streaming pitcher opportunities
-  - `historical-backfill.ts` - Backfills snapshots for seasons with historical ESPN data
-  - `transaction-impact.ts` - Analyzes WPA impact of trades/moves (Roto points added/lost)
-  - `player-pool-sync.ts` - Syncs free agent pool from ESPN (ownership %)
-- Depends on: Kysely database, Pino logger (optional), ESPN adapter, shared formulas, utils
-- Used by: API routes, worker processes, other agents
-
-**Data Access Layer:**
-- Purpose: Database abstraction, schema definition, connection pooling, migrations
+**Data/Persistence Layer:**
+- Purpose: Store and retrieve all league, team, player, projection, and transaction data
 - Location: `packages/backend/src/db/`
-- Contains:
-  - `schema.ts` - TypeScript interfaces for 20+ tables (league, team, player, snapshots, projections, auth, Slack, transactions)
-  - `connection.ts` - Singleton Kysely instance with PostgreSQL dialect
-  - `migrate.ts` - Migration runner using raw SQL files
-  - `migrations/` - SQL migration files (001-006)
-- Depends on: PostgreSQL driver, environment config
-- Used by: All agents, API routes
+- Contains: Kysely schema (`schema.ts`), migrations, connection management
+- Depends on: PostgreSQL (external), environment config
+- Used by: All backend agents and API routes
 
-**External Integration Layer:**
-- Purpose: Adapter pattern for external APIs
+**ESPN Integration Layer:**
+- Purpose: Fetch and normalize ESPN league data, handle auth cookies, detect schema drift
 - Location: `packages/backend/src/adapters/espn.ts`
-- Contains:
-  - ESPN API client with axios + retry logic
-  - Authentication via SWID + espn_s2 cookies
-  - Response normalization to canonical interfaces (ESPNLeagueData, ESPNTeamData, ESPNFreeAgent)
-  - Raw response archiving with schema fingerprints for drift detection
-- Depends on: Axios, axios-retry, Pino logger (optional)
-- Used by: SnapshotOrchestratorAgent, league connection routes
+- Contains: HTTP client, response validation, rate limiting, in-memory caching
+- Depends on: Axios, Pino logging, ESPN API endpoints
+- Used by: SnapshotOrchestratorAgent, various manual snapshot triggers
 
-**Shared/Infrastructure Layer:**
-- Purpose: Cross-package utilities, type definitions, formula implementations, Slack integration
-- Location: `packages/shared/src/`, `packages/backend/src/utils/`
-- Shared types: `types.ts` (League, Team, Player, projections, auth, Slack models)
-- Shared formulas: `formulas.ts` (AVG, OBP, SLG, OPS, ERA, WHIP, K/9, component combining)
-- Backend utilities:
-  - `encryption.ts` - AES encryption/decryption for Slack bot tokens
-  - `feature-flags.ts` - Runtime feature toggles (slackEnabled, etc.)
-  - `retry.ts` - Axios retry wrapper with exponential backoff
-  - `slack-gateway.ts` - Slack Web API client wrapper
-  - `slack-verify.ts` - Slack request signature verification
-  - `auth-cookies.ts` - ESPN auth cookie management
-  - `roto-ranking.ts` - Roto points calculation (numTeams - rank + 1)
-- Depends on: None (shared is a leaf)
+**Agent Layer (Core Business Logic):**
+- Purpose: Each agent owns one responsibility (snapshot orchestration, projections, standings, recommendations, draft analysis)
+- Location: `packages/backend/src/agents/`
+- Contains: Specialized agent classes with single responsibility
+- Depends on: Kysely database, Pino logging
+- Used by: API routes, background workers
+
+**API Route Layer:**
+- Purpose: HTTP endpoints for leagues, projections, timeseries, recommendations, draft, authentication
+- Location: `packages/backend/src/api/`
+- Contains: Fastify route handlers, validation, auth middleware
+- Depends on: Agents, database, authentication utilities
+- Used by: Frontend, extension, external clients
+
+**Background Job Layer:**
+- Purpose: Async execution of long-running tasks (snapshots, backfill, player pool sync, morning reports)
+- Location: `packages/backend/src/workers/`
+- Contains: BullMQ queue and worker definitions
+- Depends on: Redis, agents, Pino logging
+- Used by: Manual triggers, scheduled cron jobs
+
+**Shared Types Layer:**
+- Purpose: Central type definitions used across backend, frontend, and extension
+- Location: `packages/shared/src/`
+- Contains: Core types, stat formulas (AVG, OBP, SLG, OPS, ERA, WHIP), glossary
+- Depends on: Nothing (pure types and functions)
 - Used by: All packages
+
+**Frontend Page Layer:**
+- Purpose: Next.js App Router pages with server and client components
+- Location: `packages/frontend/src/app/`
+- Contains: Authenticated pages (leagues, standings, trades, waivers, projections, lineup, streaming) and public pages (auth, home)
+- Depends on: API client, TanStack Query, Tailwind, Recharts
+- Used by: Web browsers
+
+**Frontend Component Layer:**
+- Purpose: Reusable UI components (league-specific, motion, generic UI)
+- Location: `packages/frontend/src/components/`
+- Contains: League components, motion/animation components, generic UI primitives
+- Depends on: Tailwind CSS, Lucide icons
+- Used by: Pages in the app layer
+
+**Extension Layer:**
+- Purpose: Chrome extension for live draft automation and overlay UI
+- Location: `packages/extension/`
+- Contains: DOM observers, auto-bid controller, draft state management, simulator engine
+- Depends on: Zustand for state, WebSockets for live signals
+- Used by: Draft participants on ESPN.com
 
 ## Data Flow
 
-**Daily Snapshot Workflow (BullMQ → Agents → Database):**
+**Daily League Snapshot:**
 
-1. **Trigger:** Scheduled job via `snapshot-worker.ts` (daily at 03:00 league timezone) or manual `POST /api/leagues/:id/snapshot`
-2. **Fetch:** `ESPNAdapter.fetchLeague()` calls ESPN API with auth cookies (SWID + espn_s2), uses axios-retry for resilience
-3. **Archive:** Raw ESPN response stored in `league_raw_payload` table with schema fingerprint hash
-4. **Normalize:** `ESPNAdapter.normalizeLeagueData()` extracts teams, players, rosters, stat categories
-5. **Persist (SnapshotOrchestratorAgent):**
-   - Write `league_daily_snapshot` (metadata: date, settings_version_id, is_degraded, degraded_reasons)
-   - Write `team_daily_category_totals` (per-category stats for each team)
-   - Write `team_daily_category_ranks` (rank within league per category)
-   - Write `team_daily_overall` (roto points = sum of category rankings converted to points)
-   - Write `team_roster_snapshot` (player roster with status: active/bench/IL)
-6. **Project (StandingsProjectionAgent):**
-   - Query current totals from snapshot tables
-   - Join with latest `player_projection` rows (components: AB, H, IP, ER, etc.)
-   - For each category: combine current components + projected components using `combineComponents()`
-   - Apply rate stat formula (e.g., ERA = 9 * ER / IP) to combined components
-   - Rank teams by projected final value per category
-   - Compute Roto points: numTeams - rank + 1
-   - Write `team_daily_projected_category` and `team_daily_projected_overall`
-7. **Degradation:** If projections missing, mark snapshot `is_degraded=true` with reason `["projections_missing"]`; use only current-to-date components
+1. Cron trigger (03:00 UTC) → calls `POST /api/leagues/:id/snapshot`
+2. API route calls `SnapshotOrchestratorAgent.executeSnapshot()`
+3. Agent sequence:
+   - Fetch ESPN league data via `ESPNAdapter.fetchLeague()`
+   - Normalize to canonical models, archive raw response
+   - Write `league_daily_snapshot` with settings version
+   - Write team rosters to `team_roster_snapshot`
+   - Compute category totals → `team_daily_category_totals`
+   - Compute category ranks → `team_daily_category_ranks`
+   - Compute roto points → `team_daily_overall`
+   - Trigger `StandingsProjectionAgent` to compute projected standings
+4. Returns snapshot record with degradation status
 
-**Recommendation Workflow (API → Agent → Simulation → Response):**
+**Projections Upload & Re-snapshot:**
 
-1. **Waiver Request:** Frontend `GET /api/leagues/:id/teams/:teamId/waivers/recommendations`
-2. **Load:** WaiverRecommendationAgent fetches projected standings (baseline), free agent pool, team roster
-3. **Simulate:** For each free agent:
-   - Add to team's roster
-   - Drop lowest impact player
-   - Recalculate final standings with new projections
-   - Compute delta overall Roto points
-4. **Rank:** Sort agents by delta (descending); return top N with impact breakdown
-5. **Response:** Include agent details, projected final points delta, risk flags (e.g., "rate stat adjustment incomplete")
+1. Frontend: `POST /api/projections/upload` (multipart CSV)
+2. API route parses batters/pitchers CSV
+3. Calls `ProjectionsIngestAgent.ingestProjections()`
+4. Agent uses `PlayerIdentityResolutionAgent` for fuzzy name matching
+5. Inserts rows to `projections_run` + `player_projection` tables
+6. If projections fresh, re-triggers snapshot jobs for all degraded leagues
+7. Returns projection run summary with match statistics
 
-**Trade Workflow (POST → Agent → Simulation → Impact Analysis):**
+**Trade Impact Analysis:**
 
-1. **Request:** `POST /api/leagues/:id/teams/:teamId/trades/impact` with trade details (player IDs to swap)
-2. **Baseline:** Load projected final standings before trade
-3. **Simulate:** Swap rest-of-season projections between teams:
-   - Team A gets Team B's players' remaining projections
-   - Team B gets Team A's players' remaining projections
-   - Recompute final standings with swapped projections
-4. **Measure:** Calculate delta points for each team (winner/loser/balanced)
-5. **Return:** Trade impact breakdown per category, Roto points delta, complexity notes
+1. Frontend: `POST /api/leagues/:id/teams/:teamId/trades/impact`
+2. API validates proposed trade (add/drop players)
+3. Calls `TradeRecommendationAgent.analyzeTradeImpact()`
+4. Agent:
+   - Fetches current projected standings for baseline
+   - Simulates trade by swapping rest-of-season projections
+   - Recomputes roto standings impact
+   - Returns delta per category and overall points gain/loss
+5. Returns impact data for each team
 
-**Draft Assistant Workflow (Extension ↔ Backend):**
+**Live Draft Auto-Bid:**
 
-1. **Page Load:** Chrome content script (`entrypoints/content.tsx`) initializes DOM observers on ESPN draft page
-2. **Config Detect:** `detectLeagueConfig()` parses ESPN page to extract league ID, scoring format, roster slots, total teams
-3. **State Init:** Zustand store (`useDraftStore`) hydrates from `chrome.storage.local` with draft state (picks, budget, remaining)
-4. **Fetch Rankings:** Extension calls `GET /api/leagues/:id/draft/recommendations` with current draft format (snake/auction)
-5. **Refresh Cycle:** After each pick detected on board:
-   - Update local state (pick removed from pool, budget decremented)
-   - Fetch fresh rankings with updated `draftFormat` and `remainingBudget`
-   - Store to chrome.storage.local for persistence
-   - Update sidebar UI with ranked players + auction values
-6. **Graceful Degradation:** If API call fails after retries, keep stale rankings on display (user sees "last refreshed at X")
+1. Chrome extension loads, establishes WebSocket connection to backend
+2. Backend subscribes user to WebSocket "draft:{draftId}" channel
+3. Extension monitors DOM for price changes and turn detection
+4. On user turn: extension calls `GET /api/draft/recommendations` for top nominations
+5. Backend `DraftNarratorAgent` generates signals (shouldBid, maxBid, topTargets)
+6. Extension `AutoBidController` watches signals, clicks ESPN "+1 bid" button when price < maxBid
+7. On nomination trigger: extension auto-selects top queued player from extension Zustand store
+8. All state changes broadcast over WebSocket for real-time mobile companion view
 
-**Authentication & Token Refresh:**
+**State Management:**
 
-1. **Login:** User provides email + password or clicks OAuth provider button
-2. **Backend:** Auth route hashes password, generates JWT access token + refresh token
-3. **Response:** Access token stored in httpOnly cookie (`accessToken`), refresh token in separate cookie
-4. **Protected Route:** Middleware `authenticate` verifies JWT from cookie; if missing/expired, returns 401
-5. **Frontend Refresh:** API client (`lib/api.ts`) catches 401, calls `POST /api/auth/refresh` with refresh token
-6. **Silent Refresh:** Backend validates refresh token, generates new access token, returns in cookie
-7. **Retry:** API client retries original request with new token; if still fails, redirects to `/login`
+**Backend State:**
+- Database tables are source of truth for league/team/player/projection data
+- Daily snapshots create immutable historical records
+- Redis caches active projections runs and throttles ESPN API calls
 
-**State Management Patterns:**
+**Frontend State:**
+- TanStack Query maintains server-synced data (leagues, standings, timeseries)
+- Zustand manages UI-only state (selected team, modal open/closed)
+- localStorage persists selected team per league across sessions
 
-- **Backend:** Stateless request/response with persistent state in PostgreSQL + Redis queues
-- **Frontend:** AuthContext (React Context) holds `user` and `loading` state; TanStack Query caches API responses per endpoint; localStorage stores selected team per league (`league_${leagueId}_team`)
-- **Extension:** Zustand store with `chrome.storage.local` persistence (draft picks, budget, remaining players); cache invalidation on page reload
-- **Job Queue:** BullMQ with Redis backend; jobs stored with deduplication key (`snapshot-{leagueId}-{date}`); retries on failure with exponential backoff
+**Extension State:**
+- Zustand `useDraftStore` tracks: auctionPrice, currentBatter, rosterStatus, queuedPlayers, engineSignals
+- DOM observers detect ESPN state changes (price, turn, new player)
+- Signals subscribe via WebSocket and update Zustand in real-time
 
 ## Key Abstractions
 
-**Agent Pattern:**
+**Agent Base Pattern:**
+- Purpose: Isolate business logic responsibilities from HTTP/IO details
+- Examples: `SnapshotOrchestratorAgent`, `StandingsProjectionAgent`, `TradeRecommendationAgent`
+- Pattern: Single class method per responsibility, always mark degraded outputs, never fabricate missing data
+- Dependencies: `Kysely` database instance, optional `Pino` logger, no HTTP/IO direct
 
-Pattern: Encapsulation of domain logic with dependency injection
+**Degraded Data Marker:**
+- Purpose: Flag incomplete/unreliable data without fabricating estimates
+- Location: `league_daily_snapshot.is_degraded` (boolean), `degraded_reasons` (JSONB array)
+- Values: `["projections_missing"]`, `["projections_stale"]`, `["espn_fetch_error"]`, etc.
+- Used by: Frontend to show warnings, APIs to filter results, workflows to trigger re-snapshots
 
-```typescript
-export class {Agent}Agent {
-  constructor(
-    private db: Kysely<Database>,
-    private logger?: Logger,
-  ) {}
+**Component-Based Rate Stat Calculation:**
+- Purpose: Combine current-to-date + remaining-season stats using component math
+- Examples: AVG = H / AB, ERA = 9 * ER / IP
+- Implementation: `calculateFinalRate(currentComponents, projectedComponents)` in `packages/shared/src/formulas.ts`
+- Never average rates directly (always rebuild from totals)
 
-  async execute(options: Options): Promise<Result> {
-    // Single responsibility: do one thing well
-    this.logger?.info({ ...context }, "Starting operation");
-    try {
-      // Execute business logic
-    } catch (error) {
-      this.logger?.error({ error, ...context }, "Operation failed");
-      throw error;
-    }
-  }
-}
-```
+**Time Series Snapshots:**
+- Purpose: Track league progression over time for trends and rankings
+- Tables: `team_daily_category_totals`, `team_daily_category_ranks`, `team_daily_overall` (one per day per team)
+- Indices: (league_id, team_id, snapshot_date) for efficient range queries
+- Used by: Timeseries API endpoints, trends visualization, trade impact simulation
 
-- Contract: All agents accept Kysely db instance + optional Pino logger
-- Never log secrets (ESPN cookies, auth headers, etc.)
-- Mark outputs degraded when data incomplete; never fabricate missing data
-- Examples: `SnapshotOrchestratorAgent`, `StandingsProjectionAgent`, `TradeRecommendationAgent`, `WaiverRecommendationAgent`
+**Settings Version Snapshot:**
+- Purpose: Capture league category/roster configuration at specific snapshot date
+- Location: `league_settings_version` table
+- Contains: JSONB column with full `LeagueSettings` (categories, roster_slots, acquisition_rules)
+- Enables: Accurate historical replay if league settings changed mid-season
 
-**Adapter Pattern:**
-
-Pattern: External API normalization to internal canonical models
-
-```typescript
-interface ESPNLeagueData { settings, teams, standings, transactions }
-const espnData = await espnAdapter.fetchLeague({ leagueId, season, auth })
-const rawPayload = { data: espnData, schemaFingerprint, fetchedAt }
-await db.insert('league_raw_payload').values(rawPayload)
-const normalized = espnAdapter.normalizeLeagueData(espnData)
-```
-
-- Handles: Auth cookies (SWID + espn_s2), retry logic, response schema drift detection
-- Example: `ESPNAdapter` converts ESPN raw response to canonical `ESPNLeagueData`, `ESPNTeamData`, `ESPNFreeAgent`
-
-**Degradation Pattern:**
-
-Pattern: Graceful fallback when dependencies unavailable or incomplete
-
-```typescript
-if (projectionsRunId === null) {
-  snapshot.is_degraded = true
-  snapshot.degraded_reasons.push('projections_missing')
-}
-// Continue with current-to-date data only
-const finalRate = calculateFinalRate(formulaId, currentComponents, {}) // projected={}
-```
-
-- Used by: SnapshotOrchestratorAgent, StandingsProjectionAgent
-- Frontend shows warning badge; data queryable but with caveat
-
-**Component-Based Formula Pattern:**
-
-Pattern: Rate stats computed from components, not averaged directly
-
-```typescript
-const combined = combineComponents(currentComponents, projectedComponents)
-const era = calculateERA(combined) // 9 * ER / IP from combined components
-```
-
-- Examples: AVG = H / AB, OBP = (H + BB + HBP) / (AB + BB + HBP + SF), ERA = 9 * ER / IP
-- Implementation: `packages/shared/src/formulas.ts` exports calculation functions
-- Avoid: Never average rates directly (e.g., don't average ERA values)
+**Extension WebSocket Subscription Model:**
+- Purpose: Push live draft signals from backend to extension without polling
+- Flow: Extension connects → registers for "draft:{draftId}" → backend broadcasts signals → extension updates UI
+- Payloads: `DraftEngineSignals` with shouldBid, maxBid, topTargets, narrativeEvent
+- Fallback: If WebSocket drops, extension polls via `GET /api/draft/live/{draftId}`
 
 ## Entry Points
 
-**Backend Server:**
+**Backend HTTP Entry:**
 - Location: `packages/backend/src/index.ts`
-- Invoked: `npm run dev` (local) or `node dist/index.js` (production)
+- Triggers: `npm run dev` or container startup
 - Responsibilities:
-  - Bootstrap Fastify instance with plugins (CORS, JWT, multipart, rate-limit, Redis)
-  - Register all API route modules (auth, leagues, projections, timeseries, recommendations, draft, slack, admin, transaction-impact, internal)
-  - Initialize singleton database connection via `getDb()`
-  - Set up graceful shutdown handlers (SIGINT, SIGTERM)
-- Listens: PORT (default 3001) on HOST (default 0.0.0.0)
+  - Initialize Fastify with plugins (cors, jwt, websocket, multipart, redis, rate-limit)
+  - Register route handlers (auth, leagues, projections, timeseries, recommendations, draft, etc.)
+  - Setup graceful shutdown on SIGINT/SIGTERM
+  - Port 3001 (default)
 
-**Snapshot Worker:**
+**Background Worker Entry:**
 - Location: `packages/backend/src/workers/snapshot-worker.ts`
-- Invoked: Separate process, typically started alongside main server
+- Triggers: Separate process (distinct from HTTP server)
 - Responsibilities:
-  - Consumes BullMQ snapshot jobs from Redis queue (queue name: "snapshots")
-  - For each job: instantiate SnapshotOrchestratorAgent, execute snapshot for league + date
-  - Retry failed jobs up to 3 times with exponential backoff (5s, 10s, 20s delays)
-  - Log job completions and failures
-  - Graceful shutdown on SIGTERM
-- Schedules: Daily snapshot jobs at 03:00 league timezone (via `scheduleDailySnapshots()`)
+  - Listen for jobs on BullMQ "snapshots" queue
+  - Execute `SnapshotOrchestratorAgent` for each job
+  - Move failed jobs to DLQ after max retries
+  - Concurrency: 3 parallel snapshot jobs
 
-**Frontend Entry:**
-- Location: `packages/frontend/src/app/layout.tsx` (root layout) and `packages/frontend/src/app/page.tsx` (home page)
-- Invoked: Browser navigation to frontend URL (default port 3000)
+**Frontend App Entry:**
+- Location: `packages/frontend/src/app/layout.tsx` + `packages/frontend/src/app/page.tsx`
+- Triggers: `npm run dev` or Next.js build
 - Responsibilities:
-  - `layout.tsx`: Wraps entire app with providers (AuthContext, QueryClientProvider), applies global CSS
-  - `page.tsx`: Home page component that redirects authenticated users to league list, shows landing for guests
-  - Navigation: Shared `navigation.tsx` component shows header with logout, league selector
+  - Initialize authentication context (AuthContext, useAuth hook)
+  - Set up TanStack Query and Tailwind
+  - Route unauthenticated users to login, authenticated to leagues
+  - Port 3000 (default)
 
-**Chrome Extension Entrypoints:**
-- **Content Script:** `packages/extension/entrypoints/content.tsx`
-  - Triggered: When ESPN draft page loads
-  - Responsibilities:
-    - Detect draft board via DOM observers
-    - Inject Shadow DOM sidebar for draft assistant UI
-    - Listen to board changes, refresh rankings after each pick
-    - Store draft state to chrome.storage.local
-- **Popup:** `packages/extension/entrypoints/popup/index.tsx`
-  - Triggered: User clicks extension icon
-  - Responsibilities: Display popup UI for navigation, settings, current draft status
+**Extension Popup Entry:**
+- Location: `packages/extension/entrypoints/popup/App.tsx`
+- Triggers: User clicks extension icon on ESPN.com during draft
+- Responsibilities:
+  - Initialize Zustand draft store
+  - Connect WebSocket to backend
+  - Display live signals (price, bid cap, top targets, narrative)
+  - Trigger auto-bid and nomination via `AutoBidController`
+
+**Extension Content Script Entry:**
+- Location: `packages/extension/entrypoints/content.ts` (inferred from wxt build)
+- Triggers: Content script injected on ESPN.com
+- Responsibilities:
+  - Initialize DOM observers for ESPN price/turn detection
+  - Populate Zustand store with ESPN state
+  - Fire mutations and UI updates based on store changes
 
 ## Error Handling
 
-**Strategy:** Graceful degradation with detailed logging and user-facing error messages
+**Strategy:** Explicit degradation > silent failure > hard errors
 
 **Patterns:**
 
-- **ESPN Fetch Failure:** SnapshotOrchestratorAgent catches error, marks snapshot `is_degraded=true` with reason `["espn_fetch_failed"]`; logs error context (leagueId, season)
-- **Projection Missing:** StandingsProjectionAgent detects empty player_projection table for projections_run_id, marks degraded with reason `["projections_missing"]`, uses only current-to-date components in formulas
-- **Database Error:** All agents wrap queries in try-catch, log error with context (leagueId, snapshotDate), re-throw for upstream handling
-- **API 401 Unauthorized:** Frontend API client catches, attempts silent refresh via `POST /api/auth/refresh`; if refresh fails, redirects to `/login`
-- **Rate Limit (429):** Fastify returns 429; frontend should back off and retry; BullMQ jobs retry automatically
-- **Job Failure:** BullMQ job fails after 3 retries → logged to error handler → job persisted in queue for 24 hours for manual inspection
-- **Invalid Input:** Zod schemas validate request bodies; if validation fails, route returns 400 with error details
+**API Validation Errors:**
+```typescript
+// packages/backend/src/api/leagues.ts (example)
+const validation = ConnectLeagueSchema.safeParse(request.body);
+if (!validation.success) {
+  return reply.code(400).send({
+    error: "Validation failed",
+    details: validation.error.errors
+  });
+}
+```
+
+**Degraded Snapshot Handling:**
+```typescript
+// packages/backend/src/agents/snapshot-orchestrator.ts
+// If ESPN fetch fails or projections missing, mark snapshot degraded
+await db
+  .updateTable("league_daily_snapshot")
+  .set({
+    is_degraded: true,
+    degraded_reasons: ["projections_missing"],
+  })
+  .execute();
+```
+
+**Agent Data Validation:**
+- Agents check for empty arrays before SQL `WHERE col IN ()` to prevent invalid SQL
+- Agents log data gaps but never fabricate values
+- Example: WaiverRecommendationAgent defaults free_agent_pool to empty array if fetch fails
+
+**Async Job Failure Handling:**
+- BullMQ retries failed jobs up to 3 times with exponential backoff
+- Failed jobs moved to DLQ after max retries
+- Slack notification sent on DLQ move (if enabled)
+
+**Frontend Auth Retry:**
+```typescript
+// packages/frontend/src/lib/api.ts
+// On 401: attempt silent refresh of JWT token
+// If refresh succeeds: retry original request
+// If refresh fails: redirect to /login
+```
 
 ## Cross-Cutting Concerns
 
-**Logging:** Pino logger with contextual fields (leagueId, teamId, jobId); JSON format in production, pretty-printed in development via pino-pretty transport
+**Logging:** Pino logger instance passed to all agents, includes jobId/leagueId for tracing
 
-**Validation:** Zod schema validation on API request bodies; TypeScript type safety throughout; no fabrication of missing data (e.g., no default values for required projections)
+**Validation:**
+- Backend uses Zod schemas (`packages/backend/src/utils/validation.ts`) for request bodies
+- ESPN responses validated via Zod schemas (`packages/backend/src/utils/espn-schemas.ts`)
+- Frontend uses TypeScript types only (no runtime validation)
 
-**Authentication:** JWT tokens issued on login/OAuth callback; stored in httpOnly cookie (`accessToken`); verified by `authenticate` middleware on protected routes; refresh tokens enable silent token rotation
+**Authentication:**
+- Backend: JWT token in cookies or Authorization header, verified via Fastify JWT plugin
+- Frontend: Stored in httpOnly cookie, auto-refresh on 401
+- Extension: Uses session cookie from browser (local dev only)
 
-**Authorization:** Middleware `authenticate` enforces user logged in; middleware `requireLeagueAccess` enforces user owns team in requested league; role-based access for admin routes
+**Rate Limiting:** Fastify rate-limit plugin per-route (configured in each route handler)
 
-**Encryption:** ESPN auth cookies (SWID, espn_s2) optionally encrypted at rest using `encryption.ts` utilities; Slack bot tokens encrypted in database using `slack_installation.bot_token_encrypted` column
-
-**Caching:**
-- ESPN responses cached in-memory during snapshot execution (per-request, not Redis)
-- Frontend TanStack Query handles client-side data cache with invalidation on mutations
-- Extension Zustand store persists draft state to chrome.storage.local
-
-**Rate Limiting:** Fastify rate-limit plugin on sensitive endpoints (e.g., `POST /api/leagues/connect` = 30 req/min); uses Redis if available, falls back to in-memory storage
+**Secrets Management:**
+- ESPN auth cookies stored encrypted at rest (via `utils/encryption.ts`)
+- JWT secret + Cookie secret from environment variables
+- OAuth client IDs for Google and GitHub (optional)
 
 ---
 
-*Architecture analysis: 2025-02-23*
+*Architecture analysis: 2026-03-13*
