@@ -1,300 +1,257 @@
-# Pitfalls Research: Adding Mastra Agent to ESPN Fantasy Baseball Draft Assistant
+# Pitfalls Research
 
-**Domain:** AI Agent Integration — Mastra + Fastify + Chrome Extension (Real-Time Auction Draft)
-**Researched:** 2026-03-05
-**Confidence:** HIGH (Mastra v1 docs + official release notes + GitHub issues), MEDIUM (cost estimates based on measured latency + pricing, not direct billing data)
+**Domain:** Chrome Extension DOM Automation + Chrome DevTools MCP + WebSocket Mobile Companion
+**Researched:** 2026-03-14
+**Confidence:** HIGH (project history, official Chrome DevTools MCP docs, GitHub repo) / MEDIUM (MCP failure modes from community)
 
 ---
 
 ## Critical Context
 
-This document covers pitfalls specific to **adding Mastra to an existing system** — not building Mastra from scratch. The existing narrator is a single `new OpenAI()` call wrapped in a Fastify route. Mastra replaces or wraps that. The user constraint is hard: auction picks happen every 30–60 seconds, latency budget is under 3 seconds, and the user pays per-call.
+This document covers pitfalls specific to **adding three features to an existing system**:
 
-**Existing system facts that affect every pitfall:**
-- Current narrator: `DraftNarratorAgent` — raw OpenAI SDK, per-request instantiation, no memory, 120-call session cap
-- Extension: Chrome MV3, fetches `POST /api/draft/narrate`, `AbortController` for in-flight cancel
-- Backend: Fastify 4, existing `/api/*` routes, PostgreSQL via Kysely, Node.js
-- Model: `gpt-4.1-mini-2025-04-14`, `max_tokens: 200`, `temperature: 0.4`
-- Latency baseline: 0.47s TTFT + ~2.5s for 200 tokens = ~3s total at p50 (measured, OpenAI API)
+1. **Chrome DevTools MCP** — development-time tool for ESPN DOM inspection (not a runtime dependency)
+2. **Auto-nomination rework** — `auto-bid-controller.ts` + `dom-observers.ts`, which have accumulated 10+ selector-fix iterations (quick tasks 60, 79, 80, 85–90). Each fix introduced its own regression.
+3. **Mobile draft companion expansion** — `draft/live` page + `draft-live.ts` WebSocket relay. Currently 3 control messages. Adding full-control means more message types, more state to relay, more surface area for desync.
+
+**Existing system facts that shape every pitfall:**
+- Auto-bid controller: ~900 lines, Zustand store subscription, polling loops, in-memory nomination state
+- WebSocket relay: single-module `draftLiveRoutes`, one extension socket, N mobile clients, no authentication
+- Extension: Chrome MV3, content script on `fantasy.espn.com/baseball/draft*`
+- ESPN frontend: React-controlled inputs, JSX-generated class names, dynamic DOM re-renders
+- Chrome DevTools MCP: dev-only, connects to a separate Chrome profile via remote debugging
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: maxSteps Default of 1 Silently Disables Tool Calling
+### Pitfall 1: ESPN React Inputs Silently Ignore Programmatic `Event('input')` Dispatch
 
 **What goes wrong:**
-You register tools on the Mastra agent, call `agent.generate()`, and the tools are never invoked. The agent produces a text response that ignores all the tools entirely. No error is thrown. You spend hours debugging prompt engineering when the issue is a single missing parameter.
+Auto-nomination code dispatches a JavaScript `Event('input')` to populate ESPN's search input. The input element's visible value changes but ESPN's React state doesn't update — the search returns no results. The selector logic then fails to find the Queue button, treats the nomination attempt as failed, and backs off. No error is thrown.
 
 **Why it happens:**
-Mastra's `maxSteps` defaults to `1`. One step means: one LLM call, no iteration. Tool calling requires at least `maxSteps: 2` — one step to decide to call a tool, one step to process the result and generate a final response. Developers coming from the raw OpenAI SDK (where you manually parse `tool_calls` and loop) don't realize Mastra controls the loop and the default opt-out is this low.
+ESPN's draft page is a React app using controlled inputs. React's synthetic event system reads `data` and `inputType` from `InputEvent` to reconcile value changes. A plain `Event('input', { bubbles: true })` provides neither field — React ignores it silently. The browser DOM accepts the event but React's virtual DOM never updates. This was root-caused in quick task 86 and required switching to `InputEvent` with `{ data: searchTerm, inputType: 'insertText' }` plus `focus()` before dispatch and `nativeInputValueSetter` to bypass React's read-only value setter.
 
 **How to avoid:**
-Always set `maxSteps` explicitly. For a narrator with 2–3 tools: `maxSteps: 4` (tool call → tool result → optional second tool → final answer). For a narrator that should answer in one pass without tools, set `maxSteps: 1` intentionally and document why.
-
+Any time the rework dispatches synthetic events to ESPN inputs, use the established pattern:
 ```typescript
-// Wrong — tools registered but never called
-const narrator = new Agent({ tools: { getScarcityData, getBudgetStatus } });
-await narrator.generate(messages); // maxSteps = 1, tools ignored
-
-// Correct
-await narrator.generate(messages, { maxSteps: 4 });
+const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+  window.HTMLInputElement.prototype, 'value'
+)?.set;
+nativeInputValueSetter?.call(input, searchTerm);
+input.focus();
+input.dispatchEvent(new InputEvent('input', { data: searchTerm, inputType: 'insertText', bubbles: true }));
+input.dispatchEvent(new Event('change', { bubbles: true }));
+input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
 ```
+Never simplify to `input.value = x; input.dispatchEvent(new Event('input'))`.
 
 **Warning signs:**
-- Agent responds but never calls tools you registered
-- Tool execution callbacks (`onStepFinish`) never fire
-- Response ignores data that tools would have provided
+- Search input shows text but dropdown/results don't appear
+- Nomination flow falls through to "no button found" with correct player name in logs
+- Quick tasks targeting `searchAndNominate` or `clearPlayerSearch` that look like "just add `focus()` calls"
 
-**Phase to address:** Mastra integration bootstrap phase — set `maxSteps` in the agent definition, not at call time, so it can't be omitted.
+**Phase to address:** Auto-nomination rework phase — document the React input dispatch pattern as an invariant in the method header comment. Add a test fixture that confirms `InputEvent` type (not `Event`) is used.
 
 ---
 
-### Pitfall 2: Fastify Route Prefix Collision with Existing `/api` Routes
+### Pitfall 2: ESPN DOM Render Timing Is Non-Deterministic — Single Delays Break Under Load
 
 **What goes wrong:**
-Mastra's Fastify adapter mounts its endpoints under `/api/agents`, `/api/workflows` by default. This project already has `/api/draft/narrate`, `/api/leagues`, etc. The collisions are subtle — Mastra's agent endpoints appear at `/api/agents/narrator/...` which doesn't immediately conflict, but the `/api/v1` prefix expected by future versioning gets tangled, and the middleware ordering breaks: custom routes added before `server.init()` lack Mastra context; those added after have access.
+After clicking a search result or triggering a nomination, the code waits a fixed delay (e.g., 800ms) then queries for the Queue/Select button. During a fast draft with many simultaneous bidders, ESPN's server-round-trip and React re-render takes longer than 800ms. The button isn't in the DOM yet. The nomination attempt fails. The cooldown fires, and 5 seconds later the nomination window has closed.
 
 **Why it happens:**
-The Fastify adapter documentation says "custom routes you add directly to the app are not affected by this prefix," but CORS configuration, rate limiting, and authentication middleware registered through Fastify's native mechanisms do not automatically apply to Mastra-registered routes. Developers assume `fastify.addHook('onRequest', authenticate)` covers everything; it does not cover Mastra's routes unless registered before `init()`.
+Fixed delays are cargo-culted from the first working attempt and never adjusted when ESPN's load characteristics change. This is the root cause of the quick task 86 → 87 → 88 → 89 regression chain: each fix added 200–400ms to a delay, then the next failure prompted another delay increase. Quick task 89 finally replaced delays with `pollForQueueButton` (300ms polling, 3000ms max), which handles variable render latency correctly.
 
 **How to avoid:**
-1. Use a non-default prefix: `{ prefix: '/api/mastra' }` to isolate Mastra routes from existing `/api/*` routes.
-2. Register auth middleware **before** calling `server.init()`.
-3. Explicitly configure CORS on the Fastify instance — Mastra's own CORS settings have no effect when using the adapter.
-4. Be aware: custom routes registered via `registerApiRoute()` were broken (returning 404 while appearing in OpenAPI) until Mastra v1.4.0 — verify version before relying on this.
-
+Replace every fixed `setTimeout` delay that waits for a DOM element with a polling loop:
 ```typescript
-// Correct ordering
-const app = Fastify();
-app.addHook('onRequest', authenticate); // BEFORE init
-const server = new MastraServer({ app, mastra, prefix: '/api/mastra' });
-await server.init();
-// Existing routes still at /api/draft/narrate — no conflict
+function pollForElement(
+  selector: () => Element | null,
+  onFound: (el: Element) => void,
+  intervalMs = 300,
+  maxMs = 3000,
+): void {
+  const start = Date.now();
+  function attempt() {
+    const el = selector();
+    if (el) { onFound(el); return; }
+    if (Date.now() - start >= maxMs) { /* log timeout + DOM snapshot */ return; }
+    setTimeout(attempt, intervalMs);
+  }
+  attempt();
+}
 ```
+The `pollForDropdown` and `pollForQueueButton` patterns already in `auto-bid-controller.ts` are the correct model. When reworking nomination, extend them — do not add new fixed delays.
 
 **Warning signs:**
-- Auth not enforced on Mastra agent endpoints
-- CORS errors from extension when hitting Mastra routes but not existing routes
-- 404 on agent routes that appear in OpenAPI spec (pre-v1.4.0 bug)
+- Magic numbers like `1200`, `1500`, `2000` in setTimeout calls waiting for DOM elements
+- "Button not found" in nomination logs on the first attempt, followed by success on retry
+- Nomination reliability degrades on slow draft days vs. fast ones
 
-**Phase to address:** Mastra integration bootstrap phase, specifically the "mount Mastra into Fastify" step.
+**Phase to address:** Auto-nomination rework — audit all `setTimeout` calls in `auto-bid-controller.ts`; replace any that wait for ESPN DOM elements with polling loops. Keep fixed delays only for inter-nomination pacing (the 1s cooldown after an auction ends is intentional).
 
 ---
 
-### Pitfall 3: PostgreSQL Schema Collision — Mastra Auto-Creates Tables in Your Database
+### Pitfall 3: Auto-Nomination State Machine Has No Single Source of Truth
 
 **What goes wrong:**
-Mastra's PostgreSQL storage adapter creates its own tables (`mastra_threads`, `mastra_messages`, `mastra_traces`, `mastra_workflow_snapshot`, `mastra_evals`, `mastra_resources`, `mastra_scorers`) in your existing Postgres database on first `init()`. These are unversioned relative to Kysely migrations and invisible to your migration tooling. When you upgrade Mastra versions, new columns may be missing (`requestContext` on `mastra_scorers` is a known example from GitHub issue #11789), and Mastra will crash with schema mismatch errors.
+The nomination controller tracks state across multiple private fields (`nominationAttempts`, `lastNominationTime`, `lastCandidateSource`, `nominationDelayTimer`, `queuedPlayerIds`) that are reset in three different places: `clearNominationState()`, `stop()`, and inline within `evaluateAndNominate()`. When a new feature adds a reset path (e.g., "force re-populate queue on reconnect"), it calls one reset path but not another. Nomination attempts start from a stale counter, the cooldown doesn't clear, or the queued player set is out of sync with actual ESPN queue state.
 
 **Why it happens:**
-Mastra says "auto-creates necessary tables on first interaction" which sounds safe. But it uses `CREATE TABLE IF NOT EXISTS` — it will not add new columns to existing tables when upgrading. The tables are also not in your Kysely schema, so `db.selectFrom('mastra_threads')` won't typecheck. If you use a separate schema for your app (e.g., `public` vs `app`), the Mastra tables land in `public` by default, mixing concerns.
+The controller grew incrementally over 10 quick tasks. Each task added a new state field and reset it in the obvious place. No single method owns all state lifecycle. The `clearNominationState()` already exists to address this, but it doesn't include `queuedPlayerIds` — that was added later and resets only in `stop()`, not in `clearNominationState()`.
 
 **How to avoid:**
-1. Use Mastra's PostgreSQL storage with `schema: 'mastra'` to isolate tables in their own schema.
-2. After any Mastra upgrade, manually inspect for missing columns (run Mastra's schema against your DB).
-3. Pin the `@mastra/pg` version in `package.json` and treat upgrades as migrations.
-4. Do NOT use the existing Kysely `db` connection for Mastra storage — create a separate `MastraStorage` instance that owns its own connection lifecycle.
+Before adding any new nomination-related state field:
+1. Add it to the `NominationDiagnostics` interface immediately (forces it to be observable)
+2. Reset it in `clearNominationState()` — the one canonical reset path
+3. Verify `stop()` calls `clearNominationState()` (it does — preserve this)
+4. Never reset nomination state inline in `evaluateAndNominate()` except for `nominationAttempts = 0` on player-appeared events (that's a deliberate design, not a reset)
 
+**Warning signs:**
+- Nomination works after page reload but breaks mid-draft without a reload
+- `getNominationDiagnostics()` shows stale data that doesn't match observed behavior
+- `queuedPlayerIds.size` non-zero after `clearNominationState()` is called
+
+**Phase to address:** Auto-nomination rework phase — consolidate all state resets into `clearNominationState()` as the first task before adding new features.
+
+---
+
+### Pitfall 4: Chrome DevTools MCP Requires a Separate Chrome Profile — Cannot Use the Live Draft Profile
+
+**What goes wrong:**
+Developer connects Chrome DevTools MCP to their default Chrome profile to inspect ESPN's live draft DOM. Starting with Chrome 136, remote debugging is blocked on default profiles as a security measure. The MCP server fails to connect or connects to a stale, non-draft page. The developer then installs an `--allow-remote-debugging` workaround that enables remote debugging on their actual session — now their ESPN cookies, draft state, and any other open tabs are fully accessible to the MCP client (which may include AI agents reading the entire browser context).
+
+**Why it happens:**
+The documentation says "current stable Chrome" but Chrome 136 added a profile-level restriction on remote debugging that requires a separate `--user-data-dir`. Many setup guides predate Chrome 136 and show the simple `--remote-debugging-port=9222` without a separate profile.
+
+**How to avoid:**
+Use a dedicated Chrome profile for MCP inspection, never the live draft profile:
+```bash
+# Correct — separate profile, separate port
+google-chrome --remote-debugging-port=9223 \
+  --user-data-dir=/tmp/espn-devtools-profile \
+  "https://fantasy.espn.com/baseball/draft?..."
+```
+In Claude Code MCP config, use `--wsEndpoint` to connect to the debug port, not `--autoConnect` (which expects the default profile). Document this in a repo-level note so any developer can reproduce the setup.
+
+**Warning signs:**
+- `chrome-devtools-mcp` fails to launch or immediately disconnects
+- Chrome shows a "remote debugging is not enabled for this profile" error
+- The MCP connects but page content is not the ESPN draft page
+
+**Phase to address:** Chrome DevTools MCP setup phase — document the exact launch command and MCP config before any DOM inspection tasks. Treat this as a dev environment setup step, not a runtime dependency.
+
+---
+
+### Pitfall 5: chrome-devtools-mcp Node.js Minor Version Constraint Is Enforced Strictly
+
+**What goes wrong:**
+Developer runs `npx chrome-devtools-mcp@latest` on Node.js 20.18.0. The process exits immediately with a version error. This is not `node: >= 20` — it requires `^20.19.0 || ^22.12.0 || >=23`. Minor version matters. If the repo's `.nvmrc` is set to `20.x` (which resolves to 20.18 on some systems), every developer who runs `nvm use` will hit this.
+
+**Why it happens:**
+chrome-devtools-mcp enforces version validation at startup via an explicit check — it exits before any server code runs. The `^20.19.0` constraint is about a specific API stabilization in Node 20 LTS. Developers who see `>=20` in README text (if any) or assume LTS is compatible get surprised.
+
+**How to avoid:**
+Document the required Node version in the project's development setup notes. If `.nvmrc` is pinned to `20`, update it to `20.19.0` minimum. Run `node -v` and confirm before any chrome-devtools-mcp session.
+
+The extension and backend do not need chrome-devtools-mcp at runtime — this constraint only affects developers doing DOM inspection. Keep it out of the main `package.json` dependencies; run via `npx` only.
+
+**Warning signs:**
+- `npx chrome-devtools-mcp` exits immediately with no error visible (process exit code non-zero but no output to stderr if terminal isn't showing it)
+- Works on CI (newer Node) but not on local dev
+
+**Phase to address:** Chrome DevTools MCP setup phase — check and document Node version before running any inspection sessions.
+
+---
+
+### Pitfall 6: Adding New CONTROL Message Types Without Validating in Extension Content Script Causes Silent Failures
+
+**What goes wrong:**
+A new mobile control is added (e.g., `FORCE_NOMINATE`, `QUEUE_PLAYER`, `NOMINATE_FROM_QUEUE`). The mobile page sends `{ type: "CONTROL", action: "FORCE_NOMINATE" }`. The WebSocket relay in `draft-live.ts` forwards it to the extension background worker. The background worker forwards it via `chrome.runtime.sendMessage`. The content script's `switch` statement has no `case "FORCE_NOMINATE"` — it falls through silently. No error is thrown, no response is different, the mobile UI gets `{ ok: true }` back, and the user thinks the action executed.
+
+**Why it happens:**
+The relay layer in `draft-live.ts` is transport-only — it forwards any `CONTROL` message without validation. The content script is the action executor, but TypeScript doesn't enforce that the switch is exhaustive because the action is typed as `string` (not a discriminated union). The `sendResponse({ ok: true })` fires unconditionally regardless of whether any action matched.
+
+**How to avoid:**
+1. Define a typed union for all CONTROL actions in a shared type file:
 ```typescript
-// Correct — isolated schema, separate from Kysely-managed tables
-const mastraStorage = new PostgresStorage({
-  connectionString: process.env.DATABASE_URL,
-  schema: 'mastra', // Creates tables as mastra.mastra_threads, etc.
-});
+export type ControlAction =
+  | "SET_AUTO_MODE"
+  | "SET_POSITION_FILTER"
+  | "SET_PITCHER_HITTER_SPLIT"
+  | "TOGGLE_SIDEBAR"
+  | "FORCE_NOMINATE";
 ```
+2. Use this type in the content script's message listener and in the mobile page's `sendControl` call.
+3. Add a `default` case that logs a warning: `logger.warn('[Control] Unknown action:', message.action)`.
+4. In the relay, consider echoing `{ ok: false, error: 'unknown action' }` for unrecognized actions to surface gaps during development.
 
 **Warning signs:**
-- `ERROR: column "requestContext" of relation "mastra_scorers" does not exist` after upgrade
-- Kysely migration tooling shows unexpected tables in schema diff
-- Mastra agent silently stores no memory (storage fails but error is swallowed)
+- Mobile button appears to work (no error) but extension takes no action
+- Console in extension shows no log for an action that should have fired
+- "Missing case" TypeScript error not appearing because `action` is typed as `string`
 
-**Phase to address:** Mastra integration bootstrap — establish the storage adapter before any agent code.
+**Phase to address:** Mobile companion expansion phase — type the CONTROL action union before adding any new message types.
 
 ---
 
-### Pitfall 4: Unbounded Memory Growth During a 3-Hour Draft Session
+### Pitfall 7: WebSocket Relay Has No Extension-Connected Guard — Mobile Controls Fire Into the Void
 
 **What goes wrong:**
-You enable Mastra memory with `lastMessages: 20` to give the agent draft context across the 120-call session cap. Over a 3-hour, 25-round auction draft with 13 teams (325 total picks), the thread accumulates 120 messages. With the full structured payload per narration (~400–600 tokens each), the thread context hits 60,000+ tokens before the draft ends. The agent's context window fills, responses degrade, latency spikes, and cost multiplies. With `observationalMemory: true`, background compression agents add further LLM calls (Gemini 2.5 Flash by default) and latency.
+The mobile page is connected to the WebSocket relay. The extension tab is closed or the draft ends. The mobile user taps "Force Nominate" or "Auto ON". The relay receives the CONTROL message, checks `extensionSocket?.readyState === 1`, finds it `null`, and silently drops the message. The mobile UI shows no feedback — no error, no "extension disconnected" state.
 
 **Why it happens:**
-Auction draft narration payloads are large (structured JSON signals, player data, alert arrays). Developers set `lastMessages: 20` thinking this caps growth — it does not cap the token size of those 20 messages. The observational memory compression threshold is 30,000 tokens of uncompressed messages before triggering — that threshold can be hit mid-draft, causing a synchronous pause during live bidding.
+`draft-live.ts` correctly does `if (msg.type === "CONTROL" && extensionSocket?.readyState === 1)` before forwarding. This is the right guard, but the mobile client doesn't know the extension is disconnected — `STATE_SNAPSHOT` messages stop arriving, but the mobile page's `connected` flag (which reflects WebSocket connection to the relay, not extension presence) stays `true`. The user keeps tapping controls thinking they're working.
 
 **How to avoid:**
-For the narrator use case, **do not use Mastra persistent memory at all.** The current architecture is correct: stateless per-call with no conversation history. The agent receives the full current engine state in every request — this is already the "working memory." Thread memory is appropriate for multi-turn conversation assistants, not for stateless signal-to-commentary translation.
+Add extension presence to the state snapshot relay: when the extension connects or disconnects, send a `{ type: "EXTENSION_STATUS", connected: bool }` message to all mobile clients. The mobile page should display a clear "Extension disconnected" banner and disable all control buttons when this arrives.
 
-If context across picks is genuinely needed, pass a manually-constructed condensed summary (last 3 narrations as a string, max 200 tokens) in the request body rather than threading through Mastra memory.
-
+In `draft-live.ts`:
 ```typescript
-// Wrong — memory accumulates 120 narration messages per draft
-await agent.generate(messages, { threadId: draftSessionId, resourceId: userId });
-
-// Correct — stateless, full current state sent each call
-await agent.generate(messages); // no threadId, no memory overhead
-```
-
-**Warning signs:**
-- Response latency increases progressively through a draft session
-- Agent starts contradicting itself ("you passed on Trout earlier" when it didn't)
-- Token usage reported per-call grows over the course of a session
-
-**Phase to address:** Mastra agent design phase — explicitly document the stateless narration pattern as a constraint.
-
----
-
-### Pitfall 5: Streaming SSE Does Not Work in Chrome Extension Background Service Workers
-
-**What goes wrong:**
-You migrate the narrator to use `agent.stream()` for progressive text display (show first words immediately, stream the rest). The extension switches from `fetch()` + `.json()` to reading an SSE stream. This breaks in Chrome MV3 background service workers: `EventSource` is not available in service worker context, and streaming `fetch` responses using `ReadableStream` have known reliability issues in Chrome extensions (connection drops, partial reads, service worker sleep interruption).
-
-**Why it happens:**
-Mastra's streaming uses SSE (`text/event-stream`) for agent responses. SSE requires a persistent connection. Chrome MV3 service workers are ephemeral — they can be terminated while a stream is open. The existing extension correctly uses `AbortController` with regular `fetch()` because it understands this constraint. Developers see streaming as a UX improvement and don't check extension execution context compatibility.
-
-**How to avoid:**
-Keep the narrator as a non-streaming `agent.generate()` call returning complete text. The latency budget (3s) and output size (200 tokens) don't justify streaming's UX benefit — the user would see words appear over 2.5 seconds rather than the full response at 3s. The abort-and-replace pattern already in `use-narrator.ts` handles stale requests correctly without streaming.
-
-If streaming is genuinely needed in a future iteration, route through the extension's background service worker using `chrome.runtime.sendMessage` to a long-lived offscreen document, not directly from the content script.
-
-**Warning signs:**
-- SSE connection drops mid-response in extension (no error, just incomplete text)
-- Service worker is killed while stream is open, leaving UI in loading state permanently
-- `EventSource is not defined` runtime error in extension console
-
-**Phase to address:** Extension integration phase — explicitly choose non-streaming generate() and document the MV3 constraint.
-
----
-
-### Pitfall 6: Tool Design That Requires Multiple LLM Iterations Destroys Latency Budget
-
-**What goes wrong:**
-You design the Mastra narrator with tools like `getPlayerProjection(playerName)`, `getLiveAuctionValues()`, `getTeamBudgetStatus(teamId)`. The agent decides to call 2–3 tools before answering. With `maxSteps: 4`, the actual execution is: LLM call 1 (decides to call tools) → tool executions (fast, DB queries) → LLM call 2 (processes tool results, decides to call another tool) → LLM call 3 (final answer). That's 3 LLM calls at ~3s each = 9 seconds total. The auction pick is already decided.
-
-**Why it happens:**
-Tool-calling agents are designed for use cases where the agent needs to discover information it doesn't have. The narrator is the opposite: it receives a pre-computed payload with all relevant signals already summarized. Giving the narrator tools to look up data it already has in the payload causes it to call those tools redundantly, multiplying LLM calls.
-
-**Cost implication at 120 calls/session:** Current cost = 120 × ~600 input tokens + ~200 output tokens = ~96K tokens total ≈ $0.05/session at gpt-4.1-mini pricing. With 2 extra LLM calls per trigger: cost triples to ~$0.15/session. With tool calls adding context (tool schemas + results): easily 5× the current cost.
-
-**How to avoid:**
-Keep the narrator **prompt-only, no tools.** All computation belongs in the deterministic engine (already implemented in Phase 20–23 outputs). The narrator's job is interpretation and articulation of pre-computed signals, not data retrieval. If new data is needed, add it to `NarratorPayload` (extend the TypeScript interface) rather than adding a tool.
-
-Reserve Mastra tools for a separate "on-demand research agent" use case (e.g., "tell me about this player's injury history") that is explicitly user-initiated and not latency-constrained.
-
-```typescript
-// Wrong — tools cause multi-step LLM iteration
-const narrator = new Agent({
-  tools: { getPlayerProjection, getMarketPrice, getBudgetStatus }
-});
-
-// Correct — payload already contains all needed data, no tools
-const narrator = new Agent({
-  // instructions only, no tools
-  instructions: SYSTEM_PROMPT,
-  model: openai('gpt-4.1-mini-2025-04-14'),
-});
-```
-
-**Warning signs:**
-- Agent response time exceeds 5 seconds
-- `onStepFinish` fires more than twice per narration request
-- Tool call logs show the agent fetching data already present in the user message
-
-**Phase to address:** Mastra agent design phase — enforce the "no tools on narrator" constraint in the agent definition.
-
----
-
-### Pitfall 7: Mastra v1 Import Path Changes Break Existing Agent Code
-
-**What goes wrong:**
-You install `@mastra/core` and use `import { Agent } from '@mastra/core'`. This worked in pre-v1 but throws a module error in Mastra 1.0+. The framework now requires subpath imports: `import { Agent } from '@mastra/core/agent'`, `import { createTool } from '@mastra/core/tools'`. Additionally, the `createTool` execute function signature changed from `(context)` to `(inputData, context)`, which causes runtime errors when tools are called — not TypeScript errors at compile time if you're using `any`.
-
-**Why it happens:**
-Mastra v1 was released in January 2026 and reorganized its package structure for tree-shaking. All tutorials and Stack Overflow answers written before January 2026 use the old import style. The AI SDK model adapter also changed: `openai('gpt-4.1-mini')` now requires `@ai-sdk/openai` and AI SDK v5/v6 — not the `openai` npm package used directly by the existing narrator.
-
-**Breaking changes in v1 relevant to this project:**
-- `import { Agent } from '@mastra/core'` → `import { Agent } from '@mastra/core/agent'`
-- `createTool` execute: `(context)` → `(inputData, context)`
-- `RuntimeContext` renamed to `RequestContext`
-- Memory `memoryOptions` parameter renamed to `memory`
-- `stream()` returns AI SDK v5 types (not v4); use `streamLegacy()` for v4 compatibility
-- Node.js 22.13.0 minimum required
-- DB migration required for PostgreSQL and libSQL users
-
-**How to avoid:**
-Pin to the specific Mastra version you test against. Read the official v1 migration guide before installing. Run the provided codemods. Treat each Mastra minor version bump as a potential breaking change until the API stabilizes (it is actively developed).
-
-**Warning signs:**
-- `Module '"@mastra/core"' has no exported member 'Agent'` TypeScript error
-- Tool execute functions receive `undefined` for `context` parameter
-- `generateLegacy is not a function` at runtime after upgrading
-
-**Phase to address:** Mastra integration bootstrap — pin version, run codemod, write integration test.
-
----
-
-### Pitfall 8: AbortController Not Propagated to Mastra Stream
-
-**What goes wrong:**
-The extension's `use-narrator.ts` already implements in-flight request cancellation: when a new trigger fires before the previous request completes, `abortControllerRef.current.abort()` is called. With the raw `fetch()` approach this works. After migrating to Mastra client SDK, the abort signal is not propagated to the underlying stream request in certain SDK versions — the request continues server-side after the client aborts, consuming tokens and incurring cost for a response the user will never see.
-
-**Why it happens:**
-GitHub issue #5673 confirmed that `@mastra/client-js@0.10.9` had a bug where `signal` passed to `agent.stream()` was not forwarded to the underlying HTTP request. The fix required passing the abort signal at client instantiation, not at the method level. This bug is fixed in post-0.10.9 versions, but the correct usage pattern is non-obvious.
-
-**How to avoid:**
-1. Don't use the Mastra client SDK from the extension — continue using raw `fetch()` to `POST /api/draft/narrate`. The extension talks to the Fastify route, which calls `agent.generate()` internally. This avoids the client SDK's abort bug entirely.
-2. If using `agent.stream()` server-side (not recommended, see Pitfall 5), pass `abortSignal` through to the agent call from the Fastify request's abort signal.
-
-```typescript
-// Extension: keep raw fetch with AbortController (already correct)
-const response = await fetch(`${baseUrl}/api/draft/narrate`, {
-  method: 'POST',
-  signal: abortControllerRef.current.signal, // still works
-  body: JSON.stringify(payload),
-});
-
-// Fastify route: pass Fastify's request abort signal to Mastra
-const narration = await agent.generate(messages, {
-  abortSignal: request.raw.socket.destroyed
-    ? AbortSignal.abort()
-    : undefined,
-});
-```
-
-**Warning signs:**
-- Token usage continues climbing after user navigates away from draft
-- Server logs show completed responses with no corresponding frontend receipt
-- Cost per session higher than expected given call count
-
-**Phase to address:** Mastra integration phase — explicitly test abort behavior, log token usage per call.
-
----
-
-### Pitfall 9: Mastra's Node.js 22.13.0 Minimum Conflicts with Production Runtime
-
-**What goes wrong:**
-The project runs Node.js 18 LTS or 20 LTS (typical for production backends). Mastra v1 requires Node.js 22.13.0 minimum. Installing Mastra in the backend fails silently or produces cryptic `ERR_UNSUPPORTED_ESM_URL_SCHEME` or native module errors at runtime. Docker base images, CI runners, and Heroku/Railway/Fly.io dyno defaults may all be below this threshold.
-
-**Why it happens:**
-Mastra v1 uses features from Node 22 including native fetch improvements, `--experimental-vm-modules` behaviors, and native `AbortController` changes. The requirement is listed in the migration guide but not prominently surfaced in `npm install` output.
-
-**How to avoid:**
-Before adding Mastra, verify current Node.js version across: local dev, Docker image, CI runner, production runtime. If below 22.13.0, plan the Node.js upgrade as a prerequisite task in the same phase as Mastra integration. Update `.nvmrc` and `engines` in `package.json` simultaneously.
-
-```json
-// package.json
-{
-  "engines": {
-    "node": ">=22.13.0"
+// When extension connects
+for (const client of mobileClients) {
+  if (client.readyState === 1) {
+    client.send(JSON.stringify({ type: "EXTENSION_STATUS", connected: true }));
+  }
+}
+// When extension disconnects
+for (const client of mobileClients) {
+  if (client.readyState === 1) {
+    client.send(JSON.stringify({ type: "EXTENSION_STATUS", connected: false }));
   }
 }
 ```
 
 **Warning signs:**
-- `npm install @mastra/core` succeeds but `node -e "require('@mastra/core/agent')"` fails
-- CI passes (if CI uses newer Node) but production deploy fails
-- Cryptic module resolution errors with no clear "Node version" message
+- Mobile controls send successfully to relay but extension takes no action
+- Mobile `connected` state stays green while draft state stops updating
+- User reports "tapping buttons does nothing" after extension tab was closed
 
-**Phase to address:** Pre-integration infrastructure phase — verify and upgrade Node.js before writing any Mastra code.
+**Phase to address:** Mobile companion expansion phase — implement EXTENSION_STATUS message before adding any new control actions.
+
+---
+
+### Pitfall 8: Nomination Turn Detection Has 5 Competing Strategies — A New Rework Can Break the Strategy That Actually Works
+
+**What goes wrong:**
+`isMyTurnToNominate()` has at least 5 detection strategies, each added when a previous one failed. Strategy 4 (`button.Button--select[data-player-id]`) is the current primary match, added in quick task 80. A rework that modifies how the player table is scraped, or changes the MutationObserver target, breaks the DOM context that Strategy 4 relies on — without breaking the TypeScript build. The function now returns false when it's genuinely the user's turn.
+
+**Why it happens:**
+Each strategy was added at an inflection point where ESPN changed its DOM or the previous strategy had edge-case failures. The strategies have no test coverage against real ESPN DOM snapshots. There is no regression test that says "given this DOM state, `isMyTurnToNominate()` must return `true`."
+
+**How to avoid:**
+Before any rework of nomination, run `window.espnDraftAssistant.nominationDiag()` in a live draft to record which strategy currently matches. Document it at the top of `isMyTurnToNominate()`. If the rework changes DOM observation scope, re-verify the winning strategy still finds its elements.
+
+When Chrome DevTools MCP is available, use it to snapshot the exact DOM state during "it's your turn to nominate" and save it as a test fixture for `isMyTurnToNominate()`. This allows offline regression testing before deploying.
+
+**Warning signs:**
+- Nomination diagnostics panel shows "Not detected (checked 5 strategies)" when it should be detecting a turn
+- Turn detection worked before and stopped working after an unrelated DOM observer change
+- `lastTurnDetectionResult.matched` is false but the user can manually see the "Select" button in ESPN
+
+**Phase to address:** Auto-nomination rework — capture a DOM snapshot with Chrome DevTools MCP, write a unit test for `isMyTurnToNominate()` against that snapshot before touching any turn detection code.
 
 ---
 
@@ -302,12 +259,12 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Wrap existing `DraftNarratorAgent` with Mastra without restructuring | Fast first integration | Mastra's lifecycle management conflicts with per-request class instantiation | Never — restructure at integration time |
-| Use Mastra's default `libsql` in-memory storage | No DB config needed | Restarts lose all thread state; fails silently under load | Local dev only, never production |
-| Skip pinning `@mastra/core` version | Always gets latest fixes | Breaking changes on any deploy; AI SDK v4/v5/v6 churn is real | Never in production |
-| Enable `observationalMemory: true` without a cost model | Better long-context behavior | Adds Gemini 2.5 Flash calls you don't control; cost and latency unpredictable | Never without explicit budget approval |
-| Use Mastra tools for data the payload already contains | Feels more "agentic" | 2–3× more LLM calls, 3× cost, 3× latency per narration | Never for this narrator use case |
-| Mix Mastra's PostgreSQL tables with Kysely-managed tables in same schema | Simpler config | Schema drift on Mastra upgrades breaks Kysely migrations | Never — use `schema: 'mastra'` isolation |
+| Adding another selector fallback instead of using Chrome DevTools MCP to find the stable one | Quick fix, unblocks draft | Selector list grows to 10+ entries; true match is buried; first-match logging gets noisy | Never during rework — acceptable only as emergency hotfix |
+| Fixed `setTimeout` delays for ESPN DOM readiness | Simple to write | Breaks under different network/load conditions; each "fix" just increases the delay | Never for DOM presence checks — use polling loops |
+| `action: string` for WebSocket CONTROL messages | Faster to prototype | TypeScript can't catch typos or missing handler cases; mobile sends valid JSON that silently does nothing | Never — add the union type before the first new action |
+| Using default Chrome profile for DevTools MCP inspection | Less setup | Chrome 136+ blocks this; if it works, your actual ESPN cookies are exposed to MCP client | Never for any ESPN-auth profile |
+| Resetting nomination state in multiple places instead of `clearNominationState()` | Appears obvious at the call site | State gets partially reset; fields added later are only reset in some paths | Never — always go through `clearNominationState()` |
+| Adding mobile controls before implementing EXTENSION_STATUS relay message | Controls work when both are connected | User taps controls with no extension → silent failure, confusing UX | Never — implement EXTENSION_STATUS first |
 
 ---
 
@@ -315,12 +272,12 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Mastra + Fastify 4 | Registering routes then calling `init()` | Call `init()` after all hooks but before routes; use `prefix: '/api/mastra'` to avoid collision |
-| Mastra + OpenAI | Using `openai` npm package directly | Use `@ai-sdk/openai` with `openai('model-id')` — Mastra uses AI SDK v5/v6 model format |
-| Mastra + existing PostgreSQL | Pointing `MastraStorage` at same schema as app tables | Use `{ schema: 'mastra' }` to isolate Mastra tables |
-| Mastra + Chrome extension | Using Mastra client SDK from content script | Use raw `fetch()` to Fastify route — client SDK has SSE limitations in MV3 service workers |
-| Mastra memory + draft session | Using `threadId` for draft session ID | Do not use memory for narrator — stateless per-call is correct for this use case |
-| AI SDK v4 vs v5 | Mixing `stream()` (v5) with v4 model adapters | Use `streamLegacy()`/`generateLegacy()` when using AI SDK v4 models; new methods require v5 |
+| Chrome DevTools MCP + ESPN draft page | Running `npx chrome-devtools-mcp` against default Chrome profile | Use `--user-data-dir=/tmp/espn-mcp-profile` with a fresh profile; log in to ESPN in that profile first |
+| Chrome DevTools MCP + MV3 extension | Inspecting extension background worker through DevTools MCP | DevTools MCP targets pages, not extension service workers; use `chrome://extensions` debug panel for service worker logs |
+| WebSocket relay + multiple mobile clients | Assuming `latestSnapshot` is always current when mobile connects | Snapshot is only from last extension message; if extension restarts during draft, mobile gets stale snapshot until next STATE_SNAPSHOT push |
+| CONTROL messages + background service worker | Mobile sends CONTROL → relay → extension content script (one hop) | Relay → background worker → content script (two hops via `chrome.runtime.sendMessage`); both legs must be open |
+| Nomination controller + page reload | Expecting nomination state to persist across reload | All nomination state is in-memory class fields; `stop()` + `start()` is called on each content script initialization; cooldowns reset on reload (intentional) |
+| Chrome DevTools MCP + headless mode | Running MCP in headless for CI/automated inspection | Headless viewport is capped at 3840x2160 internally; ESPN's responsive breakpoints may render differently than headed; always use headed Chrome for DOM selector discovery |
 
 ---
 
@@ -328,12 +285,11 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| `maxSteps > 1` with tools on narrator | Each narration takes 6–9s instead of 3s | Keep `maxSteps: 1` for prompt-only narrator, never add tools | On every trigger when tools are present |
-| Thread memory enabled during 120-call draft session | Latency grows throughout session; token count grows | Disable memory for narrator agent entirely | After ~30 calls when context fills |
-| `observationalMemory` compression triggers mid-pick | 2–5s pause during live auction nomination | Disable observational memory for narrator; use stateless calls | When thread hits ~30K tokens (~50 narrations with full payloads) |
-| Structured output with separate extraction model | Two LLM calls per narration (generate + extract) | Use prompt-enforced plain text output, not `structuredOutput` | Every call — doubles cost and latency |
-| Tools returning large JSON results | Tool result fills context window, leaving no room for final answer | Cap tool outputs at 500 tokens, filter to only needed fields | When tools return full player arrays or projection tables |
-| Full draft state in every narration (unfiltered) | Input token count at 2,000+ per call vs. current ~600 | Pre-filter in `buildNarratorPayload()` before sending to Mastra | Already addressed by existing payload builder — don't regress this |
+| Polling loops that don't have a max timeout | `pollForElement` runs indefinitely if ESPN never renders the element | Always pair `intervalMs` with `maxMs`; log diagnostic on timeout with DOM snapshot | On any ESPN render failure or navigation away from draft page |
+| Nomination diagnostics panel polling at 500ms | 500ms polling creates 2 timer firings/sec for the entire draft session | The 500ms poll is intentional and cheap (just reads from class fields); acceptable. Do not increase frequency. | Not a performance issue at this scale |
+| Zustand store subscription in AutoBidController without `subscribeWithSelector` | Full store diff on every state change, including unrelated fields | The current manual diffing pattern is correct; do not switch to subscription middleware without profiling first | Only affects performance if store state is very large; acceptable |
+| STATE_SNAPSHOT messages fanout to N mobile clients | If N clients connect, every snapshot gets sent N times | For local-network use case, N is always 1–2; no fanout concern. Would matter at scale. | Not relevant for local-network draft companion use case |
+| Chrome DevTools MCP sequential tool execution | Tools run through a mutex — one at a time | For DOM inspection this is fine; don't expect parallel `querySelectorAll` calls to run concurrently | Never a real issue for the inspection use case |
 
 ---
 
@@ -341,10 +297,10 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Exposing Mastra's auto-generated agent endpoints without auth | Any client can call agent with arbitrary prompts — prompt injection, cost exhaustion | Always register auth middleware before `server.init()`; use `prefix: '/api/mastra'` and block from public access |
-| Logging full `NarratorPayload` at debug level | Draft strategy leaks in logs; OpenAI API key visible if logged together | Redact `apiKey` field; log only `triggerReason` and call count at debug level |
-| Trusting `resourceId` from request body | Caller can impersonate another user's draft session | Derive `resourceId` from authenticated session, never accept it from client |
-| OpenAI API key in environment without rotation plan | Key exhausted by runaway agent (no `maxSteps` set) | Set explicit `maxSteps` cap; add server-side rate limiting on `/api/draft/narrate` (already implemented: 30/min) |
+| Using live ESPN profile for Chrome DevTools MCP | Entire browser session (ESPN cookies, other tabs, credentials) exposed to MCP client | Always use isolated profile with `--user-data-dir=/tmp/...` |
+| WebSocket relay with no authentication | Any device on the local network can send CONTROL messages to the extension | Acceptable for local-network draft day use; add a shared secret before any internet exposure |
+| Mobile page sending CONTROL messages over `ws://` (plain WebSocket) | No encryption on local network; adjacent devices can intercept | Acceptable for local-network; use `wss://` if exposing over internet |
+| `window.espnDraftAssistant.forceNominate()` available in DEV builds | If a DEV build is accidentally loaded in production, force nomination is exposed to browser console | Confirm `import.meta.env.DEV` guard is active; never distribute DEV builds |
 
 ---
 
@@ -352,24 +308,22 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Showing "loading" state for full 3s before any text appears | User stresses during live auction nomination — 3s feels eternal when a pick costs $50 | Show last narration until new one replaces it; only show spinner on manual "Ask for advice" button |
-| Streaming partial narration tokens | Text reads awkwardly mid-sentence during live bid | Non-streaming generate() gives complete, grammatically correct text atomically |
-| Agent "thinking out loud" about tools (tool call reasoning exposed) | Confusing intermediate text like "I need to check the budget first..." | No tools on narrator means no intermediate reasoning visible |
-| Memory causing agent to reference prior picks incorrectly | "You passed on Soto earlier" when pick belongs to opponent | Stateless calls with full current state prevent stale cross-pick confusions |
+| Mobile shows "Connected" (to relay) but extension is disconnected | User taps Auto ON / Force Nominate with no effect; assumes extension is working | Implement EXTENSION_STATUS relay message; show distinct "Extension disconnected" banner |
+| Adding too many control buttons to mobile UI | Mobile screen is small; too many controls make fat-finger errors likely during a live draft | Group controls; keep the sticky footer to max 3–4 touch targets; put secondary controls behind a drawer |
+| Control feedback only through extension state changes (async) | User taps "Force Nominate", waits 5s for feedback; unclear if tap registered | Show immediate optimistic feedback on mobile ("Nominating...") then reconcile with next STATE_SNAPSHOT |
+| Nomination diagnostics only visible in extension sidebar | During fast auction, user can't alt-tab to check nomination state | The mobile companion should show last nomination attempt result in the STATE_SNAPSHOT relay |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Mastra installed:** Verify `@mastra/core` version is pinned; check `node --version >= 22.13.0`; verify imports use subpath style (`@mastra/core/agent`)
-- [ ] **Fastify integration:** Confirm auth hook registered before `server.init()`; confirm Mastra routes use non-default prefix; confirm CORS set via Fastify native (not Mastra config)
-- [ ] **Database:** Confirm Mastra storage uses `schema: 'mastra'`; run Mastra's schema init; verify no collision with Kysely migration state
-- [ ] **Agent definition:** Confirm `maxSteps` is explicitly set; confirm no tools on narrator agent; confirm model uses `@ai-sdk/openai` format
-- [ ] **Memory disabled:** Confirm no `threadId` or `resourceId` passed in narrator calls; confirm no memory adapter attached to narrator agent
-- [ ] **AbortController:** Confirm extension still uses raw `fetch()` with `signal`; confirm server-side request abort tested manually
-- [ ] **Cost baseline:** Measure token count per call before and after Mastra migration; confirm cost ≤ current baseline
-- [ ] **Session cap:** Confirm 120-call server-side enforcement still works through Mastra wrapper (it lives in rate limiter on route, not in agent)
-- [ ] **Node.js version:** Updated in Docker base image, `.nvmrc`, CI matrix, and `package.json` `engines` field
+- [ ] **Chrome DevTools MCP setup:** Confirm it connects to a non-default profile (`--user-data-dir=/tmp/espn-mcp-profile`); confirm Node version is `^20.19.0 || ^22.12.0+`; confirm ESPN draft page loads in the MCP-connected Chrome instance
+- [ ] **New CONTROL action added:** Confirm action is in the typed union; confirm `case` exists in content script switch; confirm mobile page sends exactly the same action string; confirm `default` case logs warning
+- [ ] **EXTENSION_STATUS message implemented:** Confirm mobile page shows disconnected state when extension tab is closed mid-draft; confirm control buttons are disabled when disconnected
+- [ ] **Nomination turn detection preserved:** Run `nominationDiag()` before and after any DOM observer changes; confirm `lastTurnDetectionResult.matched` is true when manually observing "Select" buttons in ESPN
+- [ ] **React input dispatch pattern:** Confirm any code interacting with ESPN inputs uses `InputEvent` with `data`/`inputType`, not plain `Event('input')`; confirm `focus()` is called before dispatch
+- [ ] **Polling not delays:** Confirm no new `setTimeout(fn, N)` calls were added that wait for ESPN DOM elements; all DOM-wait logic uses polling loops with max-timeout fallback
+- [ ] **`clearNominationState()` covers all fields:** Confirm any new nomination state field is reset in `clearNominationState()` and appears in `NominationDiagnostics` interface
 
 ---
 
@@ -377,42 +331,13 @@ Before adding Mastra, verify current Node.js version across: local dev, Docker i
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| maxSteps too low — tools silently ignored | LOW | Add `maxSteps` param; redeploy |
-| Route prefix collision breaks existing endpoints | MEDIUM | Change Mastra prefix; update extension `backendUrl` if path changed; redeploy |
-| PostgreSQL schema collision after Mastra upgrade | MEDIUM | Run `ALTER TABLE mastra.mastra_scorers ADD COLUMN IF NOT EXISTS ...` manually; pin Mastra version |
-| Memory growth caused draft-session latency spike | LOW | Remove `threadId` from narrator `generate()` call; no data lost (narrator has no state to preserve) |
-| Node.js version mismatch breaks production deploy | HIGH | Emergency Node 22 upgrade across all infrastructure; may require Docker base image update and full CI rebuild |
-| Cost explosion from accidental tool-calling loop | MEDIUM | Set `maxSteps: 1`; add per-session token budget enforcement via OpenAI's `max_tokens` (already set to 200) |
-| v1 import path errors post-upgrade | LOW | Run Mastra's automated codemods: `npx @mastra/codemod`; fix remaining manually |
-
----
-
-## Cost Estimation: Mastra Agent vs. Current Narrator
-
-All estimates use gpt-4.1-mini-2025-04-14 at $0.40/M input tokens, $1.60/M output tokens (OpenAI API, March 2026).
-
-**Current narrator (raw OpenAI SDK):**
-- Input: ~600 tokens/call (system prompt ~200 + payload ~400)
-- Output: ~150 tokens/call (120 words)
-- Per call: (600 × $0.40 + 150 × $1.60) / 1,000,000 = $0.000240 + $0.000240 = **$0.00048**
-- Per 120-call session: **~$0.058**
-
-**Mastra prompt-only agent (no tools, no memory) — target:**
-- Overhead: +50–100 tokens input for Mastra's internal prompt formatting
-- Per call: ~$0.00053 (+10% vs. current)
-- Per 120-call session: **~$0.064** (acceptable)
-
-**Mastra with 2 tools, maxSteps: 4 — worst case:**
-- Tool schemas add ~300 input tokens; tool results add ~400 tokens; second LLM call adds another full-context call
-- Effective: 3 LLM calls × ~1,500 tokens input + ~150 tokens output = $0.0018 per narration
-- Per 120-call session: **~$0.22** (3.8× current cost)
-
-**Mastra with observationalMemory enabled:**
-- Adds Gemini 2.5 Flash calls for compression (uncontrolled frequency)
-- Estimated +$0.001–0.003 per compression cycle (unknown frequency)
-- Not recommended for narrator use case
-
-**Recommendation:** Mastra prompt-only is cost-neutral. Mastra with tools is a cost regression. Do not enable tools on the narrator agent.
+| ESPN React input dispatch broken | LOW | Add `focus()` + switch to `InputEvent`; the pattern is documented in quick task 86 |
+| Fixed delay causing nomination miss | LOW | Replace with `pollForQueueButton` pattern from quick task 89 |
+| New CONTROL action silently dropped | LOW | Add case to content script switch + action to typed union |
+| Extension disconnected but mobile shows connected | LOW | Implement EXTENSION_STATUS message; state is already tracked in `extensionSocket` ref |
+| Chrome DevTools MCP won't connect | LOW | Verify separate Chrome profile + Node version; try `npx chrome-devtools-mcp@latest --isolated` to confirm it launches |
+| Nomination turn detection broken by DOM change | MEDIUM | Use `window.espnDraftAssistant.nominationDiag()` to see which strategies are being checked; capture DOM state with DevTools MCP; add failing strategy back or update selector |
+| State machine desync mid-draft | MEDIUM | `autoBidController.stop()` then `.start()` resets all state; same as page reload effect; user loses nomination attempt count but cooldowns clear |
 
 ---
 
@@ -420,39 +345,33 @@ All estimates use gpt-4.1-mini-2025-04-14 at $0.40/M input tokens, $1.60/M outpu
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| maxSteps default silently disables tools | Mastra integration bootstrap | Integration test: register a dummy tool, confirm it is never called (tools should not be on narrator) |
-| Fastify route prefix collision | Mastra integration bootstrap | `GET /api/draft/narrate` and `GET /api/mastra/agents` both return 200 with no interference |
-| PostgreSQL schema collision | Pre-integration infrastructure | `\dn` in psql shows `mastra` schema; `\dt mastra.*` shows Mastra tables; `\dt public.*` shows no Mastra tables |
-| Memory growth / thread accumulation | Mastra agent design | 120 calls in a test session: final call latency ≤ first call latency ± 20% |
-| SSE streaming breaks in Chrome MV3 | Extension integration | Narrator works after background service worker is killed and restarted mid-session |
-| Tools multiply LLM calls | Mastra agent design | Confirm `onStepFinish` fires exactly once per narrate call; token usage per call ≤ 800 |
-| v1 import path breaking changes | Version pinning | CI: `tsc --noEmit` passes; no `@mastra/core` top-level imports in codebase |
-| AbortController not propagated | Extension integration | Trigger two narrations within 500ms; confirm only one completes (log on server side) |
-| Node.js version mismatch | Pre-integration infrastructure | `node --version` in CI, Docker, and production all show ≥22.13.0 |
+| ESPN React input dispatch | Auto-nomination rework | `grep -n "new InputEvent\|new Event.*input"` confirms InputEvent is used; no plain `Event('input')` |
+| Fixed delays for DOM readiness | Auto-nomination rework | `grep -n "setTimeout.*[0-9][0-9][0-9][0-9]"` in auto-bid-controller; each match is either pacing (justified) or a polling loop entry point |
+| Nomination state machine gaps | Auto-nomination rework | All fields in `clearNominationState()` match all fields in `NominationDiagnostics`; review both side-by-side |
+| DevTools MCP profile isolation | Chrome DevTools MCP setup | `chrome://version` in MCP-connected Chrome shows non-default profile path |
+| Node version enforcement | Chrome DevTools MCP setup | `node -v` shows `^20.19.0 || ^22.12.0+`; document in project dev notes |
+| Missing CONTROL action handler | Mobile companion expansion | TypeScript: `action` typed as union; switch has default warn case; integration test sends each action and checks store state |
+| Extension status not relayed | Mobile companion expansion | Close extension tab mid-session; mobile shows "Extension disconnected" banner within 2 seconds |
+| Turn detection broken by rework | Any nomination-touching phase | `window.espnDraftAssistant.nominationDiag().lastTurnDetectionResult.matched` is `true` when "Select" buttons visible in live draft |
 
 ---
 
 ## Sources
 
-- [Mastra Agent Memory Documentation](https://mastra.ai/docs/agents/agent-memory) — thread/resource ownership, lastMessages, storage requirements. Confidence: HIGH.
-- [Mastra Memory Overview](https://mastra.ai/docs/memory/overview) — storage backend requirements, auto-table creation. Confidence: HIGH.
-- [Mastra Observational Memory](https://mastra.ai/docs/memory/observational-memory) — compression triggers (30K tokens), default model (Gemini 2.5 Flash), async vs. sync behavior. Confidence: HIGH.
-- [Mastra Working Memory](https://mastra.ai/docs/memory/working-memory) — scope exclusivity pitfall, storage adapter requirements. Confidence: HIGH.
-- [Mastra Server Adapters Documentation](https://mastra.ai/docs/server/server-adapters) — middleware ordering, prefix configuration, CORS behavior in adapters. Confidence: HIGH.
-- [Mastra v1 Migration Guide](https://mastra.ai/guides/migrations/upgrade-to-v1/overview) — import subpath changes, createTool signature, Node 22 requirement, DB migration requirement. Confidence: HIGH.
-- [Mastra Streaming Migration Guide](https://mastra.ai/blog/migration-guide-streaming) — stream/streamLegacy rename, AI SDK v5 type changes, modelSettings restructure. Confidence: HIGH.
-- [Mastra Agent Orchestration Blog](https://mastra.ai/blog/announcing-mastra-improved-agent-orchestration-ai-sdk-v5-support) — maxSteps control, Mastra now owns the agent loop (not AI SDK). Confidence: HIGH.
-- [Mastra Server Adapter Announcement](https://mastra.ai/blog/mastra-server-adapters) — Fastify/Express adapter integration pattern. Confidence: HIGH.
-- [GitHub Issue #5673: Abort stream not working](https://github.com/mastra-ai/mastra/issues/5673) — AbortController bug in Mastra client SDK v0.10.9, fixed in PR #5686. Confidence: HIGH.
-- [GitHub Issue #11789: Missing migration for new columns](https://github.com/mastra-ai/mastra/issues/11789) — PostgreSQL schema drift on Mastra upgrade, requestContext column missing. Confidence: HIGH.
-- [GitHub Issue #2930: maxSteps docs unclear](https://github.com/mastra-ai/mastra/issues/2930) — confirms maxSteps default of 1, docs gap acknowledged. Confidence: HIGH.
-- [GitHub Issue #11856: Thread and resource isolation](https://github.com/mastra-ai/mastra/issues/11856) — threadId isolation gap in listMessages API. Confidence: HIGH.
-- [Mastra Latency Optimization Blog](https://mastra.ai/blog/building-fast-reliable-input-processors) — sub-500ms achievable with prompt surgery, schema optimization. Confidence: HIGH.
-- [GPT-4.1 mini Performance Analysis](https://artificialanalysis.ai/models/gpt-4-1-mini) — TTFT 0.47–0.77s, 62–79 t/s output speed, ~3–4s for 200 token completion. Confidence: MEDIUM (measured benchmarks, not real-time SLAs).
-- [Mastra Changelog 2026-01-20](https://mastra.ai/blog/changelog-2026-01-20) — v1 release details, adapter packages for Express/Fastify/Hono/Koa. Confidence: HIGH.
-- [Dynamic Agents: Runtime Context in Mastra](https://mastra.ai/blog/dynamic-agents) — context injection pattern, per-request isolation requirements. Confidence: HIGH.
+- Project quick task history (tasks 60, 79, 80, 85–90) — direct regression evidence from nomination iteration chain. Confidence: HIGH (first-party).
+- `packages/extension/lib/auto-bid-controller.ts` — current implementation, nomination state machine, polling patterns. Confidence: HIGH (first-party).
+- `packages/extension/lib/dom-observers.ts` — current selector approach, fallback chains. Confidence: HIGH (first-party).
+- `packages/backend/src/api/draft-live.ts` — WebSocket relay, extension socket guard. Confidence: HIGH (first-party).
+- `packages/frontend/src/app/draft/live/` — mobile page, current 3 control messages, `useDraftLiveSocket`. Confidence: HIGH (first-party).
+- [Chrome DevTools MCP GitHub repository](https://github.com/ChromeDevTools/chrome-devtools-mcp) — Node version enforcement, profile requirements, `--autoConnect` needing Chrome 144+, sequential mutex execution. Confidence: HIGH (official).
+- [Chrome DevTools MCP blog post](https://developer.chrome.com/blog/chrome-devtools-mcp) — Chrome 136 default profile debugging restriction, telemetry defaults. Confidence: HIGH (official Google).
+- [DeepWiki: chrome-devtools-mcp getting started](https://deepwiki.com/ChromeDevTools/chrome-devtools-mcp/2-getting-started) — concurrent instance collision, `--isolated` flag, conflicting flag validation. Confidence: MEDIUM (derived from source code analysis).
+- Quick task 86 summary — React input dispatch pattern (`InputEvent` vs `Event`), `nativeInputValueSetter`. Confidence: HIGH (first-party, battle-tested).
+- Quick task 89 summary — polling loop pattern replacing fixed delays. Confidence: HIGH (first-party).
+- Quick task 80 plan — `button.Button--select` and `button.bid-player__button` as stable ESPN class names (verified against live ESPN DOM during quick task execution). Confidence: MEDIUM (ESPN may change at any time).
+- Quick task 90 summary — `button.action-btn` as preferred selector prefix for Queue/Select/Dequeue buttons. Confidence: MEDIUM.
 
 ---
 
-*Pitfalls research for: Adding Mastra AI agent to ESPN Fantasy Baseball Draft Assistant (Fastify backend + Chrome extension)*
-*Researched: 2026-03-05*
+*Pitfalls research for: Chrome DevTools MCP setup + auto-nomination rework + mobile draft companion expansion*
+*Researched: 2026-03-14*

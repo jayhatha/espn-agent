@@ -1,615 +1,573 @@
-# Architecture Patterns: Mastra AI Agent Integration
+# Architecture Research: Chrome DevTools MCP, Auto-Nomination Rework, Mobile Command Center
 
-**Domain:** AI agent framework integration with existing Fastify + Chrome extension
-**Researched:** 2026-03-05
-**Confidence:** HIGH (core patterns) / MEDIUM (streaming specifics — SSE event format varies)
+**Domain:** Chrome extension + Fastify backend integration — DOM inspection tooling, auction automation, mobile remote control
+**Researched:** 2026-03-14
+**Confidence:** HIGH (existing system fully read) / MEDIUM (Chrome DevTools Protocol integration — see notes)
 
 ---
 
 ## Executive Summary
 
-This document covers how Mastra integrates with the existing ESPN Fantasy Baseball backend and Chrome extension. The key architectural insight is that Mastra's `Agent` class from `@mastra/core` is framework-agnostic — you instantiate it like a service class and call `agent.stream()` or `agent.generate()` from any HTTP framework. The `@mastra/fastify` adapter is a convenience wrapper that auto-registers Mastra's built-in REST endpoints, but it requires Fastify v5 (the existing app uses Fastify v4), making direct integration the right path.
+This document answers the question: "How do Chrome DevTools MCP, reworked auto-nomination, and full-control mobile integrate with the existing extension/backend/frontend architecture?" It maps every integration point, identifies new vs. modified files, and specifies a build order that respects the existing dependency graph.
 
-**Integration strategy: Use `@mastra/core` Agent class directly inside existing Fastify v4 routes.** Replace `DraftNarratorAgent` (which manually calls OpenAI) with a Mastra `Agent` that has tools, memory, and streaming support. The existing `POST /api/draft/narrate` route becomes the integration point — it calls `mastraAgent.stream()` and pipes chunks to the response.
+The existing system has three layers communicating in a defined topology:
 
----
+1. **Chrome extension (content script + background SW):** Scrapes ESPN DOM via MutationObserver and polling intervals. Drives `useDraftStore` (Zustand). Relays state to backend via WebSocket (`chrome.storage.local` change → background SW → `ws://localhost:3001/draft/live?role=extension`).
+2. **Fastify WS hub (`draft-live.ts`):** Single-server multiplexer. One `extensionSocket`, N `mobileClients`. Fans extension `STATE_SNAPSHOT` out to all mobile clients. Routes mobile `CONTROL` messages back to extension socket.
+3. **Next.js mobile page (`/draft/live`):** Connects to hub as `?role=mobile`. Displays read-only draft state. Sends `CONTROL` messages back via the same socket. No direct DOM access.
 
-## Critical Constraint: Fastify v4 vs @mastra/fastify
-
-The `@mastra/fastify` adapter package specifies peer dependency `fastify: "^5.0.0"` (confirmed via npm). The existing backend uses Fastify v4. Fastify v5 has breaking changes (schema validation requirements, logger API, redirect arg order, decorator restrictions) that would require systematic updates across all 12 route files.
-
-**Decision: Do not use `@mastra/fastify` adapter. Use `@mastra/core` directly.**
-
-The `Agent` class from `@mastra/core/agent` has no dependency on Fastify. You can call `agent.stream()` from a Fastify v4 route handler the same way you call any async function. The adapter only adds value for auto-generated REST endpoints that expose agents to external callers — not needed here since we control the route contract.
+All three new features slot into this topology without requiring structural changes to the WS hub or the state relay path. The hub is a dumb bus — it does not need to understand the new message types.
 
 ---
 
-## Architecture Overview
+## Current Architecture (Baseline)
 
-### Current Flow (No Streaming, No Memory, No Tools)
-
-```
-Chrome Extension
-  useNarrator hook fires trigger
-    ↓
-  POST /api/draft/narrate
-  body: NarratorPayload (structured signals)
-    ↓
-  Fastify route handler
-    ↓
-  DraftNarratorAgent.narrate(payload)
-    → Manually builds prompt string
-    → Calls OpenAI chat.completions.create (non-streaming)
-    → Returns { narration: string }
-    ↓
-  Extension receives JSON, calls setNarration(data.narration)
-  UI shows full text instantly
-```
-
-### Target Flow (Mastra Agent with Streaming + Tools + Memory)
+### System Overview
 
 ```
-Chrome Extension
-  useNarrator hook fires trigger
-    ↓
-  POST /api/draft/narrate (MODIFIED: accepts SSE response)
-  body: NarratorPayload
-    ↓
-  Fastify route handler
-    → Sets Content-Type: text/event-stream
-    → reply.raw.writeHead(200, SSE headers)
-    → Builds message array from NarratorPayload
-    ↓
-  mastraAgent.stream(messages, { memory: { resource, thread } })
-    → Agent decides to call tools if needed:
-        getPlayerProjection(playerName)    ← looks up FanGraphs data
-        getAuctionComps(playerName)        ← gets market comparables
-    → LLM streams token chunks
-    ↓
-  for await (const chunk of stream.textStream)
-    → reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`)
-    ↓
-  on finish: reply.raw.write("data: [DONE]\n\n") + reply.raw.end()
+ESPN Draft Page (browser tab)
+  ├── content.tsx (content script, injected into ESPN page)
+  │   ├── dom-observers.ts        — MutationObserver + polling scrapes ESPN DOM
+  │   ├── draft-config-detector.ts — Detects league config from DOM
+  │   ├── auto-bid-controller.ts  — Zustand subscriber; clicks bid/nominate buttons
+  │   └── DraftSidebar (React, Shadow DOM)
+  │       └── engine/ (pure functions: inflation, scarcity, simulation, etc.)
+  │
+  └── background.ts (service worker)
+      ├── WS client → ws://localhost:3001/draft/live?role=extension
+      ├── chrome.storage.local.onChanged → sends STATE_SNAPSHOT messages
+      └── Receives CONTROL messages → chrome.tabs.sendMessage → content script
 
-Chrome Extension
-  useNarrator receives SSE stream
-    → Processes tokens as they arrive
-    → setNarration accumulates partial text
-    → UI shows text as it streams
+Fastify backend (localhost:3001)
+  └── draft-live.ts (WebSocket route)
+      ├── extensionSocket: WebSocket | null   — one extension at a time
+      ├── mobileClients: Set<WebSocket>        — N mobile clients
+      ├── latestSnapshot: string | null        — cached for reconnects
+      └── Fan out: STATE_SNAPSHOT → all mobile clients
+          Route back: CONTROL → extensionSocket
+
+Next.js frontend (localhost:3000)
+  └── /draft/live page
+      ├── useDraftLiveSocket(wsUrl)  — WS consumer
+      └── sendControl(action, payload) → CONTROL message to hub
 ```
+
+### State Relay Flow
+
+```
+Zustand store mutation (engine compute, bid detected, pick scraped)
+  ↓
+content.tsx: chrome.storage.local.set({ 'draft-mobile-state': ..., 'draft-engine-signals': ... })
+  ↓
+background.ts: storage.onChanged fires → WS send STATE_SNAPSHOT { payload, engineSignals, ts }
+  ↓
+draft-live.ts hub: caches latestSnapshot, fans out to all mobile clients
+  ↓
+useDraftLiveSocket: setState(msg.payload), setEngineSignals(msg.engineSignals)
+  ↓
+Mobile page renders current nomination, win probability, budget, roster, alerts
+```
+
+### CONTROL Flow (Mobile → Extension)
+
+```
+Mobile user taps "Auto ON" / position filter / split slider
+  ↓
+sendControl("SET_AUTO_MODE", true) → WS CONTROL message to hub
+  ↓
+draft-live.ts hub: extensionSocket.send(raw)
+  ↓
+background.ts: receives CONTROL → chrome.tabs.sendMessage(tab.id, msg)
+  ↓
+content.tsx: onMessage listener → store.setAutoMode(true) etc.
+```
+
+### Existing CONTROL Actions
+
+| Action | Handler in content.tsx |
+|--------|------------------------|
+| `SET_AUTO_MODE` | `store.setAutoMode(payload)` |
+| `SET_POSITION_FILTER` | `store.setPositionFilter(payload)` |
+| `TOGGLE_SIDEBAR` | `store.toggleSidebar()` |
+| `SET_PITCHER_HITTER_SPLIT` | `store.setPitcherHitterSplit(payload)` |
 
 ---
 
-## Component Map: New vs Modified
+## Feature 1: Chrome DevTools MCP Server
 
-### New Files
+### What It Does
+
+Exposes ESPN page DOM structure to an MCP client (Claude, Cursor, etc.) as tools. Allows inspection of live DOM selectors without opening DevTools manually. Primary use case: debugging and validating DOM selectors that `dom-observers.ts` and `auto-bid-controller.ts` depend on.
+
+### Integration Point
+
+Chrome DevTools Protocol (CDP) is accessible from Node.js via the `chrome-remote-interface` or `puppeteer/playwright` CDP client. In a local dev context, Chrome must be launched with `--remote-debugging-port=9222`. The MCP server exposes CDP primitives as MCP tools callable from Claude Code.
+
+The MCP server is a **standalone Node.js process** — not part of the Fastify backend. It runs on a different port and has no runtime coupling to the extension or Fastify. Its sole job is: accept MCP tool calls → invoke CDP → return DOM data.
+
+### Component Map
+
+#### New Files
 
 | File | Purpose |
 |------|---------|
-| `packages/backend/src/mastra/index.ts` | Mastra instance (agent registry, memory config) |
-| `packages/backend/src/mastra/agents/draft-narrator-agent.ts` | Mastra Agent definition with tools |
-| `packages/backend/src/mastra/tools/player-projection-tool.ts` | Tool: look up FanGraphs projection for player |
-| `packages/backend/src/mastra/tools/auction-comp-tool.ts` | Tool: get market comps for player at current inflation |
-| `packages/backend/src/mastra/tools/draft-state-tool.ts` | Tool: query backend DB for current roster state |
+| `tools/espn-devtools-mcp/index.ts` | MCP server entry point — registers tools, starts stdio or HTTP transport |
+| `tools/espn-devtools-mcp/cdp-client.ts` | CDP connection management — connect to Chrome on port 9222, reconnect on drop |
+| `tools/espn-devtools-mcp/tools/query-selector.ts` | MCP tool: `querySelector(selector)` → returns matching element count + outer HTML |
+| `tools/espn-devtools-mcp/tools/get-dom-tree.ts` | MCP tool: `getDOMTree(depth?)` → returns simplified DOM tree JSON |
+| `tools/espn-devtools-mcp/tools/evaluate-expression.ts` | MCP tool: `evaluateExpression(expr)` → evaluates JS in page context, returns result |
+| `tools/espn-devtools-mcp/tools/get-auction-selectors.ts` | MCP tool: `getAuctionSelectors()` → runs known selector battery, reports which matched |
+| `tools/espn-devtools-mcp/package.json` | Standalone package — not part of existing monorepo packages |
 
-### Modified Files
+#### No-Change Files
 
-| File | Change | Why |
-|------|--------|-----|
-| `packages/backend/src/api/draft.ts` | Replace `DraftNarratorAgent` call with `mastraAgent.stream()`, add SSE headers to `/api/draft/narrate` | Replace non-streaming JSON with streaming SSE |
-| `packages/extension/lib/use-narrator.ts` | Change `response.json()` to SSE stream reader | Consume streaming response instead of full JSON |
-| `packages/backend/package.json` | Add `@mastra/core`, `@mastra/memory`, `@mastra/pg` | New deps |
+The MCP server does not touch:
+- `packages/extension/` — no modification to DOM observers or auto-bid controller
+- `packages/backend/` — no modification to Fastify routes
+- `packages/frontend/` — no modification to mobile page
 
-### No-Change Files
+### Data Flow
 
-| File | Why untouched |
+```
+Claude Code / Cursor (MCP client)
+  ↓ MCP tool call: querySelector(".pick-train")
+  ↓
+tools/espn-devtools-mcp/index.ts (MCP server, stdio transport)
+  ↓
+cdp-client.ts: Runtime.evaluate({ expression: "document.querySelectorAll(...).length" })
+  ↓
+Chrome browser (ESPN draft tab, port 9222)
+  ↓ returns count, outerHTML sample
+  ↓
+MCP server → tool response to Claude
+```
+
+### Key Constraint: Chrome Must Run with Remote Debugging Enabled
+
+Chrome must be launched with `--remote-debugging-port=9222` for CDP to work. Normal Chrome does not allow external CDP connections. In local dev, this means using a separate Chrome profile launched from the command line. This is a setup prerequisite, not an architectural constraint on the codebase.
+
+Confidence: MEDIUM — CDP target discovery (`/json/list` endpoint) and `Runtime.evaluate` are stable and well-documented APIs. The MCP tool wrapping pattern is straightforward. The risk is that ESPN's draft page may use iframe sandboxing that requires targeting a specific CDP frame — this needs validation against the live ESPN draft page.
+
+### Build Order for Feature 1
+
+1. Install `chrome-remote-interface` (or `@modelcontextprotocol/sdk`) in `tools/espn-devtools-mcp/`
+2. Implement `cdp-client.ts` — connect to localhost:9222, list targets, select ESPN draft tab
+3. Implement `query-selector` tool — simplest CDP call
+4. Implement `get-auction-selectors` tool — runs the full selector battery from `dom-observers.ts` and reports matches
+5. Test against live ESPN draft page
+6. Implement `evaluate-expression` last (higher security surface area)
+
+---
+
+## Feature 2: Auto-Nomination Rework
+
+### Current State
+
+`AutoBidController.populateQueue()` uses `findActionButton(playerId)` which queries `button.action-btn[data-player-id="${playerId}"]` — a selector that assumes ESPN attaches `data-player-id` to queue buttons. `isMyTurnToNominate()` uses five fallback strategies, several of which match on unstable text content (`"nominate a player"`) or broad structural patterns. `scrapeESPNNominationQueue()` detects queued players by button text containing "dequeue" / "deselect" / "remove" — also fragile against ESPN renaming.
+
+The core problem: selectors are guesses that have never been validated against the live 2026 ESPN auction draft DOM. The MCP DevTools server (Feature 1) is the primary tool for fixing this.
+
+### What Changes
+
+The rework is **inside existing files only**. No new files are created. The architectural pattern (DOM scraping → Zustand store → AutoBidController action) does not change.
+
+#### Modified Files
+
+| File | What Changes |
 |------|--------------|
-| `packages/backend/src/agents/draft-narrator.ts` | Deprecated by Mastra agent — keep for reference, delete when stable |
-| `packages/backend/src/index.ts` | Server setup unchanged — no adapter needed |
-| `packages/extension/lib/engine/` | All deterministic engine logic unchanged |
-| `packages/shared/src/` | NarratorPayload type stays as-is |
+| `packages/extension/lib/dom-observers.ts` | Replace speculative selectors with validated selectors from MCP inspection. Update `scrapeESPNNominationQueue()`, `observeCurrentAuctionPlayer()`, `scrapeESPNAuctionTable()`, and pick-train scraping. |
+| `packages/extension/lib/auto-bid-controller.ts` | Update `isMyTurnToNominate()` strategy priority based on what actually works. Potentially replace Strategy 1 (body text match) with a more reliable DOM signal. Update `findActionButton()` if `data-player-id` is not present in the live DOM. |
+| `packages/extension/lib/draft-config-detector.ts` | Update position tracker and budget scraping selectors as needed. |
+
+#### No-Change Files
+
+- `packages/extension/entrypoints/content.tsx` — orchestration logic unchanged
+- `packages/extension/entrypoints/background.ts` — WS relay unchanged
+- `packages/backend/` — no changes
+- `packages/frontend/` — no changes
+
+### Key Pattern: Selector Validation Protocol
+
+The rework requires a specific workflow rather than code changes alone:
+
+```
+1. Use Feature 1 (MCP DevTools) to inspect live ESPN draft DOM
+   → getAuctionSelectors() reports which selectors match
+   → querySelector(".pick-train") returns outer HTML sample
+   → evaluateExpression("...") extracts exact class names
+
+2. Update dom-observers.ts with validated selectors
+   → Replace all "speculative" selectors with confirmed matches
+   → Add selector version comment with date
+
+3. Update auto-bid-controller.ts isMyTurnToNominate() strategy order
+   → Strategy that reliably matches moves to position 1
+   → Unreliable strategies demoted or removed
+
+4. Live test during actual draft
+   → NominationDiagnostics panel (already built in phase 33) shows which strategy matched
+   → Force Nominate button allows real-time validation
+```
+
+### Nomination Flow Architecture (Post-Rework)
+
+The flow remains the same — only selector reliability changes:
+
+```
+AutoBidController.evaluateAndNominate()
+  ├── isMyTurnToNominate()  ← USES VALIDATED SELECTORS
+  │   └── Returns true when confident it's our turn
+  ├── Select candidate from nominationStrategy or idealRoster
+  ├── findActionButton(playerId)  ← USES VALIDATED SELECTORS
+  │   └── May fall through to searchAndQueue()
+  └── button.click()
+```
+
+### Queue Population Flow (Post-Rework)
+
+```
+AutoBidController.populateQueue()  [called on 15s interval + every updateSignals()]
+  ├── scrapeESPNNominationQueue()   ← USES VALIDATED SELECTORS
+  │   └── Detects which players are already queued by button state
+  ├── Build candidate list from nominationStrategy + idealRoster
+  ├── findActionButton(playerId) or searchAndQueue()
+  └── button.click() to add to queue
+```
 
 ---
 
-## Folder Structure
+## Feature 3: Mobile Draft Command Center Redesign
 
-Mastra agent definitions live inside the existing backend package, not a separate package:
+### Current State
+
+The mobile page (`/draft/live`) is a **read-mostly** experience. The only controls are:
+- Auto-bid toggle (on/off)
+- Position filter (dropdown)
+- Pitcher/hitter split (slider)
+
+There is no way to force a nomination, view top targets interactively, or override the engine recommendation from mobile. The page layout is a vertical stack of SectionCard components with no navigation.
+
+### What Changes
+
+The redesign adds new CONTROL message types and new UI sections to the mobile page. The WS hub is a transparent bus — it does not need to understand the new message types. The backend does not change.
+
+#### New CONTROL Actions
+
+The mobile page sends these new `CONTROL` messages. The extension content script handles them:
+
+| New Action | Payload | Handler Change Required |
+|------------|---------|------------------------|
+| `FORCE_NOMINATE` | none | content.tsx: `autoBidController.forceNominate()` |
+| `SKIP_PLAYER` | `{ playerName: string }` | content.tsx: marks player as skipped in store → engine re-ranks |
+| `SET_BUDGET_OVERRIDE` | `{ amount: number }` | content.tsx: `store.setRemainingBudget(payload)` (already exists) |
+| `NAVIGATE_TAB` | `{ tab: "targets" \| "roster" \| "alerts" \| "controls" }` | Mobile-only: changes active tab in mobile UI, no extension handler needed |
+
+#### Modified Files
+
+| File | What Changes | Why |
+|------|--------------|-----|
+| `packages/frontend/src/app/draft/live/page.tsx` | Redesign from vertical stack to tabbed layout. Add Targets tab, Controls tab. Add Force Nominate button. Add skip player buttons next to target list items. | Full-control command center requires navigation and richer interactions |
+| `packages/frontend/src/app/draft/live/useDraftLiveSocket.ts` | Add types for new CONTROL actions. Add `NAVIGATE_TAB` handler (local state only). | New actions need type coverage |
+| `packages/extension/entrypoints/content.tsx` | Add `case "FORCE_NOMINATE"` and `case "SKIP_PLAYER"` to the CONTROL message switch. | Extension needs to handle new commands |
+| `packages/extension/lib/draft-state.ts` | Add `skippedPlayerIds: Set<number>` to store (or array for serialization). | Skip state must persist in the engine evaluation loop |
+| `packages/extension/lib/engine/nomination-strategy.ts` | Filter out `skippedPlayerIds` from nomination candidates. | Skip signal must propagate to engine output |
+
+#### No-Change Files
+
+- `packages/backend/src/api/draft-live.ts` — hub is transparent, no changes
+- `packages/extension/entrypoints/background.ts` — CONTROL routing unchanged
+- All engine files except `nomination-strategy.ts`
+
+### New Mobile Page Layout
 
 ```
-packages/backend/src/
-  mastra/
-    index.ts                        ← Mastra instance, registers agents
-    agents/
-      draft-narrator-agent.ts       ← Agent definition with tools + memory
-    tools/
-      player-projection-tool.ts     ← createTool() for FanGraphs lookups
-      auction-comp-tool.ts          ← createTool() for market comps
-      draft-state-tool.ts           ← createTool() for DB queries
-  api/
-    draft.ts                        ← MODIFIED: uses mastraAgent.stream()
-  agents/
-    draft-narrator.ts               ← OLD: kept temporarily, delete later
+Mobile Command Center (/draft/live)
+  ├── Header (sticky)
+  │   ├── Title + Connection dot
+  │   └── Tab nav: [Live] [Targets] [Roster] [Controls]
+  │
+  ├── [Live tab] — Current nomination card
+  │   ├── Player name, positions, nominating team
+  │   ├── Current bid + Max bid verdict (BID/PASS in large text)
+  │   ├── Value surplus + expected market price
+  │   └── Win probability + decision comparison
+  │
+  ├── [Targets tab] — Top player targets
+  │   ├── List of engine topTargets (from RosterOptimizationSignal)
+  │   ├── Each row: player name, position, max bid, [Skip] button
+  │   └── [Force Nominate top target] button (only when auto mode is ON)
+  │
+  ├── [Roster tab] — My drafted roster
+  │   ├── Roster table with positions and cost
+  │   ├── Budget breakdown: remaining / spent / slots left
+  │   └── Category progress bars (from categoryProgress if available)
+  │
+  └── [Controls tab] — Draft controls
+      ├── Auto-bid toggle (large button)
+      ├── Position filter
+      ├── Pitcher/Hitter split slider
+      ├── Budget override input
+      └── Force Nominate button (bypasses cooldown/attempts)
 ```
 
-This colocation approach avoids monorepo compilation issues. Mastra docs confirm workspace packages with uncompiled TypeScript cause `ERR_UNKNOWN_FILE_EXTENSION` errors. Co-locating within the existing compiled package eliminates this.
+### Data Flow for New Commands
+
+```
+Mobile user taps [Force Nominate] in Controls tab
+  ↓
+sendControl("FORCE_NOMINATE", undefined)
+  ↓ WS CONTROL message
+draft-live.ts hub: extensionSocket.send(raw)  [no change to hub]
+  ↓
+background.ts: receives CONTROL → chrome.tabs.sendMessage(tab.id, msg)  [no change to SW]
+  ↓
+content.tsx: case "FORCE_NOMINATE": autoBidController.forceNominate()
+  ↓
+AutoBidController.forceNominate(): resets cooldown/attempts, calls evaluateAndNominate()
+  ↓
+ESPN DOM: button.click() on nominate button
+```
+
+```
+Mobile user taps [Skip] next to "Juan Soto" in Targets tab
+  ↓
+sendControl("SKIP_PLAYER", { playerName: "Juan Soto" })
+  ↓ WS CONTROL message
+hub → background SW → content.tsx
+  ↓
+content.tsx: case "SKIP_PLAYER": store.addSkippedPlayer(payload.playerName)
+  ↓
+draft-state.ts: skippedPlayerIds updated
+  ↓
+engine/nomination-strategy.ts: filters out skipped players from candidates
+  ↓
+Next useDraftEngine() compute: nomination strategy no longer shows Juan Soto
+  ↓
+STATE_SNAPSHOT sent back to mobile: topTargets list updated (Juan Soto absent)
+```
 
 ---
 
-## Component Definitions
+## Component Boundaries Summary
 
-### Mastra Instance (`packages/backend/src/mastra/index.ts`)
+### New Components
 
+| Component | Package | Type | Responsibility |
+|-----------|---------|------|----------------|
+| `tools/espn-devtools-mcp/` | New standalone package | Node.js MCP server | CDP-based ESPN DOM inspection |
+| `tools/espn-devtools-mcp/cdp-client.ts` | New | Module | CDP connection, target discovery |
+| `tools/espn-devtools-mcp/tools/*.ts` | New | MCP tools | DOM query, eval, selector battery |
+
+### Modified Components
+
+| Component | Package | Change Type | Change Scope |
+|-----------|---------|-------------|--------------|
+| `packages/extension/lib/dom-observers.ts` | Extension | Selector update | Replace speculative selectors with validated ones — no API change |
+| `packages/extension/lib/auto-bid-controller.ts` | Extension | Strategy update | Reorder/replace `isMyTurnToNominate()` strategies — no API change |
+| `packages/extension/entrypoints/content.tsx` | Extension | New CONTROL handlers | Add 2 new switch cases |
+| `packages/extension/lib/draft-state.ts` | Extension | New state field | `skippedPlayerIds` set |
+| `packages/extension/lib/engine/nomination-strategy.ts` | Extension | Filter | Skip skipped players |
+| `packages/frontend/src/app/draft/live/page.tsx` | Frontend | Full redesign | Tabbed layout, new command buttons |
+| `packages/frontend/src/app/draft/live/useDraftLiveSocket.ts` | Frontend | Type additions | New CONTROL action types |
+
+### Unchanged Components
+
+| Component | Why Untouched |
+|-----------|---------------|
+| `packages/backend/src/api/draft-live.ts` | Hub is a transparent bus — does not interpret CONTROL or STATE_SNAPSHOT payload content |
+| `packages/extension/entrypoints/background.ts` | WS relay logic is generic — forwards any JSON message |
+| `packages/extension/lib/engine/` (except nomination-strategy.ts) | Engine is deterministic — skip list is an input filter, not an engine change |
+| `packages/backend/src/api/` (all other routes) | No new backend API surface |
+| `packages/shared/src/` | No shared type changes required |
+
+---
+
+## Data Flow Map (All Three Features)
+
+```
+MCP Client (Claude Code)
+  ↓ MCP tool call
+tools/espn-devtools-mcp/        [NEW: Feature 1]
+  ↓ Chrome DevTools Protocol
+Chrome tab (ESPN draft page)
+  ↓ DOM inspection results
+MCP Client receives validated selectors
+  ↓
+Developer updates dom-observers.ts  [MODIFIED: Feature 2]
+  ↓
+Auto-bid-controller.ts uses validated selectors  [MODIFIED: Feature 2]
+  ↓
+ESPN DOM: reliable click on correct button
+
+
+Mobile user (phone, /draft/live)
+  ↓ tap Force Nominate / Skip Player
+useDraftLiveSocket.sendControl()   [MODIFIED: Feature 3]
+  ↓ WS CONTROL
+draft-live.ts hub                   [UNCHANGED]
+  ↓
+background.ts SW                    [UNCHANGED]
+  ↓ chrome.tabs.sendMessage
+content.tsx CONTROL handler         [MODIFIED: Feature 3]
+  ↓
+autoBidController or store action   [MODIFIED: Feature 3]
+  ↓ state change + engine recompute
+chrome.storage.local.set
+  ↓
+background.ts: STATE_SNAPSHOT       [UNCHANGED]
+  ↓
+hub → mobile clients                [UNCHANGED]
+  ↓
+Mobile page shows updated state     [MODIFIED: Feature 3]
+```
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: Hub as Transparent Bus
+
+**What:** The Fastify WS hub (`draft-live.ts`) forwards messages byte-for-byte without parsing payload content beyond the `type` field (for PING/PONG). All business logic lives in the extension (content script) and the mobile client.
+
+**When to use:** For all new CONTROL actions and any new STATE_SNAPSHOT fields. Never add payload-specific logic to the hub.
+
+**Trade-off:** The hub cannot validate, rate-limit, or transform messages. For a local dev tool this is acceptable. For production, a validation layer would be needed.
+
+**Example:**
 ```typescript
-import { Mastra } from "@mastra/core";
-import { Memory } from "@mastra/memory";
-import { PostgresStore } from "@mastra/pg";
-import { draftNarratorAgent } from "./agents/draft-narrator-agent.js";
-
-export const mastra = new Mastra({
-  agents: { draftNarratorAgent },
-  storage: new PostgresStore({
-    connectionString: process.env.DATABASE_URL!,
-  }),
-});
-
-export const draftMemory = new Memory({
-  storage: new PostgresStore({
-    connectionString: process.env.DATABASE_URL!,
-  }),
-  options: {
-    lastMessages: 10, // keep 10-message window per draft session
-  },
-});
-```
-
-**Why PostgreSQL for memory:** The existing app already uses PostgreSQL (same `DATABASE_URL`). `@mastra/pg` (v1.7.2 as of March 2026) stores message history in Mastra-managed tables separate from the app's Kysely schema. No schema conflict.
-
-**Why not Redis for memory:** Redis is used for rate limiting and caching but not for conversational memory. PostgreSQL is more appropriate for structured thread history that needs durability.
-
----
-
-### Draft Narrator Agent (`packages/backend/src/mastra/agents/draft-narrator-agent.ts`)
-
-```typescript
-import { Agent } from "@mastra/core/agent";
-import { draftMemory } from "../index.js";
-import { playerProjectionTool } from "../tools/player-projection-tool.js";
-import { auctionCompTool } from "../tools/auction-comp-tool.js";
-
-const SYSTEM_PROMPT = `You are a tactical fantasy baseball auction draft advisor...
-[same prompt as current DraftNarratorAgent system prompt]`;
-
-export const draftNarratorAgent = new Agent({
-  id: "draft-narrator",
-  name: "Draft Narrator",
-  instructions: SYSTEM_PROMPT,
-  model: "openai/gpt-4.1-mini-2025-04-14",
-  tools: { playerProjectionTool, auctionCompTool },
-  memory: draftMemory,
-});
-```
-
-**Why same model as existing:** No regression risk. The existing `MODEL_ID = "gpt-4.1-mini-2025-04-14"` continues.
-
-**Why these two tools first:** They cover the most actionable questions the LLM can't answer from the NarratorPayload alone. Player projection gives it FanGraphs context. Auction comp gives it market pricing context. Both have finite, fast DB queries behind them.
-
----
-
-### Tool: Player Projection (`packages/backend/src/mastra/tools/player-projection-tool.ts`)
-
-```typescript
-import { createTool } from "@mastra/core/tools";
-import { z } from "zod";
-import { getDb } from "../../db/connection.js";
-
-export const playerProjectionTool = createTool({
-  id: "get-player-projection",
-  description: "Look up FanGraphs ROS projections for a player by name",
-  inputSchema: z.object({
-    playerName: z.string().describe("Player full name, e.g. 'Shohei Ohtani'"),
-  }),
-  outputSchema: z.object({
-    found: z.boolean(),
-    playerName: z.string().optional(),
-    projectedStats: z.record(z.number()).optional(),
-    note: z.string().optional(),
-  }),
-  execute: async ({ playerName }) => {
-    const db = getDb();
-    const projection = await db
-      .selectFrom("player_projection as pp")
-      .innerJoin("player as p", "p.id", "pp.player_id")
-      .select(["p.name", "pp.projected_stats"])
-      .where("p.name", "ilike", `%${playerName}%`)
-      .orderBy("pp.created_at", "desc")
-      .executeTakeFirst();
-
-    if (!projection) {
-      return { found: false, note: "No FanGraphs projection found" };
-    }
-    return {
-      found: true,
-      playerName: projection.name,
-      projectedStats: projection.projected_stats as Record<string, number>,
-    };
-  },
-});
-```
-
-**Why `getDb()` inside tool:** The tool is called during agent execution inside a Fastify request. `getDb()` returns the existing singleton Kysely instance. Tools are synchronous closures that close over the module scope — using the existing DB connection pattern avoids creating new DB pools.
-
----
-
-### Modified Fastify Route (`packages/backend/src/api/draft.ts` — narrate endpoint)
-
-```typescript
-// POST /api/draft/narrate — MODIFIED for streaming
-app.post<{ Body: NarratorPayload }>(
-  "/api/draft/narrate",
-  { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
-  async (request, reply) => {
-    const payload = request.body as NarratorPayload;
-
-    if (!payload.alerts?.length && !payload.currentAuctionPlayer) {
-      return reply.code(400).send({ error: "No meaningful signals provided" });
-    }
-
-    // SSE headers — must set before writing to reply.raw
-    reply.raw.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "Access-Control-Allow-Origin": "https://fantasy.espn.com",
-    });
-
-    try {
-      const agent = mastra.getAgent("draftNarratorAgent");
-
-      // Convert NarratorPayload to message string (same logic as buildUserMessage)
-      const userMessage = buildUserMessage(payload);
-
-      // Thread = draft session; resource = "extension" (no user identity in extension)
-      const stream = await agent.stream(
-        [{ role: "user", content: userMessage }],
-        {
-          memory: {
-            resource: "extension",
-            thread: `draft-session-${Date.now()}`, // or persistent per-session ID
-          },
-        }
-      );
-
-      for await (const chunk of stream.textStream) {
-        reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
-      }
-
-      reply.raw.write("data: [DONE]\n\n");
-    } catch (error) {
-      request.log.error({ err: error }, "[DraftNarrator] Streaming failed");
-      // SSE error event before ending
-      reply.raw.write(`data: ${JSON.stringify({ error: "narration failed" })}\n\n`);
-    } finally {
-      reply.raw.end();
-    }
-  }
-);
-```
-
-**Why `reply.raw` instead of Fastify's reply API:** Fastify's reply serialization closes the response after `reply.send()`. For streaming, you must bypass Fastify's response lifecycle and write directly to the underlying Node.js `ServerResponse`. This is documented in the Fastify community and confirmed by existing patterns.
-
-**Why not `@fastify/sse`:** The `@fastify/sse` plugin adds `reply.sse()` convenience but imposes its own event format and lifecycle management. Using `reply.raw` directly gives full control over the SSE wire format, which must match what the extension client expects.
-
----
-
-### Modified Extension Hook (`packages/extension/lib/use-narrator.ts`)
-
-The `fireNarration` function needs to change from `response.json()` to SSE stream reading:
-
-```typescript
-// BEFORE (in fireNarration):
-const response = await fetch(`${baseUrl}/api/draft/narrate`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(payload),
-  signal: abortControllerRef.current.signal,
-});
-const data = await response.json();
-setNarration(data.narration ?? "");
-
-// AFTER (streaming SSE):
-const response = await fetch(`${baseUrl}/api/draft/narrate`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(payload),
-  signal: abortControllerRef.current.signal,
-});
-
-if (!response.ok || !response.body) {
-  throw new Error(`HTTP ${response.status}`);
+// hub (draft-live.ts) — no changes needed for new CONTROL types
+if (msg.type === "CONTROL" && extensionSocket?.readyState === 1) {
+  extensionSocket.send(raw.toString()); // forwards blindly — correct behavior
 }
-
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-let accumulated = "";
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-
-  const text = decoder.decode(value, { stream: true });
-  const lines = text.split("\n");
-  for (const line of lines) {
-    if (!line.startsWith("data: ")) continue;
-    const data = line.slice(6).trim();
-    if (data === "[DONE]") break;
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed.text) {
-        accumulated += parsed.text;
-        setNarration(accumulated); // Update UI progressively
-      }
-    } catch {
-      // Ignore malformed SSE lines
-    }
-  }
-}
 ```
 
-**Why `fetch` + `ReadableStream` instead of `EventSource`:** `EventSource` only supports GET requests. The narrator sends a POST with a body (NarratorPayload). Chrome extension content scripts support `fetch` with `response.body.getReader()` — this is the standard pattern for POST-based SSE in extensions.
+### Pattern 2: Zustand as Single State Authority
 
-**Why progressive `setNarration`:** Each chunk updates the UI immediately. The user sees text appearing word by word rather than waiting for the full response. This is the primary UX benefit of streaming.
+**What:** All extension state lives in `useDraftStore`. CONTROL messages translate to store mutations. Engine recomputes from store state. State serialized to `chrome.storage.local` triggers WS relay.
 
----
+**When to use:** New skip state (`skippedPlayerIds`) follows this pattern. Store → engine input → STATE_SNAPSHOT output.
 
-## Memory Architecture
+**Trade-off:** State serialization to `chrome.storage.local` has a 5MB quota and is synchronous on write. Large sets (skipped players) should be stored as arrays (serializable), not `Set` (not JSON-serializable directly).
 
-### Thread and Resource Strategy
-
-Mastra memory organizes history by `resource` (the owner entity) and `thread` (the conversation session).
-
-For the draft narrator use case:
-
-| Concept | Value | Rationale |
-|---------|-------|-----------|
-| `resource` | `"extension"` | All draft sessions are from one Chrome extension. No per-user identity in extension context. |
-| `thread` | `draft-${leagueId}-${dateStamp}` | One thread per draft session per day per league. Keeps history scoped to one draft. |
-
-**Thread lifecycle:** A draft session is typically 2-3 hours. Using `draft-${leagueId}-${date}` as the thread ID means all narrator calls in one draft share context. The agent's last 10 messages (configured `lastMessages: 10`) give it enough context to avoid repeating advice already given.
-
-**What gets stored:** Mastra automatically stores both user messages (the formatted NarratorPayload text) and agent responses. This means the agent remembers it already said "Ohtani is overpriced" earlier in the draft.
-
-### PostgreSQL Memory Tables
-
-`@mastra/pg` creates its own tables in the same PostgreSQL database. These tables do not conflict with the existing Kysely schema:
-
-```
-mastra_messages        ← message history per thread
-mastra_threads         ← thread metadata
-mastra_resources       ← resource registry
+**Example:**
+```typescript
+// draft-state.ts
+skippedPlayerIds: number[];  // NOT Set<number> — storage requires JSON serialization
+addSkippedPlayer: (playerId: number) => set((s) => ({
+  skippedPlayerIds: [...new Set([...s.skippedPlayerIds, playerId])]
+}));
 ```
 
-**No migration needed in Kysely.** The PostgresStore initializes its own tables on first use. They should be excluded from the Kysely schema file (`packages/backend/src/db/schema.ts`).
+### Pattern 3: MCP Tool = CDP Wrapper
 
----
+**What:** Each MCP tool is a thin wrapper around a CDP method call. Tools do not contain business logic — they return raw DOM data for the MCP client to interpret.
 
-## Data Flow Diagram
+**When to use:** `getAuctionSelectors()` is the exception — it bundles a selector battery and returns structured results. This bundling is appropriate because running each selector individually would require many round trips.
 
-### Full Request Flow: Extension → Backend → Mastra Agent → Tools → Response
-
-```
-1. TRIGGER (Chrome extension)
-   ─────────────────────────────
-   useNarrator detects: new nomination OR alert severity > 0.65 OR pacing change
-   Debounce: 1500ms window clusters rapid events
-   buildNarratorPayload(signals, triggerReason, context) → NarratorPayload
-
-2. HTTP REQUEST
-   ─────────────────────────────
-   POST /api/draft/narrate
-   Headers: Content-Type: application/json
-   Body: NarratorPayload (structured signals, no raw arrays)
-
-3. FASTIFY ROUTE HANDLER (draft.ts)
-   ─────────────────────────────
-   Validates payload (alerts present OR currentAuctionPlayer present)
-   Sets SSE headers via reply.raw.writeHead(200, {...})
-   Calls buildUserMessage(payload) → string (same as current DraftNarratorAgent)
-   Calls mastra.getAgent("draftNarratorAgent")
-
-4. MASTRA AGENT EXECUTION
-   ─────────────────────────────
-   agent.stream(messages, { memory: { resource, thread } })
-   ├── Memory lookup: fetch last 10 messages for this thread
-   ├── LLM decides: do I need tool data?
-   │   ├── YES: calls playerProjectionTool({ playerName: "Shohei Ohtani" })
-   │   │   └── Tool queries PostgreSQL player_projection table via getDb()
-   │   │   └── Returns { projectedStats: { HR: 42, R: 95, ... } }
-   │   └── NO: proceeds directly to generation
-   └── LLM generates streaming response
-
-5. STREAMING OUTPUT
-   ─────────────────────────────
-   for await (chunk of stream.textStream)
-     reply.raw.write(`data: ${JSON.stringify({ text: chunk })}\n\n`)
-   reply.raw.write("data: [DONE]\n\n")
-   reply.raw.end()
-
-6. EXTENSION RECEIVES STREAM
-   ─────────────────────────────
-   response.body.getReader() reads chunks
-   Each "data: {...}" line parsed
-   accumulated += chunk.text
-   setNarration(accumulated) called on each chunk → progressive UI update
-   [DONE] sentinel ends read loop
-```
-
----
-
-## Streaming Event Format
-
-**SSE wire format used by the narrate endpoint:**
-
-```
-data: {"text":"At "}\n\n
-data: {"text":"$45 "}\n\n
-data: {"text":"Ohtani "}\n\n
-data: {"text":"is overpriced"}\n\n
-data: [DONE]\n\n
-```
-
-**Error event:**
-
-```
-data: {"error":"narration failed"}\n\n
-```
-
-**Why not use Mastra's built-in SSE format:** Mastra's built-in event format emits typed events (text-delta, tool-call, tool-result, etc.). For the narrator use case, the extension only needs text chunks plus a done signal. Using a minimal format reduces extension parsing complexity and avoids coupling to Mastra's internal event schema.
-
----
-
-## Tool Execution Pattern
-
-### How the Agent Decides to Call Tools
-
-Mastra agents use the LLM's function-calling capability. The LLM sees tool descriptions and decides when they add value. For the draft narrator:
-
-- **`get-player-projection`** — agent calls this when a player is nominated and the NarratorPayload has limited stat context, or when it wants to verify a claim before making a recommendation
-- **`get-auction-comp`** — agent calls this when the current bid is near a player's estimated value and it needs market context
-
-Tool calls happen before the streaming text response begins. The agent resolves all tools first, then streams the final response.
-
-**Implication:** First token latency is higher when tools fire (one extra DB roundtrip). When no tools fire, first token latency is similar to the current non-streaming implementation (~300-500ms).
-
-### Tool Lifecycle in a Fastify Route
-
-```
-Fastify route handler
-  └── agent.stream() called
-      ├── Mastra internally calls tool execute() functions
-      │   └── These call getDb() → Kysely query → PostgreSQL
-      └── After all tools resolve, LLM streams text
-Fastify route handler still alive (async generator pattern)
-  └── for await iterates textStream chunks
-      └── reply.raw.write() for each chunk
-```
-
-The Fastify route handler remains open (streaming) while the agent executes. The `for await` loop drives the event loop — Node.js does not need any special configuration for this pattern.
-
----
-
-## Scalability Considerations
-
-| Concern | At current load (1 draft session) | At 100 concurrent sessions | Mitigation |
-|---------|-----------------------------------|---------------------------|------------|
-| SSE connections held open | 1 persistent connection per narrator call (~15-30s) | 100 simultaneous open HTTP connections | Nginx/reverse proxy keep-alive tuning; each connection is lightweight |
-| PostgreSQL memory tables | Minimal (10 messages per thread) | 100 active threads | Thread cleanup job: delete threads older than 24h |
-| Tool DB queries | 1-2 queries per agent invocation | 100-200 queries/min | Kysely query already uses indexed lookups; acceptable |
-| LLM API cost | Same as current | Same rate, higher volume | Session cap (120 calls/draft) already enforced in useNarrator |
-
----
-
-## Build Order (Integration Steps)
-
-Dependencies flow strictly top-to-bottom. Each step produces a testable artifact.
-
-### Step 1: Install Packages and Create Mastra Instance
-**Files:** `packages/backend/package.json`, `packages/backend/src/mastra/index.ts`
-**Action:** `pnpm add @mastra/core @mastra/memory @mastra/pg` in backend package. Create `mastra/index.ts` with PostgresStore using existing `DATABASE_URL`.
-**Test:** Import `mastra` in a test file, verify no runtime errors.
-**Dependency:** None.
-
-### Step 2: Define Tools
-**Files:** `packages/backend/src/mastra/tools/player-projection-tool.ts`, `auction-comp-tool.ts`
-**Action:** Implement `createTool()` with `inputSchema`, `outputSchema`, `execute`. Each tool queries existing Kysely DB.
-**Test:** Call `tool.execute({ playerName: "Aaron Judge" })` directly in a unit test — verify returns projection data.
-**Dependency:** Step 1 (need `getDb()` available).
-
-### Step 3: Define Mastra Agent
-**Files:** `packages/backend/src/mastra/agents/draft-narrator-agent.ts`
-**Action:** `new Agent({ id, instructions, model, tools, memory })`. Register in `mastra/index.ts`.
-**Test:** Call `agent.generate("test message")` in isolation — verify text response. Call with tool trigger input — verify tool fires.
-**Dependency:** Steps 1 and 2.
-
-### Step 4: Modify Fastify Route to SSE Streaming
-**Files:** `packages/backend/src/api/draft.ts`
-**Action:** Replace `DraftNarratorAgent` with `mastra.getAgent(...)`. Add SSE headers. Add `for await` streaming loop over `stream.textStream`. Keep `buildUserMessage()` function unchanged.
-**Test:** `curl -N -X POST http://localhost:3001/api/draft/narrate -d '{...}'` — verify SSE chunks arrive progressively.
-**Dependency:** Step 3.
-
-### Step 5: Update Extension SSE Consumer
-**Files:** `packages/extension/lib/use-narrator.ts`
-**Action:** Change `response.json()` to `response.body.getReader()`. Parse `data: {...}` lines. Call `setNarration(accumulated)` on each chunk.
-**Test:** In dev with real ESPN draft page — verify text appears progressively in DraftSidebar.
-**Dependency:** Step 4.
-
-### Step 6: Memory Thread Persistence (Optional, Deferred)
-**Files:** `packages/extension/lib/draft-state.ts` (or equivalent)
-**Action:** Generate a stable `threadId` at draft session start. Pass it in the POST body alongside `NarratorPayload`. Backend uses it for memory scoping.
-**Test:** Two narrator calls in same session — verify agent references context from first call.
-**Dependency:** Step 5.
+**Trade-off:** CDP requires Chrome launched with `--remote-debugging-port=9222`. This is a setup constraint that cannot be programmatically bypassed.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Using @mastra/fastify Adapter
-**What:** Installing `@mastra/fastify` and calling `new MastraServer({ app, mastra }).init()`
-**Why bad:** Requires Fastify v5. Upgrading from v4 requires schema validation changes on all 12 route files, logger API change, redirect argument order reversal, decorator restriction updates. 1-2 days of migration risk for zero feature benefit.
-**Instead:** Use `@mastra/core` Agent class directly. Call `agent.stream()` from existing Fastify v4 route handlers.
+### Anti-Pattern 1: Adding CONTROL Dispatch Logic to the Hub
 
-### Anti-Pattern 2: Defining Mastra Tools in a Separate Workspace Package
-**What:** Creating `packages/mastra-tools/` with TypeScript tool definitions, importing via `workspace:^`
-**Why bad:** Mastra transpiles workspace packages at build time. Uncompiled TypeScript causes `ERR_UNKNOWN_FILE_EXTENSION` errors. Pre-compiling the tools package adds a build step dependency.
-**Instead:** Co-locate tools inside `packages/backend/src/mastra/tools/`. They're compiled together with the backend.
+**What people do:** Add a switch/case inside `draft-live.ts` that handles specific CONTROL action types (e.g., validates `FORCE_NOMINATE`, rate-limits `SKIP_PLAYER`).
 
-### Anti-Pattern 3: Using EventSource for POST-Based SSE
-**What:** `const es = new EventSource("/api/draft/narrate")` in extension
-**Why bad:** `EventSource` only supports GET requests with no body. NarratorPayload cannot be sent.
-**Instead:** Use `fetch()` with `response.body.getReader()` to read SSE chunks from a POST response. Chrome extensions fully support this pattern.
+**Why it's wrong:** The hub is currently stateless and has zero business logic. Adding per-action logic creates coupling between the hub (a transport layer) and the domain model (nomination strategy, skip lists). Changes to CONTROL actions would require backend deploys.
 
-### Anti-Pattern 4: Calling `reply.send()` Before SSE Completes
-**What:** Using `return reply.send(...)` in the route handler while the stream is ongoing
-**Why bad:** Fastify's `reply.send()` finalizes and closes the response. Calling it while `reply.raw` is still open corrupts the stream.
-**Instead:** Use only `reply.raw.writeHead()`, `reply.raw.write()`, and `reply.raw.end()` in streaming routes. Do not call `reply.send()` or `return reply.*` after streaming begins.
+**Do this instead:** Keep the hub as a transparent forwarder. All CONTROL validation belongs in content.tsx (the actual executor).
 
-### Anti-Pattern 5: One Memory Thread Per Request
-**What:** Generating a new `threadId` for every narrator call (e.g., `draft-session-${Date.now()}`)
-**Why bad:** Each call starts with no context. The agent can't recall it already advised on a player earlier in the draft. Memory becomes useless.
-**Instead:** Generate the `threadId` once at draft session start (when the extension loads on the ESPN draft page) and reuse it for all narrator calls in that session. Pass it in the request body.
+### Anti-Pattern 2: Using CDP Runtime.evaluate for DOM Mutations in Production
 
-### Anti-Pattern 6: Awaiting `stream.text` Instead of Iterating `textStream`
-**What:** `const text = await stream.text` then sending as JSON response
-**Why bad:** This defeats streaming — waits for the full response before sending anything. Identical behavior to the current non-streaming implementation.
-**Instead:** Use `for await (const chunk of stream.textStream)` and write each chunk immediately.
+**What people do:** Use the DevTools MCP server to click buttons or mutate DOM on the live ESPN page during a real draft.
+
+**Why it's wrong:** CDP evaluate runs in the page's main world and bypasses Chrome extension security. This is debugging infrastructure only. Auto-bid should always use `button.click()` from within the content script.
+
+**Do this instead:** Use MCP only for inspection (read-only queries). DOM mutations remain in `auto-bid-controller.ts` running inside the extension content script.
+
+### Anti-Pattern 3: Storing Skip State Only in Mobile UI
+
+**What people do:** Track skipped players as local React state in the mobile page (`const [skipped, setSkipped] = useState([])`).
+
+**Why it's wrong:** The mobile page does not control the nomination engine — the extension does. A skip list in mobile React state cannot prevent the extension from nominating a skipped player. Skip state must round-trip through the CONTROL → content script → store → engine pipeline.
+
+**Do this instead:** `sendControl("SKIP_PLAYER", { playerName })` → store mutation in extension → engine filters. Mobile page reflects the updated `topTargets` from the next `STATE_SNAPSHOT`.
+
+### Anti-Pattern 4: One CDP Connection Per MCP Tool Call
+
+**What people do:** In each MCP tool's `execute()` function, open a new CDP connection, run the query, close it.
+
+**Why it's wrong:** CDP connection setup has ~100-200ms overhead. If multiple tools are called in sequence (a selector battery), this adds seconds of latency.
+
+**Do this instead:** `cdp-client.ts` maintains a singleton CDP connection that reconnects on drop. Tool handlers call into the shared client.
 
 ---
 
-## Dependency Versions (Verified via npm, March 2026)
+## Build Order (Cross-Feature Dependencies)
 
-| Package | Latest Version | Peer Deps |
-|---------|---------------|-----------|
-| `@mastra/core` | 1.10.0 | none framework-specific |
-| `@mastra/memory` | 1.6.1 | `@mastra/core >= 1.0.0` |
-| `@mastra/pg` | 1.7.2 | `@mastra/core >= 1.0.0` |
-| `@mastra/fastify` | 1.1.9 | `fastify: ^5.0.0` ← incompatible with existing v4 |
+Dependencies flow strictly. Feature 1 (MCP server) unblocks Feature 2 (selector rework). Feature 3 (mobile redesign) can start independently.
+
+```
+Feature 1: Chrome DevTools MCP          [no upstream deps, starts first]
+  → tools/espn-devtools-mcp scaffolding
+  → cdp-client.ts (singleton connection)
+  → querySelector + evaluateExpression tools
+  → getAuctionSelectors tool (runs selector battery)
+  → Validated: can inspect live ESPN draft DOM
+
+Feature 2: Auto-Nomination Rework       [depends on Feature 1 output]
+  → Run MCP against live ESPN draft page
+  → Document confirmed selector patterns
+  → Update dom-observers.ts selectors
+  → Update auto-bid-controller.ts isMyTurnToNominate() strategies
+  → Validate: NominationDiagnostics panel shows correct turn detection
+
+Feature 3: Mobile Command Center        [independent of Features 1 & 2]
+  → Add skippedPlayerIds to draft-state.ts
+  → Add SKIP_PLAYER / FORCE_NOMINATE to nomination-strategy.ts engine filter
+  → Add new CONTROL cases to content.tsx
+  → Redesign /draft/live page.tsx with tab navigation
+  → Add new action types to useDraftLiveSocket.ts
+  → Validate: Force Nominate fires from phone, Skip removes from target list
+```
+
+**Why this order:** Feature 2 cannot produce reliable selector fixes without Feature 1's inspection results. Feature 3 is self-contained (new UI + new CONTROL types) with no dependency on DOM selector correctness.
+
+---
+
+## Integration Points
+
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Chrome DevTools Protocol | HTTP + WebSocket (`localhost:9222`) | Chrome must be launched with `--remote-debugging-port=9222`. Target discovery at `/json/list`. CDP over WebSocket for Runtime.evaluate. |
+| ESPN Draft Page | MutationObserver + polling (existing) | No changes to how extension connects to ESPN — only which selectors it uses. |
+| Fastify WS hub | Existing — no changes | Hub is transparent. New CONTROL types flow through unchanged. |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| MCP server ↔ Chrome tab | Chrome DevTools Protocol (CDP) | Read-only inspection only. No mutations from MCP server. |
+| Mobile page ↔ WS hub | WebSocket (existing) | New CONTROL action types added to protocol. Hub does not need updating. |
+| content.tsx ↔ auto-bid-controller | Direct function call (existing) | Two new calls: `autoBidController.forceNominate()` and `store.addSkippedPlayer()` |
+| engine/nomination-strategy.ts ↔ draft-state | DraftEngineInput (existing) | `skippedPlayerIds` added to `DraftEngineInput` type — minor type extension |
+| MCP DevTools server ↔ developer | Stdio MCP transport | No integration with running app — pure developer tooling |
 
 ---
 
 ## Sources
 
-- [Mastra Server Adapters Documentation](https://mastra.ai/docs/server/server-adapters) — adapter architecture, init() lifecycle
-- [Mastra Blog: Announcing Server Adapters](https://mastra.ai/blog/mastra-server-adapters) — Fastify adapter pattern, route registration
-- [Mastra Agent.stream() Reference](https://mastra.ai/reference/streaming/agents/stream) — textStream, fullStream, callbacks
-- [Mastra Streaming Events Documentation](https://mastra.ai/docs/streaming/events) — event types, Fastify SSE example
-- [Mastra Memory Documentation](https://mastra.ai/docs/agents/agent-memory) — thread/resource concepts, PostgreSQL storage
-- [Mastra PostgreSQL Storage Reference](https://mastra.ai/docs/memory/storage/memory-with-pg) — PostgresStore configuration
-- [Mastra createTool() Reference](https://mastra.ai/reference/tools/create-tool) — tool definition API with Zod schemas
-- [Mastra Deployment: Monorepo](https://mastra.ai/docs/deployment/monorepo) — workspace package TypeScript gotcha
-- [Fastify v5 Migration Guide](https://fastify.dev/docs/latest/Guides/Migration-Guide-V5/) — breaking changes from v4
-- [DeepWiki: Mastra Streaming Architecture](https://deepwiki.com/mastra-ai/mastra/9.6-streaming-architecture-and-sse) — SSE implementation internals
-- [npm: @mastra/fastify](https://www.npmjs.com/package/@mastra/fastify) — peer dependency `fastify: ^5.0.0` (confirmed via npm CLI)
+- Existing codebase: `packages/extension/entrypoints/background.ts`, `content.tsx`, `lib/auto-bid-controller.ts`, `lib/dom-observers.ts`, `lib/draft-state.ts`, `lib/engine/types.ts` (read 2026-03-14)
+- Existing codebase: `packages/backend/src/api/draft-live.ts` (read 2026-03-14)
+- Existing codebase: `packages/frontend/src/app/draft/live/page.tsx`, `useDraftLiveSocket.ts` (read 2026-03-14)
+- Chrome DevTools Protocol documentation: https://chromedevtools.github.io/devtools-protocol/ (MEDIUM confidence — stable API, but ESPN iframe structure may require additional target selection logic not yet validated)
+- Model Context Protocol spec: https://spec.modelcontextprotocol.io/ (HIGH confidence — stdio transport and tool definition patterns are stable)
+- `@modelcontextprotocol/sdk` pattern (standard tool definition): HIGH confidence based on existing MCP tooling ecosystem
 
 ---
 
-**Last Updated:** 2026-03-05
-**Confidence Level:** HIGH for integration strategy and component boundaries; MEDIUM for SSE event format details (Mastra's internal format may evolve; using minimal custom format mitigates this)
+*Architecture research for: Chrome DevTools MCP, auto-nomination rework, mobile command center*
+*Researched: 2026-03-14*
