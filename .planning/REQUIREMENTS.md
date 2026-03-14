@@ -75,35 +75,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEV-01 | — | Pending |
-| DEV-02 | — | Pending |
-| DEV-03 | — | Pending |
-| NOM-01 | — | Pending |
-| NOM-02 | — | Pending |
-| NOM-03 | — | Pending |
-| NOM-04 | — | Pending |
-| NOM-05 | — | Pending |
-| NOM-06 | — | Pending |
-| MOB-01 | — | Pending |
-| MOB-02 | — | Pending |
-| MOB-03 | — | Pending |
-| MOB-04 | — | Pending |
-| MOB-05 | — | Pending |
-| MOB-06 | — | Pending |
-| MOB-07 | — | Pending |
-| MOB-08 | — | Pending |
-| MOB-09 | — | Pending |
-| MOB-10 | — | Pending |
-| MOB-11 | — | Pending |
-| MOB-12 | — | Pending |
-| MOB-13 | — | Pending |
-| MOB-14 | — | Pending |
+| DEV-01 | Phase 39 | Pending |
+| DEV-02 | Phase 39 | Pending |
+| DEV-03 | Phase 39 | Pending |
+| NOM-01 | Phase 40 | Pending |
+| NOM-02 | Phase 40 | Pending |
+| NOM-03 | Phase 40 | Pending |
+| NOM-04 | Phase 40 | Pending |
+| NOM-05 | Phase 40 | Pending |
+| NOM-06 | Phase 40 | Pending |
+| MOB-01 | Phase 41 | Pending |
+| MOB-02 | Phase 41 | Pending |
+| MOB-03 | Phase 41 | Pending |
+| MOB-04 | Phase 41 | Pending |
+| MOB-05 | Phase 41 | Pending |
+| MOB-06 | Phase 41 | Pending |
+| MOB-07 | Phase 41 | Pending |
+| MOB-08 | Phase 41 | Pending |
+| MOB-09 | Phase 41 | Pending |
+| MOB-10 | Phase 41 | Pending |
+| MOB-11 | Phase 41 | Pending |
+| MOB-12 | Phase 41 | Pending |
+| MOB-13 | Phase 41 | Pending |
+| MOB-14 | Phase 41 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after initial definition*
+*Last updated: 2026-03-14 after roadmap creation*
