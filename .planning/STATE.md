@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: 41 of 41 (Mobile Command Center)
-Plan: 2 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: Executing
-Last activity: 2026-03-14 — Completed 41-01 CONTROL handlers and store fields
+Last activity: 2026-03-14 — Completed 41-03 tabbed mobile layout with typed controls
 
 Progress: [##░░░░░░░░] 8% (v3.0)
 
@@ -43,6 +43,8 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 - [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
 - [v3.0 start]: `motion@^12.36.0` is the only new production dependency for v3.0 (swipe gesture animations on mobile)
 - [Phase 41]: Defined types locally in Strategy tab components for parallel development with Plan 41-03
+- [41-03]: sendControlUntyped adapter for QueueTab compatibility; bottom TabBar always visible; control bar stays inside LiveTab
+- [Phase 41]: Used typed sendControl from Plan 03 instead of untyped bridge pattern for QueueTab
 
 ### Pending Todos
 
@@ -57,5 +59,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Completed 41-01-PLAN.md (CONTROL handlers and store fields)
+Stopped at: Completed 41-03-PLAN.md (tabbed mobile layout with typed controls)
 Resume file: None
