@@ -42,7 +42,16 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Active
 
-(None — ready for next milestone planning)
+#### Current Milestone: v3.0 Draft Automation & Mobile Command Center
+
+**Goal:** Make auto-nomination reliable with verified ESPN selectors (via Chrome DevTools MCP) and rework the mobile draft companion into a full-control command center.
+
+- [ ] Chrome DevTools MCP server setup for live ESPN DOM inspection
+- [ ] Auto-nomination selector overhaul using verified ESPN DOM selectors
+- [ ] Auto-nomination flow rework (search, queue, turn detection reliability)
+- [ ] Mobile draft companion full redesign with all engine signals
+- [ ] Mobile full draft control (queue management, bid limits, strategy anchors)
+- [ ] Mobile responsive layout optimized for phone screens
 
 ### Deferred
 
@@ -82,6 +91,8 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | Monte Carlo for bid uncertainty | Captures draft outcome variance | ✓ Good |
 | WebSocket hub for mobile companion | Extension → Fastify → phone, works on LAN | ✓ Good |
 | Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic | — Pending |
+| Chrome DevTools MCP for selector discovery | Live DOM inspection beats guessing at ESPN selectors | — Pending |
+| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline | — Pending |
 
 ---
-*Last updated: 2026-03-14 after v2.0 milestone completion*
+*Last updated: 2026-03-14 after v3.0 milestone start*

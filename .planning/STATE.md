@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Planning next milestone
+**Current focus:** v3.0 Draft Automation & Mobile Command Center
 
 ## Current Position
 
-Status: v2.0 milestone complete — between milestones
-Last activity: 2026-03-14 — v2.0 Position Shopping List shipped
-
-```
-[████████████████████] 100% v2.0 complete
-```
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-14 — Milestone v3.0 started
 
 ## Performance Metrics
 
