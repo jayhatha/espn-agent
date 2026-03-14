@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v3.0 Draft Automation & Mobile Command Center — Phase 40 (Auto-Nomination Rework)
+**Current focus:** v3.0 Draft Automation & Mobile Command Center — Phase 41 (Mobile Command Center)
 
 ## Current Position
 
-Phase: 40 of 41 (Auto-Nomination Rework)
-Plan: 4 of 4 in current phase
+Phase: 41 of 41 (Mobile Command Center)
+Plan: 2 of 5 in current phase
 Status: Executing
-Last activity: 2026-03-14 — Completed 40-04 NominationDiagnostics panel update
+Last activity: 2026-03-14 — Completed 41-02 EXTENSION_STATUS broadcast
 
 Progress: [##░░░░░░░░] 8% (v3.0)
 
@@ -36,6 +36,7 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 - [40-02]: Strategy 4 (Button--select) runs before Strategy 3 (pickArea) as primary tier; UNTESTED fallbacks emit logger.warn; clearNominationState() is single reset path
 - [40-03]: typeIntoSearchInput() shared helper eliminates duplicated React input typing; 5 named timeout constants replace magic numbers in search polling
 - [40-04]: Used text-content-secondary for timestamps (text-content-muted not in design system); strategy tier badge pattern established
+- [41-02]: Used satisfies ExtensionStatusMessage for type safety on mobile join send; broadcastToMobile helper pattern for hub-to-mobile fan-out
 - [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
 - [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
@@ -54,5 +55,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Completed 40-04-PLAN.md (NominationDiagnostics panel update)
+Stopped at: Completed 41-02-PLAN.md (EXTENSION_STATUS broadcast)
 Resume file: None

@@ -35,9 +35,9 @@ Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roa
 - [ ] **MOB-09**: Mobile page displays current nomination queue and allows reordering
 - [ ] **MOB-10**: Mobile page uses tabbed/sectioned responsive layout optimized for phone screens
 - [ ] **MOB-11**: Mobile page uses Screen Wake Lock API to prevent screen dimming during draft
-- [ ] **MOB-12**: Mobile page shows extension connection status with reconnect handling
+- [x] **MOB-12**: Mobile page shows extension connection status with reconnect handling
 - [ ] **MOB-13**: WebSocket CONTROL actions are typed as a union (not `action: string`)
-- [ ] **MOB-14**: Extension relays connection status to mobile via EXTENSION_STATUS message type
+- [x] **MOB-14**: Extension relays connection status to mobile via EXTENSION_STATUS message type
 
 ## Future Requirements
 
@@ -95,9 +95,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOB-09 | Phase 41 | Pending |
 | MOB-10 | Phase 41 | Pending |
 | MOB-11 | Phase 41 | Pending |
-| MOB-12 | Phase 41 | Pending |
+| MOB-12 | Phase 41 | Complete |
 | MOB-13 | Phase 41 | Pending |
-| MOB-14 | Phase 41 | Pending |
+| MOB-14 | Phase 41 | Complete |
 
 **Coverage:**
 - v3.0 requirements: 23 total
