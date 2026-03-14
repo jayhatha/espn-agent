@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-14)
 ## Current Position
 
 Phase: 40 of 41 (Auto-Nomination Rework)
-Plan: 3 of 4 in current phase
+Plan: 4 of 4 in current phase
 Status: Executing
-Last activity: 2026-03-14 — Completed 40-02 turn detection consolidation plan
+Last activity: 2026-03-14 — Completed 40-04 NominationDiagnostics panel update
 
 Progress: [##░░░░░░░░] 8% (v3.0)
 
@@ -34,6 +34,7 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 
 - [40-01]: CONFIRMED/UNTESTED annotation convention established for all nomination-critical selectors; findFirstMatchingSelector helper exported for Plan 02
 - [40-02]: Strategy 4 (Button--select) runs before Strategy 3 (pickArea) as primary tier; UNTESTED fallbacks emit logger.warn; clearNominationState() is single reset path
+- [40-04]: Used text-content-secondary for timestamps (text-content-muted not in design system); strategy tier badge pattern established
 - [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
 - [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
@@ -52,5 +53,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Completed 40-02-PLAN.md (turn detection consolidation)
+Stopped at: Completed 40-04-PLAN.md (NominationDiagnostics panel update)
 Resume file: None

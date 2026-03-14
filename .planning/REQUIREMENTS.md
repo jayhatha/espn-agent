@@ -20,7 +20,7 @@ Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roa
 - [ ] **NOM-03**: Search-and-queue flow reliably finds players, types into ESPN search, and clicks queue button
 - [x] **NOM-04**: Nomination state machine is consolidated with clear state transitions and cooldown management
 - [x] **NOM-05**: Selector fallback hierarchy gracefully degrades when primary selectors fail
-- [ ] **NOM-06**: Nomination diagnostics panel reflects reworked flow with accurate status reporting
+- [x] **NOM-06**: Nomination diagnostics panel reflects reworked flow with accurate status reporting
 
 ### Mobile Command Center
 
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NOM-03 | Phase 40 | Pending |
 | NOM-04 | Phase 40 | Complete |
 | NOM-05 | Phase 40 | Complete |
-| NOM-06 | Phase 40 | Pending |
+| NOM-06 | Phase 40 | Complete |
 | MOB-01 | Phase 41 | Pending |
 | MOB-02 | Phase 41 | Pending |
 | MOB-03 | Phase 41 | Pending |
