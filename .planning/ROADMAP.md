@@ -41,7 +41,10 @@ Phases 6-38 covering v1.1 trade upgrades, history backfill, Chrome extension, de
   2. Every selector constant in `dom-observers.ts` has been evaluated against the live ESPN page and documented as matched, failed, or replaced
   3. A stable selector map document exists recording the confirmed ESPN DOM targets (data-*, aria-*, structural selectors) for use in Phase 40
   4. The Chrome profile isolation requirement (separate `--user-data-dir`) is documented so ESPN auth cookies are never exposed to the MCP process
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 39-01-PLAN.md — Configure chrome-devtools-mcp in .mcp.json and write Chrome profile isolation guide
+- [ ] 39-02-PLAN.md — Run selector battery via MCP against live ESPN draft DOM and produce SELECTOR-MAP.md
 
 ### Phase 40: Auto-Nomination Rework
 **Goal**: Auto-nomination reliably finds, queues, and nominates players using selectors confirmed against the live 2026 ESPN draft DOM
