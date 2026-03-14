@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A public web app where fantasy baseball managers sign up, connect their ESPN league, and get a full command center for managing their team — projected standings, team health analysis, daily action items (waiver grabs, trade proposals, lineup suggestions), draft rankings, and category trend analysis. Powered by FanGraphs RoS projections and component-based stat math.
+A web app and Chrome extension for fantasy baseball managers. The web app connects to ESPN leagues and provides projected standings, team health analysis, daily action items, waiver/trade recommendations, and category trend charts. The Chrome extension overlays ESPN's live auction draft page with a deterministic draft engine (inflation tracking, positional scarcity, category gap analysis, budget curves, roster optimization, projected standings, win probability) and an AI narrator for tactical commentary. Powered by FanGraphs RoS projections and component-based stat math.
 
 ## Core Value
 
@@ -20,63 +20,45 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 - ✓ Trade impact analysis and 1-for-1 candidate generation with accurate deltas — v1.0
 - ✓ Time series data with transaction timeline annotations — v1.0
 - ✓ JWT auth with email/password, HttpOnly cookies, refresh token rotation — v1.0
-- ✓ OAuth stubs for Google and GitHub — v1.0
-- ✓ Guided 4-step onboarding wizard for new users — v1.0
 - ✓ Team dashboard with health overview, scarcity badges, category mini-charts — v1.0
-- ✓ Recharts trend visualizations (not tables) for standings over time — v1.0
-- ✓ Daily action items with ESPN deep links — v1.0
-- ✓ Lineup optimizer with greedy slot-filling algorithm — v1.0
-- ✓ Streaming pitcher suggestions via MLB StatsAPI matchup analysis — v1.0
 - ✓ Draft rankings with VBD/SGP positional scarcity analysis — v1.0
 - ✓ Auction valuations based on projected stats and budget constraints — v1.0
-- ✓ Shared component library (ui/ + league/ two-tier structure) — v1.0
-- ✓ Centralized API client with environment-based URLs — v1.0
-- ✓ Multi-tenant auth with league membership verification on all routes — v1.0
-- ✓ Admin dashboard with system health KPIs, user management, batch upload, league health — v1.0
+- ✓ Admin dashboard with system health KPIs, user management, batch upload — v1.0
+- ✓ Multi-player trade evaluation (N-for-M) with component math — v1.1
+- ✓ Historical backfill from ESPN API with rate limiting and dedup — v1.1
+- ✓ Season timeline with week-by-week standings and transaction annotations — v1.1
+- ✓ Chrome extension with live auction draft overlay — v1.2
+- ✓ Deterministic draft engine (inflation, scarcity, category gaps, budget curves) — v1.4
+- ✓ Build archetype detection and pivot logic — v1.4
+- ✓ AI narrator with tactical commentary via OpenAI — v1.4
+- ✓ Monte Carlo roster optimization with SGP-based max bids — v1.4
+- ✓ Projected standings for all teams during draft — v1.4
+- ✓ Position-organized shopping list with priority scoring — v2.0
+- ✓ Forward-looking draft simulation with win probability — v2.0
+- ✓ Mobile draft companion page via WebSocket — v2.0
+- ✓ Typography-driven editorial site redesign — v2.0
+- ✓ Auto-nomination from ESPN queue — v2.0
+- ✓ Category floor enforcement (no punt categories) — v2.0
 
 ### Active
 
-- [ ] Position-organized shopping list replacing Top Targets in draft sidebar
-- [ ] Combined priority scoring (scarcity + roster needs + budget fit) for position ordering
-- [ ] Per-position top N targets with max bid and expected market price
-- [ ] Dynamic adjustment as players are drafted
+(None — ready for next milestone planning)
 
 ### Deferred
 
 - [ ] Mastra AI agent with tools for draft engine signals, player data, and league state
-- [ ] Agent memory for draft session context (remembers earlier advice, strategy evolution)
+- [ ] Agent memory for draft session context
 - [ ] Streaming agent responses in extension sidebar
-- [ ] Multi-player trade evaluation (user proposes N-for-N trades, sees projected standings impact)
-- [ ] Season replay (week-by-week standings evolution from collected snapshots and backfilled data)
-- [ ] Trade retrospectives (how past trades impacted standings based on actual outcomes)
-- [ ] Historical data backfill from ESPN API (pull season data from before league connection)
-
-## Current Milestone: v2.0 Position Shopping List
-
-**Goal:** Replace the generic Top Targets section with a position-organized shopping list that shows the best available players at each unfilled position, with max bids and market prices, prioritized by a combined scarcity + roster needs + budget fit score
-
-**Target features:**
-- Position-by-position target recommendations replacing Top Targets in sidebar
-- Combined priority scoring blending scarcity urgency, empty roster slots, and budget constraints
-- Top N available players per position with max bid (binary search) and expected market price (opponent model)
-- Dynamic updates as draft progresses — positions re-prioritize as roster fills and pool shrinks
-
-### Out of Scope
-
-- AI/LLM agent integration — deferred to v2.1 (research complete in .planning/research/)
-- Web app changes — extension sidebar only
-- New data sources — uses existing FanGraphs projections and engine signals
-- Snake draft support — auction only for now
+- [ ] Trade retrospectives (actual vs projected outcomes)
+- [ ] Interactive trade builder with live impact preview
+- [ ] Snake draft support
+- [ ] Points/H2H league support
 
 ## Context
 
-Shipped v1.0 with 24,177 lines of TypeScript across a monorepo (Turbo + pnpm). Backend: Fastify 4, Kysely (PostgreSQL), BullMQ (Redis). Frontend: Next.js 14 (App Router), TanStack Query v5, Tailwind CSS, Recharts. Shared package: types, component-based stat formulas (AVG, OBP, SLG, OPS, ERA, WHIP), VBD/SGP draft math.
+Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm). Backend: Fastify 4, Kysely (PostgreSQL), BullMQ (Redis). Frontend: Next.js 14 (App Router), TanStack Query v5, Tailwind CSS, Recharts. Chrome extension: WXT + React. Shared package: types, component-based stat formulas, VBD/SGP draft math.
 
-7 backend agents: ESPNAdapter, ProjectionsIngestAgent, PlayerIdentityResolutionAgent, StandingsProjectionAgent, WaiverRecommendationAgent, TradeRecommendationAgent, SnapshotOrchestratorAgent. Plus: DraftRankingsAgent, AuctionValuationAgent, LineupOptimizerAgent, StreamingPitcherAgent. Admin API with user management, system stats, league health, and batch upload.
-
-Chrome extension (WXT + React) with deterministic draft engine: inflation tracking, enhanced scarcity, category gap analysis, budget curves, build archetype detection, projected standings, roster optimization (SGP-based max bid, Monte Carlo simulation, opponent modeling). Current AI layer: stateless narrator (Phase 22-24) calling GPT with engine signals as prompt context — no tools, no memory, no reasoning chain.
-
-ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies (encrypted at rest with AES-256-GCM). MLB StatsAPI (free, no auth) used for game schedules and probable pitchers.
+11 backend agents, 4 API route modules, Chrome extension with deterministic draft engine (6 models), AI narrator, mobile WebSocket companion. Editorial design system with DM Serif Display typography.
 
 ## Constraints
 
@@ -84,27 +66,22 @@ ESPN Fantasy API is read-only and undocumented. Auth uses SWID + espn_s2 cookies
 - **ESPN API**: Read-only, undocumented, cookie-based auth — retry with exponential backoff
 - **Projections**: FanGraphs CSV upload (manual) — ToS prevents automated fetching
 - **Rate stats**: Must use component math from `packages/shared/src/formulas.ts` — never average rates
-- **Multi-tenant**: All data scoped per user/league, JWT auth with league membership verification
-- **Roto only**: Category-based roto leagues for v1 — points/H2H are different paradigms
+- **Roto only**: Category-based roto leagues — points/H2H are different paradigms
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Recommendations only, no ESPN write actions | ESPN has no official write API; reverse-engineering is fragile | ✓ Good — deep links to ESPN.com work well |
-| Deep links to ESPN.com for user action | Low complexity, reliable, good UX | ✓ Good |
-| Current-season history first, backfill later | Nail current experience before investing in historical data | ✓ Good — v1 ships without backfill |
-| Build on existing stack (Fastify + Next.js) | Large working codebase, no reason to rewrite | ✓ Good — saved significant time |
-| Roto category leagues only for v1 | Simplifies scoring model; points/H2H are different paradigms | ✓ Good — focused scope |
-| AES-256-GCM for ESPN cookie encryption | Industry standard, graceful degradation without ENCRYPTION_KEY | ✓ Good |
-| Component-based rate stat math (never average rates) | Mathematically correct projections | ✓ Good — fixed broken trade simulations |
+| Recommendations only, no ESPN write actions | ESPN has no official write API | ✓ Good |
+| Deep links to ESPN.com for user action | Low complexity, reliable | ✓ Good |
+| Component-based rate stat math | Mathematically correct projections | ✓ Good |
 | VBD with population std dev for SGP | Complete player pool, not sample | ✓ Good |
-| MLB StatsAPI for schedules (free, no auth) | Reliable, well-documented, no cost | ✓ Good |
-| Manual FanGraphs CSV upload only | ToS compliance — no automated scraping | ✓ Good — batch upload UX acceptable |
-| Two-tier component structure (ui/ + league/) | Generic primitives vs domain-specific separation | ✓ Good |
-| HttpOnly cookies for JWT (not localStorage) | XSS protection, automatic inclusion | ✓ Good |
-| Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic — proper agent framework vs ad-hoc prompts | — Pending |
-| Agent on backend (not extension) | Extension can't hold long-lived agent state; backend can persist memory, manage API keys | — Pending |
+| Deterministic engine + AI narrator layering | Engine computes, AI interprets — separation of concerns | ✓ Good |
+| Client-side draft engine (not server) | Low latency, works offline, no network dependency during draft | ✓ Good |
+| Greedy roster optimization over ILP | Good enough results within 100ms budget | ✓ Good |
+| Monte Carlo for bid uncertainty | Captures draft outcome variance | ✓ Good |
+| WebSocket hub for mobile companion | Extension → Fastify → phone, works on LAN | ✓ Good |
+| Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic | — Pending |
 
 ---
-*Last updated: 2026-03-05 after v2.0 milestone start*
+*Last updated: 2026-03-14 after v2.0 milestone completion*

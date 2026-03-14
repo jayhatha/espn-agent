@@ -2,22 +2,18 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-05)
+See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Milestone v2.0 — Shopping List UI (Phase 27: Shopping List UI)
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 38 — UX Audit and Fixes — In Progress
-Plan: 1/3 complete (38-01 done)
-Status: Phase 38 In Progress — BidVerdict card and player card expand/collapse implemented
-Last activity: 2026-03-10 — 38-01 complete (2 tasks, BidVerdict + compact player cards)
-
-Progress: Phase 38 In Progress (1/3 plans complete)
+Status: v2.0 milestone complete — between milestones
+Last activity: 2026-03-14 — v2.0 Position Shopping List shipped
 
 ```
-[############                            ] 30% v2.0
+[████████████████████] 100% v2.0 complete
 ```
 
 ## Performance Metrics

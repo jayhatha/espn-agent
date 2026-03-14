@@ -17,3 +17,24 @@
 
 ---
 
+
+## v2.0 Position Shopping List (Shipped: 2026-03-14)
+
+**Phases completed:** 35 phases, 108 plans
+**Timeline:** 18 days (2026-02-24 to 2026-03-13)
+**Scope:** Phases 6-38 (v1.1 through v2.0 — trades, history, draft engine, redesign, shopping list, audits)
+
+**Key accomplishments:**
+- Built Chrome extension with deterministic draft engine: inflation tracking, positional scarcity, category gap analysis, budget curves, build archetype detection, and Monte Carlo roster optimization
+- Position-organized shopping list with combined priority scoring (scarcity + roster needs + budget fit) and per-position top N targets with max bids
+- Full-season projected standings engine for all teams during live auction drafts
+- AI narrator layer interpreting engine signals with tactical commentary via OpenAI
+- Forward-looking draft simulation with win probability and trap nomination strategy
+- Mobile draft companion page via WebSocket for phone-based draft monitoring
+- Site redesign with typography-driven editorial composition design system
+- Performance audit fixing N+1 queries, DOM observer bottlenecks, and infrastructure config
+- Code quality audit addressing correctness bugs, error boundaries, and type safety
+- UX audit with BidVerdict cards, hierarchical navigation, tooltip glossary, and waiver grouping
+
+---
+
