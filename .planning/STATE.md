@@ -34,6 +34,7 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 
 - [40-01]: CONFIRMED/UNTESTED annotation convention established for all nomination-critical selectors; findFirstMatchingSelector helper exported for Plan 02
 - [40-02]: Strategy 4 (Button--select) runs before Strategy 3 (pickArea) as primary tier; UNTESTED fallbacks emit logger.warn; clearNominationState() is single reset path
+- [40-03]: typeIntoSearchInput() shared helper eliminates duplicated React input typing; 5 named timeout constants replace magic numbers in search polling
 - [40-04]: Used text-content-secondary for timestamps (text-content-muted not in design system); strategy tier badge pattern established
 - [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only

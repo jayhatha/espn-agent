@@ -27,7 +27,7 @@ Phases 6-38 covering v1.1 trade upgrades, history backfill, Chrome extension, de
 **Milestone Goal:** Make auto-nomination reliable with verified ESPN selectors and upgrade the mobile draft companion into a full command-and-control terminal.
 
 - [ ] **Phase 39: DevTools Setup** - Chrome DevTools MCP configured, selector battery validated against live ESPN draft DOM
-- [ ] **Phase 40: Auto-Nomination Rework** - Nomination state machine consolidated using MCP-verified selectors with polling-based reliability
+- [x] **Phase 40: Auto-Nomination Rework** - Nomination state machine consolidated using MCP-verified selectors with polling-based reliability (completed 2026-03-14)
 - [ ] **Phase 41: Mobile Command Center** - Mobile page redesigned with all engine signals, full draft controls, and phone-optimized layout
 
 ## Phase Details
@@ -83,5 +83,5 @@ Phases execute in numeric order: 39 → 40 → 41
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 39. DevTools Setup | v3.0 | 0/TBD | Not started | - |
-| 40. Auto-Nomination Rework | 3/4 | In Progress|  | - |
+| 40. Auto-Nomination Rework | 4/4 | Complete   | 2026-03-14 | - |
 | 41. Mobile Command Center | v3.0 | 0/TBD | Not started | - |
