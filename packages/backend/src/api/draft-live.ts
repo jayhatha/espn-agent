@@ -23,6 +23,12 @@ interface ControlMessage {
   payload?: unknown;
 }
 
+interface ExtensionStatusMessage {
+  type: "EXTENSION_STATUS";
+  connected: boolean;
+  ts: number;
+}
+
 type ExtensionMessage = PingMessage | StateSnapshotMessage;
 type MobileMessage = ControlMessage;
 type InboundMessage = ExtensionMessage | MobileMessage;
@@ -32,6 +38,13 @@ export async function draftLiveRoutes(app: FastifyInstance) {
   const mobileClients = new Set<WebSocket>();
   let latestSnapshot: string | null = null;
 
+  function broadcastToMobile(msg: Record<string, unknown>) {
+    const str = JSON.stringify(msg);
+    for (const client of mobileClients) {
+      if (client.readyState === 1) client.send(str);
+    }
+  }
+
   app.get("/draft/live", { websocket: true }, (socket, req) => {
     const params = new URLSearchParams(req.url.split("?")[1] ?? "");
     const role = params.get("role");
@@ -39,6 +52,7 @@ export async function draftLiveRoutes(app: FastifyInstance) {
     if (role === "extension") {
       extensionSocket = socket;
       app.log.info("[DraftLive] Extension connected");
+      broadcastToMobile({ type: "EXTENSION_STATUS", connected: true, ts: Date.now() });
 
       socket.on("message", (raw: Buffer) => {
         let msg: InboundMessage;
@@ -68,11 +82,13 @@ export async function draftLiveRoutes(app: FastifyInstance) {
       socket.on("close", () => {
         extensionSocket = null;
         app.log.info("[DraftLive] Extension disconnected");
+        broadcastToMobile({ type: "EXTENSION_STATUS", connected: false, ts: Date.now() });
       });
 
       socket.on("error", (err: Error) => {
         app.log.error({ err }, "[DraftLive] Extension socket error");
         extensionSocket = null;
+        broadcastToMobile({ type: "EXTENSION_STATUS", connected: false, ts: Date.now() });
       });
     } else {
       // Treat all non-extension connections as mobile clients
@@ -80,6 +96,13 @@ export async function draftLiveRoutes(app: FastifyInstance) {
       app.log.info(
         `[DraftLive] Mobile client connected (total: ${mobileClients.size})`,
       );
+
+      // Send current extension status immediately so mobile knows connection state
+      socket.send(JSON.stringify({
+        type: "EXTENSION_STATUS",
+        connected: extensionSocket !== null,
+        ts: Date.now(),
+      } satisfies ExtensionStatusMessage));
 
       // Send the latest snapshot immediately so the phone gets current state
       if (latestSnapshot !== null) {
