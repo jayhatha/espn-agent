@@ -118,6 +118,16 @@ export class AutoBidController {
   private static readonly TARGET_QUEUE_SIZE = 3;
   /** Minimum time between queue population runs (ms) — prevents rapid re-clicking */
   private static readonly QUEUE_POPULATE_COOLDOWN_MS = 15000;
+  /** How long to wait for ESPN's search dropdown to appear after typing (ms) */
+  private static readonly SEARCH_DROPDOWN_TIMEOUT_MS = 2000;
+  /** How long to wait for ESPN's queue button to appear after clicking dropdown match (ms) */
+  private static readonly SEARCH_QUEUE_BUTTON_TIMEOUT_MS = 3000;
+  /** Polling interval for dropdown and queue button checks (ms) */
+  private static readonly SEARCH_POLL_INTERVAL_MS = 200;
+  /** Delay after clicking dropdown match before starting queue button poll (ms) */
+  private static readonly SEARCH_DROPDOWN_SETTLE_MS = 500;
+  /** Delay after clicking queue/select button before clearing search (ms) */
+  private static readonly SEARCH_CLEAR_DELAY_MS = 500;
 
   start(): void {
     if (this.unsubscribe) {
@@ -955,6 +965,75 @@ export class AutoBidController {
   }
 
   /**
+   * Find ESPN's player search input and type a search term into it using the
+   * React-compatible nativeInputValueSetter + InputEvent pattern.
+   *
+   * ESPN's draft page uses React, so plain `input.value = x` assignments are ignored
+   * by React's synthetic event system. We must use the native setter to bypass React's
+   * value tracking, then dispatch an InputEvent (not a plain Event) with inputType
+   * "insertText" — this is what React's onChange handler receives from a real keystroke.
+   *
+   * Returns the search input element if found and typed into, null if the input was not found.
+   *
+   * Selectors (Phase 39 Group 9):
+   * CONFIRMED: .playersSearch input.form__control
+   * UNTESTED:  input[placeholder="Player Name"] — fallback if primary fails
+   */
+  private typeIntoSearchInput(
+    searchTerm: string,
+    context: string,
+  ): HTMLInputElement | null {
+    // CONFIRMED (Phase 39 Group 9): .playersSearch input.form__control
+    const searchInput =
+      document.querySelector<HTMLInputElement>(
+        ".playersSearch input.form__control",
+      ) ??
+      document.querySelector<HTMLInputElement>(
+        'input[placeholder="Player Name"]',
+      ); // UNTESTED fallback
+
+    if (!searchInput) {
+      logger.warn(
+        `[${context}] Search input not found (.playersSearch input.form__control) — cannot search`,
+      );
+      return null;
+    }
+
+    // Focus before typing so ESPN's React app registers the interaction
+    searchInput.focus();
+
+    // Set value via native setter to bypass React's controlled input tracking
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(searchInput, searchTerm);
+    } else {
+      searchInput.value = searchTerm;
+    }
+
+    // Dispatch InputEvent (carries data/inputType) — React's synthetic event handler uses this
+    searchInput.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: searchTerm,
+        inputType: "insertText",
+      }),
+    );
+    // Dispatch change + keyup for handlers that listen for keyboard events
+    searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+    searchInput.dispatchEvent(
+      new KeyboardEvent("keyup", {
+        bubbles: true,
+        key: searchTerm.slice(-1),
+      }),
+    );
+
+    return searchInput;
+  }
+
+  /**
    * Use ESPN's player search input to find a player not visible in the table,
    * click their dropdown match, wait for the Queue button to appear, click it,
    * then clear the search. Returns true if successfully queued, false otherwise.
@@ -964,57 +1043,23 @@ export class AutoBidController {
     playerId: number,
   ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      const searchInput = document.querySelector<HTMLInputElement>(
-        '.playersSearch input.form__control, input[placeholder="Player Name"]',
-      );
-
-      if (!searchInput) {
-        logger.warn(
-          `[AutoQueue] Search input not found — cannot search for ${candidateName}`,
-        );
-        resolve(false);
-        return;
-      }
-
       // Use last name for search — ESPN search works better with just the surname
       const nameParts = candidateName.trim().split(/\s+/);
       const searchTerm =
         nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
 
-      // Focus the input before typing so ESPN's React app registers the interaction
-      searchInput.focus();
-
-      // Type the search term into the search input using React-compatible value setting
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(searchInput, searchTerm);
-      } else {
-        searchInput.value = searchTerm;
+      const searchInput = this.typeIntoSearchInput(searchTerm, "AutoQueue");
+      if (!searchInput) {
+        resolve(false);
+        return;
       }
-      searchInput.dispatchEvent(
-        new InputEvent("input", {
-          bubbles: true,
-          data: searchTerm,
-          inputType: "insertText",
-        }),
-      );
-      searchInput.dispatchEvent(new Event("change", { bubbles: true }));
-      searchInput.dispatchEvent(
-        new KeyboardEvent("keyup", {
-          bubbles: true,
-          key: searchTerm.slice(-1),
-        }),
-      );
 
       logger.log(
         `[AutoQueue] Typed "${searchTerm}" into search (from "${candidateName}")`,
       );
 
-      const maxElapsed = 2000;
-      const pollInterval = 200;
+      const maxElapsed = AutoBidController.SEARCH_DROPDOWN_TIMEOUT_MS;
+      const pollInterval = AutoBidController.SEARCH_POLL_INTERVAL_MS;
       const normalizedCandidate = normalizeName(candidateName);
 
       const pollForDropdown = (elapsed: number): void => {
@@ -1075,8 +1120,8 @@ export class AutoBidController {
                   );
                   setTimeout(() => {
                     this.clearPlayerSearch();
-                    setTimeout(() => resolve(true), 500);
-                  }, 500);
+                    setTimeout(() => resolve(true), AutoBidController.SEARCH_CLEAR_DELAY_MS);
+                  }, AutoBidController.SEARCH_CLEAR_DELAY_MS);
                   return;
                 }
               }
@@ -1096,15 +1141,15 @@ export class AutoBidController {
                     );
                     setTimeout(() => {
                       this.clearPlayerSearch();
-                      setTimeout(() => resolve(true), 500);
-                    }, 500);
+                      setTimeout(() => resolve(true), AutoBidController.SEARCH_CLEAR_DELAY_MS);
+                    }, AutoBidController.SEARCH_CLEAR_DELAY_MS);
                     return;
                   }
                 }
               }
 
               // Continue polling if timeout not reached
-              if (elapsed + 300 < 3000) {
+              if (elapsed + 300 < AutoBidController.SEARCH_QUEUE_BUTTON_TIMEOUT_MS) {
                 setTimeout(() => pollForQueueButton(elapsed + 300), 300);
               } else {
                 // Timeout — log diagnostics to help debug future failures
@@ -1117,7 +1162,7 @@ export class AutoBidController {
                   )
                   .join(", ");
                 logger.warn(
-                  `[AutoQueue] Queue button not found for ${candidateName} (ID: ${playerId}) after 3000ms polling. Visible buttons: [${buttonSummary}]`,
+                  `[AutoQueue] Queue button not found for ${candidateName} (ID: ${playerId}) after ${AutoBidController.SEARCH_QUEUE_BUTTON_TIMEOUT_MS}ms polling. Visible buttons: [${buttonSummary}]`,
                 );
                 this.clearPlayerSearch();
                 resolve(false);
@@ -1125,7 +1170,7 @@ export class AutoBidController {
             };
 
             // Start polling after initial delay to give ESPN time to process the dropdown click
-            setTimeout(() => pollForQueueButton(0), 500);
+            setTimeout(() => pollForQueueButton(0), AutoBidController.SEARCH_DROPDOWN_SETTLE_MS);
             return;
           }
         }
@@ -1159,50 +1204,17 @@ export class AutoBidController {
     playerId: number,
     candidateReason: string,
   ): void {
-    const searchInput = document.querySelector<HTMLInputElement>(
-      '.playersSearch input.form__control, input[placeholder="Player Name"]',
-    );
-
-    if (!searchInput) {
-      logger.warn(
-        `[AutoNominate] Search input not found — cannot search for ${candidateName}`,
-      );
-      this.nominationAttempts++;
-      this.lastNominationTime = Date.now();
-      return;
-    }
-
     // Use last name for search — ESPN search works better with just the surname
     const nameParts = candidateName.trim().split(/\s+/);
     const searchTerm =
       nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
 
-    // Focus the input before typing so ESPN's React app registers the interaction
-    searchInput.focus();
-
-    // Type the search term into the search input using React-compatible value setting
-    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )?.set;
-    if (nativeInputValueSetter) {
-      nativeInputValueSetter.call(searchInput, searchTerm);
-    } else {
-      searchInput.value = searchTerm;
+    const searchInput = this.typeIntoSearchInput(searchTerm, "AutoNominate");
+    if (!searchInput) {
+      this.nominationAttempts++;
+      this.lastNominationTime = Date.now();
+      return;
     }
-    // Dispatch InputEvent (carries data/inputType) which React's synthetic event system uses,
-    // followed by a change event and a keyup event for handlers that listen for keyboard events
-    searchInput.dispatchEvent(
-      new InputEvent("input", {
-        bubbles: true,
-        data: searchTerm,
-        inputType: "insertText",
-      }),
-    );
-    searchInput.dispatchEvent(new Event("change", { bubbles: true }));
-    searchInput.dispatchEvent(
-      new KeyboardEvent("keyup", { bubbles: true, key: searchTerm.slice(-1) }),
-    );
 
     logger.log(
       `[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`,
@@ -1210,8 +1222,8 @@ export class AutoBidController {
 
     // Poll for the search dropdown (.player--search--matches) to appear, then click the
     // correct match button. Use recursive setTimeout (not setInterval) for clean termination.
-    const maxElapsed = 2000;
-    const pollInterval = 200;
+    const maxElapsed = AutoBidController.SEARCH_DROPDOWN_TIMEOUT_MS;
+    const pollInterval = AutoBidController.SEARCH_POLL_INTERVAL_MS;
     const normalizedCandidate = normalizeName(candidateName);
 
     const pollForDropdown = (elapsed: number): void => {
@@ -1259,12 +1271,12 @@ export class AutoBidController {
           // After ESPN processes the dropdown selection, click the Nominate/Select confirm button
           setTimeout(() => {
             this.clickNominateButton(candidateName);
-          }, 500);
+          }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS);
 
           // Clear the search input after the nomination flow completes
           setTimeout(() => {
             this.clearPlayerSearch();
-          }, 1500);
+          }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS + 1000);
           return;
         }
       }
@@ -1291,11 +1303,12 @@ export class AutoBidController {
    * Clear ESPN's player search input by clicking the clear button or resetting the value.
    */
   private clearPlayerSearch(): void {
-    // Try the clear button first — also try the SVG child as a fallback click target
+    // CONFIRMED (Phase 39 Group 9): .player--search--clear
     let clearButton = document.querySelector<HTMLElement>(
       ".player--search--clear",
     );
     if (!clearButton) {
+      // UNTESTED: SVG child fallback — ESPN may structure the clear button differently
       const clearSvg = document.querySelector<SVGElement>(
         "div.player--search--clear svg",
       );
@@ -1310,8 +1323,9 @@ export class AutoBidController {
     }
 
     // Fallback: reset input value directly
+    // CONFIRMED (Phase 39 Group 9): .playersSearch input.form__control
     const searchInput = document.querySelector<HTMLInputElement>(
-      '.playersSearch input.form__control, input[placeholder="Player Name"]',
+      ".playersSearch input.form__control",
     );
     if (searchInput) {
       // Focus before clearing so React registers the interaction
@@ -1325,7 +1339,7 @@ export class AutoBidController {
       } else {
         searchInput.value = "";
       }
-      // InputEvent with deleteContentBackward mirrors what a user pressing Ctrl+A+Delete would do
+      // InputEvent with deleteContentBackward mirrors Ctrl+A+Delete — React's onChange handles this correctly
       searchInput.dispatchEvent(
         new InputEvent("input", {
           bubbles: true,
