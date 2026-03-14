@@ -7,19 +7,21 @@ import { logger } from "./logger";
 function findActionButton(playerId: string | number): HTMLButtonElement | null {
   return (
     document.querySelector<HTMLButtonElement>(
-      `button.action-btn[data-player-id="${playerId}"]`
+      `button.action-btn[data-player-id="${playerId}"]`,
     ) ??
     document.querySelector<HTMLButtonElement>(
-      `button[data-player-id="${playerId}"]`
+      `button[data-player-id="${playerId}"]`,
     )
   );
 }
 
 /** Find all action buttons, preferring .action-btn class */
 function findAllActionButtons(): NodeListOf<HTMLButtonElement> {
-  const buttons = document.querySelectorAll<HTMLButtonElement>('button.action-btn[data-player-id]');
+  const buttons = document.querySelectorAll<HTMLButtonElement>(
+    "button.action-btn[data-player-id]",
+  );
   if (buttons.length > 0) return buttons;
-  return document.querySelectorAll<HTMLButtonElement>('button[data-player-id]');
+  return document.querySelectorAll<HTMLButtonElement>("button[data-player-id]");
 }
 
 /**
@@ -34,8 +36,13 @@ export interface NominationDiagnostics {
   cooldownRemainingMs: number;
   lastAttemptResult: string | null;
   lastCandidateName: string | null;
-  lastCandidateSource: 'simulation' | 'idealRoster' | 'queue' | null;
-  lastTurnDetectionResult: { matched: boolean; strategy: string | null; strategiesChecked: string[] };
+  lastCandidateSource: "simulation" | "idealRoster" | "queue" | null;
+  lastTurnDetectionResult: {
+    matched: boolean;
+    strategy: string | null;
+    strategiesChecked: string[];
+    turnStrategyType: "primary" | "fallback" | null;
+  };
   isActive: boolean; // autoMode && currentAuctionPlayer == null
   queuePopulationCount: number; // size of queuedPlayerIds set (players we queued this session)
   lastQueuePopulateTime: number | null; // timestamp of last queue population run
@@ -89,11 +96,18 @@ export class AutoBidController {
   // Diagnostic state (for getNominationDiagnostics() and NominationDiagnostics UI)
   private lastAttemptResult: string | null = null;
   private lastCandidateName: string | null = null;
-  private lastCandidateSource: 'simulation' | 'idealRoster' | 'queue' | null = null;
-  private lastTurnDetection: { matched: boolean; strategy: string | null; strategiesChecked: string[] } = {
+  private lastCandidateSource: "simulation" | "idealRoster" | "queue" | null =
+    null;
+  private lastTurnDetection: {
+    matched: boolean;
+    strategy: string | null;
+    strategiesChecked: string[];
+    turnStrategyType: "primary" | "fallback" | null;
+  } = {
     matched: false,
     strategy: null,
     strategiesChecked: [],
+    turnStrategyType: null,
   };
 
   /** Cooldown between nomination attempts (ms) */
@@ -178,13 +192,13 @@ export class AutoBidController {
     this.unsubscribe = null;
     this.lastBidPrice = null;
     this.lastEngineSignals = null;
+    // Reset bid tracking state
     this.prevAutoMode = false;
     this.prevCurrentBid = undefined;
     this.prevPlayerName = undefined;
     this.prevCurrentAuctionPlayer = undefined;
+    // Single reset path for all nomination state (including queue state)
     this.clearNominationState();
-    this.lastQueuePopulateTime = null;
-    this.queuedPlayerIds.clear();
     logger.log("[AutoBidController] Stopped");
   }
 
@@ -242,7 +256,13 @@ export class AutoBidController {
     this.lastAttemptResult = null;
     this.lastCandidateName = null;
     this.lastCandidateSource = null;
-    this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked: [] };
+    this.lastTurnDetection = {
+      matched: false,
+      strategy: null,
+      strategiesChecked: [],
+      turnStrategyType: null,
+    };
+    // Queue population state (resets on stop/mode-off so next session starts fresh)
     this.lastQueuePopulateTime = null;
     this.queuedPlayerIds.clear();
   }
@@ -255,9 +275,14 @@ export class AutoBidController {
   getNominationDiagnostics(): NominationDiagnostics {
     const state = useDraftStore.getState();
     const now = Date.now();
-    const cooldownRemainingMs = this.lastNominationTime != null
-      ? Math.max(0, AutoBidController.NOMINATION_COOLDOWN_MS - (now - this.lastNominationTime))
-      : 0;
+    const cooldownRemainingMs =
+      this.lastNominationTime != null
+        ? Math.max(
+            0,
+            AutoBidController.NOMINATION_COOLDOWN_MS -
+              (now - this.lastNominationTime),
+          )
+        : 0;
 
     return {
       autoMode: state.autoMode,
@@ -299,21 +324,99 @@ export class AutoBidController {
   private isMyTurnToNominate(): boolean {
     const strategiesChecked: string[] = [];
 
-    // Strategy 1: Check for "Nominate a Player" or "Select a player" prompt text
-    // ESPN shows this when it is your turn and no player is nominated
-    const s1 = "Strategy 1 (body text: 'nominate a player' / 'select a player')";
-    strategiesChecked.push(s1);
-    const bodyText = document.body?.innerText || "";
-    const s1matched = /nominate\s+a\s+player/i.test(bodyText) || /select\s+a\s+player/i.test(bodyText);
-    logger.debug(`[AutoNominate] ${s1}: ${s1matched}`);
-    if (s1matched) {
-      this.lastTurnDetection = { matched: true, strategy: s1, strategiesChecked };
-      logger.log(`[AutoNominate] Turn detected via: ${s1}`);
+    // ── PRIMARY TIER: CONFIRMED selectors (Phase 39 SELECTOR-MAP) ──────────────
+    // Run these first. If either matches, we are confident it is our turn.
+
+    // Strategy 4 (PRIMARY): Button--select buttons in player table
+    // CONFIRMED: button.Button--select[data-player-id]:not([disabled]) — Phase 39 Group 6
+    // ESPN changes Queue → Select buttons when it is the user's nomination turn.
+    const s4 = "Strategy 4 [PRIMARY] (Button--select buttons in player table)";
+    strategiesChecked.push(s4);
+    const selectButtons = document.querySelectorAll<HTMLButtonElement>(
+      "button.Button--select[data-player-id]:not([disabled])",
+    );
+    const s4matched = selectButtons.length > 0;
+    logger.debug(`[AutoNominate] ${s4}: ${s4matched} (count=${selectButtons.length})`);
+    if (s4matched) {
+      this.lastTurnDetection = {
+        matched: true,
+        strategy: s4,
+        strategiesChecked,
+        turnStrategyType: "primary",
+      };
+      logger.log(`[AutoNominate] Turn detected via: ${s4}`);
       return true;
     }
 
-    // Strategy 2: Check pick train for highlighted/active team matching our team
-    const s2 = "Strategy 2 (pick train active team: 'your'/'my turn' indicator)";
+    // Strategy 3 (PRIMARY): pickArea text or empty pickArea with no player selected
+    // CONFIRMED: .pickArea — Phase 39 Group 4/8
+    // CONFIRMED: [data-testid="player-selected"] — Phase 39 Group 4
+    const s3 = "Strategy 3 [PRIMARY] (pickArea text or nominate button)";
+    strategiesChecked.push(s3);
+    const pickArea = document.querySelector(".pickArea");
+    let s3matched = false;
+    if (pickArea) {
+      const pickAreaText = pickArea.textContent?.toLowerCase() || "";
+      if (
+        pickAreaText.includes("nominate") ||
+        pickAreaText.includes("select a player")
+      ) {
+        s3matched = true;
+      } else {
+        const playerSelected = pickArea.querySelector(
+          '[data-testid="player-selected"]',
+        );
+        if (!playerSelected && pickAreaText.trim().length < 20) {
+          const nominateButton = document.querySelector("button.bid-player__button");
+          if (nominateButton) {
+            s3matched = true;
+          }
+        }
+      }
+    }
+    logger.debug(`[AutoNominate] ${s3}: ${s3matched} (pickArea found=${pickArea != null})`);
+    if (s3matched) {
+      this.lastTurnDetection = {
+        matched: true,
+        strategy: s3,
+        strategiesChecked,
+        turnStrategyType: "primary",
+      };
+      logger.log(`[AutoNominate] Turn detected via: ${s3}`);
+      return true;
+    }
+
+    // ── FALLBACK TIER: UNTESTED selectors — only runs if primary tier fails ──────
+    // These strategies have not been verified against live ESPN DOM (Phase 39).
+    // If one of these matches, log a warning so we know to validate it.
+    logger.debug("[AutoNominate] Primary strategies failed — trying UNTESTED fallback strategies");
+
+    // Strategy 1 (UNTESTED_FALLBACK): body text scan
+    // UNTESTED: relies on ESPN text content not changing between seasons
+    const s1 = "Strategy 1 [UNTESTED_FALLBACK] (body text: 'nominate a player' / 'select a player')";
+    strategiesChecked.push(s1);
+    const bodyText = document.body?.innerText || "";
+    const s1matched =
+      /nominate\s+a\s+player/i.test(bodyText) ||
+      /select\s+a\s+player/i.test(bodyText);
+    logger.debug(`[AutoNominate] ${s1}: ${s1matched}`);
+    if (s1matched) {
+      logger.warn(
+        "[AutoNominate] Turn detected via UNTESTED fallback strategy 1 (body text). " +
+        "Verify this selector with Chrome DevTools MCP and update SELECTOR-MAP.md.",
+      );
+      this.lastTurnDetection = {
+        matched: true,
+        strategy: s1,
+        strategiesChecked,
+        turnStrategyType: "fallback",
+      };
+      return true;
+    }
+
+    // Strategy 2 (UNTESTED_FALLBACK): pick train active team
+    // UNTESTED: .pick-train, [class*="pickTrain"], .active/[class*="active"] not verified
+    const s2 = "Strategy 2 [UNTESTED_FALLBACK] (pick train active team)";
     strategiesChecked.push(s2);
     const pickTrainSelectors = [
       ".pick-train",
@@ -321,13 +424,11 @@ export class AutoBidController {
       '[class*="pick-train"]',
       '[class*="PickTrain"]',
     ];
-
     let pickTrain: Element | null = null;
     for (const selector of pickTrainSelectors) {
       pickTrain = document.querySelector(selector);
       if (pickTrain) break;
     }
-
     let s2matched = false;
     if (pickTrain) {
       const activeSelectors = [
@@ -339,13 +440,11 @@ export class AutoBidController {
         '[class*="myTurn"]',
         '[class*="your-turn"]',
       ];
-
       let activeTeam: Element | null = null;
       for (const selector of activeSelectors) {
         activeTeam = pickTrain.querySelector(selector);
         if (activeTeam) break;
       }
-
       if (activeTeam) {
         const activeText = activeTeam.textContent?.toLowerCase() || "";
         if (activeText.includes("your") || activeText.includes("my turn")) {
@@ -355,79 +454,56 @@ export class AutoBidController {
     }
     logger.debug(`[AutoNominate] ${s2}: ${s2matched} (pickTrain found=${pickTrain != null})`);
     if (s2matched) {
-      this.lastTurnDetection = { matched: true, strategy: s2, strategiesChecked };
-      logger.log(`[AutoNominate] Turn detected via: ${s2}`);
+      logger.warn(
+        "[AutoNominate] Turn detected via UNTESTED fallback strategy 2 (pick train). " +
+        "Verify with Chrome DevTools MCP and update SELECTOR-MAP.md.",
+      );
+      this.lastTurnDetection = {
+        matched: true,
+        strategy: s2,
+        strategiesChecked,
+        turnStrategyType: "fallback",
+      };
       return true;
     }
 
-    // Strategy 3: Check if the bidding form area is in a "waiting to nominate" state
-    // ESPN shows the pick area empty or with a nomination prompt when it's your turn
-    const s3 = "Strategy 3 (pickArea text or nominate button)";
-    strategiesChecked.push(s3);
-    const pickArea = document.querySelector(".pickArea, [class*='pickArea']");
-    let s3matched = false;
-    if (pickArea) {
-      const pickAreaText = pickArea.textContent?.toLowerCase() || "";
-      if (pickAreaText.includes("nominate") || pickAreaText.includes("select a player")) {
-        s3matched = true;
-      } else {
-        const playerSelected = pickArea.querySelector('[data-testid="player-selected"], .player-selected');
-        if (!playerSelected && pickAreaText.trim().length < 20) {
-          const nominateButton = document.querySelector(
-            'button[class*="nominate"], button[class*="Nominate"], [data-testid*="nominate"]'
-          );
-          if (nominateButton) {
-            s3matched = true;
-          }
-        }
-      }
-    }
-    logger.debug(`[AutoNominate] ${s3}: ${s3matched} (pickArea found=${pickArea != null})`);
-    if (s3matched) {
-      this.lastTurnDetection = { matched: true, strategy: s3, strategiesChecked };
-      logger.log(`[AutoNominate] Turn detected via: ${s3}`);
-      return true;
-    }
-
-    // Strategy 4: Check for "Select" buttons (Button--select class) in the player table
-    // ESPN changes "Queue" → "Select" when it is your turn to nominate
-    const s4 = "Strategy 4 (Button--select buttons in player table)";
-    strategiesChecked.push(s4);
-    const selectButtons = document.querySelectorAll<HTMLButtonElement>(
-      "button.Button--select[data-player-id]:not([disabled])"
-    );
-    const s4matched = selectButtons.length > 0;
-    logger.debug(`[AutoNominate] ${s4}: ${s4matched} (count=${selectButtons.length})`);
-    if (s4matched) {
-      this.lastTurnDetection = { matched: true, strategy: s4, strategiesChecked };
-      logger.log(`[AutoNominate] Turn detected via: ${s4}`);
-      return true;
-    }
-
-    // Strategy 5: Check for an enabled Queue button in the player table
-    // If queue buttons are clickable, it likely means we can nominate
-    const s5 = "Strategy 5 (enabled queue buttons, no active bidding form)";
+    // Strategy 5 (UNTESTED_FALLBACK): enabled queue buttons + no bidding form
+    // UNTESTED: form.bidding-form__default not confirmed against live ESPN DOM
+    const s5 = "Strategy 5 [UNTESTED_FALLBACK] (enabled queue buttons, no active bidding form)";
     strategiesChecked.push(s5);
     const queueButtons = document.querySelectorAll<HTMLButtonElement>(
-      "button[data-player-id]:not([disabled])"
+      "button[data-player-id]:not([disabled])",
     );
     let s5matched = false;
     if (queueButtons.length > 0) {
       const biddingForm = document.querySelector("form.bidding-form__default");
-      const currentAmount = document.querySelector(".current-amount");
+      const currentAmount = document.querySelector(".current-amount"); // CONFIRMED
       if (!biddingForm && !currentAmount) {
         s5matched = true;
       }
     }
     logger.debug(`[AutoNominate] ${s5}: ${s5matched} (queueCount=${queueButtons.length})`);
     if (s5matched) {
-      this.lastTurnDetection = { matched: true, strategy: s5, strategiesChecked };
-      logger.log(`[AutoNominate] Turn detected via: ${s5}`);
+      logger.warn(
+        "[AutoNominate] Turn detected via UNTESTED fallback strategy 5 (queue buttons + no bid form). " +
+        "Verify with Chrome DevTools MCP and update SELECTOR-MAP.md.",
+      );
+      this.lastTurnDetection = {
+        matched: true,
+        strategy: s5,
+        strategiesChecked,
+        turnStrategyType: "fallback",
+      };
       return true;
     }
 
     // No strategy matched
-    this.lastTurnDetection = { matched: false, strategy: null, strategiesChecked };
+    this.lastTurnDetection = {
+      matched: false,
+      strategy: null,
+      strategiesChecked,
+      turnStrategyType: null,
+    };
     return false;
   }
 
@@ -470,14 +546,16 @@ export class AutoBidController {
     const selectButtons = findAllActionButtons();
     let hasSelectButton = false;
     for (const btn of selectButtons) {
-      const text = btn.textContent?.trim().toLowerCase() || '';
-      if (text === 'select') {
+      const text = btn.textContent?.trim().toLowerCase() || "";
+      if (text === "select") {
         hasSelectButton = true;
         break;
       }
     }
     if (hasSelectButton) {
-      logger.log('[AutoQueue] User\'s turn detected (Select buttons present) — skipping queue population');
+      logger.log(
+        "[AutoQueue] User's turn detected (Select buttons present) — skipping queue population",
+      );
       return;
     }
 
@@ -486,27 +564,30 @@ export class AutoBidController {
 
     // Scrape current queue state to know which players are already queued
     const currentQueue = scrapeESPNNominationQueue();
-    const alreadyQueuedIds = new Set(currentQueue.map(q => q.playerId));
+    const alreadyQueuedIds = new Set(currentQueue.map((q) => q.playerId));
     const currentQueueSize = currentQueue.length;
 
     const slotsToFill = AutoBidController.TARGET_QUEUE_SIZE - currentQueueSize;
     if (slotsToFill <= 0) {
-      logger.log(`[AutoQueue] Queue already at target size (${currentQueueSize}/${AutoBidController.TARGET_QUEUE_SIZE}) — skipping`);
+      logger.log(
+        `[AutoQueue] Queue already at target size (${currentQueueSize}/${AutoBidController.TARGET_QUEUE_SIZE}) — skipping`,
+      );
       return;
     }
 
     // Build candidate list from engine signals
     // Primary: nomination strategy trap scores (already sorted by trapScore desc)
     // Fallback: ideal roster non-drafted players
-    const draftedPlayerIds = new Set(state.allPicks.map(p => p.playerId));
+    const draftedPlayerIds = new Set(state.allPicks.map((p) => p.playerId));
 
-    type Candidate = { name: string; source: 'simulation' | 'idealRoster' };
+    type Candidate = { name: string; source: "simulation" | "idealRoster" };
     const candidates: Candidate[] = [];
 
-    const nominationStrategy = this.lastEngineSignals?.simulation?.nominationStrategy;
+    const nominationStrategy =
+      this.lastEngineSignals?.simulation?.nominationStrategy;
     if (nominationStrategy && nominationStrategy.length > 0) {
       for (const rec of nominationStrategy) {
-        candidates.push({ name: rec.playerName, source: 'simulation' });
+        candidates.push({ name: rec.playerName, source: "simulation" });
       }
     }
 
@@ -514,12 +595,14 @@ export class AutoBidController {
     const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
     for (const p of idealPlayers) {
       if (!p.isDrafted) {
-        candidates.push({ name: p.name, source: 'idealRoster' });
+        candidates.push({ name: p.name, source: "idealRoster" });
       }
     }
 
     if (candidates.length === 0) {
-      logger.log('[AutoQueue] No engine candidates available — skipping queue population');
+      logger.log(
+        "[AutoQueue] No engine candidates available — skipping queue population",
+      );
       return;
     }
 
@@ -531,11 +614,13 @@ export class AutoBidController {
 
       const normalizedCandidate = normalizeName(candidate.name);
       const matchedRanking = state.rankings?.find(
-        (r) => normalizeName(r.playerName) === normalizedCandidate
+        (r) => normalizeName(r.playerName) === normalizedCandidate,
       );
 
       if (!matchedRanking) {
-        logger.debug(`[AutoQueue] No ranking match for "${candidate.name}" — skipping`);
+        logger.debug(
+          `[AutoQueue] No ranking match for "${candidate.name}" — skipping`,
+        );
         continue;
       }
 
@@ -543,13 +628,20 @@ export class AutoBidController {
 
       // Skip already-drafted players
       if (draftedPlayerIds.has(playerId)) {
-        logger.debug(`[AutoQueue] ${candidate.name} already drafted — skipping`);
+        logger.debug(
+          `[AutoQueue] ${candidate.name} already drafted — skipping`,
+        );
         continue;
       }
 
       // Skip already-queued players (from DOM scrape OR our session tracking)
-      if (alreadyQueuedIds.has(playerId) || this.queuedPlayerIds.has(playerId)) {
-        logger.debug(`[AutoQueue] ${candidate.name} (ID: ${playerId}) already queued — skipping`);
+      if (
+        alreadyQueuedIds.has(playerId) ||
+        this.queuedPlayerIds.has(playerId)
+      ) {
+        logger.debug(
+          `[AutoQueue] ${candidate.name} (ID: ${playerId}) already queued — skipping`,
+        );
         continue;
       }
 
@@ -557,27 +649,38 @@ export class AutoBidController {
       const button = findActionButton(playerId);
 
       if (!button) {
-        logger.debug(`[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — searching via search bar`);
-        const searchQueued = await this.searchAndQueue(candidate.name, playerId);
+        logger.debug(
+          `[AutoQueue] Button not found for ${candidate.name} (ID: ${playerId}) — searching via search bar`,
+        );
+        const searchQueued = await this.searchAndQueue(
+          candidate.name,
+          playerId,
+        );
         if (searchQueued) {
           this.queuedPlayerIds.add(playerId);
           queued++;
-          logger.log(`[AutoQueue] Search-queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`);
+          logger.log(
+            `[AutoQueue] Search-queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`,
+          );
           // Give ESPN time to settle before next search
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 500));
         }
         continue;
       }
 
       if (button.disabled) {
-        logger.debug(`[AutoQueue] Button disabled for ${candidate.name} (ID: ${playerId}) — skipping`);
+        logger.debug(
+          `[AutoQueue] Button disabled for ${candidate.name} (ID: ${playerId}) — skipping`,
+        );
         continue;
       }
 
-      const buttonText = button.textContent?.trim().toLowerCase() || '';
-      if (!buttonText.includes('queue')) {
+      const buttonText = button.textContent?.trim().toLowerCase() || "";
+      if (!buttonText.includes("queue")) {
         // Button text is not "Queue" — it might be "Dequeue" (already queued) or something else
-        logger.debug(`[AutoQueue] Button text "${buttonText}" for ${candidate.name} — not a Queue button, skipping`);
+        logger.debug(
+          `[AutoQueue] Button text "${buttonText}" for ${candidate.name} — not a Queue button, skipping`,
+        );
         continue;
       }
 
@@ -585,13 +688,17 @@ export class AutoBidController {
       button.click();
       this.queuedPlayerIds.add(playerId);
       queued++;
-      logger.log(`[AutoQueue] Queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`);
+      logger.log(
+        `[AutoQueue] Queued ${candidate.name} (ID: ${playerId}, source=${candidate.source})`,
+      );
     }
 
     if (queued > 0) {
-      logger.log(`[AutoQueue] Queue population complete: added ${queued} player(s), total queued this session=${this.queuedPlayerIds.size}`);
+      logger.log(
+        `[AutoQueue] Queue population complete: added ${queued} player(s), total queued this session=${this.queuedPlayerIds.size}`,
+      );
     } else {
-      logger.log('[AutoQueue] Queue population run: no new players to queue');
+      logger.log("[AutoQueue] Queue population run: no new players to queue");
     }
   }
 
@@ -608,14 +715,19 @@ export class AutoBidController {
   evaluateAndNominate(): void {
     const state = useDraftStore.getState();
     const MAX = AutoBidController.MAX_NOMINATION_ATTEMPTS;
-    const cooldownRemaining = this.lastNominationTime != null
-      ? Math.max(0, AutoBidController.NOMINATION_COOLDOWN_MS - (Date.now() - this.lastNominationTime))
-      : 0;
+    const cooldownRemaining =
+      this.lastNominationTime != null
+        ? Math.max(
+            0,
+            AutoBidController.NOMINATION_COOLDOWN_MS -
+              (Date.now() - this.lastNominationTime),
+          )
+        : 0;
 
     logger.log(
       `[AutoNominate] evaluateAndNominate() called — autoMode=${state.autoMode}, ` +
-      `auctionPlayer=${state.currentAuctionPlayer?.playerName ?? 'null'}, ` +
-      `attempts=${this.nominationAttempts}/${MAX}, cooldown=${cooldownRemaining}ms`
+        `auctionPlayer=${state.currentAuctionPlayer?.playerName ?? "null"}, ` +
+        `attempts=${this.nominationAttempts}/${MAX}, cooldown=${cooldownRemaining}ms`,
     );
 
     // Guard: auto-mode must be on
@@ -632,19 +744,20 @@ export class AutoBidController {
 
     // Guard: nomination attempt limit — reset after 10s so we retry with fresh attempts
     if (this.nominationAttempts >= MAX) {
-      const timeSinceLastAttempt = this.lastNominationTime != null
-        ? Date.now() - this.lastNominationTime
-        : Infinity;
+      const timeSinceLastAttempt =
+        this.lastNominationTime != null
+          ? Date.now() - this.lastNominationTime
+          : Infinity;
       if (timeSinceLastAttempt > 10_000) {
         logger.log(
-          `[AutoNominate] Resetting stale attempts (${this.nominationAttempts}/${MAX}, ${Math.round(timeSinceLastAttempt / 1000)}s ago)`
+          `[AutoNominate] Resetting stale attempts (${this.nominationAttempts}/${MAX}, ${Math.round(timeSinceLastAttempt / 1000)}s ago)`,
         );
         this.nominationAttempts = 0;
         this.lastNominationTime = null;
       } else {
         this.lastAttemptResult = `max attempts (${this.nominationAttempts}/${MAX})`;
         logger.log(
-          `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${MAX}) — retrying in 10s`
+          `[AutoNominate] Max attempts reached (${this.nominationAttempts}/${MAX}) — retrying in 10s`,
         );
         this.scheduleNomination(10_000);
         return;
@@ -655,7 +768,7 @@ export class AutoBidController {
     if (cooldownRemaining > 0) {
       this.lastAttemptResult = `cooldown active (${Math.round(cooldownRemaining / 1000)}s remaining)`;
       logger.log(
-        `[AutoNominate] Cooldown active — ${Math.round(cooldownRemaining / 1000)}s remaining`
+        `[AutoNominate] Cooldown active — ${Math.round(cooldownRemaining / 1000)}s remaining`,
       );
       // Schedule a retry after cooldown expires
       this.scheduleNomination(cooldownRemaining + 100);
@@ -672,39 +785,46 @@ export class AutoBidController {
     // ── Queue-first candidate selection ──
     // Do a fresh scrape at nomination time to avoid polling lag
     const freshQueue = scrapeESPNNominationQueue();
-    const draftedPlayerIds = new Set(state.allPicks.map(p => p.playerId));
-    const validQueueEntries = freshQueue.filter(q => !draftedPlayerIds.has(q.playerId));
+    const draftedPlayerIds = new Set(state.allPicks.map((p) => p.playerId));
+    const validQueueEntries = freshQueue.filter(
+      (q) => !draftedPlayerIds.has(q.playerId),
+    );
 
     if (validQueueEntries.length > 0) {
       const top = validQueueEntries[0];
       const queuePlayerId = top.playerId;
       const queueCandidateName = top.playerName || `Player #${queuePlayerId}`;
       this.lastCandidateName = queueCandidateName;
-      this.lastCandidateSource = 'queue';
+      this.lastCandidateSource = "queue";
 
       logger.log(
         `[AutoNominate] Candidate source=queue: ${queueCandidateName} (ID: ${queuePlayerId}, ` +
-        `queuePosition=${top.queuePosition}, queueSize=${validQueueEntries.length})`
+          `queuePosition=${top.queuePosition}, queueSize=${validQueueEntries.length})`,
       );
 
       // Queue entries have playerId directly from DOM — skip name-to-ID mapping
       const playerButton = findActionButton(queuePlayerId);
 
       if (playerButton && !playerButton.disabled) {
-        this.clickPlayerButton(playerButton, queueCandidateName, queuePlayerId, 'espn-queue');
+        this.clickPlayerButton(
+          playerButton,
+          queueCandidateName,
+          queuePlayerId,
+          "espn-queue",
+        );
         return;
       }
 
       if (playerButton?.disabled) {
         this.lastAttemptResult = `queue button disabled for ${queueCandidateName} (ID: ${queuePlayerId})`;
         logger.warn(
-          `[AutoNominate] Queue button disabled for ${queueCandidateName} (ID: ${queuePlayerId}) — skipping to engine candidates`
+          `[AutoNominate] Queue button disabled for ${queueCandidateName} (ID: ${queuePlayerId}) — skipping to engine candidates`,
         );
         // Don't return — fall through to engine candidate selection
       } else {
         // Button not in DOM — player queued but not visible in table
         logger.log(
-          `[AutoNominate] Queue player ${queueCandidateName} (ID: ${queuePlayerId}) not visible — falling back to engine candidates`
+          `[AutoNominate] Queue player ${queueCandidateName} (ID: ${queuePlayerId}) not visible — falling back to engine candidates`,
         );
         // Don't return — fall through to engine candidate selection
       }
@@ -713,7 +833,8 @@ export class AutoBidController {
     // ── Select nomination candidate ──
 
     // Primary: nomination strategy from forward simulation
-    const nominationStrategy = this.lastEngineSignals?.simulation?.nominationStrategy;
+    const nominationStrategy =
+      this.lastEngineSignals?.simulation?.nominationStrategy;
     let candidateName: string | null = null;
     let candidateReason: string | null = null;
     let candidateTrapScore: number | null = null;
@@ -724,9 +845,9 @@ export class AutoBidController {
       candidateReason = `trap: ${topPick.reason}`;
       candidateTrapScore = topPick.trapScore;
       this.lastCandidateName = candidateName;
-      this.lastCandidateSource = 'simulation';
+      this.lastCandidateSource = "simulation";
       logger.log(
-        `[AutoNominate] Candidate source=simulation: ${candidateName} (trapScore=${candidateTrapScore.toFixed(2)}, reason=${candidateReason})`
+        `[AutoNominate] Candidate source=simulation: ${candidateName} (trapScore=${candidateTrapScore.toFixed(2)}, reason=${candidateReason})`,
       );
     }
 
@@ -738,34 +859,36 @@ export class AutoBidController {
         candidateName = firstUndrafted.name;
         candidateReason = `ideal roster ${firstUndrafted.tier} target`;
         this.lastCandidateName = candidateName;
-        this.lastCandidateSource = 'idealRoster';
+        this.lastCandidateSource = "idealRoster";
         logger.log(
-          `[AutoNominate] Candidate source=idealRoster: ${candidateName} (tier=${firstUndrafted.tier}, reason=${candidateReason})`
+          `[AutoNominate] Candidate source=idealRoster: ${candidateName} (tier=${firstUndrafted.tier}, reason=${candidateReason})`,
         );
       }
     }
 
     if (!candidateName) {
       this.lastAttemptResult = "no candidates available";
-      logger.log("[AutoNominate] No nomination candidates available — skipping");
+      logger.log(
+        "[AutoNominate] No nomination candidates available — skipping",
+      );
       return;
     }
 
     // ── Map candidate name to ESPN player ID ──
     const normalizedCandidate = normalizeName(candidateName);
     const matchedRanking = state.rankings?.find(
-      (r) => normalizeName(r.playerName) === normalizedCandidate
+      (r) => normalizeName(r.playerName) === normalizedCandidate,
     );
 
     logger.log(
       `[AutoNominate] Ranking lookup: candidateName="${candidateName}" normalized="${normalizedCandidate}" ` +
-      `→ matched="${matchedRanking?.playerName ?? 'NOT FOUND'}" playerId=${matchedRanking?.playerId ?? 'N/A'}`
+        `→ matched="${matchedRanking?.playerName ?? "NOT FOUND"}" playerId=${matchedRanking?.playerId ?? "N/A"}`,
     );
 
     if (!matchedRanking) {
       this.lastAttemptResult = `ranking not found for "${candidateName}" (normalized: "${normalizedCandidate}")`;
       logger.warn(
-        `[AutoNominate] Cannot find "${candidateName}" in rankings — cannot map to ESPN player ID`
+        `[AutoNominate] Cannot find "${candidateName}" in rankings — cannot map to ESPN player ID`,
       );
       this.nominationAttempts++;
       this.lastNominationTime = Date.now();
@@ -778,14 +901,19 @@ export class AutoBidController {
     const playerButton = findActionButton(playerId);
 
     if (playerButton && !playerButton.disabled) {
-      this.clickPlayerButton(playerButton, candidateName, playerId, candidateReason!);
+      this.clickPlayerButton(
+        playerButton,
+        candidateName,
+        playerId,
+        candidateReason!,
+      );
       return;
     }
 
     if (playerButton?.disabled) {
       this.lastAttemptResult = `button disabled for ${candidateName} (ID: ${playerId}) — already drafted or queued`;
       logger.warn(
-        `[AutoNominate] Button disabled for ${candidateName} (ID: ${playerId}, text="${playerButton.textContent?.trim()}") — already drafted or queued`
+        `[AutoNominate] Button disabled for ${candidateName} (ID: ${playerId}, text="${playerButton.textContent?.trim()}") — already drafted or queued`,
       );
       this.nominationAttempts++;
       this.lastNominationTime = Date.now();
@@ -795,7 +923,7 @@ export class AutoBidController {
     // Button not in DOM — player not visible in the table. Use ESPN's player search
     // to filter the table, then find and click the button.
     logger.log(
-      `[AutoNominate] Player not visible in table — searching for "${candidateName}"`
+      `[AutoNominate] Player not visible in table — searching for "${candidateName}"`,
     );
     this.searchAndNominate(candidateName, playerId, candidateReason!);
   }
@@ -815,7 +943,7 @@ export class AutoBidController {
     const btnText = button.textContent?.trim() || "Queue";
     this.lastAttemptResult = `clicked "${btnText}" button for ${candidateName}`;
     logger.log(
-      `[AutoNominate] Clicking "${btnText}" for ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`
+      `[AutoNominate] Clicking "${btnText}" for ${candidateName} (ID: ${playerId}, ${candidateReason}, attempt ${this.nominationAttempts}/${AutoBidController.MAX_NOMINATION_ATTEMPTS})`,
     );
 
     button.click();
@@ -831,48 +959,74 @@ export class AutoBidController {
    * click their dropdown match, wait for the Queue button to appear, click it,
    * then clear the search. Returns true if successfully queued, false otherwise.
    */
-  private searchAndQueue(candidateName: string, playerId: number): Promise<boolean> {
+  private searchAndQueue(
+    candidateName: string,
+    playerId: number,
+  ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       const searchInput = document.querySelector<HTMLInputElement>(
-        '.playersSearch input.form__control, input[placeholder="Player Name"]'
+        '.playersSearch input.form__control, input[placeholder="Player Name"]',
       );
 
       if (!searchInput) {
-        logger.warn(`[AutoQueue] Search input not found — cannot search for ${candidateName}`);
+        logger.warn(
+          `[AutoQueue] Search input not found — cannot search for ${candidateName}`,
+        );
         resolve(false);
         return;
       }
 
       // Use last name for search — ESPN search works better with just the surname
       const nameParts = candidateName.trim().split(/\s+/);
-      const searchTerm = nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
+      const searchTerm =
+        nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
 
       // Focus the input before typing so ESPN's React app registers the interaction
       searchInput.focus();
 
       // Type the search term into the search input using React-compatible value setting
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype, 'value'
+        HTMLInputElement.prototype,
+        "value",
       )?.set;
       if (nativeInputValueSetter) {
         nativeInputValueSetter.call(searchInput, searchTerm);
       } else {
         searchInput.value = searchTerm;
       }
-      searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: searchTerm, inputType: 'insertText' }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-      searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: searchTerm.slice(-1) }));
+      searchInput.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          data: searchTerm,
+          inputType: "insertText",
+        }),
+      );
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+      searchInput.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          bubbles: true,
+          key: searchTerm.slice(-1),
+        }),
+      );
 
-      logger.log(`[AutoQueue] Typed "${searchTerm}" into search (from "${candidateName}")`);
+      logger.log(
+        `[AutoQueue] Typed "${searchTerm}" into search (from "${candidateName}")`,
+      );
 
       const maxElapsed = 2000;
       const pollInterval = 200;
       const normalizedCandidate = normalizeName(candidateName);
 
       const pollForDropdown = (elapsed: number): void => {
-        const matchesContainer = document.querySelector('.player--search--matches');
+        const matchesContainer = document.querySelector(
+          ".player--search--matches",
+        );
         const matchButtons = matchesContainer
-          ? Array.from(matchesContainer.querySelectorAll<HTMLButtonElement>('button.player--search--match'))
+          ? Array.from(
+              matchesContainer.querySelectorAll<HTMLButtonElement>(
+                "button.player--search--match",
+              ),
+            )
           : [];
 
         if (matchButtons.length > 0) {
@@ -880,14 +1034,15 @@ export class AutoBidController {
           let matchButton: HTMLButtonElement | null = null;
           if (playerId) {
             matchButton = matchesContainer!.querySelector<HTMLButtonElement>(
-              `button.player--search--match[data-player-search-playerid="${playerId}"]`
+              `button.player--search--match[data-player-search-playerid="${playerId}"]`,
             );
           }
 
           // Fallback: match by player name attribute (case-insensitive, normalized)
           if (!matchButton) {
             for (const btn of matchButtons) {
-              const btnName = btn.getAttribute('data-player-search-playername') ?? '';
+              const btnName =
+                btn.getAttribute("data-player-search-playername") ?? "";
               if (normalizeName(btnName) === normalizedCandidate) {
                 matchButton = btn;
                 break;
@@ -896,21 +1051,28 @@ export class AutoBidController {
           }
 
           if (matchButton) {
-            logger.log(`[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId})`);
+            logger.log(
+              `[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId})`,
+            );
             matchButton.click();
 
             // Poll for the Queue button after ESPN re-renders the table following dropdown selection.
             // ESPN may take variable time to process the selection, so a single fixed delay is unreliable.
             const pollForQueueButton = (elapsed: number): void => {
-              logger.log(`[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms) — trying selectors for ${candidateName} (ID: ${playerId})`);
+              logger.log(
+                `[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms) — trying selectors for ${candidateName} (ID: ${playerId})`,
+              );
 
               // Strategy 1: direct data-player-id match by ID attribute
               const directButton = findActionButton(playerId);
               if (directButton && !directButton.disabled) {
-                const text = directButton.textContent?.trim().toLowerCase() ?? '';
-                if (text.includes('queue') || text.includes('select')) {
+                const text =
+                  directButton.textContent?.trim().toLowerCase() ?? "";
+                if (text.includes("queue") || text.includes("select")) {
                   directButton.click();
-                  logger.log(`[AutoQueue] Clicked "${directButton.textContent?.trim()}" button for ${candidateName} after search (${elapsed}ms)`);
+                  logger.log(
+                    `[AutoQueue] Clicked "${directButton.textContent?.trim()}" button for ${candidateName} after search (${elapsed}ms)`,
+                  );
                   setTimeout(() => {
                     this.clearPlayerSearch();
                     setTimeout(() => resolve(true), 500);
@@ -924,12 +1086,14 @@ export class AutoBidController {
               const allPlayerButtons = findAllActionButtons();
               for (const btn of allPlayerButtons) {
                 if (btn.disabled) continue;
-                const btnPlayerId = btn.getAttribute('data-player-id');
+                const btnPlayerId = btn.getAttribute("data-player-id");
                 if (btnPlayerId === String(playerId)) {
-                  const text = btn.textContent?.trim().toLowerCase() ?? '';
-                  if (text.includes('queue') || text.includes('select')) {
+                  const text = btn.textContent?.trim().toLowerCase() ?? "";
+                  if (text.includes("queue") || text.includes("select")) {
                     btn.click();
-                    logger.log(`[AutoQueue] Clicked "${btn.textContent?.trim()}" (scan) for ${candidateName} after search (${elapsed}ms)`);
+                    logger.log(
+                      `[AutoQueue] Clicked "${btn.textContent?.trim()}" (scan) for ${candidateName} after search (${elapsed}ms)`,
+                    );
                     setTimeout(() => {
                       this.clearPlayerSearch();
                       setTimeout(() => resolve(true), 500);
@@ -945,10 +1109,16 @@ export class AutoBidController {
               } else {
                 // Timeout — log diagnostics to help debug future failures
                 const foundButtons = findAllActionButtons();
-                const buttonSummary = Array.from(foundButtons).slice(0, 5).map(b =>
-                  `${b.getAttribute('data-player-id')}:"${b.textContent?.trim()}"`
-                ).join(', ');
-                logger.warn(`[AutoQueue] Queue button not found for ${candidateName} (ID: ${playerId}) after 3000ms polling. Visible buttons: [${buttonSummary}]`);
+                const buttonSummary = Array.from(foundButtons)
+                  .slice(0, 5)
+                  .map(
+                    (b) =>
+                      `${b.getAttribute("data-player-id")}:"${b.textContent?.trim()}"`,
+                  )
+                  .join(", ");
+                logger.warn(
+                  `[AutoQueue] Queue button not found for ${candidateName} (ID: ${playerId}) after 3000ms polling. Visible buttons: [${buttonSummary}]`,
+                );
                 this.clearPlayerSearch();
                 resolve(false);
               }
@@ -962,9 +1132,14 @@ export class AutoBidController {
 
         // Keep polling if we haven't hit the timeout yet
         if (elapsed + pollInterval < maxElapsed) {
-          setTimeout(() => pollForDropdown(elapsed + pollInterval), pollInterval);
+          setTimeout(
+            () => pollForDropdown(elapsed + pollInterval),
+            pollInterval,
+          );
         } else {
-          logger.warn(`[AutoQueue] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`);
+          logger.warn(
+            `[AutoQueue] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`,
+          );
           this.clearPlayerSearch();
           resolve(false);
         }
@@ -985,12 +1160,12 @@ export class AutoBidController {
     candidateReason: string,
   ): void {
     const searchInput = document.querySelector<HTMLInputElement>(
-      '.playersSearch input.form__control, input[placeholder="Player Name"]'
+      '.playersSearch input.form__control, input[placeholder="Player Name"]',
     );
 
     if (!searchInput) {
       logger.warn(
-        `[AutoNominate] Search input not found — cannot search for ${candidateName}`
+        `[AutoNominate] Search input not found — cannot search for ${candidateName}`,
       );
       this.nominationAttempts++;
       this.lastNominationTime = Date.now();
@@ -999,14 +1174,16 @@ export class AutoBidController {
 
     // Use last name for search — ESPN search works better with just the surname
     const nameParts = candidateName.trim().split(/\s+/);
-    const searchTerm = nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
+    const searchTerm =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1] : candidateName;
 
     // Focus the input before typing so ESPN's React app registers the interaction
     searchInput.focus();
 
     // Type the search term into the search input using React-compatible value setting
     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype, 'value'
+      HTMLInputElement.prototype,
+      "value",
     )?.set;
     if (nativeInputValueSetter) {
       nativeInputValueSetter.call(searchInput, searchTerm);
@@ -1015,11 +1192,21 @@ export class AutoBidController {
     }
     // Dispatch InputEvent (carries data/inputType) which React's synthetic event system uses,
     // followed by a change event and a keyup event for handlers that listen for keyboard events
-    searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: searchTerm, inputType: 'insertText' }));
-    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-    searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: searchTerm.slice(-1) }));
+    searchInput.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: searchTerm,
+        inputType: "insertText",
+      }),
+    );
+    searchInput.dispatchEvent(new Event("change", { bubbles: true }));
+    searchInput.dispatchEvent(
+      new KeyboardEvent("keyup", { bubbles: true, key: searchTerm.slice(-1) }),
+    );
 
-    logger.log(`[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`);
+    logger.log(
+      `[AutoNominate] Typed "${searchTerm}" into search (from "${candidateName}")`,
+    );
 
     // Poll for the search dropdown (.player--search--matches) to appear, then click the
     // correct match button. Use recursive setTimeout (not setInterval) for clean termination.
@@ -1028,9 +1215,15 @@ export class AutoBidController {
     const normalizedCandidate = normalizeName(candidateName);
 
     const pollForDropdown = (elapsed: number): void => {
-      const matchesContainer = document.querySelector('.player--search--matches');
+      const matchesContainer = document.querySelector(
+        ".player--search--matches",
+      );
       const matchButtons = matchesContainer
-        ? Array.from(matchesContainer.querySelectorAll<HTMLButtonElement>('button.player--search--match'))
+        ? Array.from(
+            matchesContainer.querySelectorAll<HTMLButtonElement>(
+              "button.player--search--match",
+            ),
+          )
         : [];
 
       if (matchButtons.length > 0) {
@@ -1038,14 +1231,15 @@ export class AutoBidController {
         let matchButton: HTMLButtonElement | null = null;
         if (playerId) {
           matchButton = matchesContainer!.querySelector<HTMLButtonElement>(
-            `button.player--search--match[data-player-search-playerid="${playerId}"]`
+            `button.player--search--match[data-player-search-playerid="${playerId}"]`,
           );
         }
 
         // Fallback: match by player name attribute (case-insensitive, normalized)
         if (!matchButton) {
           for (const btn of matchButtons) {
-            const btnName = btn.getAttribute('data-player-search-playername') ?? '';
+            const btnName =
+              btn.getAttribute("data-player-search-playername") ?? "";
             if (normalizeName(btnName) === normalizedCandidate) {
               matchButton = btn;
               break;
@@ -1055,7 +1249,7 @@ export class AutoBidController {
 
         if (matchButton) {
           logger.log(
-            `[AutoNominate] Clicking search match for ${candidateName} (ID: ${playerId})`
+            `[AutoNominate] Clicking search match for ${candidateName} (ID: ${playerId})`,
           );
           matchButton.click();
           this.nominationAttempts++;
@@ -1080,7 +1274,7 @@ export class AutoBidController {
         setTimeout(() => pollForDropdown(elapsed + pollInterval), pollInterval);
       } else {
         logger.warn(
-          `[AutoNominate] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`
+          `[AutoNominate] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`,
         );
         this.nominationAttempts++;
         this.lastNominationTime = Date.now();
@@ -1098,9 +1292,13 @@ export class AutoBidController {
    */
   private clearPlayerSearch(): void {
     // Try the clear button first — also try the SVG child as a fallback click target
-    let clearButton = document.querySelector<HTMLElement>('.player--search--clear');
+    let clearButton = document.querySelector<HTMLElement>(
+      ".player--search--clear",
+    );
     if (!clearButton) {
-      const clearSvg = document.querySelector<SVGElement>('div.player--search--clear svg');
+      const clearSvg = document.querySelector<SVGElement>(
+        "div.player--search--clear svg",
+      );
       if (clearSvg) {
         clearButton = clearSvg.parentElement as HTMLElement;
       }
@@ -1113,22 +1311,29 @@ export class AutoBidController {
 
     // Fallback: reset input value directly
     const searchInput = document.querySelector<HTMLInputElement>(
-      '.playersSearch input.form__control, input[placeholder="Player Name"]'
+      '.playersSearch input.form__control, input[placeholder="Player Name"]',
     );
     if (searchInput) {
       // Focus before clearing so React registers the interaction
       searchInput.focus();
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype, 'value'
+        HTMLInputElement.prototype,
+        "value",
       )?.set;
       if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(searchInput, '');
+        nativeInputValueSetter.call(searchInput, "");
       } else {
-        searchInput.value = '';
+        searchInput.value = "";
       }
       // InputEvent with deleteContentBackward mirrors what a user pressing Ctrl+A+Delete would do
-      searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: '', inputType: 'deleteContentBackward' }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+      searchInput.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          data: "",
+          inputType: "deleteContentBackward",
+        }),
+      );
+      searchInput.dispatchEvent(new Event("change", { bubbles: true }));
       logger.log("[AutoNominate] Cleared player search via input reset");
     }
   }
@@ -1143,7 +1348,7 @@ export class AutoBidController {
   private clickNominateButton(candidateName: string): void {
     // Nominate-specific selectors (high confidence — class/testid contain "nominate")
     const specificSelectors = [
-      "button.bid-player__button",          // ESPN actual: "nominate player" confirm button
+      "button.bid-player__button", // ESPN actual: "nominate player" confirm button
       "button.nominate-button",
       'button[class*="nominate"]',
       'button[class*="Nominate"]',
@@ -1177,7 +1382,7 @@ export class AutoBidController {
         const btn = document.querySelector<HTMLButtonElement>(selector);
         if (btn && !btn.disabled) {
           const text = btn.textContent?.trim().toLowerCase() || "";
-          if (actionWords.some(word => text.includes(word))) {
+          if (actionWords.some((word) => text.includes(word))) {
             nominateButton = btn;
             break;
           }
@@ -1191,7 +1396,7 @@ export class AutoBidController {
       const allButtons = document.querySelectorAll<HTMLButtonElement>("button");
       for (const btn of allButtons) {
         const text = btn.textContent?.trim().toLowerCase() || "";
-        if (actionWords.some(word => text.includes(word)) && !btn.disabled) {
+        if (actionWords.some((word) => text.includes(word)) && !btn.disabled) {
           nominateButton = btn;
           break;
         }
@@ -1200,13 +1405,13 @@ export class AutoBidController {
 
     if (!nominateButton) {
       logger.warn(
-        `[AutoNominate] Submit button not found after selecting ${candidateName} — click may have auto-submitted`
+        `[AutoNominate] Submit button not found after selecting ${candidateName} — click may have auto-submitted`,
       );
       return;
     }
 
     logger.log(
-      `[AutoNominate] Clicking "${nominateButton.textContent?.trim()}" button for ${candidateName}`
+      `[AutoNominate] Clicking "${nominateButton.textContent?.trim()}" button for ${candidateName}`,
     );
     nominateButton.click();
   }
@@ -1243,7 +1448,11 @@ export class AutoBidController {
     // 2. Rankings API values (populated from ESPN draft board API)
     const espnAsv =
       state.espnDomAuctionValues?.[playerId] ??
-      (nominatedName ? state.rankings?.find((r) => r.playerName.toLowerCase() === nominatedName)?.espnAuctionValue : undefined) ??
+      (nominatedName
+        ? state.rankings?.find(
+            (r) => r.playerName.toLowerCase() === nominatedName,
+          )?.espnAuctionValue
+        : undefined) ??
       null;
 
     // ── Strategy filter: only auto-bid on players we actually want ──
@@ -1268,22 +1477,26 @@ export class AutoBidController {
 
     const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
     const idealMatch = idealPlayers.find(
-      (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName
+      (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName,
     );
     const isIdealTarget =
-      idealMatch != null && (idealMatch.tier === "anchor" || idealMatch.tier === "core");
+      idealMatch != null &&
+      (idealMatch.tier === "anchor" || idealMatch.tier === "core");
 
     // Opportunity: high externally ranked player currently below market price
     // SPs get wider threshold (top-100) because PL rankings are deepest for SP
     const ranking = nominatedName
-      ? state.rankings?.find((r) => r.playerName.toLowerCase() === nominatedName)
+      ? state.rankings?.find(
+          (r) => r.playerName.toLowerCase() === nominatedName,
+        )
       : undefined;
     const isSP = ranking?.primaryPosition === "SP";
     const isRP = ranking?.primaryPosition === "RP";
     const isPitcher = isSP || isRP;
     const opportunityRankThreshold = isSP ? 100 : 50;
     const hasHighExternalRank =
-      ranking?.externalRank != null && ranking.externalRank <= opportunityRankThreshold;
+      ranking?.externalRank != null &&
+      ranking.externalRank <= opportunityRankThreshold;
     const isBelowMarket = espnAsv != null && currentBid < espnAsv;
     const isOpportunity = hasHighExternalRank && isBelowMarket;
 
@@ -1295,13 +1508,11 @@ export class AutoBidController {
       if (isSP) {
         // SP thresholds (more generous — PL SP rankings most valuable)
         isPLUndervalued =
-          (rank <= 50 && espnAsv < 15) ||
-          (rank <= 100 && espnAsv < 10);
+          (rank <= 50 && espnAsv < 15) || (rank <= 100 && espnAsv < 10);
       } else {
         // General thresholds
         isPLUndervalued =
-          (rank <= 30 && espnAsv < 20) ||
-          (rank <= 75 && espnAsv < 12);
+          (rank <= 30 && espnAsv < 20) || (rank <= 75 && espnAsv < 12);
       }
     }
 
@@ -1309,13 +1520,22 @@ export class AutoBidController {
     // When everyone is cheap, external rank is the best differentiator.
     // Wider rank thresholds than other paths since we're spending very little.
     const isRankedValue =
-      !isIdealTarget && !isPLUndervalued && !isOpportunity &&
-      espnAsv != null && espnAsv <= 5 &&
-      ranking?.externalRank != null && ranking.externalRank <= 200;
+      !isIdealTarget &&
+      !isPLUndervalued &&
+      !isOpportunity &&
+      espnAsv != null &&
+      espnAsv <= 5 &&
+      ranking?.externalRank != null &&
+      ranking.externalRank <= 200;
 
-    if (!isIdealTarget && !isOpportunity && !isPLUndervalued && !isRankedValue) {
+    if (
+      !isIdealTarget &&
+      !isOpportunity &&
+      !isPLUndervalued &&
+      !isRankedValue
+    ) {
       logger.log(
-        `[AutoBidController] Not a target — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, pos=${ranking?.primaryPosition ?? "?"}, belowMkt=${isBelowMarket}, plUnderval=${isPLUndervalued})`
+        `[AutoBidController] Not a target — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, pos=${ranking?.primaryPosition ?? "?"}, belowMkt=${isBelowMarket}, plUnderval=${isPLUndervalued})`,
       );
       return;
     }
@@ -1340,7 +1560,9 @@ export class AutoBidController {
           capSource = `IDEAL TARGET, engine maxBid $${maxBid}`;
         } else {
           // Worker hasn't completed yet — will retry on next updateSignals() call
-          logger.log("[AutoBidController] Ideal target but no ASV or maxBid yet — deferring");
+          logger.log(
+            "[AutoBidController] Ideal target but no ASV or maxBid yet — deferring",
+          );
           return;
         }
       }
@@ -1381,15 +1603,15 @@ export class AutoBidController {
     // overpay since they're now bench-eligible only. Cut the bid cap by 50% to reflect
     // reduced value of a second catcher slotted to UTIL/BN.
     const playerPosition = ranking?.primaryPosition;
-    if (playerPosition === 'C') {
+    if (playerPosition === "C") {
       const remainingSlots = this.lastEngineSignals?.remainingSlots;
-      const catcherSlotsRemaining = remainingSlots?.['C'] ?? 0;
+      const catcherSlotsRemaining = remainingSlots?.["C"] ?? 0;
       if (catcherSlotsRemaining <= 0) {
         const rawCap = autoBidCap;
         autoBidCap = Math.max(1, Math.ceil(autoBidCap * 0.5));
         capSource += ` → C slot filled, catcher dampened ×0.5 = $${autoBidCap} (raw $${rawCap})`;
         logger.log(
-          `[AutoBidController] C slot filled — catcher dampening applied (0.5x): $${rawCap} → $${autoBidCap}`
+          `[AutoBidController] C slot filled — catcher dampening applied (0.5x): $${rawCap} → $${autoBidCap}`,
         );
       }
     }
@@ -1397,14 +1619,14 @@ export class AutoBidController {
     // Guard: price has reached or exceeded the cap
     if (currentBid >= autoBidCap) {
       logger.log(
-        `[AutoBidController] Price $${currentBid} reached cap $${autoBidCap} (${capSource}) — stopping`
+        `[AutoBidController] Price $${currentBid} reached cap $${autoBidCap} (${capSource}) — stopping`,
       );
       return;
     }
 
     // Find the ESPN +1 bid button (the "Offer $X" button in the bidding form)
     const button = document.querySelector<HTMLButtonElement>(
-      "form.bidding-form__default button.bid-player__button"
+      "form.bidding-form__default button.bid-player__button",
     );
 
     if (!button) {
@@ -1421,7 +1643,7 @@ export class AutoBidController {
     this.lastBidPrice = currentBid;
 
     logger.log(
-      `[AutoBidController] Auto-bidding +1 at $${currentBid} (cap: $${autoBidCap} via ${capSource})`
+      `[AutoBidController] Auto-bidding +1 at $${currentBid} (cap: $${autoBidCap} via ${capSource})`,
     );
 
     button.click();
