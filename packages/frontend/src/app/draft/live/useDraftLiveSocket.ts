@@ -23,6 +23,13 @@ export interface RosterPlayer {
   cost?: number;
 }
 
+export interface NominationQueueEntry {
+  playerId: number;
+  playerName: string;
+  position: string;
+  queuePosition: number;
+}
+
 export interface DraftLiveState {
   currentAuctionPlayer: CurrentAuctionPlayer | null;
   myRosterCount: number;
@@ -33,6 +40,9 @@ export interface DraftLiveState {
   draftFormat: string;
   allPicksCount: number;
   currentPick: number;
+  espnNominationQueue: NominationQueueEntry[];
+  autoNominateMode: boolean;
+  skippedPlayerIds: number[];
 }
 
 export interface InflationSignal {
@@ -82,6 +92,44 @@ export interface SimulationSignal {
   } | null;
 }
 
+export interface IdealRosterPlayer {
+  name: string;
+  positions: string[];
+  dollars: number;
+  tier: "anchor" | "core" | "value";
+  slot: string;
+  isDrafted: boolean;
+  externalRank?: number;
+}
+
+export interface CategoryProgress {
+  statKey: string;
+  label: string;
+  target: number;
+  projected: number;
+  percent: number;
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+}
+
+export interface IdealRosterSignal {
+  players: IdealRosterPlayer[];
+  totalSGPValue: number;
+  budgetUsed: number;
+  unfilledSlots: number;
+  anchorCount: number;
+  coreCount: number;
+  valueCount: number;
+  categoryProgress?: CategoryProgress[];
+}
+
+export interface ScarcitySignal {
+  position: string;
+  supply: number;
+  demand: number;
+  tierDropValue: number;
+  scarcityIndex: number;
+}
+
 export interface EngineSignals {
   inflation: InflationSignal | null;
   budgetCurve: BudgetCurveSignal | null;
@@ -90,21 +138,44 @@ export interface EngineSignals {
   simulation: SimulationSignal | null;
   remainingSlots: RemainingSlot[] | null;
   computeTimeMs: number;
+  idealRoster: IdealRosterSignal | null;
+  scarcity: ScarcitySignal[] | null;
 }
+
+// ---- Typed Control Actions ----
+
+export type ControlActionMap = {
+  SET_AUTO_MODE: boolean;
+  SET_AUTO_NOMINATE: boolean;
+  SET_POSITION_FILTER: string | null;
+  SET_PITCHER_HITTER_SPLIT: number;
+  SET_BUDGET_OVERRIDE: number;
+  FORCE_NOMINATE: undefined;
+  SKIP_PLAYER: { playerId: number; playerName: string };
+  TOGGLE_SIDEBAR: undefined;
+  REORDER_QUEUE: number[];
+};
+
+export type ControlActionName = keyof ControlActionMap;
 
 // ---- Hook ----
 
-interface UseDraftLiveSocketResult {
+export interface UseDraftLiveSocketResult {
   state: DraftLiveState | null;
   engineSignals: EngineSignals | null;
   connected: boolean;
-  sendControl: (action: string, payload?: unknown) => void;
+  extensionConnected: boolean;
+  sendControl: <A extends ControlActionName>(
+    action: A,
+    ...args: ControlActionMap[A] extends undefined ? [] : [ControlActionMap[A]]
+  ) => void;
 }
 
 export function useDraftLiveSocket(wsUrl: string): UseDraftLiveSocketResult {
   const [state, setState] = useState<DraftLiveState | null>(null);
   const [engineSignals, setEngineSignals] = useState<EngineSignals | null>(null);
   const [connected, setConnected] = useState(false);
+  const [extensionConnected, setExtensionConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,6 +202,7 @@ export function useDraftLiveSocket(wsUrl: string): UseDraftLiveSocketResult {
 
       ws.onclose = () => {
         setConnected(false);
+        setExtensionConnected(false);
         wsRef.current = null;
         if (!closed) {
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -145,7 +217,14 @@ export function useDraftLiveSocket(wsUrl: string): UseDraftLiveSocketResult {
             type: string;
             payload?: DraftLiveState;
             engineSignals?: EngineSignals;
+            connected?: boolean;
           };
+
+          if (msg.type === "EXTENSION_STATUS") {
+            setExtensionConnected(msg.connected as boolean);
+            return;
+          }
+
           if (msg.type === "STATE_SNAPSHOT") {
             if (msg.payload) {
               setState(msg.payload);
@@ -181,11 +260,15 @@ export function useDraftLiveSocket(wsUrl: string): UseDraftLiveSocketResult {
     };
   }, [wsUrl]);
 
-  const sendControl = useCallback((action: string, payload?: unknown) => {
+  const sendControl = useCallback(<A extends ControlActionName>(
+    action: A,
+    ...args: ControlActionMap[A] extends undefined ? [] : [ControlActionMap[A]]
+  ) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      const payload = args.length > 0 ? args[0] : undefined;
       wsRef.current.send(JSON.stringify({ type: "CONTROL", action, payload }));
     }
   }, []);
 
-  return { state, engineSignals, connected, sendControl };
+  return { state, engineSignals, connected, extensionConnected, sendControl };
 }
