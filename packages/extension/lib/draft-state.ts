@@ -105,6 +105,14 @@ interface DraftState {
   // When false, optimizer uses pure SGP efficiency (default).
   optimizeForTargets: boolean;
 
+  // Players the user has explicitly skipped (mobile command center).
+  // Array (not Set) because Sets don't serialize for persist middleware.
+  skippedPlayerIds: number[];
+
+  // When true, auto-nominate mode is active (mobile can toggle).
+  // Session-only — resets on reload for safety (same as autoMode).
+  autoNominateMode: boolean;
+
   // UI state
   sidebarVisible: boolean;
   selectedPosition: string | null;
@@ -149,6 +157,10 @@ interface DraftState {
   setEspnNominationQueue: (queue: DraftState['espnNominationQueue']) => void;
   setCategoryTargets: (targets: Record<string, number>) => void;
   setOptimizeForTargets: (enabled: boolean) => void;
+  addSkippedPlayer: (playerId: number) => void;
+  removeSkippedPlayer: (playerId: number) => void;
+  setAutoNominateMode: (enabled: boolean) => void;
+  setBudgetOverride: (budget: number) => void;
   reset: () => void;
 }
 
@@ -180,6 +192,8 @@ export const useDraftStore = create<DraftState>()(
       detectedRosterSlots: null,
       categoryTargets: DEFAULT_CATEGORY_TARGETS,
       optimizeForTargets: false,
+      skippedPlayerIds: [],
+      autoNominateMode: false,
       sidebarVisible: true,
       selectedPosition: null,
       showOnlyNeeds: false,
@@ -218,6 +232,7 @@ export const useDraftStore = create<DraftState>()(
           allTeamBudgets: [],
           currentAuctionPlayer: null,
           espnNominationQueue: [],
+          skippedPlayerIds: [],
           projectedStandings: null,
           userRankingOverrides: {},
         });
@@ -367,6 +382,21 @@ export const useDraftStore = create<DraftState>()(
 
       setOptimizeForTargets: (enabled) => set({ optimizeForTargets: enabled }),
 
+      addSkippedPlayer: (playerId) =>
+        set((state) => {
+          if (state.skippedPlayerIds.includes(playerId)) return state;
+          return { skippedPlayerIds: [...state.skippedPlayerIds, playerId] };
+        }),
+
+      removeSkippedPlayer: (playerId) =>
+        set((state) => ({
+          skippedPlayerIds: state.skippedPlayerIds.filter((id) => id !== playerId),
+        })),
+
+      setAutoNominateMode: (enabled) => set({ autoNominateMode: enabled }),
+
+      setBudgetOverride: (budget) => set({ remainingBudget: budget }),
+
       reset: () =>
         set({
           allPicks: [],
@@ -383,6 +413,7 @@ export const useDraftStore = create<DraftState>()(
           allTeamBudgets: [],
           leagueCategories: [],
           detectedRosterSlots: null,
+          skippedPlayerIds: [],
           sidebarVisible: true,
           selectedPosition: null,
           showOnlyNeeds: false,

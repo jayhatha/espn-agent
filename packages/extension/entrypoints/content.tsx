@@ -81,6 +81,23 @@ export default defineContentScript({
         case "SET_PITCHER_HITTER_SPLIT":
           store.setPitcherHitterSplit(message.payload as number);
           break;
+        case "FORCE_NOMINATE":
+          autoBidController.forceNominate();
+          break;
+        case "SKIP_PLAYER": {
+          const { playerId } = message.payload as { playerId: number };
+          store.addSkippedPlayer(playerId);
+          break;
+        }
+        case "SET_AUTO_NOMINATE":
+          store.setAutoNominateMode(message.payload as boolean);
+          break;
+        case "SET_BUDGET_OVERRIDE":
+          store.setBudgetOverride(message.payload as number);
+          break;
+        case "REORDER_QUEUE":
+          autoBidController.reorderQueue(message.payload as number[]);
+          break;
       }
 
       sendResponse({ ok: true });

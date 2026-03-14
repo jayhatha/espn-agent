@@ -322,6 +322,41 @@ export class AutoBidController {
   }
 
   /**
+   * Reorder the nomination queue to match the requested player ID order.
+   * Filters to only IDs still present in the current queue.
+   *
+   * TODO: ESPN queue reorder requires DOM drag simulation which is fragile.
+   * For now, we just update the store's espnNominationQueue order to reflect
+   * the requested ordering. Actual ESPN DOM reorder is deferred.
+   */
+  reorderQueue(orderedPlayerIds: number[]): void {
+    logger.log("[AutoNominate] Reorder queue requested:", orderedPlayerIds);
+    const store = useDraftStore.getState();
+    const currentQueue = store.espnNominationQueue;
+    const queueMap = new Map(currentQueue.map((item) => [item.playerId, item]));
+
+    // Build reordered queue: requested IDs first (filtered to existing), then remaining
+    const reordered: typeof currentQueue = [];
+    const seen = new Set<number>();
+    for (const id of orderedPlayerIds) {
+      const item = queueMap.get(id);
+      if (item && !seen.has(id)) {
+        reordered.push({ ...item, queuePosition: reordered.length + 1 });
+        seen.add(id);
+      }
+    }
+    // Append any queue items not in the requested order
+    for (const item of currentQueue) {
+      if (!seen.has(item.playerId)) {
+        reordered.push({ ...item, queuePosition: reordered.length + 1 });
+      }
+    }
+
+    store.setEspnNominationQueue(reordered);
+    logger.log("[AutoNominate] Queue reordered:", reordered.length, "items");
+  }
+
+  /**
    * Detect whether it is the user's turn to nominate by inspecting ESPN's DOM.
    *
    * ESPN's auction page uses a "pick train" showing nomination order. When it is
