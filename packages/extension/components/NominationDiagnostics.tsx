@@ -68,6 +68,12 @@ export default function NominationDiagnostics() {
           >
             {statusLabel}
           </span>
+          {diag.lastTurnDetectionResult.matched &&
+            diag.lastTurnDetectionResult.turnStrategyType === "fallback" && (
+              <span className="text-warning text-body-xs" title="Turn detected via UNTESTED fallback selector">
+                ⚠
+              </span>
+            )}
         </div>
         <span className="text-body-xs text-content-secondary">{expanded ? "▲" : "▼"}</span>
       </button>
@@ -94,9 +100,24 @@ export default function NominationDiagnostics() {
           <div className="flex items-start justify-between">
             <span className="text-body-xs text-content-secondary w-24 shrink-0">Turn</span>
             <span className="text-body-xs text-content text-right">
-              {diag.lastTurnDetectionResult.matched
-                ? `Detected via: ${diag.lastTurnDetectionResult.strategy}`
-                : `Not detected (checked ${diag.lastTurnDetectionResult.strategiesChecked.length} strategies)`}
+              {diag.lastTurnDetectionResult.matched ? (
+                <>
+                  {diag.lastTurnDetectionResult.strategy?.replace(/\s*\[.*?\]/g, "")}
+                  {diag.lastTurnDetectionResult.turnStrategyType === "fallback" && (
+                    <span
+                      className="ml-1 text-warning text-body-xs font-semibold"
+                      title="UNTESTED fallback strategy fired — verify selector in SELECTOR-MAP.md"
+                    >
+                      [UNTESTED]
+                    </span>
+                  )}
+                  {diag.lastTurnDetectionResult.turnStrategyType === "primary" && (
+                    <span className="ml-1 text-positive text-body-xs">✓</span>
+                  )}
+                </>
+              ) : (
+                `Not detected (checked ${diag.lastTurnDetectionResult.strategiesChecked.length} strategies)`
+              )}
             </span>
           </div>
 
@@ -119,6 +140,21 @@ export default function NominationDiagnostics() {
               {diag.cooldownRemainingMs > 0
                 ? `${Math.ceil(diag.cooldownRemainingMs / 1000)}s remaining`
                 : "Ready"}
+            </span>
+          </div>
+
+          {/* Queue population */}
+          <div className="flex items-center justify-between">
+            <span className="text-body-xs text-content-secondary w-24 shrink-0">Queue</span>
+            <span className="text-body-xs text-content">
+              {diag.queuePopulationCount > 0
+                ? `${diag.queuePopulationCount} queued this session`
+                : "Empty"}
+              {diag.lastQueuePopulateTime != null && (
+                <span className="text-body-xs text-content-secondary ml-1">
+                  ({Math.round((Date.now() - diag.lastQueuePopulateTime) / 1000)}s ago)
+                </span>
+              )}
             </span>
           </div>
 
