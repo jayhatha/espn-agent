@@ -15,11 +15,11 @@ Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roa
 
 ### Auto-Nomination
 
-- [ ] **NOM-01**: Extension uses verified ESPN selectors from DEV-03 for all nomination DOM interactions
+- [x] **NOM-01**: Extension uses verified ESPN selectors from DEV-03 for all nomination DOM interactions
 - [ ] **NOM-02**: Turn detection correctly identifies when it's user's turn to nominate using consolidated strategy
 - [ ] **NOM-03**: Search-and-queue flow reliably finds players, types into ESPN search, and clicks queue button
 - [ ] **NOM-04**: Nomination state machine is consolidated with clear state transitions and cooldown management
-- [ ] **NOM-05**: Selector fallback hierarchy gracefully degrades when primary selectors fail
+- [x] **NOM-05**: Selector fallback hierarchy gracefully degrades when primary selectors fail
 - [ ] **NOM-06**: Nomination diagnostics panel reflects reworked flow with accurate status reporting
 
 ### Mobile Command Center
@@ -78,11 +78,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DEV-01 | Phase 39 | Pending |
 | DEV-02 | Phase 39 | Pending |
 | DEV-03 | Phase 39 | Pending |
-| NOM-01 | Phase 40 | Pending |
+| NOM-01 | Phase 40 | Complete |
 | NOM-02 | Phase 40 | Pending |
 | NOM-03 | Phase 40 | Pending |
 | NOM-04 | Phase 40 | Pending |
-| NOM-05 | Phase 40 | Pending |
+| NOM-05 | Phase 40 | Complete |
 | NOM-06 | Phase 40 | Pending |
 | MOB-01 | Phase 41 | Pending |
 | MOB-02 | Phase 41 | Pending |

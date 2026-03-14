@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-14)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v3.0 Draft Automation & Mobile Command Center — Phase 39 (DevTools Setup)
+**Current focus:** v3.0 Draft Automation & Mobile Command Center — Phase 40 (Auto-Nomination Rework)
 
 ## Current Position
 
-Phase: 39 of 41 (DevTools Setup)
-Plan: — of — in current phase
-Status: Ready to plan
-Last activity: 2026-03-14 — Roadmap created for v3.0 milestone
+Phase: 40 of 41 (Auto-Nomination Rework)
+Plan: 2 of 4 in current phase
+Status: Executing
+Last activity: 2026-03-14 — Completed 40-01 selector annotation plan
 
-Progress: [░░░░░░░░░░] 0% (v3.0)
+Progress: [##░░░░░░░░] 8% (v3.0)
 
 ## Performance Metrics
 
@@ -32,6 +32,7 @@ Progress: [░░░░░░░░░░] 0% (v3.0)
 
 ### Decisions
 
+- [40-01]: CONFIRMED/UNTESTED annotation convention established for all nomination-critical selectors; findFirstMatchingSelector helper exported for Plan 02
 - [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
 - [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
 - [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
@@ -50,5 +51,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-14
-Stopped at: Roadmap created, requirements mapped, ready to plan Phase 39
+Stopped at: Completed 40-01-PLAN.md (selector annotations)
 Resume file: None
