@@ -4,7 +4,8 @@
 
 - ✅ **v1.0 MVP** - Phases 1-5 (shipped 2026-02-21)
 - ✅ **v2.0 Position Shopping List** - Phases 6-38 (shipped 2026-03-14)
-- 🚧 **v3.0 Draft Automation & Mobile Command Center** - Phases 39-41 (in progress)
+- ✅ **v3.0 Draft Automation & Mobile Command Center** - Phases 39-42 (shipped 2026-03-14)
+- 🚧 **v4.0 Personal Season Setup** - Phases 43-46 (in progress)
 
 ## Phases
 
@@ -22,86 +23,86 @@ Phases 6-38 covering v1.1 trade upgrades, history backfill, Chrome extension, de
 
 </details>
 
-### 🚧 v3.0 Draft Automation & Mobile Command Center (In Progress)
+<details>
+<summary>✅ v3.0 Draft Automation & Mobile Command Center (Phases 39-42) - SHIPPED 2026-03-14</summary>
 
-**Milestone Goal:** Make auto-nomination reliable with verified ESPN selectors and upgrade the mobile draft companion into a full command-and-control terminal.
+Phase 39: DevTools Setup, Phase 40: Auto-Nomination Rework, Phase 41: Mobile Command Center, Phase 42: Phase-Aware Queue Strategy — auto-nomination consolidated with verified selectors, mobile draft companion upgraded to full command terminal.
 
-- [ ] **Phase 39: DevTools Setup** - Chrome DevTools MCP configured, selector battery validated against live ESPN draft DOM
-- [x] **Phase 40: Auto-Nomination Rework** - Nomination state machine consolidated using MCP-verified selectors with polling-based reliability (completed 2026-03-14)
-- [x] **Phase 41: Mobile Command Center** - Mobile page redesigned with all engine signals, full draft controls, and phone-optimized layout (completed 2026-03-14)
-- [ ] **Phase 42: Phase-Aware Queue Strategy** - Nomination queue adapts to draft phase (early=poison pills, late=own targets) with bidding guard to prevent queue actions during active bidding
+</details>
+
+### 🚧 v4.0 Personal Season Setup (In Progress)
+
+**Milestone Goal:** Strip auth complexity, hardcode league config for personal use, fix draft extension detection, and verify the full in-season pipeline works end-to-end for league 112523.
+
+- [ ] **Phase 43: Strip Auth & Env Config** - API routes and frontend pages work without authentication, ESPN credentials loaded from env vars
+- [ ] **Phase 44: Hardcode League & OPS Math** - League 112523 settings hardcoded as defaults, OPS wired as rate stat in component math
+- [ ] **Phase 45: Fix Draft Extension Detection** - Extension reliably detects user's team and roster using hardcoded config as primary, DOM detection as validation
+- [ ] **Phase 46: Verify In-Season Pipeline** - Daily snapshot pipeline, projected standings, waiver recommendations, and trade analysis work end-to-end for league 112523
 
 ## Phase Details
 
-### Phase 39: DevTools Setup
-**Goal**: Developer can inspect live ESPN auction draft DOM via Chrome DevTools MCP and produce a verified selector map
-**Depends on**: Nothing (first v3.0 phase)
-**Requirements**: DEV-01, DEV-02, DEV-03
+### Phase 43: Strip Auth & Env Config
+**Goal**: API routes and frontend pages work without authentication, ESPN credentials loaded from env vars
+**Depends on**: Nothing (first v4.0 phase)
+**Requirements**: SIMP-01, SIMP-02, SIMP-03
 **Success Criteria** (what must be TRUE):
-  1. Developer can run `chrome-devtools-mcp` against an ESPN draft tab in an isolated Chrome profile and execute querySelector/evaluateExpression calls without errors
-  2. Every selector constant in `dom-observers.ts` has been evaluated against the live ESPN page and documented as matched, failed, or replaced
-  3. A stable selector map document exists recording the confirmed ESPN DOM targets (data-*, aria-*, structural selectors) for use in Phase 40
-  4. The Chrome profile isolation requirement (separate `--user-data-dir`) is documented so ESPN auth cookies are never exposed to the MCP process
-**Plans**: 2 plans
-Plans:
-- [ ] 39-01-PLAN.md — Configure chrome-devtools-mcp in .mcp.json and write Chrome profile isolation guide
-- [ ] 39-02-PLAN.md — Run selector battery via MCP against live ESPN draft DOM and produce SELECTOR-MAP.md
+  1. All API routes return data without JWT/cookie auth headers
+  2. Frontend pages render without redirect to login
+  3. ESPN adapter reads SWID/espn_s2 from process.env with DB fallback
+**Plans**: TBD
 
-### Phase 40: Auto-Nomination Rework
-**Goal**: Auto-nomination reliably finds, queues, and nominates players using selectors confirmed against the live 2026 ESPN draft DOM
-**Depends on**: Phase 39
-**Requirements**: NOM-01, NOM-02, NOM-03, NOM-04, NOM-05, NOM-06
-**Success Criteria** (what must be TRUE):
-  1. Extension uses only selectors from the Phase 39 verified selector map — no speculative CSS class selectors remain in `dom-observers.ts`
-  2. Turn detection correctly identifies user's nomination turn using the consolidated strategy, not parallel competing checks
-  3. Search-and-queue flow reliably types into ESPN's search input (using `InputEvent` + `nativeInputValueSetter` pattern, not plain `Event`) and clicks the queue button within the polling timeout
-  4. `clearNominationState()` is the single reset path for all nomination state fields, called by both `stop()` and error recovery paths
-  5. Nomination diagnostics panel in the extension sidebar shows live, accurate state matching the reworked flow
-**Plans**: 4 plans
 Plans:
-- [ ] 40-01-PLAN.md — Reorganize dom-observers.ts selector constants with CONFIRMED-first ordering and fallback hierarchy
-- [ ] 40-02-PLAN.md — Consolidate isMyTurnToNominate() to primary/fallback tiers and establish clearNominationState() as single reset path
-- [ ] 40-03-PLAN.md — Extract typeIntoSearchInput() helper and add named search polling timeout constants
-- [ ] 40-04-PLAN.md — Update NominationDiagnostics panel with turnStrategyType, fallback warning badge, and queue state
+- [ ] TBD (run /gsd:plan-phase 43 to break down)
 
-### Phase 41: Mobile Command Center
-**Goal**: Mobile page is a full draft control terminal showing all engine signals and accepting queue, autopilot, and nomination commands from the phone
-**Depends on**: Phase 39
-**Requirements**: MOB-01, MOB-02, MOB-03, MOB-04, MOB-05, MOB-06, MOB-07, MOB-08, MOB-09, MOB-10, MOB-11, MOB-12, MOB-13, MOB-14
+### Phase 44: Hardcode League & OPS Math
+**Goal**: League 112523 settings hardcoded as defaults, OPS wired as rate stat in component math
+**Depends on**: Phase 43
+**Requirements**: CONF-01, CONF-02, CONF-03
 **Success Criteria** (what must be TRUE):
-  1. Mobile page shows extension connection status — disconnected state triggers a visible banner, not a silent void — and the `EXTENSION_STATUS` relay message is in the WS state payload before any control buttons are wired
-  2. All WebSocket CONTROL actions (FORCE_NOMINATE, SKIP_PLAYER, SET_BUDGET_OVERRIDE, hitter/pitcher split) are typed as a TypeScript discriminated union, not `action: string`
-  3. User can trigger Force Nominate, Skip Player, toggle auto-bid, toggle auto-nominate, and adjust hitter/pitcher split from the phone without touching the laptop
-  4. Mobile page displays category progress with targets, ideal roster with tier badges, win probability, build archetype, and scarcity alerts using data already flowing through the WS relay
-  5. Screen wake lock prevents phone screen from dimming during a live draft, and the page uses a tabbed/sectioned layout legible on a 375px phone screen
-**Plans**: 5 plans
+  1. Backend uses league 112523, team 13, 13 teams as default when no league specified
+  2. Categories are R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
+  3. OPS computed as OBP + SLG using component math (not raw stat)
+**Plans**: TBD
+
 Plans:
-- [ ] 41-01-PLAN.md — Extension: typed CONTROL handlers, new store fields, expanded relay payload
-- [ ] 41-02-PLAN.md — Backend hub: EXTENSION_STATUS broadcast to mobile clients
-- [ ] 41-03-PLAN.md — Frontend: typed sendControl, tabbed layout shell, wake lock, connection banner, LiveTab
-- [ ] 41-04-PLAN.md — Frontend: StrategyTab with category progress, ideal roster, archetype, scarcity
-- [ ] 41-05-PLAN.md — Frontend: QueueTab with force nominate, skip player, auto-nominate, queue display
+- [ ] TBD (run /gsd:plan-phase 44 to break down)
+
+### Phase 45: Fix Draft Extension Detection
+**Goal**: Extension reliably detects user's team and roster using hardcoded config as primary, DOM detection as validation
+**Depends on**: Phase 44
+**Requirements**: CONF-04, DFIX-01, DFIX-02, DFIX-03
+**Success Criteria** (what must be TRUE):
+  1. Extension loads hardcoded league config (team 13, 13 teams, categories) before DOM detection runs
+  2. myRoster only contains picks from the user's team column
+  3. Team detection succeeds on page load without timing races
+  4. Config detection (team count, categories, roster slots) uses hardcoded values with DOM validation
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 45 to break down)
+
+### Phase 46: Verify In-Season Pipeline
+**Goal**: Daily snapshot pipeline, projected standings, waiver recommendations, and trade analysis work end-to-end for league 112523
+**Depends on**: Phase 43, Phase 44
+**Requirements**: SEAS-01, SEAS-02, SEAS-03, SEAS-04
+**Success Criteria** (what must be TRUE):
+  1. Running snapshot for league 112523 produces team_daily_category_totals and projected standings
+  2. Waiver recommendations endpoint returns ranked suggestions for user's team
+  3. Trade analysis endpoint evaluates a proposed trade with accurate projected deltas
+  4. Frontend dashboard renders standings and recommendations without auth redirect
+**Plans**: TBD
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 46 to break down)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 39 → 40 → 41
+Phases execute in numeric order: 43 -> 44 -> 45 -> 46
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 39. DevTools Setup | v3.0 | 0/2 | Not started | - |
-| 40. Auto-Nomination Rework | v3.0 | 4/4 | Complete | 2026-03-14 |
-| 41. Mobile Command Center | 5/5 | Complete   | 2026-03-14 | - |
-
-### Phase 42: Phase-Aware Queue Strategy
-**Goal**: Nomination queue strategy adapts to draft phase — early draft queues expensive non-targets (poison pills) to drain opponent budgets, later draft queues our core and value targets. Queue population only runs when idle (not actively bidding).
-**Depends on**: Phase 40
-**Success Criteria** (what must be TRUE):
-  1. populateQueue() checks bidding state and skips when user is actively bidding on a nominated player
-  2. Early draft (≤30% roster filled) prioritizes trap-score candidates (expensive non-needs) over ideal roster targets
-  3. Late draft (>30% roster filled) prioritizes own core/value targets from ideal roster over poison pills
-  4. Queue strategy transition is smooth — no abrupt flip, blends trap scores with target priority based on roster fill %
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 42 to break down)
+| 43. Strip Auth & Env Config | v4.0 | 0/? | Not started | - |
+| 44. Hardcode League & OPS Math | v4.0 | 0/? | Not started | - |
+| 45. Fix Draft Extension Detection | v4.0 | 0/? | Not started | - |
+| 46. Verify In-Season Pipeline | v4.0 | 0/? | Not started | - |

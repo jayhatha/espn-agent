@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v4.0 Personal Season Setup
+**Current focus:** v4.0 Personal Season Setup — Phase 43: Strip Auth & Env Config
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-15 — Milestone v4.0 started
+Phase: 43 of 46 (Strip Auth & Env Config)
+Plan: Ready to plan
+Status: Ready to plan
+Last activity: 2026-03-15 — Roadmap created for v4.0
 
 Progress: [░░░░░░░░░░] 0% (v4.0)
 
@@ -45,5 +45,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-15
-Stopped at: Starting v4.0 milestone
+Stopped at: Roadmap created for v4.0, ready to plan Phase 43
 Resume file: None

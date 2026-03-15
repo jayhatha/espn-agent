@@ -77,25 +77,25 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIMP-01 | TBD | Pending |
-| SIMP-02 | TBD | Pending |
-| SIMP-03 | TBD | Pending |
-| CONF-01 | TBD | Pending |
-| CONF-02 | TBD | Pending |
-| CONF-03 | TBD | Pending |
-| CONF-04 | TBD | Pending |
-| DFIX-01 | TBD | Pending |
-| DFIX-02 | TBD | Pending |
-| DFIX-03 | TBD | Pending |
-| SEAS-01 | TBD | Pending |
-| SEAS-02 | TBD | Pending |
-| SEAS-03 | TBD | Pending |
-| SEAS-04 | TBD | Pending |
+| SIMP-01 | Phase 43 | Pending |
+| SIMP-02 | Phase 43 | Pending |
+| SIMP-03 | Phase 43 | Pending |
+| CONF-01 | Phase 44 | Pending |
+| CONF-02 | Phase 44 | Pending |
+| CONF-03 | Phase 44 | Pending |
+| CONF-04 | Phase 45 | Pending |
+| DFIX-01 | Phase 45 | Pending |
+| DFIX-02 | Phase 45 | Pending |
+| DFIX-03 | Phase 45 | Pending |
+| SEAS-01 | Phase 46 | Pending |
+| SEAS-02 | Phase 46 | Pending |
+| SEAS-03 | Phase 46 | Pending |
+| SEAS-04 | Phase 46 | Pending |
 
 **Coverage:**
 - v4.0 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 (pending roadmap)
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
