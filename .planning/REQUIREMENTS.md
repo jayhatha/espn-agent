@@ -28,10 +28,10 @@ Requirements for v4.0 Personal Season Setup. Each maps to roadmap phases.
 
 ### In-Season Pipeline
 
-- [ ] **SEAS-01**: Daily snapshot pipeline runs and produces projected standings for league 112523
-- [ ] **SEAS-02**: Waiver recommendations return ranked add/drop suggestions
-- [ ] **SEAS-03**: Trade analysis evaluates proposed trades with accurate projected impact
-- [ ] **SEAS-04**: Frontend dashboard shows standings, trends, and recommendations without auth
+- [x] **SEAS-01**: Daily snapshot pipeline runs and produces projected standings for league 112523
+- [x] **SEAS-02**: Waiver recommendations return ranked add/drop suggestions
+- [x] **SEAS-03**: Trade analysis evaluates proposed trades with accurate projected impact
+- [x] **SEAS-04**: Frontend dashboard shows standings, trends, and recommendations without auth
 
 ## v3.0 Requirements (Completed)
 
@@ -87,10 +87,10 @@ Deferred to future release. Tracked but not in current roadmap.
 | DFIX-01 | Phase 45 | Pending |
 | DFIX-02 | Phase 45 | Pending |
 | DFIX-03 | Phase 45 | Pending |
-| SEAS-01 | Phase 46 | Pending |
-| SEAS-02 | Phase 46 | Pending |
-| SEAS-03 | Phase 46 | Pending |
-| SEAS-04 | Phase 46 | Pending |
+| SEAS-01 | Phase 46 | Complete |
+| SEAS-02 | Phase 46 | Complete |
+| SEAS-03 | Phase 46 | Complete |
+| SEAS-04 | Phase 46 | Complete |
 
 **Coverage:**
 - v4.0 requirements: 14 total
