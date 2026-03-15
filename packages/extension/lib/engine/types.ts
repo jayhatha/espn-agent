@@ -12,6 +12,8 @@ export interface PoolPlayer {
   isPitcher: boolean;
   positions: string[];  // From FG auction pos field, split on "/"
   stats: Record<string, number>;
+  /** ESPN average salary (scraped from DOM). When present, used by nomination strategy to compute overpricing. */
+  espnAvgSalary?: number;
 }
 
 export interface CategoryStats {
