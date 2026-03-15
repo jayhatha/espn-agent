@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 
 ## Current Position
 
-Phase: 47 of 51 (ready to plan)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-15 — v5.0 milestone started
+Phase: 47 of 51 (completed)
+Plan: 01 of 01
+Status: Phase 47 complete
+Last activity: 2026-03-15 — Phase 47 endgame mode & budget bands
 
-Progress: [░░░░░░░░░░] 0% (v5.0)
+Progress: [##░░░░░░░░] 20% (v5.0 — 1/5 phases)
 
 ## Performance Metrics
 
@@ -33,6 +33,14 @@ Progress: [░░░░░░░░░░] 0% (v5.0)
 - [v5.0 start]: Add spec gaps as enhancements, not replacements
 - [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
 - [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
+- [Phase 47]: Endgame at - [v5.0 start]: Keep simulation-based BID/PASS (more sophisticated than spec formula)
+- [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
+- [v5.0 start]: Add spec gaps as enhancements, not replacements
+- [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
+- [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
+- [Phase 47]: Endgame at $20 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
+0 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
+- [Phase 51]: Client-side CSV parsing for FanGraphs/ESPN data import in extension popup
 
 ### Pending Todos
 
