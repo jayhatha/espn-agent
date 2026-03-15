@@ -172,14 +172,37 @@ export default defineContentScript({
 
     await resolveBackendLeagueMapping();
 
-    // Detect league config — retry after delay if initial detection fails (ESPN React may not have rendered yet)
-    let detection = detectLeagueConfig();
-    if (detection.warnings.length > 0) {
-      logger.log("[ESPN Draft Assistant] Initial config detection incomplete, retrying in 3s...");
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      detection = detectLeagueConfig();
-    }
+    // Use hardcoded league config as PRIMARY source (no DOM timing dependency).
+    // DOM detection runs as VALIDATION only — mismatches are logged but don't override.
+    cachedLeagueConfig = {
+      totalTeams: DEFAULT_TOTAL_TEAMS,
+      categories: DEFAULT_CATEGORIES,
+      rosterSlots: DEFAULT_ROSTER_SLOTS,
+      budget: DEFAULT_BUDGET,
+    };
+    logger.log("[ESPN Draft Assistant] Using hardcoded league 112523 config as primary:", {
+      totalTeams: DEFAULT_TOTAL_TEAMS,
+      categories: DEFAULT_CATEGORIES.length,
+      rosterSlots: Object.keys(DEFAULT_ROSTER_SLOTS).length,
+      budget: DEFAULT_BUDGET,
+    });
+
+    // Run DOM detection for validation (non-blocking — don't await retries)
+    const detection = detectLeagueConfig();
     configDetectionWarnings = detection.warnings;
+    if (detection.config) {
+      // Log comparison between hardcoded and detected values
+      const detected = detection.config;
+      if (detected.totalTeams !== DEFAULT_TOTAL_TEAMS) {
+        logger.warn("[ESPN Draft Assistant] DOM detected totalTeams=" + detected.totalTeams + " vs hardcoded=" + DEFAULT_TOTAL_TEAMS);
+      }
+      if (detected.categories.length !== DEFAULT_CATEGORIES.length) {
+        logger.warn("[ESPN Draft Assistant] DOM detected " + detected.categories.length + " categories vs hardcoded " + DEFAULT_CATEGORIES.length);
+      }
+      logger.log("[ESPN Draft Assistant] DOM validation complete (confidence=" + detection.confidence + ")");
+    } else {
+      logger.log("[ESPN Draft Assistant] DOM config detection returned null (expected early in page load)");
+    }
 
     // Wait for Zustand persist to finish hydrating from chrome.storage.local
     // before touching store state. Without this, initializeDraft() clears
@@ -203,23 +226,8 @@ export default defineContentScript({
     // Store warnings for UI display
     useDraftStore.getState().setConfigWarnings(detection.warnings);
 
-    if (detection.config) {
-      cachedLeagueConfig = detection.config;
-      logger.log("[ESPN Draft Assistant] Config detected:", {
-        confidence: detection.confidence,
-        totalTeams: detection.config.totalTeams,
-        categories: detection.config.categories.length,
-        rosterSlots: Object.keys(detection.config.rosterSlots).length,
-      });
-    } else {
-      // Use league 112523 defaults (OPS league) from shared config
-      cachedLeagueConfig = {
-        totalTeams: DEFAULT_TOTAL_TEAMS,
-        categories: DEFAULT_CATEGORIES,
-        rosterSlots: DEFAULT_ROSTER_SLOTS,
-        budget: DEFAULT_BUDGET,
-      };
-      logger.warn("[ESPN Draft Assistant] Config detection failed, using league 112523 defaults (OPS league)");
+    {
+      // Config is always set from hardcoded defaults (already assigned above)
     }
 
     // Always initialize draft state from current URL context
