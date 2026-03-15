@@ -367,13 +367,20 @@ export default defineContentScript({
       useDraftStore.getState().addPick(pick);
 
       const currentState = useDraftStore.getState();
-      const isMyPick =
-        pick.teamId === currentState.myTeamId ||
-        pick.teamId === "myTeam" ||
-        pick.teamName === "My Team" ||
-        (myGridColumn !== null && pick.teamId === myGridColumn);
+      let matchReason: string | null = null;
+      if (pick.teamId === currentState.myTeamId) {
+        matchReason = "teamId=" + pick.teamId + " matches myTeamId=" + currentState.myTeamId;
+      } else if (pick.teamId === "myTeam") {
+        matchReason = "teamId is myTeam";
+      } else if (pick.teamName === "My Team") {
+        matchReason = "teamName is My Team";
+      } else if (myGridColumn !== null && pick.teamId === myGridColumn) {
+        matchReason = "teamId=" + pick.teamId + " matches myGridColumn=" + myGridColumn;
+      }
+      const isMyPick = matchReason !== null;
 
       if (isMyPick) {
+        logger.log("[ESPN Draft Assistant] MY PICK: " + pick.playerName + " (reason: " + matchReason + ")");
         const alreadyInRoster = currentState.myRoster.some(
           (player) => player.playerId === pick.playerId,
         );
