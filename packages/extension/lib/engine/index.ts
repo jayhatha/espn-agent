@@ -865,8 +865,20 @@ export function computeDraftEngine(
 
   const remainingRosterSpots = Math.max(0, input.rosterSize - input.myRoster.length);
 
-  // Compute initial budget from remaining + spent
-  const mySpent = input.myRoster.reduce((sum, p) => sum + (p.cost ?? 0), 0);
+  // Compute initial budget from remaining + spent, split by hitter/pitcher
+  const PITCHER_POSITIONS = new Set(["SP", "RP", "P"]);
+  let hitterSpent = 0;
+  let pitcherSpent = 0;
+  for (const p of input.myRoster) {
+    const cost = p.cost ?? 0;
+    const isPitcher = p.positions.some(pos => PITCHER_POSITIONS.has(pos));
+    if (isPitcher) {
+      pitcherSpent += cost;
+    } else {
+      hitterSpent += cost;
+    }
+  }
+  const mySpent = hitterSpent + pitcherSpent;
   const totalBudget = input.remainingBudget + mySpent;
 
   const budgetCurve = computeBudgetCurve(
@@ -876,6 +888,8 @@ export function computeDraftEngine(
     input.rosterSize,
     inflation.inflationFactor,
     currentPlayerValue,
+    hitterSpent,
+    pitcherSpent,
   );
 
   // 5. Generate alerts from all signals
