@@ -32,6 +32,7 @@ Progress: [░░░░░░░░░░] 0% (v5.0)
 - [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
 - [v5.0 start]: Add spec gaps as enhancements, not replacements
 - [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
+- [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
 
 ### Pending Todos
 

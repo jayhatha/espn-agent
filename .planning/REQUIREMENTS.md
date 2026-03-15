@@ -20,9 +20,9 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 
 ### Positional & Pitching
 
-- [ ] **POS-01**: Positional priority weights applied: SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1
-- [ ] **POS-02**: SP tier caps enforced: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
-- [ ] **POS-03**: 200 GS cap awareness in pitching strategy (limit SP spending)
+- [x] **POS-01**: Positional priority weights applied: SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1
+- [x] **POS-02**: SP tier caps enforced: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
+- [x] **POS-03**: 200 GS cap awareness in pitching strategy (limit SP spending)
 
 ### Inflation & Signals
 
@@ -71,9 +71,9 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 | END-03 | Phase 47 | Pending |
 | NOM-07 | Phase 48 | Pending |
 | NOM-08 | Phase 48 | Pending |
-| POS-01 | Phase 49 | Pending |
-| POS-02 | Phase 49 | Pending |
-| POS-03 | Phase 49 | Pending |
+| POS-01 | Phase 49 | Complete |
+| POS-02 | Phase 49 | Complete |
+| POS-03 | Phase 49 | Complete |
 | INF-01 | Phase 50 | Pending |
 | INF-02 | Phase 50 | Pending |
 | INF-03 | Phase 50 | Pending |
