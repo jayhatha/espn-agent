@@ -6,6 +6,7 @@ import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryptio
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID, DEFAULT_TOTAL_TEAMS } from "../../../shared/dist/index.js";
 
 /**
  * Leagues API Routes
@@ -704,6 +705,140 @@ export async function leaguesRoutes(app: FastifyInstance) {
         categories,
         roster: rosterRows,
       };
+    },
+  );
+
+  // Bootstrap league 112523 for single-user mode (v4.0)
+  // Creates the league row + triggers initial snapshot if the league doesn't exist yet
+  app.post(
+    "/api/leagues/bootstrap",
+    {
+      onRequest: [authenticate],
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const season = new Date().getFullYear();
+
+      try {
+        // Check if already exists
+        const existing = await db
+          .selectFrom("league")
+          .selectAll()
+          .where("espn_league_id", "=", DEFAULT_ESPN_LEAGUE_ID)
+          .where("season", "=", season)
+          .executeTakeFirst();
+
+        if (existing) {
+          return { league: existing, isNew: false, message: "League already exists" };
+        }
+
+        // Require ESPN credentials
+        const auth = getEspnAuthFromEnv();
+        if (!auth) {
+          return reply.code(400).send({
+            error: "ESPN_SWID and ESPN_S2 environment variables required for bootstrap",
+          });
+        }
+
+        // Fetch league data from ESPN to get name + teams
+        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnData = await espnAdapter.fetchLeague({
+          leagueId: DEFAULT_ESPN_LEAGUE_ID,
+          season,
+          auth,
+          views: ["mSettings", "mTeam"],
+        });
+
+        const normalized = espnAdapter.normalizeLeagueData(espnData.data);
+
+        // Create league
+        const league = await db
+          .insertInto("league")
+          .values({
+            provider: "espn",
+            espn_league_id: DEFAULT_ESPN_LEAGUE_ID,
+            season,
+            name: normalized.settings.name || `ESPN League ${DEFAULT_ESPN_LEAGUE_ID}`,
+            timezone: "America/New_York",
+            created_at: new Date(),
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        // Create teams and identify user's team
+        let userTeamDbId: number | null = null;
+        for (const teamData of normalized.teams) {
+          const team = await db
+            .insertInto("team")
+            .values({
+              league_id: league.id,
+              espn_team_id: teamData.id,
+              name: teamData.name,
+              created_at: new Date(),
+            })
+            .onConflict((oc) =>
+              oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
+                name: teamData.name,
+              })
+            )
+            .returningAll()
+            .executeTakeFirstOrThrow();
+
+          if (teamData.id === DEFAULT_TEAM_ID) {
+            userTeamDbId = team.id;
+          }
+        }
+
+        // Set user_team_id on league
+        if (userTeamDbId) {
+          await db
+            .updateTable("league")
+            .set({ user_team_id: userTeamDbId })
+            .where("id", "=", league.id)
+            .execute();
+        }
+
+        // Trigger initial snapshot in background
+        const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+        const today = new Date().toISOString().split("T")[0];
+        orchestrator
+          .executeSnapshot({
+            leagueId: league.id,
+            snapshotDate: today,
+            espnAuth: auth,
+          })
+          .then(() => {
+            request.log.info({ leagueId: league.id }, "Bootstrap snapshot completed");
+          })
+          .catch((err) => {
+            request.log.error({ error: err, leagueId: league.id }, "Bootstrap snapshot failed");
+          });
+
+        const updatedLeague = await db
+          .selectFrom("league")
+          .selectAll()
+          .where("id", "=", league.id)
+          .executeTakeFirstOrThrow();
+
+        return {
+          league: updatedLeague,
+          isNew: true,
+          teamsCreated: normalized.teams.length,
+          userTeamDetected: userTeamDbId !== null,
+          message: "League bootstrapped, snapshot running in background",
+        };
+      } catch (error) {
+        request.log.error({ error }, "Failed to bootstrap league");
+        return reply.code(500).send({
+          error: "Failed to bootstrap league",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
   );
 
