@@ -1132,15 +1132,24 @@ export class AutoBidController {
 
           if (matchButton) {
             logger.log(
-              `[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId})`,
+              `[AutoQueue] Clicking search match for ${candidateName} (ID: ${playerId}, btn: "${matchButton.textContent?.trim()}")`,
             );
+            // Use both click() and dispatchEvent to handle React synthetic event listeners
+            matchButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+            matchButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
             matchButton.click();
 
             // Poll for the Queue button after ESPN re-renders the table following dropdown selection.
             // ESPN may take variable time to process the selection, so a single fixed delay is unreliable.
             const pollForQueueButton = (elapsed: number): void => {
+              // Log all visible action buttons for diagnostics
+              const allBtns = findAllActionButtons();
+              const btnSummary = Array.from(allBtns)
+                .slice(0, 5)
+                .map(b => `${b.getAttribute("data-player-id")}:"${b.textContent?.trim()}"`)
+                .join(", ");
               logger.log(
-                `[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms) — trying selectors for ${candidateName} (ID: ${playerId})`,
+                `[AutoQueue] Polling for Queue button (elapsed: ${elapsed}ms, target ID: ${playerId}, visible: [${btnSummary}])`,
               );
 
               // Strategy 1: direct data-player-id match by ID attribute
@@ -1180,6 +1189,23 @@ export class AutoBidController {
                     }, AutoBidController.SEARCH_CLEAR_DELAY_MS);
                     return;
                   }
+                }
+              }
+
+              // Strategy 3: If search filtered the table to a single result, click that button
+              // regardless of player ID (ESPN may use a different ID than expected)
+              if (allBtns.length === 1 && !allBtns[0].disabled) {
+                const text = allBtns[0].textContent?.trim().toLowerCase() ?? "";
+                if (text.includes("queue") || text.includes("select")) {
+                  allBtns[0].click();
+                  logger.log(
+                    `[AutoQueue] Clicked single visible "${allBtns[0].textContent?.trim()}" button for ${candidateName} (btn ID: ${allBtns[0].getAttribute("data-player-id")}, expected: ${playerId})`,
+                  );
+                  setTimeout(() => {
+                    this.clearPlayerSearch();
+                    setTimeout(() => resolve(true), AutoBidController.SEARCH_CLEAR_DELAY_MS);
+                  }, AutoBidController.SEARCH_CLEAR_DELAY_MS);
+                  return;
                 }
               }
 
