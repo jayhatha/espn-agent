@@ -33,13 +33,7 @@ Progress: [##░░░░░░░░] 20% (v5.0 — 1/5 phases)
 - [v5.0 start]: Add spec gaps as enhancements, not replacements
 - [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
 - [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
-- [Phase 47]: Endgame at - [v5.0 start]: Keep simulation-based BID/PASS (more sophisticated than spec formula)
-- [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
-- [v5.0 start]: Add spec gaps as enhancements, not replacements
-- [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
-- [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
 - [Phase 47]: Endgame at $20 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
-0 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
 - [Phase 51]: Client-side CSV parsing for FanGraphs/ESPN data import in extension popup
 
 ### Pending Todos
@@ -53,5 +47,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-15
-Stopped at: v5.0 milestone started, ready to plan phases
+Stopped at: Completed 47-01-PLAN.md
 Resume file: None
