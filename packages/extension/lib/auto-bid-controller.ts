@@ -1803,6 +1803,19 @@ export class AutoBidController {
       capSource += ` → ENDGAME dampened ×0.70 = $${autoBidCap} (raw $${rawCap})`;
     }
 
+    // Apply inflation bid adjustment (INF-02): when inflation > 1.10 (buying_window
+    // or strong_value band), opponents are overspending relative to remaining value —
+    // extend bid ceiling by +2 to capture bargains.
+    const inflationFactor = this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0;
+    const inflationBand = this.lastEngineSignals?.inflation?.inflationBand ?? "neutral";
+    if (inflationFactor > 1.10) {
+      autoBidCap += 2;
+      capSource += ` → inflation adjustment +2 (inflation=${inflationFactor.toFixed(2)}, band=${inflationBand})`;
+      logger.log(
+        `[AutoBid] Inflation adjustment: +2 (inflation=${inflationFactor.toFixed(2)}, band=${inflationBand})`,
+      );
+    }
+
     // Guard: price has reached or exceeded the cap
     if (currentBid >= autoBidCap) {
       logger.log(
