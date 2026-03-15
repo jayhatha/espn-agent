@@ -8,8 +8,9 @@ import type {
   Category,
 } from "@espn-fantasy/shared";
 
-// Re-export canonical normalizer so existing imports from draft-state continue to work
-export { normalizeName } from "./engine/normalizer";
+// Import for local use + re-export so existing imports from draft-state continue to work
+import { normalizeName } from "./engine/normalizer";
+export { normalizeName };
 
 export interface ProjectedOverallRow {
   team_id: number;
