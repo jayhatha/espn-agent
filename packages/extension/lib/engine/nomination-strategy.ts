@@ -1,33 +1,39 @@
 /**
  * nomination-strategy.ts
  *
- * Heuristic trap nomination strategy for auction drafts.
+ * Overpricing-based nomination strategy for auction drafts.
  *
  * Exported functions:
- *   recommendNomination — returns top N players to nominate, ranked by trapScore
+ *   recommendNomination — returns top N players to nominate, ranked by nomination score
  *
- * Algorithm: heuristic trap scoring (not simulation-based).
- * Three factors combine into a trapScore (0-1):
- *   1. Budget drain factor (0-0.4):   expensive players drain opponent budget
- *   2. Opponent need factor (0-0.3):  many opponents need this position = bidding wars
- *   3. My non-need factor (0-0.3):    nominate players at positions I've already filled
+ * Algorithm: overpricing-based scoring.
+ * Primary factor: ESPN average salary minus model dollar value (overpriced players
+ * force opponents to overspend, increasing inflation in our favor).
+ * Secondary/tertiary factors: opponent need and my non-need for tiebreaking.
+ *
+ * Formula:
+ *   nominationScore = normalizedOverpricing * 0.6 + opponentNeedFactor * 0.2 + myNonNeedFactor * 0.2
  *
  * Pure function: no Zustand reads, no DOM access, all data accepted as parameters.
  */
 
 import type { PoolPlayer, SimTeamState, OpponentModel, NominationRecommendation } from "./types";
 
+/** Max overpricing delta used for normalization (dollars) */
+const MAX_OVERPRICING = 30;
+
 // ============================================================
 // recommendNomination
 // ============================================================
 
 /**
- * Recommend top N players to nominate based on trap scoring heuristics.
+ * Recommend top N players to nominate based on overpricing scoring.
  *
- * For each available player, computes a trapScore (0-1) using:
- *   1. Budget drain factor (0-0.4): min(0.4, player.dollars / 50)
- *   2. Opponent need factor (0-0.3): normalized count of opponents needing this position
- *   3. My non-need factor (0-0.3): reward positions I've already filled
+ * For each available player, computes a nominationScore (0-1) using:
+ *   1. Overpricing factor (60%): (espnAvgSalary - modelDollars) normalized 0-1
+ *      Fallback when no ESPN ASV: budget drain heuristic (dollars / 50)
+ *   2. Opponent need factor (20%): normalized count of opponents needing this position
+ *   3. My non-need factor (20%): reward positions I've already filled
  *
  * @param availablePlayers  Undrafted player pool
  * @param sgpValues         Parallel SGP values (same indices as availablePlayers)
@@ -35,7 +41,7 @@ import type { PoolPlayer, SimTeamState, OpponentModel, NominationRecommendation 
  * @param opponentModel     Opponent need/budget model (unused here; see opponentStates)
  * @param opponentStates    Per-opponent SimTeamState array for slot analysis
  * @param topN              Number of recommendations to return (default 5)
- * @returns                 Array of NominationRecommendation sorted by trapScore descending
+ * @returns                 Array of NominationRecommendation sorted by nominationScore descending
  */
 export function recommendNomination(
   availablePlayers: PoolPlayer[],
@@ -54,13 +60,28 @@ export function recommendNomination(
     if (!player) continue;
 
     // ------------------------------------------------------------------
-    // Factor 1: Budget drain (0-0.4)
-    // Expensive players force opponents to spend big or lose them
+    // Factor 1: Overpricing (0-1, weight 0.6)
+    // ESPN avg salary minus model dollar value — positive = overpriced.
+    // When ESPN ASV unavailable, fall back to budget drain heuristic.
     // ------------------------------------------------------------------
-    const budgetDrainFactor = Math.min(0.4, player.dollars / 50);
+    let overpricingRaw: number;
+    let hasEspnAsv = false;
+    let espnPrice = 0;
+    let modelValue = player.dollars;
+
+    if (player.espnAvgSalary != null && player.espnAvgSalary > 0) {
+      hasEspnAsv = true;
+      espnPrice = player.espnAvgSalary;
+      overpricingRaw = espnPrice - modelValue;
+    } else {
+      // Fallback: budget drain heuristic (expensive players drain budgets)
+      overpricingRaw = player.dollars / 50 * MAX_OVERPRICING;
+    }
+
+    const normalizedOverpricing = Math.max(0, Math.min(1, overpricingRaw / MAX_OVERPRICING));
 
     // ------------------------------------------------------------------
-    // Factor 2: Opponent need factor (0-0.3)
+    // Factor 2: Opponent need factor (0-1, weight 0.2)
     // Count opponents who have remaining slots at any of this player's positions
     // ------------------------------------------------------------------
     let opponentNeedCount = 0;
@@ -75,37 +96,44 @@ export function recommendNomination(
     }
 
     const opponentNeedFactor = opponentStates.length > 0
-      ? Math.min(0.3, 0.3 * opponentNeedCount / Math.max(1, opponentStates.length))
+      ? opponentNeedCount / Math.max(1, opponentStates.length)
       : 0;
 
     // ------------------------------------------------------------------
-    // Factor 3: My non-need factor (0-0.3)
+    // Factor 3: My non-need factor (0-1, weight 0.2)
     // Nominate players I don't need (position already filled)
     // ------------------------------------------------------------------
     const playerPositionsUpper = player.positions.map(p => p.toUpperCase());
-    const myNeedScore = playerPositionsUpper.some(
+    const iNeedThisPosition = playerPositionsUpper.some(
       pos => (myTeamState.slotsRemaining[pos] ?? 0) > 0,
-    ) ? 1.0 : 0.0;
-    const myNonNeedFactor = 0.3 * (1 - myNeedScore);
+    );
+    const myNonNeedFactor = iNeedThisPosition ? 0.0 : 1.0;
 
     // ------------------------------------------------------------------
-    // trapScore = sum of three factors, floored at 0.01
+    // nominationScore = weighted sum, floored at 0.01
     // ------------------------------------------------------------------
-    const rawTrapScore = budgetDrainFactor + opponentNeedFactor + myNonNeedFactor;
-    const trapScore = Math.max(0.01, rawTrapScore);
+    const rawScore = normalizedOverpricing * 0.6 + opponentNeedFactor * 0.2 + myNonNeedFactor * 0.2;
+    const trapScore = Math.max(0.01, Math.min(1.0, rawScore));
 
     // ------------------------------------------------------------------
     // Reason generation: build human-readable explanation
     // ------------------------------------------------------------------
     const reasons: string[] = [];
 
-    if (budgetDrainFactor > 0.2) {
+    if (hasEspnAsv && overpricingRaw > 5) {
+      reasons.push(
+        `Overpriced by $${Math.round(overpricingRaw)} (ESPN $${espnPrice} vs model $${Math.round(modelValue)})`,
+      );
+    } else if (hasEspnAsv && overpricingRaw > 0) {
+      reasons.push(`Slightly overpriced (ESPN $${espnPrice} vs model $${Math.round(modelValue)})`);
+    } else if (!hasEspnAsv && player.dollars > 15) {
       reasons.push(`Expensive ($${player.dollars}) -- drains opponent budget`);
     }
-    if (opponentNeedFactor > 0.15) {
+
+    if (opponentNeedFactor > 0.5) {
       reasons.push(`${opponentNeedCount} opponents need this position`);
     }
-    if (myNonNeedFactor > 0.15) {
+    if (myNonNeedFactor > 0.5) {
       reasons.push("You don't need this position");
     }
     if (reasons.length === 0) {
@@ -116,9 +144,8 @@ export function recommendNomination(
 
     // ------------------------------------------------------------------
     // expectedDrain: rough estimate of opponent spend
-    // Derived from opponentNeedFactor scaling back to fraction (0-1)
     // ------------------------------------------------------------------
-    const expectedDrain = player.dollars * (opponentNeedFactor / 0.3);
+    const expectedDrain = (hasEspnAsv ? espnPrice : player.dollars) * opponentNeedFactor;
 
     recommendations.push({
       playerIndex: idx,
