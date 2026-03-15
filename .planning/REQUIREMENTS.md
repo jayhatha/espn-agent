@@ -26,9 +26,9 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 
 ### Inflation & Signals
 
-- [ ] **INF-01**: Inflation interpretation bands: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
-- [ ] **INF-02**: Bid ceiling adjusts based on inflation bands (+2 when inflation > 1.10)
-- [ ] **INF-03**: Category targets: OPS top 3, HR top 3, SB top 4, Saves top 4, K top 5
+- [x] **INF-01**: Inflation interpretation bands: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
+- [x] **INF-02**: Bid ceiling adjusts based on inflation bands (+2 when inflation > 1.10)
+- [x] **INF-03**: Category targets: OPS top 3, HR top 3, SB top 4, Saves top 4, K top 5
 
 ### Data Pipeline
 
@@ -74,9 +74,9 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 | POS-01 | Phase 49 | Complete |
 | POS-02 | Phase 49 | Complete |
 | POS-03 | Phase 49 | Complete |
-| INF-01 | Phase 50 | Pending |
-| INF-02 | Phase 50 | Pending |
-| INF-03 | Phase 50 | Pending |
+| INF-01 | Phase 50 | Complete |
+| INF-02 | Phase 50 | Complete |
+| INF-03 | Phase 50 | Complete |
 | DATA-01 | Phase 51 | Pending |
 | DATA-02 | Phase 51 | Pending |
 
