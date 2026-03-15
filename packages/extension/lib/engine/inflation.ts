@@ -67,6 +67,13 @@ export function computeInflation(
   // Low confidence when fewer than 20 valued players remain (late draft instability)
   const confidence = remainingPlayers.length >= 20 ? "high" : "low";
 
+  // Interpret inflation factor into semantic band (INF-01)
+  const inflationBand: InflationSignal["inflationBand"] =
+    inflationFactor < 1.00 ? "overspending"
+    : inflationFactor <= 1.05 ? "neutral"
+    : inflationFactor <= 1.15 ? "buying_window"
+    : "strong_value";
+
   return {
     inflationFactor,
     rawInflationFactor: rawFactor,
@@ -74,5 +81,6 @@ export function computeInflation(
     totalRemainingValue: normalizedRemainingValue,  // Use normalized for display
     confidence,
     percentOverMarket: Math.round((inflationFactor - 1) * 100),
+    inflationBand,
   };
 }

@@ -45,6 +45,7 @@ export interface InflationSignal {
   totalRemainingValue: number;
   confidence: "high" | "low";    // Low when < 20 valued players remain
   percentOverMarket: number;     // (inflationFactor - 1) * 100
+  inflationBand: "overspending" | "neutral" | "buying_window" | "strong_value";
 }
 
 export interface EnhancedScarcitySignal {
