@@ -4,6 +4,7 @@ import { getDb } from "../db/connection.js";
 import { ProjectionsIngestAgent } from "../agents/projections-ingest.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
  * Projections API Routes
@@ -54,9 +55,9 @@ async function triggerDegradedLeagueResnapshots(
         try {
           const orchestrator = new SnapshotOrchestratorAgent(db, log);
 
-          // Decrypt ESPN cookies (encrypted only - no plaintext fallback)
-          let auth: { SWID: string; espn_s2: string } | undefined;
-          if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+          // ESPN auth: env vars first, then encrypted DB fallback
+          let auth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
+          if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
             if (!hasEncryptionKey()) {
               log.error({ leagueId: league.id }, "ENCRYPTION_KEY not configured - cannot decrypt credentials");
               return;

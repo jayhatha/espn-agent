@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 // Import backfill worker so it runs in the same process
 import "./backfill-worker.js";
@@ -54,7 +55,7 @@ const worker = new Worker<SnapshotJobData>(
       await orchestrator.executeSnapshot({
         leagueId,
         snapshotDate,
-        espnAuth: auth,
+        espnAuth: auth || getEspnAuthFromEnv(),
       });
 
       logger.info({ jobId: job.id, leagueId }, "Snapshot job completed");

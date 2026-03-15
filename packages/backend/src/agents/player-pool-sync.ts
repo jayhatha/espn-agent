@@ -2,6 +2,7 @@ import type { Logger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { ESPNAdapter, ESPN_STAT_MAP } from "../adapters/espn.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
  * Player Pool Sync Agent
@@ -74,9 +75,9 @@ export class PlayerPoolSyncAgent {
         "Using connected league for player pool sync",
       );
 
-      // Get ESPN auth credentials (encrypted only)
-      let espnAuth: { SWID: string; espn_s2: string } | undefined;
-      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+      // ESPN auth: env vars first, then encrypted DB fallback
+      let espnAuth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
+      if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         // Import decryption utilities
         const { decryptToken, hasEncryptionKey } = await import(
           "../utils/encryption.js"

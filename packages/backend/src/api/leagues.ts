@@ -5,6 +5,7 @@ import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
  * Leagues API Routes
@@ -505,10 +506,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         const today = new Date().toISOString().split("T")[0];
 
-        // Build auth cookies from encrypted credentials (required)
-        let auth: ESPNAuthCookies | undefined;
+        // Build auth cookies: env vars first, then encrypted DB fallback
+        let auth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
 
-        if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
           if (!hasEncryptionKey()) {
             return reply
               .code(500)

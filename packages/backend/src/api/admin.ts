@@ -4,6 +4,7 @@ import { getDb } from "../db/connection.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { backfillQueue } from "../workers/backfill-worker.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import {
   ESPNAdapter,
   type ESPNAuthCookies,
@@ -339,9 +340,9 @@ export async function adminRoutes(app: FastifyInstance) {
         });
       }
 
-      // Get ESPN auth credentials (encrypted only)
-      let espnAuth: { SWID?: string; espn_s2?: string } | undefined;
-      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+      // ESPN auth: env vars first, then encrypted DB fallback
+      let espnAuth: { SWID?: string; espn_s2?: string } | undefined = getEspnAuthFromEnv();
+      if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
           return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
         }
@@ -795,9 +796,9 @@ export async function adminRoutes(app: FastifyInstance) {
         });
       }
 
-      // Get ESPN auth credentials (encrypted only)
-      let espnAuth: ESPNAuthCookies | undefined;
-      if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+      // ESPN auth: env vars first, then encrypted DB fallback
+      let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
+      if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
           return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
         }

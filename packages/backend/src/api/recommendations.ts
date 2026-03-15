@@ -8,6 +8,7 @@ import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
  * Recommendations API Routes
@@ -64,9 +65,9 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           return reply.code(404).send({ error: "League not found" });
         }
 
-        // Decrypt ESPN cookies (encrypted only)
-        let auth: { SWID: string; espn_s2: string } | undefined;
-        if (league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        // ESPN auth: env vars first, then encrypted DB fallback
+        let auth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
+        if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
           if (!hasEncryptionKey()) {
             return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
           }

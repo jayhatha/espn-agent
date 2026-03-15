@@ -3,6 +3,7 @@ import IORedis from "ioredis";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { HistoricalBackfillAgent, type BackfillProgress } from "../agents/historical-backfill.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
  * Background worker for historical backfill jobs
@@ -55,7 +56,7 @@ const worker = new Worker<BackfillJobData>(
         season,
         startWeek,
         endWeek,
-        espnAuth,
+        espnAuth: espnAuth || getEspnAuthFromEnv(),
         onProgress: async (progress: BackfillProgress) => {
           // Update job progress in Redis (visible via API)
           await job.updateProgress(progress);
