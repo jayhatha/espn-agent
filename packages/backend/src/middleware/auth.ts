@@ -16,12 +16,16 @@ declare module "@fastify/jwt" {
 // All middleware functions are no-ops. Auth code preserved for future multi-user.
 // =============================================================================
 
-// Authenticate middleware (bypassed)
+// Mock user for single-user mode — routes reference request.user.userId / request.user.role
+const MOCK_USER = { userId: 1, email: "local@localhost", role: "admin" as const };
+
+// Authenticate middleware (bypassed — injects mock user)
 export async function authenticate(
-  _request: FastifyRequest,
+  request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // No-op: auth bypassed for single-user mode
+  // Populate request.user so downstream handlers don't crash
+  (request as any).user = MOCK_USER;
 }
 
 // Require admin role (bypassed)
