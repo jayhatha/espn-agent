@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 43 of 46 (Strip Auth & Env Config)
-Plan: Ready to plan
-Status: Ready to plan
-Last activity: 2026-03-15 — Roadmap created for v4.0
+Plan: 1 of 1 -- COMPLETE
+Status: Phase 43 complete
+Last activity: 2026-03-15 -- Completed 43-01-PLAN.md (7 min)
 
-Progress: [░░░░░░░░░░] 0% (v4.0)
+Progress: [##░░░░░░░░] 25% (v4.0) -- Phase 43 done
 
 ## Performance Metrics
 
@@ -33,6 +33,9 @@ Progress: [░░░░░░░░░░] 0% (v4.0)
 - [v4.0 start]: Categories: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP (5x5 with OPS)
 - [v4.0 start]: ESPN creds via .env (SWID + espn_s2) primary, encrypted DB as fallback
 - [v4.0 start]: Keep all existing code for later expansion — don't delete, just bypass
+- [Phase 43]: Auth middleware made no-op (not deleted) for future re-enablement
+- [Phase 43]: AuthContext provides mock admin user for single-user mode
+- [Phase 43]: ESPN creds via ESPN_SWID/ESPN_S2 env vars, encrypted DB as fallback
 - [Phase 44]: OPS replaces AVG as default hitting rate stat; shared league-defaults.ts as single source of truth
 
 ### Pending Todos
@@ -46,5 +49,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-15
-Stopped at: Roadmap created for v4.0, ready to plan Phase 43
+Stopped at: Completed 43-01-PLAN.md
 Resume file: None

@@ -9,9 +9,9 @@ Requirements for v4.0 Personal Season Setup. Each maps to roadmap phases.
 
 ### Simplification
 
-- [ ] **SIMP-01**: API routes respond without authentication (no JWT, no cookie check)
-- [ ] **SIMP-02**: Frontend pages load without login redirect (no auth guard)
-- [ ] **SIMP-03**: ESPN credentials loaded from env vars (ESPN_SWID, ESPN_S2) with DB fallback
+- [x] **SIMP-01**: API routes respond without authentication (no JWT, no cookie check)
+- [x] **SIMP-02**: Frontend pages load without login redirect (no auth guard)
+- [x] **SIMP-03**: ESPN credentials loaded from env vars (ESPN_SWID, ESPN_S2) with DB fallback
 
 ### League Configuration
 
@@ -77,9 +77,9 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIMP-01 | Phase 43 | Pending |
-| SIMP-02 | Phase 43 | Pending |
-| SIMP-03 | Phase 43 | Pending |
+| SIMP-01 | Phase 43 | Complete |
+| SIMP-02 | Phase 43 | Complete |
+| SIMP-03 | Phase 43 | Complete |
 | CONF-01 | Phase 44 | Complete |
 | CONF-02 | Phase 44 | Complete |
 | CONF-03 | Phase 44 | Complete |

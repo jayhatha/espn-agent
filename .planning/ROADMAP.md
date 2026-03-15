@@ -34,7 +34,7 @@ Phase 39: DevTools Setup, Phase 40: Auto-Nomination Rework, Phase 41: Mobile Com
 
 **Milestone Goal:** Strip auth complexity, hardcode league config for personal use, fix draft extension detection, and verify the full in-season pipeline works end-to-end for league 112523.
 
-- [ ] **Phase 43: Strip Auth & Env Config** - API routes and frontend pages work without authentication, ESPN credentials loaded from env vars
+- [x] **Phase 43: Strip Auth & Env Config** - API routes and frontend pages work without authentication, ESPN credentials loaded from env vars (completed 2026-03-15)
 - [x] **Phase 44: Hardcode League & OPS Math** - League 112523 settings hardcoded as defaults, OPS wired as rate stat in component math (completed 2026-03-15)
 - [ ] **Phase 45: Fix Draft Extension Detection** - Extension reliably detects user's team and roster using hardcoded config as primary, DOM detection as validation
 - [ ] **Phase 46: Verify In-Season Pipeline** - Daily snapshot pipeline, projected standings, waiver recommendations, and trade analysis work end-to-end for league 112523
@@ -102,7 +102,7 @@ Phases execute in numeric order: 43 -> 44 -> 45 -> 46
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 43. Strip Auth & Env Config | v4.0 | 0/? | Not started | - |
+| 43. Strip Auth & Env Config | 1/1 | Complete   | 2026-03-15 | - |
 | 44. Hardcode League & OPS Math | 1/1 | Complete   | 2026-03-15 | - |
 | 45. Fix Draft Extension Detection | v4.0 | 0/? | Not started | - |
 | 46. Verify In-Season Pipeline | v4.0 | 0/? | Not started | - |
