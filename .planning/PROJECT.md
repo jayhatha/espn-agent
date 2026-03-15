@@ -39,19 +39,23 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 - ✓ Typography-driven editorial site redesign — v2.0
 - ✓ Auto-nomination from ESPN queue — v2.0
 - ✓ Category floor enforcement (no punt categories) — v2.0
+- ✓ MCP-verified ESPN DOM selectors for reliable draft automation — v3.0
+- ✓ Mobile command center with full draft controls — v3.0
+- ✓ Phase-aware nomination queue strategy — v3.0
 
 ### Active
 
-#### Current Milestone: v3.0 Draft Automation & Mobile Command Center
+#### Current Milestone: v4.0 Personal Season Setup
 
-**Goal:** Make auto-nomination reliable with verified ESPN selectors (via Chrome DevTools MCP) and rework the mobile draft companion into a full-control command center.
+**Goal:** Strip multi-user complexity, hardcode league settings for league 112523 (13 teams, 5x5 with OPS), and make the full stack work end-to-end for one user's draft and season.
 
-- [ ] Chrome DevTools MCP server setup for live ESPN DOM inspection
-- [ ] Auto-nomination selector overhaul using verified ESPN DOM selectors
-- [ ] Auto-nomination flow rework (search, queue, turn detection reliability)
-- [ ] Mobile draft companion full redesign with all engine signals
-- [ ] Mobile full draft control (queue management, bid limits, strategy anchors)
-- [ ] Mobile responsive layout optimized for phone screens
+- [ ] Remove auth system (no login, no JWT, no users table dependency on API routes)
+- [ ] Hardcode league settings (league 112523, team 13, 13 teams, R/RBI/HR/SB/OPS + K/W/SV/ERA/WHIP)
+- [ ] ESPN credentials via env vars (SWID + espn_s2 in .env), keep DB fallback
+- [ ] Fix draft extension roster/team detection with hardcoded league config + detection fallback
+- [ ] Wire OPS as a rate stat in component math (OBP + SLG, needs both component sets)
+- [ ] Verify in-season pipeline: daily snapshots, projected standings, waivers, trades
+- [ ] Fix bugs found during live draft testing (pick detection, queue timing, config detection)
 
 ### Deferred
 
@@ -91,8 +95,11 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | Monte Carlo for bid uncertainty | Captures draft outcome variance | ✓ Good |
 | WebSocket hub for mobile companion | Extension → Fastify → phone, works on LAN | ✓ Good |
 | Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic | — Pending |
-| Chrome DevTools MCP for selector discovery | Live DOM inspection beats guessing at ESPN selectors | — Pending |
-| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline | — Pending |
+| Chrome DevTools MCP for selector discovery | Live DOM inspection beats guessing at ESPN selectors | ✓ Good |
+| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline | ✓ Good |
+| Strip auth for v4.0 personal use | No login friction, re-enable later for multi-user | — Pending |
+| Hardcode league 112523 settings | Reliable config over error-prone DOM detection | — Pending |
+| OPS as custom rate stat | OBP + SLG components, not a simple stat | — Pending |
 
 ---
-*Last updated: 2026-03-14 after v3.0 milestone start*
+*Last updated: 2026-03-15 after v4.0 milestone start*

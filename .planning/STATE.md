@@ -2,28 +2,24 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-14)
+See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v3.0 Draft Automation & Mobile Command Center — Phase 41 (Mobile Command Center)
+**Current focus:** v4.0 Personal Season Setup
 
 ## Current Position
 
-Phase: 41 of 41 (Mobile Command Center)
-Plan: 4 of 5 in current phase
-Status: Executing
-Last activity: 2026-03-14 — Completed 41-03 tabbed mobile layout with typed controls
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-15 — Milestone v4.0 started
 
-Progress: [##░░░░░░░░] 8% (v3.0)
+Progress: [░░░░░░░░░░] 0% (v4.0)
 
 ## Performance Metrics
 
-**Velocity (v2.0 completed — 108 plans across phases 6-38):**
-- Typical plan duration: 1-30 min (most under 10 min)
-- Trend: Stable
-
-**Recent Trend:**
-- Phase 38 plans: 4-15 min each
+**Velocity (v3.0 completed — 12 plans across phases 39-42):**
+- Typical plan duration: 1-10 min
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -32,36 +28,22 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 
 ### Decisions
 
-- [40-01]: CONFIRMED/UNTESTED annotation convention established for all nomination-critical selectors; findFirstMatchingSelector helper exported for Plan 02
-- [40-02]: Strategy 4 (Button--select) runs before Strategy 3 (pickArea) as primary tier; UNTESTED fallbacks emit logger.warn; clearNominationState() is single reset path
-- [40-03]: typeIntoSearchInput() shared helper eliminates duplicated React input typing; 5 named timeout constants replace magic numbers in search polling
-- [40-04]: Used text-content-secondary for timestamps (text-content-muted not in design system); strategy tier badge pattern established
-- [41-01]: skippedPlayerIds as array (not Set) for Zustand persist compatibility; reorderQueue store-only (DOM drag deferred); scarcity relay filtered to scarcityIndex > 0.3
-- [41-02]: Used satisfies ExtensionStatusMessage for type safety on mobile join send; broadcastToMobile helper pattern for hub-to-mobile fan-out
-- [v3.0 start]: Chrome DevTools MCP (dev-only, npx, no package.json entry) chosen for selector validation over guessing — 10+ prior regressions from unvalidated selectors
-- [v3.0 start]: Hub-as-transparent-bus pattern retained — all new CONTROL types flow through unchanged; validation in content.tsx only
-- [v3.0 start]: `skippedPlayerIds` must live in extension Zustand store, not mobile React state, so it filters the engine before candidates reach WS broadcast
-- [v3.0 start]: `motion@^12.36.0` is the only new production dependency for v3.0 (swipe gesture animations on mobile)
-- [Phase 41]: Defined types locally in Strategy tab components for parallel development with Plan 41-03
-- [41-03]: sendControlUntyped adapter for QueueTab compatibility; bottom TabBar always visible; control bar stays inside LiveTab
-- [Phase 41]: Used typed sendControl from Plan 03 instead of untyped bridge pattern for QueueTab
+- [v4.0 start]: Remove auth entirely (no JWT, no users table, no login) — re-enable later for multi-user
+- [v4.0 start]: League 112523, Team 13, 13 teams hardcoded as primary config
+- [v4.0 start]: Categories: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP (5x5 with OPS)
+- [v4.0 start]: ESPN creds via .env (SWID + espn_s2) primary, encrypted DB as fallback
+- [v4.0 start]: Keep all existing code for later expansion — don't delete, just bypass
 
 ### Pending Todos
 
 None yet.
 
-### Roadmap Evolution
-
-- Phase 42 added: Phase-aware nomination queue strategy with bidding guard
-
 ### Blockers/Concerns
 
-- [Phase 39]: ESPN draft page may use iframes requiring CDP frame targeting — must document exact `list targets` → `select target` sequence during first MCP session
-- [Phase 40]: React fiber path to ESPN nomination/queue state is unknown until Phase 39 inspection; do not write any fiber traversal code before Phase 39 output exists
-- [Phase 41]: EXTENSION_STATUS relay and typed CONTROL union are prerequisites within this phase — implement them before wiring any new control buttons
+None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14
-Stopped at: Completed 41-03-PLAN.md (tabbed mobile layout with typed controls)
+Last session: 2026-03-15
+Stopped at: Starting v4.0 milestone
 Resume file: None
