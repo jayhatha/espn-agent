@@ -9,65 +9,19 @@ function cleanParams(params: Record<string, any>): Record<string, string> {
   return clean;
 }
 
-// Mutex for refresh token rotation - prevents multiple concurrent refresh calls
-let refreshPromise: Promise<boolean> | null = null;
-
-async function tryRefresh(): Promise<boolean> {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = (async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      return res.ok;
-    } catch {
-      return false;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-  return refreshPromise;
-}
+// =============================================================================
+// AUTH BYPASSED: Single-user mode (v4.0)
+// No token refresh, no 401 redirect-to-login. Just fetch and return.
+// =============================================================================
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
   });
-
-  if (res.status === 401) {
-    // Attempt silent refresh before giving up
-    const refreshed = await tryRefresh();
-    if (refreshed) {
-      // Retry original request with fresh tokens
-      const retryRes = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
-
-      if (retryRes.ok) {
-        return retryRes.json();
-      }
-    }
-
-    // Refresh failed or retry failed - redirect to login (unless already on an auth page)
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname;
-      if (path !== '/login' && path !== '/signup' && path !== '/') {
-        window.location.href = '/login';
-      }
-    }
-    throw new Error('Unauthorized');
-  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -115,35 +69,8 @@ export const api = {
     // Browser will automatically set multipart/form-data with boundary
     const res = await fetch(`${API_URL}/api/projections/upload`, {
       method: 'POST',
-      credentials: 'include',
       body: formData,
     });
-
-    if (res.status === 401) {
-      // Attempt silent refresh before giving up
-      const refreshed = await tryRefresh();
-      if (refreshed) {
-        // Retry upload with fresh tokens
-        const retryRes = await fetch(`${API_URL}/api/projections/upload`, {
-          method: 'POST',
-          credentials: 'include',
-          body: formData,
-        });
-
-        if (retryRes.ok) {
-          return retryRes.json();
-        }
-      }
-
-      // Refresh failed - redirect to login
-      if (typeof window !== 'undefined') {
-        const path = window.location.pathname;
-        if (path !== '/login' && path !== '/signup' && path !== '/') {
-          window.location.href = '/login';
-        }
-      }
-      throw new Error('Unauthorized');
-    }
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({ error: 'Upload failed' }));

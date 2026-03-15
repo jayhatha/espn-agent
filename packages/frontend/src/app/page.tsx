@@ -4,27 +4,25 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trophy, BarChart3, RefreshCw, TrendingUp, Zap, Target, Smartphone, ArrowRight } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { Heading } from "@/components/ui/Heading";
 import { Text } from "@/components/ui/Text";
-import { Button, buttonVariants } from "@/components/ui/Button";
+import { buttonVariants } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FadeIn } from "@/components/motion/FadeIn";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
+// =============================================================================
+// AUTH BYPASSED: Single-user mode (v4.0)
+// Home page auto-redirects to first league. No login gate.
+// =============================================================================
+
 export default function HomePage() {
-  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [redirecting, setRedirecting] = useState(false);
+  const [redirecting, setRedirecting] = useState(true);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) return;
-
-    // User is logged in -- check if they have leagues
-    setRedirecting(true);
     api
       .getLeagues()
       .then((leagues: { id: number }[]) => {
@@ -35,13 +33,12 @@ export default function HomePage() {
         }
       })
       .catch(() => {
-        // If league fetch fails, stay on home page
+        // If league fetch fails, show landing page
         setRedirecting(false);
       });
-  }, [user, authLoading, router]);
+  }, [router]);
 
-  // Show loading spinner while checking auth or redirecting
-  if (authLoading || redirecting) {
+  if (redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" message="Loading..." />
@@ -49,12 +46,7 @@ export default function HomePage() {
     );
   }
 
-  // Unauthenticated users see the landing page
-  if (!user) {
-    return <LandingPage />;
-  }
-
-  return null;
+  return <LandingPage />;
 }
 
 function LandingPage() {
