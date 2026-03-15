@@ -164,8 +164,13 @@ export default defineContentScript({
 
     await resolveBackendLeagueMapping();
 
-    // Detect league config once at page load (user constraint)
-    const detection = detectLeagueConfig();
+    // Detect league config — retry after delay if initial detection fails (ESPN React may not have rendered yet)
+    let detection = detectLeagueConfig();
+    if (detection.warnings.length > 0) {
+      logger.log("[ESPN Draft Assistant] Initial config detection incomplete, retrying in 3s...");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      detection = detectLeagueConfig();
+    }
     configDetectionWarnings = detection.warnings;
 
     // Wait for Zustand persist to finish hydrating from chrome.storage.local

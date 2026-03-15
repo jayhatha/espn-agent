@@ -132,6 +132,9 @@ function getPickCandidatesFromNode(node: Node): Element[] {
  * Logs warnings if primary selector fails but fallback succeeds
  * Logs errors if all selectors fail with DOM structure snapshot
  */
+// Track whether we've logged the "all selectors failed" error to avoid spam
+let selectorFailureLogged = new Set<string>();
+
 function validateAndFindElement(
   selectorArray: string,
   selectorName: string,
@@ -144,41 +147,21 @@ function validateAndFindElement(
 
     if (element) {
       if (i > 0) {
-        // Primary selector failed, but fallback succeeded
         logger.warn(
           `[ESPN Draft Assistant] Primary ${selectorName} selector failed, using fallback #${i + 1}: "${selector}"`,
         );
       }
+      // Clear failure flag on success
+      selectorFailureLogged.delete(selectorName);
       return element;
     }
   }
 
-  // All selectors failed - log error with DOM snapshot
-  logger.error(
-    `[ESPN Draft Assistant] All ${selectorName} selectors failed. ESPN DOM may have changed.`,
-  );
-  logger.error(
-    "[ESPN Draft Assistant] Document body classes:",
-    document.body?.className || "none",
-  );
-  logger.error(
-    "[ESPN Draft Assistant] Document body children count:",
-    document.body?.children.length || 0,
-  );
-
-  // Log first 5 elements with their classes for debugging
-  if (document.body) {
-    const elements = Array.from(document.body.querySelectorAll("*")).slice(
-      0,
-      5,
-    );
-    logger.error(
-      "[ESPN Draft Assistant] First 5 elements:",
-      elements.map((el) => ({
-        tag: el.tagName,
-        class: el.className,
-        id: el.id,
-      })),
+  // Only log once per selector name to avoid spam during bootstrap
+  if (!selectorFailureLogged.has(selectorName)) {
+    selectorFailureLogged.add(selectorName);
+    logger.warn(
+      `[ESPN Draft Assistant] ${selectorName} selectors not found yet (ESPN may still be loading)`,
     );
   }
 
@@ -363,14 +346,12 @@ export function observeDraftBoard(
   });
 
   if (!observedBoard) {
-    // Try narrower containers first — ESPN draft boards use these patterns.
-    // Observing a narrower container reduces mutation events on ESPN's DOM-heavy pages.
+    // CONFIRMED (MCP verified 2026-03-14): ESPN draft board bootstrap targets.
+    // Try narrower containers first to reduce mutation noise.
     const bootstrapTarget =
-      document.querySelector(".draft-board") ||
-      document.querySelector('[class*="DraftBoard"]') ||
+      document.querySelector(".draft-content-wrapper") ||
+      document.querySelector('[class*="draftBoard"]') ||
       document.querySelector(".players-table") ||
-      document.querySelector('[class*="playersTable"]') ||
-      document.getElementById("draft-content") ||
       document.body;
 
     if (bootstrapTarget) {
