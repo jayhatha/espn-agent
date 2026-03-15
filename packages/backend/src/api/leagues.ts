@@ -343,14 +343,12 @@ export async function leaguesRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      // Only return leagues where the user has a team
+    async () => {
+      // Single-user mode: return all leagues (no user_id filtering)
       const leagues = await db
         .selectFrom("league")
-        .innerJoin("team", "team.league_id", "league.id")
-        .selectAll("league")
-        .where("team.user_id", "=", request.user.userId)
-        .orderBy("league.created_at", "desc")
+        .selectAll()
+        .orderBy("created_at", "desc")
         .limit(100)
         .execute();
 
