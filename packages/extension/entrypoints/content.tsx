@@ -27,6 +27,7 @@ import {
   DEFAULT_TOTAL_TEAMS,
   DEFAULT_ROSTER_SLOTS,
   DEFAULT_BUDGET,
+  DEFAULT_TEAM_ID,
 } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -237,7 +238,7 @@ export default defineContentScript({
       draftFormat: resolvedDraftFormat,
       totalTeams: cachedLeagueConfig?.totalTeams || 12,
       rosterSize: totalRosterSize,
-      myTeamId: teamId ?? "user",
+      myTeamId: String(DEFAULT_TEAM_ID),
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
 
@@ -251,8 +252,9 @@ export default defineContentScript({
     // existing draft session rather than starting fresh.
     const statePreserved = useDraftStore.getState().allPicks.length > 0;
 
-    logger.log("[ESPN Draft Assistant] Draft state initialized", {
+    logger.log("[ESPN Draft Assistant] Draft state initialized (hardcoded myTeamId=" + DEFAULT_TEAM_ID + ")", {
       statePreserved,
+      myTeamId: String(DEFAULT_TEAM_ID),
       myRoster: useDraftStore.getState().myRoster.length,
       allPicks: useDraftStore.getState().allPicks.length,
     });
@@ -829,7 +831,7 @@ export default defineContentScript({
         draftFormat: "auction",
         totalTeams: latestState.totalTeams,
         rosterSize: latestState.rosterSize,
-        myTeamId: latestState.myTeamId || teamId || "user",
+        myTeamId: latestState.myTeamId || String(DEFAULT_TEAM_ID),
         budget: latestState.remainingBudget || cachedLeagueConfig?.budget || 260,
       });
 
