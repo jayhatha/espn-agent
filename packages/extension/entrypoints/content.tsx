@@ -22,6 +22,12 @@ import {
 } from "../lib/api-client";
 import { detectLeagueConfig, detectMyTeam, detectAllTeamBudgets, detectRosterSlotsFromPlayersTable, detectRosterSizeFromPositionTracker } from "../lib/draft-config-detector";
 import type { DraftConfiguration } from "@espn-fantasy/shared";
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_TOTAL_TEAMS,
+  DEFAULT_ROSTER_SLOTS,
+  DEFAULT_BUDGET,
+} from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import contentStyles from "../styles/content.css?inline";
@@ -204,37 +210,14 @@ export default defineContentScript({
         rosterSlots: Object.keys(detection.config.rosterSlots).length,
       });
     } else {
-      // Use default 5x5 config per user constraint
+      // Use league 112523 defaults (OPS league) from shared config
       cachedLeagueConfig = {
-        totalTeams: 12,
-        categories: [
-          { category_id: "R", stat_key: "R", type: "COUNTING", direction: "HIGHER_BETTER", name: "Runs" },
-          { category_id: "HR", stat_key: "HR", type: "COUNTING", direction: "HIGHER_BETTER", name: "Home Runs" },
-          { category_id: "RBI", stat_key: "RBI", type: "COUNTING", direction: "HIGHER_BETTER", name: "RBI" },
-          { category_id: "SB", stat_key: "SB", type: "COUNTING", direction: "HIGHER_BETTER", name: "Stolen Bases" },
-          { category_id: "AVG", stat_key: "AVG", type: "RATE", direction: "HIGHER_BETTER", name: "Batting Average", formula_id: "avg", required_components: ["AB", "H"] },
-          { category_id: "W", stat_key: "W", type: "COUNTING", direction: "HIGHER_BETTER", name: "Wins" },
-          { category_id: "SV", stat_key: "SV", type: "COUNTING", direction: "HIGHER_BETTER", name: "Saves" },
-          { category_id: "K", stat_key: "K", type: "COUNTING", direction: "HIGHER_BETTER", name: "Strikeouts" },
-          { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA", formula_id: "era", required_components: ["ER", "IP"] },
-          { category_id: "WHIP", stat_key: "WHIP", type: "RATE", direction: "LOWER_BETTER", name: "WHIP", formula_id: "whip", required_components: ["IP", "H", "BB"] },
-        ],
-        rosterSlots: {
-          "C": 1,
-          "1B": 1,
-          "2B": 1,
-          "3B": 1,
-          "SS": 1,
-          "OF": 3,
-          "UTIL": 1,
-          "SP": 4,
-          "RP": 2,
-          "P": 2,
-          "BN": 3,
-        },
-        budget: 260,
+        totalTeams: DEFAULT_TOTAL_TEAMS,
+        categories: DEFAULT_CATEGORIES,
+        rosterSlots: DEFAULT_ROSTER_SLOTS,
+        budget: DEFAULT_BUDGET,
       };
-      logger.warn("[ESPN Draft Assistant] Config detection failed, using 5x5 defaults");
+      logger.warn("[ESPN Draft Assistant] Config detection failed, using league 112523 defaults (OPS league)");
     }
 
     // Always initialize draft state from current URL context
