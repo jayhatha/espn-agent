@@ -90,3 +90,27 @@ export function getSpTierCap(spCount: number): number {
  * high-K relievers who contribute without consuming GS.
  */
 export const GS_CAP = 200;
+
+// ============================================================
+// Category Rank Targets (INF-03)
+// ============================================================
+
+/**
+ * Target finish position per scoring category.
+ * Used by strategy logic and displayed in sidebar to guide draft priorities.
+ *
+ * Lower number = more aggressive target (top 3 = finish in top 3 of league).
+ * OPS/HR: top 3, SB/SV: top 4, K: top 5, others: sensible defaults.
+ */
+export const CATEGORY_RANK_TARGETS: Record<string, number> = {
+  OPS: 3,   // finish top 3
+  HR: 3,
+  SB: 4,
+  SV: 4,
+  K: 5,
+  R: 4,
+  RBI: 4,
+  W: 5,
+  ERA: 4,
+  WHIP: 4,
+};
