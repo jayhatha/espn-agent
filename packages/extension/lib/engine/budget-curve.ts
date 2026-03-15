@@ -7,6 +7,8 @@ export function computeBudgetCurve(
   totalRosterSize: number,
   inflationFactor: number,
   currentPlayerDollarValue: number,
+  hitterSpent: number = 0,
+  pitcherSpent: number = 0,
 ): BudgetCurveSignal {
   const minReserve = Math.max(0, remainingRosterSpots - 1); // $1 per remaining spot
   const usableBudget = Math.max(0, remainingBudget - minReserve);
@@ -39,6 +41,9 @@ export function computeBudgetCurve(
     ? usableBudget / remainingRosterSpots
     : 0;
 
+  // Endgame mode: activates when budget is critically low
+  const endgameMode = remainingBudget <= 20;
+
   return {
     remainingBudget,
     remainingRosterSpots,
@@ -48,5 +53,11 @@ export function computeBudgetCurve(
     maxBidRecommendation,
     pacingStatus,
     inflationAdjustedBid: Math.max(1, Math.min(inflationAdjustedValue, usableBudget)),
+    endgameMode,
+    hitterBudgetTarget: { min: 185, max: 205 },
+    pitcherBudgetTarget: { min: 55, max: 70 },
+    benchBudget: 5,
+    hitterSpent,
+    pitcherSpent,
   };
 }
