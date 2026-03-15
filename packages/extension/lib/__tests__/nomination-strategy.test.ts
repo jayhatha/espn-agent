@@ -6,7 +6,12 @@ import { recommendNomination } from "../engine/nomination-strategy";
 // Fixtures / helpers
 // ============================================================
 
-function makePlayer(name: string, dollars: number, positions: string[]): PoolPlayer {
+function makePlayer(
+  name: string,
+  dollars: number,
+  positions: string[],
+  espnAvgSalary?: number,
+): PoolPlayer {
   return {
     name,
     normalizedName: name.toLowerCase(),
@@ -14,6 +19,7 @@ function makePlayer(name: string, dollars: number, positions: string[]): PoolPla
     isPitcher: positions.some(p => p === "SP" || p === "RP" || p === "P"),
     positions,
     stats: { HR: 20, R: 80, RBI: 60, AB: 400, H: 110, IP: 0, ER: 0, K: 0, W: 0, SV: 0 },
+    espnAvgSalary,
   };
 }
 
@@ -38,20 +44,79 @@ const EMPTY_OPPONENT_MODEL: OpponentModel = {
 // ============================================================
 
 describe("recommendNomination", () => {
+  it("ranks overpriced players higher than fairly-priced players", () => {
+    // Player A: ESPN $40, model $10 => overpriced by $30 (high score)
+    const playerA = makePlayer("Overpriced Star", 10, ["1B"], 40);
+    // Player B: ESPN $15, model $14 => overpriced by $1 (low score)
+    const playerB = makePlayer("Fair Value", 14, ["1B"], 15);
+
+    const myTeamState = makeTeamState(100, {}); // no slots needed
+
+    const result = recommendNomination(
+      [playerA, playerB],
+      [5, 5],
+      myTeamState,
+      EMPTY_OPPONENT_MODEL,
+      [],
+      2,
+    );
+
+    expect(result.length).toBe(2);
+    expect(result[0].playerName).toBe("Overpriced Star");
+    expect(result[0].trapScore).toBeGreaterThan(result[1].trapScore);
+  });
+
+  it("uses budget drain fallback when espnAvgSalary is undefined", () => {
+    // No ESPN ASV, so falls back to dollars/50 * 30 for overpricing
+    const expensivePlayer = makePlayer("Expensive No ASV", 40, ["1B"]); // no espnAvgSalary
+    const cheapPlayer = makePlayer("Cheap No ASV", 5, ["1B"]);
+
+    const myTeamState = makeTeamState(100, {}); // no slots needed
+
+    const result = recommendNomination(
+      [expensivePlayer, cheapPlayer],
+      [8, 2],
+      myTeamState,
+      EMPTY_OPPONENT_MODEL,
+      [],
+      2,
+    );
+
+    expect(result.length).toBe(2);
+    // Expensive player should score higher in fallback mode
+    expect(result[0].playerName).toBe("Expensive No ASV");
+    expect(result[0].trapScore).toBeGreaterThan(result[1].trapScore);
+  });
+
+  it("includes overpricing reason when overpricing > 5", () => {
+    const player = makePlayer("Overpriced Ace", 10, ["SP"], 25);
+    const myTeamState = makeTeamState(100, {});
+
+    const result = recommendNomination(
+      [player],
+      [5],
+      myTeamState,
+      EMPTY_OPPONENT_MODEL,
+      [],
+      5,
+    );
+
+    expect(result.length).toBe(1);
+    expect(result[0].reason).toContain("Overpriced by $15");
+    expect(result[0].reason).toContain("ESPN $25");
+    expect(result[0].reason).toContain("model $10");
+  });
+
   it("sorts by trapScore descending", () => {
-    // Player A: expensive ($40), position I don't need → high trapScore
-    const playerA = makePlayer("Big Bat", 40, ["1B"]);
-    // Player B: cheap ($5), position I need → low trapScore
-    const playerB = makePlayer("Cheap Utility", 5, ["SS"]);
-    // Player C: mid price ($20), position most opponents need → medium trapScore
-    const playerC = makePlayer("Mid Pitcher", 20, ["SP"]);
+    // Player A: overpriced, position I don't need => high score
+    const playerA = makePlayer("Big Bat", 10, ["1B"], 40);
+    // Player B: fairly priced, position I need => low score
+    const playerB = makePlayer("Cheap Utility", 5, ["SS"], 6);
+    // Player C: moderately overpriced, opponents need => medium score
+    const playerC = makePlayer("Mid Pitcher", 15, ["SP"], 30);
 
-    const myTeamState = makeTeamState(100, {
-      // I have SS slot open but not 1B or SP
-      SS: 1,
-    });
+    const myTeamState = makeTeamState(100, { SS: 1 }); // I need SS but not 1B or SP
 
-    // 8 of 10 opponents need SP
     const opponentStates = Array.from({ length: 10 }, () =>
       makeTeamState(80, { SP: 1 }),
     );
@@ -96,7 +161,7 @@ describe("recommendNomination", () => {
 
   it("respects topN limit", () => {
     const players = Array.from({ length: 10 }, (_, i) =>
-      makePlayer(`Player${i}`, 10 + i * 2, ["OF"]),
+      makePlayer(`Player${i}`, 10 + i * 2, ["OF"], 20 + i * 3),
     );
     const sgpValues = players.map((_, i) => 5 - i * 0.5);
     const myTeamState = makeTeamState(100, { SS: 1 }); // No OF slot needed
@@ -113,44 +178,70 @@ describe("recommendNomination", () => {
     expect(result.length).toBe(3);
   });
 
-  it("generates correct reason strings", () => {
-    // Test 1: Expensive player at a position I don't need
-    const expensivePlayer = makePlayer("Expensive Star", 45, ["1B"]);
-    const myTeamNoNeed = makeTeamState(100, { SS: 1 }); // No 1B slot needed
+  it("boosts score for opponent need and my non-need", () => {
+    // Two equally overpriced players, but one at a position opponents need
+    const playerNeeded = makePlayer("Needed Closer", 10, ["RP"], 25);
+    const playerNotNeeded = makePlayer("Not Needed 1B", 10, ["1B"], 25);
 
-    const result1 = recommendNomination(
-      [expensivePlayer],
-      [10],
-      myTeamNoNeed,
+    const myTeamState = makeTeamState(100, {}); // no slots needed (both get non-need bonus)
+
+    // All opponents need RP, none need 1B
+    const opponentStates = Array.from({ length: 10 }, () =>
+      makeTeamState(80, { RP: 1 }),
+    );
+
+    const result = recommendNomination(
+      [playerNeeded, playerNotNeeded],
+      [5, 5],
+      myTeamState,
+      EMPTY_OPPONENT_MODEL,
+      opponentStates,
+      2,
+    );
+
+    expect(result.length).toBe(2);
+    // playerNeeded should score higher due to opponent need factor
+    expect(result[0].playerName).toBe("Needed Closer");
+    expect(result[0].trapScore).toBeGreaterThan(result[1].trapScore);
+    expect(result[0].reason).toContain("opponents need this position");
+  });
+
+  it("penalizes positions I need", () => {
+    // Same overpricing, but one is a position I need
+    const playerINeed = makePlayer("My SS", 10, ["SS"], 25);
+    const playerIDontNeed = makePlayer("Extra 1B", 10, ["1B"], 25);
+
+    const myTeamState = makeTeamState(100, { SS: 1 }); // I need SS
+
+    const result = recommendNomination(
+      [playerINeed, playerIDontNeed],
+      [5, 5],
+      myTeamState,
       EMPTY_OPPONENT_MODEL,
       [],
-      5,
+      2,
     );
 
-    expect(result1.length).toBe(1);
-    expect(result1[0].reason).toContain("Expensive");
-    expect(result1[0].reason).toContain("You don't need this position");
+    expect(result.length).toBe(2);
+    // Player I don't need should rank higher
+    expect(result[0].playerName).toBe("Extra 1B");
+    expect(result[0].reason).toContain("You don't need this position");
+  });
 
-    // Test 2: Cheap player at a position 8 of 10 opponents need
-    const cheapTargetedPlayer = makePlayer("Cheap Closer", 3, ["RP"]);
-    const myTeamWithRP = makeTeamState(100, { RP: 1 }); // I still need RP
-    // 8 of 10 opponents need RP
-    const manyOpponentsNeedRP = Array.from({ length: 10 }, (_, i) =>
-      i < 8
-        ? makeTeamState(80, { RP: 1 }) // needs RP
-        : makeTeamState(80, {}),        // doesn't need RP
-    );
+  it("handles slightly overpriced reason string", () => {
+    const player = makePlayer("Slight Overprice", 10, ["OF"], 13); // overpriced by $3
 
-    const result2 = recommendNomination(
-      [cheapTargetedPlayer],
-      [1],
-      myTeamWithRP,
+    const result = recommendNomination(
+      [player],
+      [5],
+      makeTeamState(100, {}),
       EMPTY_OPPONENT_MODEL,
-      manyOpponentsNeedRP,
-      5,
+      [],
+      1,
     );
 
-    expect(result2.length).toBe(1);
-    expect(result2[0].reason).toContain("opponents need this position");
+    expect(result.length).toBe(1);
+    expect(result[0].reason).toContain("Slightly overpriced");
+    expect(result[0].reason).toContain("ESPN $13");
   });
 });
