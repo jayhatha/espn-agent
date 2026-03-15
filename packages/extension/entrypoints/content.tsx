@@ -12,6 +12,7 @@ import {
   observeCurrentAuctionPlayer,
   scrapeESPNAuctionTable,
   scrapeESPNNominationQueue,
+  getTeamColumnMapping,
 } from "../lib/dom-observers";
 import { useDraftStore } from "../lib/draft-state";
 import {
@@ -264,17 +265,63 @@ export default defineContentScript({
     }
     useDraftStore.setState({ sidebarVisible: true });
 
-    // Detect user's own team from the auction pick train
-    const myTeamDetection = detectMyTeam();
-    // Grid column for my team (1-based position in pick train → grid column number).
-    // DOM-parsed picks use gridArea.column as teamId, which differs from the pick
-    // train's number prefix (e.g., column "3" vs teamId "13"). We need both for matching.
+    // Compute myGridColumn from team column mapping (dropdown → grid column).
+    // parsePickElement sets pick.teamId to the grid column string (e.g., "5"),
+    // NOT the ESPN team ID. So we need to find which grid column corresponds to
+    // our ESPN team ID (DEFAULT_TEAM_ID) to match our picks correctly.
     let myGridColumn: string | null = null;
+
+    const computeMyGridColumn = (): string | null => {
+      const columnMap = getTeamColumnMapping();
+      if (columnMap.size === 0) return null;
+      for (const [column, entry] of columnMap) {
+        if (entry.teamId === String(DEFAULT_TEAM_ID)) {
+          return String(column);
+        }
+      }
+      return null;
+    };
+
+    myGridColumn = computeMyGridColumn();
+    if (myGridColumn) {
+      logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from dropdown mapping for teamId=" + DEFAULT_TEAM_ID + ")");
+    }
+
+    // Fallback: detect from pick train if dropdown mapping failed
+    const myTeamDetection = detectMyTeam();
     if (myTeamDetection) {
-      useDraftStore.getState().setMyTeamId(myTeamDetection.teamId);
       useDraftStore.getState().setRemainingBudget(myTeamDetection.remainingBudget);
-      myGridColumn = myTeamDetection.gridColumn ? String(myTeamDetection.gridColumn) : null;
-      logger.log("[ESPN Draft Assistant] My team set from pick train:", myTeamDetection);
+      if (!myGridColumn && myTeamDetection.gridColumn) {
+        myGridColumn = String(myTeamDetection.gridColumn);
+        logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (fallback from pick train detection)");
+      }
+      logger.log("[ESPN Draft Assistant] Pick train detection:", myTeamDetection);
+    }
+
+    // Retry: if myGridColumn is still null, the dropdown may not be rendered yet
+    if (!myGridColumn) {
+      logger.log("[ESPN Draft Assistant] myGridColumn not found yet, scheduling retry in 3s...");
+      setTimeout(() => {
+        if (!myGridColumn) {
+          myGridColumn = computeMyGridColumn();
+          if (myGridColumn) {
+            logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from retry after 3s)");
+          } else {
+            // Second fallback: try detectMyTeam again
+            const retryDetection = detectMyTeam();
+            if (retryDetection?.gridColumn) {
+              myGridColumn = String(retryDetection.gridColumn);
+              logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from detectMyTeam retry)");
+            }
+            if (retryDetection) {
+              useDraftStore.getState().setRemainingBudget(retryDetection.remainingBudget);
+            }
+          }
+          if (!myGridColumn) {
+            logger.warn("[ESPN Draft Assistant] myGridColumn still null after retry - pick matching may fail");
+          }
+        }
+      }, 3000);
     }
 
     // Detect roster slots from players-table DOM (more accurate than settings panel)
