@@ -46,6 +46,7 @@ export interface NominationDiagnostics {
   isActive: boolean; // autoMode && currentAuctionPlayer == null
   queuePopulationCount: number; // size of queuedPlayerIds set (players we queued this session)
   lastQueuePopulateTime: number | null; // timestamp of last queue population run
+  queueStrategy: "poison-pills" | "own-targets" | null; // current queue strategy based on draft phase
 }
 
 /**
@@ -92,6 +93,7 @@ export class AutoBidController {
   // Queue population state
   private lastQueuePopulateTime: number | null = null;
   private queuedPlayerIds: Set<number> = new Set();
+  private queueStrategy: "poison-pills" | "own-targets" | null = null;
 
   // Diagnostic state (for getNominationDiagnostics() and NominationDiagnostics UI)
   private lastAttemptResult: string | null = null;
@@ -128,6 +130,8 @@ export class AutoBidController {
   private static readonly SEARCH_DROPDOWN_SETTLE_MS = 500;
   /** Delay after clicking queue/select button before clearing search (ms) */
   private static readonly SEARCH_CLEAR_DELAY_MS = 500;
+  /** Approximate roster size for draft phase fill % calculation */
+  private static readonly TARGET_ROSTER_SIZE = 28;
 
   start(): void {
     if (this.unsubscribe) {
@@ -275,6 +279,7 @@ export class AutoBidController {
     // Queue population state (resets on stop/mode-off so next session starts fresh)
     this.lastQueuePopulateTime = null;
     this.queuedPlayerIds.clear();
+    this.queueStrategy = null;
   }
 
   /**
@@ -307,6 +312,7 @@ export class AutoBidController {
       isActive: state.autoMode && state.currentAuctionPlayer == null,
       queuePopulationCount: this.queuedPlayerIds.size,
       lastQueuePopulateTime: this.lastQueuePopulateTime,
+      queueStrategy: this.queueStrategy,
     };
   }
 
@@ -604,6 +610,16 @@ export class AutoBidController {
       return;
     }
 
+    // Guard: do not populate queue during active bidding
+    // CONFIRMED (MCP verified 2026-03-14): form.bidding-form__default is present during active bidding
+    const biddingForm = document.querySelector("form.bidding-form__default");
+    if (biddingForm) {
+      logger.log(
+        "[AutoQueue] Active bidding detected (bidding form present) — skipping queue population",
+      );
+      return;
+    }
+
     // Update cooldown timestamp now (before any async work)
     this.lastQueuePopulateTime = now;
 
@@ -620,29 +636,46 @@ export class AutoBidController {
       return;
     }
 
-    // Build candidate list from engine signals
-    // Primary: nomination strategy trap scores (already sorted by trapScore desc)
-    // Fallback: ideal roster non-drafted players
+    // Compute draft phase from roster fill percentage
+    const rosterFillPct = state.myRoster.length / Math.max(1, AutoBidController.TARGET_ROSTER_SIZE);
+    const isEarlyDraft = rosterFillPct <= 0.3;
+
+    AutoBidController.diagnostics.queueStrategy = isEarlyDraft ? "poison-pills" : "own-targets";
+
+    // Build candidate lists from engine signals
     const draftedPlayerIds = new Set(state.allPicks.map((p) => p.playerId));
 
     type Candidate = { name: string; source: "simulation" | "idealRoster" };
-    const candidates: Candidate[] = [];
+    const trapCandidates: Candidate[] = [];
+    const targetCandidates: Candidate[] = [];
 
+    // Trap candidates from nomination strategy (expensive non-needs / poison pills)
     const nominationStrategy =
       this.lastEngineSignals?.simulation?.nominationStrategy;
     if (nominationStrategy && nominationStrategy.length > 0) {
       for (const rec of nominationStrategy) {
-        candidates.push({ name: rec.playerName, source: "simulation" });
+        trapCandidates.push({ name: rec.playerName, source: "simulation" });
       }
     }
 
-    // Supplement with ideal roster undrafted players as fallback
+    // Target candidates from ideal roster (our core/value players)
     const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
     for (const p of idealPlayers) {
       if (!p.isDrafted) {
-        candidates.push({ name: p.name, source: "idealRoster" });
+        targetCandidates.push({ name: p.name, source: "idealRoster" });
       }
     }
+
+    // Phase-aware ordering:
+    // Early draft (≤30% filled): poison pills first, then targets
+    // Late draft (>30% filled): our targets first, then poison pills
+    const candidates: Candidate[] = isEarlyDraft
+      ? [...trapCandidates, ...targetCandidates]
+      : [...targetCandidates, ...trapCandidates];
+
+    logger.log(
+      `[AutoQueue] Draft phase: ${isEarlyDraft ? "early" : "late"} (${(rosterFillPct * 100).toFixed(0)}% filled, ${state.myRoster.length}/${AutoBidController.TARGET_ROSTER_SIZE} slots). Strategy: ${isEarlyDraft ? "poison pills first" : "own targets first"}`,
+    );
 
     if (candidates.length === 0) {
       logger.log(

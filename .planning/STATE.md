@@ -50,6 +50,10 @@ Progress: [##░░░░░░░░] 8% (v3.0)
 
 None yet.
 
+### Roadmap Evolution
+
+- Phase 42 added: Phase-aware nomination queue strategy with bidding guard
+
 ### Blockers/Concerns
 
 - [Phase 39]: ESPN draft page may use iframes requiring CDP frame targeting — must document exact `list targets` → `select target` sequence during first MCP session

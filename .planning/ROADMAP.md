@@ -29,6 +29,7 @@ Phases 6-38 covering v1.1 trade upgrades, history backfill, Chrome extension, de
 - [ ] **Phase 39: DevTools Setup** - Chrome DevTools MCP configured, selector battery validated against live ESPN draft DOM
 - [x] **Phase 40: Auto-Nomination Rework** - Nomination state machine consolidated using MCP-verified selectors with polling-based reliability (completed 2026-03-14)
 - [x] **Phase 41: Mobile Command Center** - Mobile page redesigned with all engine signals, full draft controls, and phone-optimized layout (completed 2026-03-14)
+- [ ] **Phase 42: Phase-Aware Queue Strategy** - Nomination queue adapts to draft phase (early=poison pills, late=own targets) with bidding guard to prevent queue actions during active bidding
 
 ## Phase Details
 
@@ -91,3 +92,16 @@ Phases execute in numeric order: 39 → 40 → 41
 | 39. DevTools Setup | v3.0 | 0/2 | Not started | - |
 | 40. Auto-Nomination Rework | v3.0 | 4/4 | Complete | 2026-03-14 |
 | 41. Mobile Command Center | 5/5 | Complete   | 2026-03-14 | - |
+
+### Phase 42: Phase-Aware Queue Strategy
+**Goal**: Nomination queue strategy adapts to draft phase — early draft queues expensive non-targets (poison pills) to drain opponent budgets, later draft queues our core and value targets. Queue population only runs when idle (not actively bidding).
+**Depends on**: Phase 40
+**Success Criteria** (what must be TRUE):
+  1. populateQueue() checks bidding state and skips when user is actively bidding on a nominated player
+  2. Early draft (≤30% roster filled) prioritizes trap-score candidates (expensive non-needs) over ideal roster targets
+  3. Late draft (>30% roster filled) prioritizes own core/value targets from ideal roster over poison pills
+  4. Queue strategy transition is smooth — no abrupt flip, blends trap scores with target priority based on roster fill %
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 42 to break down)
