@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v4.0 Personal Season Setup — Phase 46: Verify In-Season Pipeline
+**Current focus:** v5.0 Draft Engine Spec Alignment
 
 ## Current Position
 
-Phase: 46 of 46 (Verify In-Season Pipeline)
-Plan: 1 of 1 -- COMPLETE
-Status: Phase 46 complete
-Last activity: 2026-03-15 -- Completed 46-01-PLAN.md (3 min)
+Phase: 47 of 51 (ready to plan)
+Plan: —
+Status: Ready to plan
+Last activity: 2026-03-15 — v5.0 milestone started
 
-Progress: [##########] 100% (v4.0) -- Phase 46 done
+Progress: [░░░░░░░░░░] 0% (v5.0)
 
 ## Performance Metrics
 
-**Velocity (v3.0 completed — 12 plans across phases 39-42):**
-- Typical plan duration: 1-10 min
+**Velocity (v4.0 completed — 4 plans across phases 43-46):**
+- Typical plan duration: 3-7 min
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -28,19 +28,10 @@ Progress: [##########] 100% (v4.0) -- Phase 46 done
 
 ### Decisions
 
-- [v4.0 start]: Remove auth entirely (no JWT, no users table, no login) — re-enable later for multi-user
-- [v4.0 start]: League 112523, Team 13, 13 teams hardcoded as primary config
-- [v4.0 start]: Categories: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP (5x5 with OPS)
-- [v4.0 start]: ESPN creds via .env (SWID + espn_s2) primary, encrypted DB as fallback
-- [v4.0 start]: Keep all existing code for later expansion — don't delete, just bypass
-- [Phase 43]: Auth middleware made no-op (not deleted) for future re-enablement
-- [Phase 43]: AuthContext provides mock admin user for single-user mode
-- [Phase 43]: ESPN creds via ESPN_SWID/ESPN_S2 env vars, encrypted DB as fallback
-- [Phase 44]: OPS replaces AVG as default hitting rate stat; shared league-defaults.ts as single source of truth
-- [Phase 45]: myTeamId from DEFAULT_TEAM_ID (not URL param); myGridColumn from dropdown mapping; config-first pattern for league detection
-- [Phase 46]: Auth middleware injects mock admin user (userId=1) for request.user references
-- [Phase 46]: League list returns all leagues (no user_id filter) in single-user mode
-- [Phase 46]: Bootstrap endpoint POST /api/leagues/bootstrap for zero-config league 112523 init
+- [v5.0 start]: Keep simulation-based BID/PASS (more sophisticated than spec formula)
+- [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
+- [v5.0 start]: Add spec gaps as enhancements, not replacements
+- [v5.0 start]: Phases 47-49+51 are independent, can execute in parallel
 
 ### Pending Todos
 
@@ -53,5 +44,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-15
-Stopped at: Completed 46-01-PLAN.md
+Stopped at: v5.0 milestone started, ready to plan phases
 Resume file: None

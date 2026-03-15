@@ -42,20 +42,23 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 - ✓ MCP-verified ESPN DOM selectors for reliable draft automation — v3.0
 - ✓ Mobile command center with full draft controls — v3.0
 - ✓ Phase-aware nomination queue strategy — v3.0
+- ✓ Auth stripped for single-user mode — v4.0
+- ✓ League 112523 hardcoded with OPS categories — v4.0
+- ✓ Draft extension detection fixed with config-first pattern — v4.0
+- ✓ In-season pipeline verified with bootstrap endpoint — v4.0
 
 ### Active
 
-#### Current Milestone: v4.0 Personal Season Setup
+#### Current Milestone: v5.0 Draft Engine Spec Alignment
 
-**Goal:** Strip multi-user complexity, hardcode league settings for league 112523 (13 teams, 5x5 with OPS), and make the full stack work end-to-end for one user's draft and season.
+**Goal:** Align the draft engine with the original auction draft system spec — add endgame mode, rework nomination strategy, implement positional priority weights, SP tier caps, inflation interpretation bands, and budget allocation bands.
 
-- [ ] Remove auth system (no login, no JWT, no users table dependency on API routes)
-- [ ] Hardcode league settings (league 112523, team 13, 13 teams, R/RBI/HR/SB/OPS + K/W/SV/ERA/WHIP)
-- [ ] ESPN credentials via env vars (SWID + espn_s2 in .env), keep DB fallback
-- [ ] Fix draft extension roster/team detection with hardcoded league config + detection fallback
-- [ ] Wire OPS as a rate stat in component math (OBP + SLG, needs both component sets)
-- [ ] Verify in-season pipeline: daily snapshots, projected standings, waivers, trades
-- [ ] Fix bugs found during live draft testing (pick detection, queue timing, config detection)
+- [ ] Endgame mode ($20 budget threshold with value_per_dollar scoring)
+- [ ] Nomination strategy rework (espn_price - model_value for overpriced players)
+- [ ] Positional priority weights (SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1)
+- [ ] SP tier caps (SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3)
+- [ ] Inflation interpretation bands (buying window vs overspending signals)
+- [ ] Budget allocation bands (Hitters $185-205, Pitchers $55-70, Bench $5)
 
 ### Deferred
 
@@ -97,9 +100,9 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic | — Pending |
 | Chrome DevTools MCP for selector discovery | Live DOM inspection beats guessing at ESPN selectors | ✓ Good |
 | Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline | ✓ Good |
-| Strip auth for v4.0 personal use | No login friction, re-enable later for multi-user | — Pending |
-| Hardcode league 112523 settings | Reliable config over error-prone DOM detection | — Pending |
-| OPS as custom rate stat | OBP + SLG components, not a simple stat | — Pending |
+| Strip auth for v4.0 personal use | No login friction, re-enable later for multi-user | ✓ Good |
+| Hardcode league 112523 settings | Reliable config over error-prone DOM detection | ✓ Good |
+| OPS as custom rate stat | OBP + SLG components, not a simple stat | ✓ Good |
 
 ---
-*Last updated: 2026-03-15 after v4.0 milestone start*
+*Last updated: 2026-03-15 after v5.0 milestone start*

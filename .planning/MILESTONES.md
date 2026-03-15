@@ -38,3 +38,31 @@
 
 ---
 
+
+## v3.0 Draft Automation & Mobile Command Center (Shipped: 2026-03-14)
+
+**Phases completed:** 4 phases, 12 plans
+**Scope:** Phases 39-42
+
+**Key accomplishments:**
+- Chrome DevTools MCP for live ESPN DOM selector verification
+- Auto-nomination reworked with MCP-verified selectors (15+ broken selectors fixed)
+- Mobile command center with full draft controls, engine signals, tabbed layout
+- Phase-aware nomination queue strategy (poison pills early, own targets late)
+
+---
+
+
+## v4.0 Personal Season Setup (Shipped: 2026-03-15)
+
+**Phases completed:** 4 phases, 4 plans
+**Scope:** Phases 43-46
+
+**Key accomplishments:**
+- Stripped auth for single-user mode (middleware no-ops, mock admin user)
+- Hardcoded league 112523 settings with OPS categories in shared config
+- Fixed draft extension detection with config-first pattern and dropdown column mapping
+- Added league bootstrap endpoint and env var ESPN credentials
+
+---
+

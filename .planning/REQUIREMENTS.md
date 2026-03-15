@@ -3,99 +3,87 @@
 **Defined:** 2026-03-15
 **Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
 
-## v4.0 Requirements
+## v5.0 Requirements
 
-Requirements for v4.0 Personal Season Setup. Each maps to roadmap phases.
+Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 
-### Simplification
+### Endgame & Budget
 
-- [x] **SIMP-01**: API routes respond without authentication (no JWT, no cookie check)
-- [x] **SIMP-02**: Frontend pages load without login redirect (no auth guard)
-- [x] **SIMP-03**: ESPN credentials loaded from env vars (ESPN_SWID, ESPN_S2) with DB fallback
+- [ ] **END-01**: Engine activates endgame mode when budget_remaining ≤ $20, switching to value_per_dollar scoring
+- [ ] **END-02**: Budget allocation bands enforced: Hitters $185-205, Pitchers $55-70, Bench $5
+- [ ] **END-03**: Endgame prioritizes breakout hitters, cheap OF, and K pitchers; avoids backup C and weak OPS
 
-### League Configuration
+### Nomination
 
-- [x] **CONF-01**: League 112523, team 13, 13 teams hardcoded as default config
-- [x] **CONF-02**: Categories hardcoded: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
-- [x] **CONF-03**: OPS wired as rate stat in component math (OBP + SLG)
-- [ ] **CONF-04**: Extension uses hardcoded league config as primary, DOM detection as validation
+- [ ] **NOM-07**: Nomination strategy uses espn_price - model_value to nominate overpriced players early
+- [ ] **NOM-08**: Nomination strategy goal is to force league overspending and increase inflation
 
-### Draft Fixes
+### Positional & Pitching
 
-- [ ] **DFIX-01**: Extension correctly detects user's own picks (myRoster populated accurately)
-- [ ] **DFIX-02**: Team detection works on page load (not race-condition dependent)
-- [ ] **DFIX-03**: Config detection (team count, categories, roster slots) succeeds reliably
+- [ ] **POS-01**: Positional priority weights applied: SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1
+- [ ] **POS-02**: SP tier caps enforced: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
+- [ ] **POS-03**: 200 GS cap awareness in pitching strategy (limit SP spending)
 
-### In-Season Pipeline
+### Inflation & Signals
 
-- [x] **SEAS-01**: Daily snapshot pipeline runs and produces projected standings for league 112523
-- [x] **SEAS-02**: Waiver recommendations return ranked add/drop suggestions
-- [x] **SEAS-03**: Trade analysis evaluates proposed trades with accurate projected impact
-- [x] **SEAS-04**: Frontend dashboard shows standings, trends, and recommendations without auth
+- [ ] **INF-01**: Inflation interpretation bands: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
+- [ ] **INF-02**: Bid ceiling adjusts based on inflation bands (+2 when inflation > 1.10)
+- [ ] **INF-03**: Category targets: OPS top 3, HR top 3, SB top 4, Saves top 4, K top 5
 
-## v3.0 Requirements (Completed)
+### Data Pipeline
 
-### DevTools & Tooling
-- [x] **DEV-01**: Chrome DevTools MCP server configured
-- [x] **DEV-02**: ESPN draft DOM inspection via MCP
-- [x] **DEV-03**: Documented selector map of stable ESPN DOM targets
+- [ ] **DATA-01**: Easy way to load FanGraphs projections into the extension (CSV upload or paste)
+- [ ] **DATA-02**: Easy way to load ESPN auction values into the extension (scrape from DOM or CSV)
 
-### Auto-Nomination
-- [x] **NOM-01** through **NOM-06**: Verified selectors, turn detection, search-and-queue, diagnostics
+## Previous Requirements (Completed)
 
-### Mobile Command Center
-- [x] **MOB-01** through **MOB-14**: Full mobile draft controls, engine signals, tabbed layout
+### v4.0 (Completed)
+- [x] **SIMP-01** through **SIMP-03**: Auth stripped, env var ESPN creds
+- [x] **CONF-01** through **CONF-04**: League 112523 hardcoded, OPS math
+- [x] **DFIX-01** through **DFIX-03**: Draft detection fixed
+- [x] **SEAS-01** through **SEAS-04**: In-season pipeline verified
+
+### v3.0 (Completed)
+- [x] **DEV-01** through **DEV-03**: DevTools MCP
+- [x] **NOM-01** through **NOM-06**: Auto-nomination rework
+- [x] **MOB-01** through **MOB-14**: Mobile command center
 
 ## Future Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
-
-### AI Agent
-- **AGT-01**: Mastra AI agent with tools for draft engine signals
-- **AGT-02**: Agent memory for draft session context
-- **AGT-03**: Streaming agent responses in extension sidebar
-
-### Multi-User
-- **MULTI-01**: Re-enable JWT auth with multi-user support
-- **MULTI-02**: League configuration UI (replace hardcoded settings)
-- **MULTI-03**: User onboarding wizard
-
-### Draft Formats
-- **FMT-01**: Snake draft support
-- **FMT-02**: Points/H2H league support
+- **AGT-01** through **AGT-03**: Mastra AI agent
+- **MULTI-01** through **MULTI-03**: Multi-user re-enablement
+- **FMT-01**, **FMT-02**: Snake draft, Points/H2H
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Multi-user auth | Stripped for v4.0 personal use — re-enable in future |
-| League config UI | Hardcoded for now — add when going multi-user |
-| React fiber probe | CSS/data-attr selectors proven sufficient via MCP |
-| Mobile authentication | App is local-network only |
+| Replace simulation-based BID/PASS | Win probability approach is more sophisticated than spec's formula |
+| Replace SGP bid optimizer | Binary search SGP-based is more accurate than model_value - 2 |
+| Auction simulator test harness | Nice-to-have but not needed for live draft use |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SIMP-01 | Phase 43 | Complete |
-| SIMP-02 | Phase 43 | Complete |
-| SIMP-03 | Phase 43 | Complete |
-| CONF-01 | Phase 44 | Complete |
-| CONF-02 | Phase 44 | Complete |
-| CONF-03 | Phase 44 | Complete |
-| CONF-04 | Phase 45 | Pending |
-| DFIX-01 | Phase 45 | Pending |
-| DFIX-02 | Phase 45 | Pending |
-| DFIX-03 | Phase 45 | Pending |
-| SEAS-01 | Phase 46 | Complete |
-| SEAS-02 | Phase 46 | Complete |
-| SEAS-03 | Phase 46 | Complete |
-| SEAS-04 | Phase 46 | Complete |
+| END-01 | Phase 47 | Pending |
+| END-02 | Phase 47 | Pending |
+| END-03 | Phase 47 | Pending |
+| NOM-07 | Phase 48 | Pending |
+| NOM-08 | Phase 48 | Pending |
+| POS-01 | Phase 49 | Pending |
+| POS-02 | Phase 49 | Pending |
+| POS-03 | Phase 49 | Pending |
+| INF-01 | Phase 50 | Pending |
+| INF-02 | Phase 50 | Pending |
+| INF-03 | Phase 50 | Pending |
+| DATA-01 | Phase 51 | Pending |
+| DATA-02 | Phase 51 | Pending |
 
 **Coverage:**
-- v4.0 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0
+- v5.0 requirements: 13 total
+- Mapped to phases: 11
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-15*

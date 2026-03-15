@@ -5,7 +5,8 @@
 - ✅ **v1.0 MVP** - Phases 1-5 (shipped 2026-02-21)
 - ✅ **v2.0 Position Shopping List** - Phases 6-38 (shipped 2026-03-14)
 - ✅ **v3.0 Draft Automation & Mobile Command Center** - Phases 39-42 (shipped 2026-03-14)
-- 🚧 **v4.0 Personal Season Setup** - Phases 43-46 (in progress)
+- ✅ **v4.0 Personal Season Setup** - Phases 43-46 (shipped 2026-03-15)
+- 🚧 **v5.0 Draft Engine Spec Alignment** - Phases 47-50 (in progress)
 
 ## Phases
 
@@ -30,79 +31,84 @@ Phase 39: DevTools Setup, Phase 40: Auto-Nomination Rework, Phase 41: Mobile Com
 
 </details>
 
-### 🚧 v4.0 Personal Season Setup (In Progress)
+<details>
+<summary>✅ v4.0 Personal Season Setup (Phases 43-46) - SHIPPED 2026-03-15</summary>
 
-**Milestone Goal:** Strip auth complexity, hardcode league config for personal use, fix draft extension detection, and verify the full in-season pipeline works end-to-end for league 112523.
+Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 45: Fix Draft Extension Detection, Phase 46: Verify In-Season Pipeline — auth stripped, league 112523 hardcoded, extension detection fixed, in-season pipeline verified.
 
-- [x] **Phase 43: Strip Auth & Env Config** - API routes and frontend pages work without authentication, ESPN credentials loaded from env vars (completed 2026-03-15)
-- [x] **Phase 44: Hardcode League & OPS Math** - League 112523 settings hardcoded as defaults, OPS wired as rate stat in component math (completed 2026-03-15)
-- [ ] **Phase 45: Fix Draft Extension Detection** - Extension reliably detects user's team and roster using hardcoded config as primary, DOM detection as validation
-- [x] **Phase 46: Verify In-Season Pipeline** - Daily snapshot pipeline, projected standings, waiver recommendations, and trade analysis work end-to-end for league 112523 (completed 2026-03-15)
+</details>
+
+### 🚧 v5.0 Draft Engine Spec Alignment (In Progress)
+
+**Milestone Goal:** Align the draft engine with the original auction draft system spec — add endgame mode, rework nomination strategy, implement positional priority weights, SP tier caps, inflation interpretation bands, and budget allocation bands.
+
+- [ ] **Phase 47: Endgame Mode & Budget Bands** - Endgame mode at $20 budget threshold with value_per_dollar scoring, hitter/pitcher budget allocation bands
+- [ ] **Phase 48: Nomination Strategy Rework** - Nominate overpriced players (espn_price - model_value) to force league overspending
+- [ ] **Phase 49: Positional Weights & SP Tiers** - Positional priority weights, SP1-SP5 tier caps, 200 GS cap awareness
+- [ ] **Phase 50: Inflation Bands & Category Targets** - Inflation interpretation bands with bid ceiling adjustments, per-category competitive targets
+- [ ] **Phase 51: Data Pipeline for Extension** - Easy projection + ESPN value loading into extension via CSV upload or DOM scrape
 
 ## Phase Details
 
-### Phase 43: Strip Auth & Env Config
-**Goal**: API routes and frontend pages work without authentication, ESPN credentials loaded from env vars
-**Depends on**: Nothing (first v4.0 phase)
-**Requirements**: SIMP-01, SIMP-02, SIMP-03
+### Phase 47: Endgame Mode & Budget Bands
+**Goal**: Engine activates endgame mode when budget ≤ $20 with value_per_dollar scoring, and enforces hitter/pitcher budget allocation bands
+**Depends on**: Nothing (first v5.0 phase)
+**Requirements**: END-01, END-02, END-03
 **Success Criteria** (what must be TRUE):
-  1. All API routes return data without JWT/cookie auth headers
-  2. Frontend pages render without redirect to login
-  3. ESPN adapter reads SWID/espn_s2 from process.env with DB fallback
+  1. When budget_remaining ≤ $20, bidding switches to value_per_dollar scoring
+  2. Endgame mode prioritizes breakout hitters, cheap OF, K pitchers; avoids backup C
+  3. Budget allocation suggests hitter target $185-205, pitcher target $55-70, bench $5
 **Plans**: TBD
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 43 to break down)
-
-### Phase 44: Hardcode League & OPS Math
-**Goal**: League 112523 settings hardcoded as defaults, OPS wired as rate stat in component math
-**Depends on**: Phase 43
-**Requirements**: CONF-01, CONF-02, CONF-03
+### Phase 48: Nomination Strategy Rework
+**Goal**: Nomination strategy nominates overpriced players (espn_price - model_value) to force league overspending and inflate the remaining player pool
+**Depends on**: Nothing
+**Requirements**: NOM-07, NOM-08
 **Success Criteria** (what must be TRUE):
-  1. Backend uses league 112523, team 13, 13 teams as default when no league specified
-  2. Categories are R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
-  3. OPS computed as OBP + SLG using component math (not raw stat)
+  1. nomination_score = espn_avg_salary - model_dollar_value (highest = most overpriced)
+  2. Overpriced players nominated early to drain opponent budgets
+  3. Strategy integrates with existing phase-aware queue (early=overpriced, late=own targets)
 **Plans**: TBD
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 44 to break down)
-
-### Phase 45: Fix Draft Extension Detection
-**Goal**: Extension reliably detects user's team and roster using hardcoded config as primary, DOM detection as validation
-**Depends on**: Phase 44
-**Requirements**: CONF-04, DFIX-01, DFIX-02, DFIX-03
+### Phase 49: Positional Weights & SP Tiers
+**Goal**: Positional priority weights influence bid decisions, SP tier caps limit pitcher spending, 200 GS cap awareness
+**Depends on**: Nothing
+**Requirements**: POS-01, POS-02, POS-03
 **Success Criteria** (what must be TRUE):
-  1. Extension loads hardcoded league config (team 13, 13 teams, categories) before DOM detection runs
-  2. myRoster only contains picks from the user's team column
-  3. Team detection succeeds on page load without timing races
-  4. Config detection (team count, categories, roster slots) uses hardcoded values with DOM validation
+  1. Positional weights (SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1) adjust bid ceilings
+  2. SP spending capped by tier: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
+  3. Engine accounts for 200 GS cap in pitcher valuation
 **Plans**: TBD
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 45 to break down)
-
-### Phase 46: Verify In-Season Pipeline
-**Goal**: Daily snapshot pipeline, projected standings, waiver recommendations, and trade analysis work end-to-end for league 112523
-**Depends on**: Phase 43, Phase 44
-**Requirements**: SEAS-01, SEAS-02, SEAS-03, SEAS-04
+### Phase 50: Inflation Bands & Category Targets
+**Goal**: Inflation interpretation bands drive bid adjustments, per-category targets guide draft strategy
+**Depends on**: Phase 47
+**Requirements**: INF-01, INF-02, INF-03
 **Success Criteria** (what must be TRUE):
-  1. Running snapshot for league 112523 produces team_daily_category_totals and projected standings
-  2. Waiver recommendations endpoint returns ranked suggestions for user's team
-  3. Trade analysis endpoint evaluates a proposed trade with accurate projected deltas
-  4. Frontend dashboard renders standings and recommendations without auth redirect
+  1. Inflation bands classified: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
+  2. Bid ceiling gets +2 adjustment when inflation > 1.10
+  3. Category targets set: OPS top 3, HR top 3, SB top 4, Saves top 4, K top 5
 **Plans**: TBD
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 46 to break down)
+### Phase 51: Data Pipeline for Extension
+**Goal**: Easy way to load FanGraphs projections and ESPN auction values into the extension
+**Depends on**: Nothing
+**Requirements**: DATA-01, DATA-02
+**Success Criteria** (what must be TRUE):
+  1. User can load FanGraphs projections into extension (CSV file or paste into popup)
+  2. User can load ESPN auction values (DOM scrape from ESPN page or CSV upload)
+  3. Loaded data persists in extension storage across page reloads
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 43 -> 44 -> 45 -> 46
+Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 43. Strip Auth & Env Config | 1/1 | Complete   | 2026-03-15 | - |
-| 44. Hardcode League & OPS Math | 1/1 | Complete   | 2026-03-15 | - |
-| 45. Fix Draft Extension Detection | v4.0 | 0/? | Not started | - |
-| 46. Verify In-Season Pipeline | 1/1 | Complete   | 2026-03-15 | - |
+| 47. Endgame Mode & Budget Bands | v5.0 | 0/? | Not started | - |
+| 48. Nomination Strategy Rework | v5.0 | 0/? | Not started | - |
+| 49. Positional Weights & SP Tiers | v5.0 | 0/? | Not started | - |
+| 50. Inflation Bands & Category Targets | v5.0 | 0/? | Not started | - |
+| 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
