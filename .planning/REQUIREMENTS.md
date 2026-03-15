@@ -1,61 +1,66 @@
 # Requirements: ESPN Fantasy Baseball Command Center
 
-**Defined:** 2026-03-14
+**Defined:** 2026-03-15
 **Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
 
-## v3.0 Requirements
+## v4.0 Requirements
 
-Requirements for v3.0 Draft Automation & Mobile Command Center. Each maps to roadmap phases.
+Requirements for v4.0 Personal Season Setup. Each maps to roadmap phases.
+
+### Simplification
+
+- [ ] **SIMP-01**: API routes respond without authentication (no JWT, no cookie check)
+- [ ] **SIMP-02**: Frontend pages load without login redirect (no auth guard)
+- [ ] **SIMP-03**: ESPN credentials loaded from env vars (ESPN_SWID, ESPN_S2) with DB fallback
+
+### League Configuration
+
+- [ ] **CONF-01**: League 112523, team 13, 13 teams hardcoded as default config
+- [ ] **CONF-02**: Categories hardcoded: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
+- [ ] **CONF-03**: OPS wired as rate stat in component math (OBP + SLG)
+- [ ] **CONF-04**: Extension uses hardcoded league config as primary, DOM detection as validation
+
+### Draft Fixes
+
+- [ ] **DFIX-01**: Extension correctly detects user's own picks (myRoster populated accurately)
+- [ ] **DFIX-02**: Team detection works on page load (not race-condition dependent)
+- [ ] **DFIX-03**: Config detection (team count, categories, roster slots) succeeds reliably
+
+### In-Season Pipeline
+
+- [ ] **SEAS-01**: Daily snapshot pipeline runs and produces projected standings for league 112523
+- [ ] **SEAS-02**: Waiver recommendations return ranked add/drop suggestions
+- [ ] **SEAS-03**: Trade analysis evaluates proposed trades with accurate projected impact
+- [ ] **SEAS-04**: Frontend dashboard shows standings, trends, and recommendations without auth
+
+## v3.0 Requirements (Completed)
 
 ### DevTools & Tooling
-
-- [ ] **DEV-01**: User can configure Chrome DevTools MCP server in `.mcp.json` for live ESPN DOM inspection
-- [ ] **DEV-02**: User can inspect ESPN draft page DOM elements and attributes via MCP tools during development
-- [ ] **DEV-03**: User can produce a documented selector map of stable ESPN DOM targets (data-*, aria-*, structural selectors)
+- [x] **DEV-01**: Chrome DevTools MCP server configured
+- [x] **DEV-02**: ESPN draft DOM inspection via MCP
+- [x] **DEV-03**: Documented selector map of stable ESPN DOM targets
 
 ### Auto-Nomination
-
-- [x] **NOM-01**: Extension uses verified ESPN selectors from DEV-03 for all nomination DOM interactions
-- [x] **NOM-02**: Turn detection correctly identifies when it's user's turn to nominate using consolidated strategy
-- [x] **NOM-03**: Search-and-queue flow reliably finds players, types into ESPN search, and clicks queue button
-- [x] **NOM-04**: Nomination state machine is consolidated with clear state transitions and cooldown management
-- [x] **NOM-05**: Selector fallback hierarchy gracefully degrades when primary selectors fail
-- [x] **NOM-06**: Nomination diagnostics panel reflects reworked flow with accurate status reporting
+- [x] **NOM-01** through **NOM-06**: Verified selectors, turn detection, search-and-queue, diagnostics
 
 ### Mobile Command Center
-
-- [x] **MOB-01**: Mobile page displays category progress with targets for all scoring categories
-- [x] **MOB-02**: Mobile page displays ideal roster with tier badges and locked player indicators
-- [x] **MOB-03**: Mobile page displays win probability, build archetype, and scarcity alerts
-- [x] **MOB-04**: Mobile page has auto-bid toggle with visual risk indicator
-- [x] **MOB-05**: Mobile page has auto-nominate toggle control
-- [x] **MOB-06**: Mobile page has hitter/pitcher split slider control
-- [x] **MOB-07**: Mobile page has force-nominate button to trigger immediate nomination from phone
-- [x] **MOB-08**: Mobile page has skip-player button to exclude current player from engine recommendations
-- [x] **MOB-09**: Mobile page displays current nomination queue and allows reordering
-- [x] **MOB-10**: Mobile page uses tabbed/sectioned responsive layout optimized for phone screens
-- [x] **MOB-11**: Mobile page uses Screen Wake Lock API to prevent screen dimming during draft
-- [x] **MOB-12**: Mobile page shows extension connection status with reconnect handling
-- [x] **MOB-13**: WebSocket CONTROL actions are typed as a union (not `action: string`)
-- [x] **MOB-14**: Extension relays connection status to mobile via EXTENSION_STATUS message type
+- [x] **MOB-01** through **MOB-14**: Full mobile draft controls, engine signals, tabbed layout
 
 ## Future Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
 ### AI Agent
-
-- **AGT-01**: Mastra AI agent with tools for draft engine signals, player data, and league state
+- **AGT-01**: Mastra AI agent with tools for draft engine signals
 - **AGT-02**: Agent memory for draft session context
 - **AGT-03**: Streaming agent responses in extension sidebar
 
-### In-Season
-
-- **SEA-01**: Trade retrospectives (actual vs projected outcomes)
-- **SEA-02**: Interactive trade builder with live impact preview
+### Multi-User
+- **MULTI-01**: Re-enable JWT auth with multi-user support
+- **MULTI-02**: League configuration UI (replace hardcoded settings)
+- **MULTI-03**: User onboarding wizard
 
 ### Draft Formats
-
 - **FMT-01**: Snake draft support
 - **FMT-02**: Points/H2H league support
 
@@ -63,47 +68,34 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Feature | Reason |
 |---------|--------|
-| React fiber probe for ESPN state | High complexity, uncertain stability — defer until CSS/data-attr selectors proven insufficient |
-| Per-player bid limits from mobile | Adds complexity to engine; auto-bid strategies already handle this |
-| Strategy anchor editing from mobile | Too complex for phone UX; set anchors on desktop before draft |
-| ESPN write API integration | ESPN has no official write API |
-| Mobile authentication | App is local-network only; auth adds unnecessary friction |
+| Multi-user auth | Stripped for v4.0 personal use — re-enable in future |
+| League config UI | Hardcoded for now — add when going multi-user |
+| React fiber probe | CSS/data-attr selectors proven sufficient via MCP |
+| Mobile authentication | App is local-network only |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEV-01 | Phase 39 | Pending |
-| DEV-02 | Phase 39 | Pending |
-| DEV-03 | Phase 39 | Pending |
-| NOM-01 | Phase 40 | Complete |
-| NOM-02 | Phase 40 | Complete |
-| NOM-03 | Phase 40 | Complete |
-| NOM-04 | Phase 40 | Complete |
-| NOM-05 | Phase 40 | Complete |
-| NOM-06 | Phase 40 | Complete |
-| MOB-01 | Phase 41 | Complete |
-| MOB-02 | Phase 41 | Complete |
-| MOB-03 | Phase 41 | Complete |
-| MOB-04 | Phase 41 | Complete |
-| MOB-05 | Phase 41 | Complete |
-| MOB-06 | Phase 41 | Complete |
-| MOB-07 | Phase 41 | Complete |
-| MOB-08 | Phase 41 | Complete |
-| MOB-09 | Phase 41 | Complete |
-| MOB-10 | Phase 41 | Complete |
-| MOB-11 | Phase 41 | Complete |
-| MOB-12 | Phase 41 | Complete |
-| MOB-13 | Phase 41 | Complete |
-| MOB-14 | Phase 41 | Complete |
+| SIMP-01 | TBD | Pending |
+| SIMP-02 | TBD | Pending |
+| SIMP-03 | TBD | Pending |
+| CONF-01 | TBD | Pending |
+| CONF-02 | TBD | Pending |
+| CONF-03 | TBD | Pending |
+| CONF-04 | TBD | Pending |
+| DFIX-01 | TBD | Pending |
+| DFIX-02 | TBD | Pending |
+| DFIX-03 | TBD | Pending |
+| SEAS-01 | TBD | Pending |
+| SEAS-02 | TBD | Pending |
+| SEAS-03 | TBD | Pending |
+| SEAS-04 | TBD | Pending |
 
 **Coverage:**
-- v3.0 requirements: 23 total
-- Mapped to phases: 23
-- Unmapped: 0 ✓
+- v4.0 requirements: 14 total
+- Mapped to phases: 0
+- Unmapped: 14 (pending roadmap)
 
 ---
-*Requirements defined: 2026-03-14*
-*Last updated: 2026-03-14 after roadmap creation*
+*Requirements defined: 2026-03-15*
