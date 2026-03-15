@@ -143,14 +143,14 @@ All selectors CONFIRMED. fixedDataTable BEM classes are stable (third-party libr
 |----------|--------|-------|
 | `button.action-btn[data-player-id]` | CONFIRMED | 15 matches — primary action button |
 | `button[data-player-id]` | CONFIRMED | Same 15 (no extra matches in this draft) |
-| `button.Button--select[data-player-id]:not([disabled])` | UNVERIFIED | 0 during non-turn state (expected) — needs turn-state verification |
+| `button.Button--select[data-player-id]:not([disabled])` | CONFIRMED | 16 matches during our turn — buttons swap from Queue to Select |
 
 **Button text values (LIVE VERIFIED):**
-- `"queue"` → CONFIRMED (player not queued, not user's turn). Class: `Button Button--sm Button--alt ttu Button--queue action-btn`
-- `"select"` → UNVERIFIED (missed turn window — draft auto-advanced)
+- `"queue"` → CONFIRMED (not user's turn). Class: `Button Button--sm Button--alt ttu Button--queue action-btn`. Style: gray border/text.
+- `"select"` → CONFIRMED (IS user's turn). Class: `Button Button--sm Button--alt ttu Button--select action-btn`. Style: red border/text (`rgb(221, 0, 0)`).
 - `"dequeue"` / `"deselect"` / `"remove"` → UNVERIFIED (no players were queued during test)
 
-**Button class pattern:** `Button--queue` class present when text is "queue". Likely `Button--select` when text is "select".
+**Button class pattern:** `Button--queue` ↔ `Button--select` swap when turn changes. ALL buttons change simultaneously (16 buttons).
 
 **Queue sidebar:** `.pick-queue` container (class `pick-queue w-100 ph4 empty` when no players queued).
 
@@ -206,8 +206,7 @@ All selectors CONFIRMED. fixedDataTable BEM classes are stable (third-party libr
 **Strategy 4 — Select buttons exist (MOST RELIABLE per code comments):**
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `button.Button--select[data-player-id]:not([disabled])` | UNVERIFIED | 0 during non-turn (expected) |
-- Could not catch during the brief turn window
+| `button.Button--select[data-player-id]:not([disabled])` | CONFIRMED | 16 matches during our turn — all buttons swap to Select |
 
 **Strategy 5 — Queue buttons + no bidding form:**
 | Selector | Status | Notes |
@@ -309,7 +308,7 @@ player-selected
 - [x] GROUP 4: All primary selectors CONFIRMED, `currentPlayer`/`activePlayer` FAILED
 - [x] GROUP 5: All selectors CONFIRMED (fixedDataTable BEM stable)
 - [x] GROUP 6: Button text "queue" CONFIRMED, `Button--queue` class CONFIRMED
-- [ ] GROUP 6: Button text "select" / `Button--select` class — UNVERIFIED (missed turn window)
+- [x] GROUP 6: Button text "Select" and `Button--select` class CONFIRMED during turn (16 buttons swap simultaneously)
 - [x] GROUP 7: `.playerFirstName`/`.playerLastName` CONFIRMED, `.playerProTeam` NEW, `.playerName`/`.teamAbbrev` FAILED
 - [x] GROUP 8: Pick train `--own`/`--selecting` NEW, `form.bidding-form__default` CONFIRMED
 - [x] GROUP 9: All selectors CONFIRMED including placeholder text
