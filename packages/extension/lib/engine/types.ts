@@ -73,6 +73,12 @@ export interface BudgetCurveSignal {
   maxBidRecommendation: number;
   pacingStatus: "ahead" | "on-track" | "behind";
   inflationAdjustedBid: number;  // For current nominated player
+  endgameMode: boolean;          // true when remainingBudget <= 20
+  hitterBudgetTarget: { min: number; max: number };   // { min: 185, max: 205 }
+  pitcherBudgetTarget: { min: number; max: number };   // { min: 55, max: 70 }
+  benchBudget: number;           // 5
+  hitterSpent: number;           // Total $ spent on hitters so far
+  pitcherSpent: number;          // Total $ spent on pitchers so far
 }
 
 export interface DraftAlert {
