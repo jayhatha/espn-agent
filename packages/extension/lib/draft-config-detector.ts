@@ -305,36 +305,37 @@ export function detectMyTeam(): {
   remainingBudget: number;
   gridColumn: number | null;
 } | null {
-  // The own-team marker is on the .content div inside .auction-pick-component
+  // CONFIRMED (MCP verified 2026-03-14): .auction-pick-component--own is on the
+  // .content div inside .picklist--item. Walk up to the parent item for full context.
   const ownContent = document.querySelector(".auction-pick-component--own");
   if (!ownContent) {
     return null;
   }
 
-  const teamNameEl = ownContent.querySelector(".team-name");
-  const cashEl = ownContent.querySelector(".cash");
+  // Walk up to the picklist item — .team-name and .cash may be at item level, not inside .content
+  const picklistItem = ownContent.closest(".picklist--item") || ownContent;
 
-  if (!teamNameEl || !cashEl) {
+  const teamNameEl = picklistItem.querySelector(".team-name") || ownContent.querySelector(".team-name");
+  const cashEl = picklistItem.querySelector(".cash") || ownContent.querySelector(".cash");
+
+  if (!teamNameEl) {
+    logger.warn("[ESPN Draft Assistant] detectMyTeam: found --own marker but no .team-name element");
     return null;
   }
 
   const rawTeamName = (teamNameEl.textContent || "").trim();
-  const cashText = (cashEl.textContent || "").trim();
+  const cashText = cashEl ? (cashEl.textContent || "").trim() : "";
 
-  // Parse budget: "$112" → 112
+  // Parse budget: "$112" → 112, default to 260 if .cash not found
   const budgetMatch = cashText.match(/\$?(\d+)/);
-  const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 0;
+  const remainingBudget = budgetMatch ? parseInt(budgetMatch[1], 10) : 260;
 
-  // Strip number prefix: "13. Nathan Fielders" → "Nathan Fielders"
-  // Use the number as teamId for uniqueness
+  // Strip number prefix: "5. Nathan Fielders" → "Nathan Fielders"
   const prefixMatch = rawTeamName.match(/^(\d+)\.\s*(.+)$/);
-  const teamId = prefixMatch ? prefixMatch[1] : rawTeamName;
   const teamName = prefixMatch ? prefixMatch[2] : rawTeamName;
 
   // Determine grid column from position among all pick train items.
   // ESPN's draft board uses CSS grid where column N = the Nth team in the pick train.
-  // The teamId (prefix number like "13") does NOT match the grid column (like "3"),
-  // so we need this mapping for reliable pick-to-team matching.
   let gridColumn: number | null = null;
   const allItems = document.querySelectorAll(".picklist--item");
   allItems.forEach((item, idx) => {
@@ -342,6 +343,17 @@ export function detectMyTeam(): {
       gridColumn = idx + 1; // grid columns are 1-based
     }
   });
+
+  // CONFIRMED (MCP verified 2026-03-14): The roster <select> dropdown maps
+  // grid column → ESPN team ID. Use this for the real team ID instead of the
+  // pick-train prefix number, which is just a display order.
+  let teamId = prefixMatch ? prefixMatch[1] : rawTeamName;
+  if (gridColumn) {
+    const dropdown = document.querySelector("select");
+    if (dropdown && dropdown.options[gridColumn - 1]) {
+      teamId = dropdown.options[gridColumn - 1].value;
+    }
+  }
 
   logger.log(
     `[ESPN Draft Assistant] My team detected from pick train: "${teamName}" (id: ${teamId}, column: ${gridColumn}, budget: $${remainingBudget})`,
