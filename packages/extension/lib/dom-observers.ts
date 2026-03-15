@@ -518,7 +518,6 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
         {
           element: pickElement.tagName,
           classes: pickElement.className,
-          hasPlayerNameEl: !!playerNameEl,
           hasFirstName: !!firstName,
           hasLastName: !!lastName,
         },
@@ -878,58 +877,73 @@ export function testParsePick(element: Element): void {
 }
 
 /**
- * Parse team rosters from ESPN draft DOM
- * Returns map of teamId -> team roster data with playerIds
+ * Read the roster dropdown to map grid column → {espnTeamId, teamName}.
  *
- * Strategy:
- * 1. Collect all completed picks using existing snapshot function
- * 2. Group picks by teamId field (already parsed by parsePickElement)
- * 3. Return Map with entry per team containing teamId/teamName/playerIds
+ * CONFIRMED (MCP verified 2026-03-14): ESPN's draft board uses a <select>
+ * dropdown whose option order matches the grid column order exactly.
+ * Column 1 = first option, column 2 = second option, etc.
+ * Option value = ESPN team ID (e.g., "22"), option text = team name.
+ */
+export function getTeamColumnMapping(): Map<
+  number,
+  { teamId: string; teamName: string }
+> {
+  const mapping = new Map<number, { teamId: string; teamName: string }>();
+  const dropdown = document.querySelector("select");
+  if (!dropdown) {
+    logger.warn("[ESPN Draft Assistant] Team dropdown not found — cannot map columns to teams");
+    return mapping;
+  }
+
+  Array.from(dropdown.options).forEach((option, index) => {
+    mapping.set(index + 1, {
+      teamId: option.value,
+      teamName: option.text,
+    });
+  });
+
+  return mapping;
+}
+
+/**
+ * Parse team rosters from ESPN draft DOM using grid column → team mapping.
  *
- * Use cases:
- * - Practice drafts: compute projected standings locally without backend API
- * - Fallback when API fails: use DOM state to maintain UI functionality
+ * CONFIRMED (MCP verified 2026-03-14): Completed picks use
+ * .draft-board-grid-pick-cell.completedPick with grid-area: row / col.
+ * Grid column maps to team via the roster <select> dropdown order.
  */
 export function parseTeamRostersFromDOM(): Map<
   string,
   { teamId: string; teamName: string; playerIds: number[] }
 > {
+  const columnMap = getTeamColumnMapping();
   const picks = collectCompletedPicksSnapshot();
   const teamRosters = new Map<
     string,
     { teamId: string; teamName: string; playerIds: number[] }
   >();
 
-  // Group picks by teamId
   for (const pick of picks) {
-    // Skip picks with missing teamId (should be rare with fallback logic in parsePickElement)
-    if (!pick.teamId) {
-      logger.warn(
-        "[ESPN Draft Assistant] Skipping pick with missing teamId:",
-        pick.playerName,
-      );
-      continue;
-    }
+    // parsePickElement sets teamId to the grid column string when no data-team-id exists
+    const colNum = parseInt(pick.teamId, 10);
+    const mapped = !isNaN(colNum) ? columnMap.get(colNum) : undefined;
 
-    // Get or create team roster entry
-    let roster = teamRosters.get(pick.teamId);
+    const teamId = mapped?.teamId || pick.teamId || "unknown";
+    const teamName = mapped?.teamName || pick.teamName || `Team ${teamId}`;
+
+    let roster = teamRosters.get(teamId);
     if (!roster) {
-      roster = {
-        teamId: pick.teamId,
-        teamName: pick.teamName || `Team ${pick.teamId}`,
-        playerIds: [],
-      };
-      teamRosters.set(pick.teamId, roster);
+      roster = { teamId, teamName, playerIds: [] };
+      teamRosters.set(teamId, roster);
     }
 
-    // Add player to roster (dedupe by playerId)
     if (!roster.playerIds.includes(pick.playerId)) {
       roster.playerIds.push(pick.playerId);
     }
   }
 
   logger.log(
-    `[ESPN Draft Assistant] Parsed ${teamRosters.size} team rosters from DOM (${picks.length} total picks)`,
+    `[ESPN Draft Assistant] Parsed ${teamRosters.size} team rosters from DOM (${picks.length} total picks, ${columnMap.size} teams mapped)`,
   );
 
   return teamRosters;

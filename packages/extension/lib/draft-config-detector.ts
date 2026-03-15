@@ -406,27 +406,37 @@ export function detectAllTeamBudgets(): Array<{
  * Multiple strategies with validation to handle ESPN DOM variations
  */
 function detectTeamCount(): number | null {
-  // Strategy 0: Count auction-pick elements or picklist items in the pick train
-  // Try multiple container selectors — ESPN uses different wrappers across draft versions
-  const containerSelectors = [
-    ".pick-train__content__picks-container",
-    "ul.picklist",
-    ".picklist",
-  ];
-  for (const selector of containerSelectors) {
-    const container = document.querySelector(selector);
-    if (container) {
-      const pickItems = container.querySelectorAll(".picklist--item");
-      if (pickItems.length >= 2 && pickItems.length <= 20) {
-        logger.log(
-          `[ESPN Draft Assistant] Team count detected from ${selector}: ${pickItems.length}`,
-        );
-        return pickItems.length;
-      }
+  // Strategy 1 (CONFIRMED — MCP verified 2026-03-14): Roster dropdown
+  // The <select> dropdown is available early in the page lifecycle and its
+  // option count matches the team count exactly. Each option value = ESPN team ID.
+  const dropdown = document.querySelector("select");
+  if (dropdown) {
+    const teamOptions = Array.from(dropdown.options).filter((opt) => {
+      const value = opt.value || "";
+      const text = (opt.textContent || "").trim();
+      return value && value !== "" && text && !text.toLowerCase().includes("select") && text.length > 0;
+    });
+    if (teamOptions.length >= 2 && teamOptions.length <= 20) {
+      logger.log(
+        `[ESPN Draft Assistant] Team count detected from roster dropdown: ${teamOptions.length}`,
+      );
+      return teamOptions.length;
     }
   }
 
-  // Fallback: count [data-testid="auction-pick"] elements (one per team)
+  // Strategy 2 (CONFIRMED): Pick train — one .picklist--item per team
+  const pickTrainContainer = document.querySelector(".pick-train__content__picks-container");
+  if (pickTrainContainer) {
+    const pickItems = pickTrainContainer.querySelectorAll(".picklist--item");
+    if (pickItems.length >= 2 && pickItems.length <= 20) {
+      logger.log(
+        `[ESPN Draft Assistant] Team count detected from pick train: ${pickItems.length}`,
+      );
+      return pickItems.length;
+    }
+  }
+
+  // Strategy 3 (CONFIRMED): auction-pick test IDs — one per team in the train
   const auctionPicks = document.querySelectorAll('[data-testid="auction-pick"]');
   if (auctionPicks.length >= 2 && auctionPicks.length <= 20) {
     logger.log(
@@ -435,17 +445,8 @@ function detectTeamCount(): number | null {
     return auctionPicks.length;
   }
 
-  // Fallback: any .picklist--item elements on the page (no container)
-  const anyPickItems = document.querySelectorAll(".picklist--item");
-  if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
-    logger.log(
-      `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
-    );
-    return anyPickItems.length;
-  }
-
-  // Strategy 1: Count unique grid columns in completed picks (most reliable)
-  const pickElements = document.querySelectorAll('[style*="grid-area"]');
+  // Strategy 4 (CONFIRMED): Grid columns — .draft-board-grid-pick-cell uses grid-area: row / col
+  const pickElements = document.querySelectorAll(".draft-board-grid-pick-cell");
   if (pickElements.length > 0) {
     const columns = new Set<number>();
     pickElements.forEach((el) => {
@@ -456,7 +457,6 @@ function detectTeamCount(): number | null {
       }
     });
     if (columns.size >= 2) {
-      // Reasonable team count (2-20)
       logger.log(
         `[ESPN Draft Assistant] Team count detected from grid columns: ${columns.size}`,
       );
@@ -464,100 +464,17 @@ function detectTeamCount(): number | null {
     }
   }
 
-  // Strategy 2: Count roster dropdown options (practice drafts and real drafts)
-  const dropdownSelectors = [
-    "select.dropdown__select",
-    'select[class*="dropdown"]',
-    'select[class*="team"]',
-    "select",
-  ];
-
-  for (const selector of dropdownSelectors) {
-    const rosterDropdown = document.querySelector(selector);
-    if (rosterDropdown) {
-      const options = rosterDropdown.querySelectorAll("option");
-      // Filter out placeholder options (empty value or text like "Select team")
-      const teamOptions = Array.from(options).filter((opt) => {
-        const value = opt.getAttribute("value") || "";
-        const text = (opt.textContent || "").trim();
-        // Valid if has value, non-empty text, doesn't say "select"
-        return (
-          value &&
-          value !== "" &&
-          text &&
-          !text.toLowerCase().includes("select") &&
-          text.length > 0
-        );
-      });
-      if (teamOptions.length >= 2) {
-        logger.log(
-          `[ESPN Draft Assistant] Team count detected from dropdown: ${teamOptions.length}`,
-        );
-        return teamOptions.length;
-      }
-    }
-  }
-
-  // Strategy 3: Count team header elements in draft board
-  const headerSelectors = [
-    '[class*="teamHeader"]',
-    '[class*="team"][class*="header"]',
-    '[class*="owner"][class*="header"]',
-    '[data-testid*="team-header"]',
-  ];
-
-  for (const selector of headerSelectors) {
-    const teamHeaders = document.querySelectorAll(selector);
-    if (teamHeaders.length >= 2) {
-      logger.log(
-        `[ESPN Draft Assistant] Team count detected from headers: ${teamHeaders.length}`,
-      );
-      return teamHeaders.length;
-    }
-  }
-
-  // Strategy 4: Parse from league info text (e.g., "12 Team League")
-  const leagueInfoSelectors = [
-    '[class*="league"][class*="info"]',
-    '[class*="leagueInfo"]',
-    ".draft-header",
-    "header",
-    "h1",
-  ];
-
-  for (const selector of leagueInfoSelectors) {
-    const leagueInfo = document.querySelector(selector);
-    if (leagueInfo) {
-      const text = leagueInfo.textContent || "";
-      const match = text.match(/(\d+)\s*team/i);
-      if (match) {
-        const count = parseInt(match[1], 10);
-        if (count >= 2 && count <= 20) {
-          logger.log(
-            `[ESPN Draft Assistant] Team count detected from text: ${count}`,
-          );
-          return count;
-        }
-      }
-    }
-  }
-
-  // Strategy 5: Check URL parameters
-  const url = new URL(window.location.href);
-  const urlTeams =
-    url.searchParams.get("teams") || url.searchParams.get("teamCount");
-  if (urlTeams) {
-    const count = parseInt(urlTeams, 10);
-    if (count >= 2 && count <= 20) {
-      logger.log(
-        `[ESPN Draft Assistant] Team count detected from URL: ${count}`,
-      );
-      return count;
-    }
+  // Strategy 5: Loose .picklist--item count (no container requirement)
+  const anyPickItems = document.querySelectorAll(".picklist--item");
+  if (anyPickItems.length >= 2 && anyPickItems.length <= 20) {
+    logger.log(
+      `[ESPN Draft Assistant] Team count detected from picklist items: ${anyPickItems.length}`,
+    );
+    return anyPickItems.length;
   }
 
   logger.warn(
-    "[ESPN Draft Assistant] Could not detect team count - tried grid columns, dropdowns, headers, text, and URL",
+    "[ESPN Draft Assistant] Could not detect team count - tried dropdown, pick train, auction-picks, grid columns",
   );
   return null;
 }
