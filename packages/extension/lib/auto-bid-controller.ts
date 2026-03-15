@@ -1635,6 +1635,48 @@ export class AutoBidController {
       ranking?.externalRank != null &&
       ranking.externalRank <= 200;
 
+    // ── Endgame mode: value_per_dollar scoring when budget <= $20 ──
+    const budgetCurve = this.lastEngineSignals?.budgetCurve;
+    const isEndgame = budgetCurve?.endgameMode === true;
+
+    if (isEndgame) {
+      logger.log(
+        `[AutoBid] ENDGAME MODE activated ($${budgetCurve?.remainingBudget ?? "?"} remaining)`,
+      );
+
+      // In endgame, only bid on high value-per-dollar players
+      // Value source: idealMatch SGP value, or external rank as proxy
+      const playerValue = idealMatch?.sgpValue ?? (ranking?.externalRank != null ? Math.max(0, 200 - ranking.externalRank) / 20 : 0);
+      const valuePerDollar = currentBid > 0 ? playerValue / currentBid : playerValue;
+
+      // Endgame preferences:
+      // - Prefer: breakout hitters (high projected HR/SB via high SGP), cheap OF, K pitchers
+      // - Avoid: backup catchers (C slot filled - already handled by catcher dampening below),
+      //          weak OPS hitters (low value hitters)
+      const isOF = ranking?.primaryPosition === "OF";
+      const isKPitcher = isSP || isRP; // All pitchers contribute K
+      const isBreakoutHitter = !isPitcher && idealMatch != null && idealMatch.sgpValue > 3;
+      const isDesirableEndgame = isBreakoutHitter || (isOF && valuePerDollar > 0.5) || (isKPitcher && valuePerDollar > 0.5);
+
+      // In endgame, skip low-value players entirely (value_per_dollar < 0.3)
+      // unless they're an ideal target or a desirable endgame pickup
+      if (valuePerDollar < 0.3 && !isIdealTarget && !isDesirableEndgame) {
+        logger.log(
+          `[AutoBid] ENDGAME skip: low value_per_dollar=${valuePerDollar.toFixed(2)} for ${nominatedName ?? "unknown"}`,
+        );
+        return;
+      }
+
+      // Weak OPS filter: skip non-pitcher players with very low SGP (weak hitters)
+      // Only applies when NOT an ideal target
+      if (!isPitcher && !isIdealTarget && idealMatch != null && idealMatch.sgpValue < 1) {
+        logger.log(
+          `[AutoBid] ENDGAME skip: weak hitter (sgp=${idealMatch.sgpValue.toFixed(2)}) ${nominatedName ?? "unknown"}`,
+        );
+        return;
+      }
+    }
+
     if (
       !isIdealTarget &&
       !isOpportunity &&
@@ -1751,6 +1793,14 @@ export class AutoBidController {
           `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
         );
       }
+    }
+
+    // Apply endgame dampening: when in endgame mode, reduce all bid caps by 30%
+    // to preserve remaining budget for high-value-per-dollar pickups.
+    if (isEndgame) {
+      const rawCap = autoBidCap;
+      autoBidCap = Math.max(1, Math.ceil(autoBidCap * 0.7));
+      capSource += ` → ENDGAME dampened ×0.70 = $${autoBidCap} (raw $${rawCap})`;
     }
 
     // Guard: price has reached or exceeded the cap
