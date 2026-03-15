@@ -981,6 +981,38 @@ export function computeDraftEngine(
   );
   const undraftedPlayers: PoolPlayer[] = [...undraftedHitters, ...undraftedPitchers];
 
+  // Stamp espnAvgSalary onto PoolPlayers when ESPN DOM auction values available.
+  // This lets nomination strategy compute overpricing (espnAvgSalary - model dollars).
+  if (input.espnDomAuctionValues && Object.keys(input.espnDomAuctionValues).length > 0) {
+    const idToNameNom = new Map<number, string>();
+    for (const av of input.auctionValues) {
+      idToNameNom.set(av.playerId, normalizeName(av.playerName));
+    }
+    for (const r of input.rankings) {
+      if (!idToNameNom.has(r.playerId)) {
+        idToNameNom.set(r.playerId, normalizeName(r.playerName));
+      }
+    }
+    for (const pick of input.allPicks) {
+      if (!idToNameNom.has(pick.playerId)) {
+        idToNameNom.set(pick.playerId, normalizeName(pick.playerName));
+      }
+    }
+    const nameToAsvNom = new Map<string, number>();
+    for (const [id, asv] of Object.entries(input.espnDomAuctionValues)) {
+      if (asv > 0) {
+        const name = idToNameNom.get(Number(id));
+        if (name) nameToAsvNom.set(name, asv);
+      }
+    }
+    for (const p of undraftedPlayers) {
+      const asv = nameToAsvNom.get(p.normalizedName);
+      if (asv != null) {
+        p.espnAvgSalary = asv;
+      }
+    }
+  }
+
   // Top 200 for roster optimization (sort by dollar value)
   const allPlayersOpt: PoolPlayer[] = [...undraftedPlayers]
     .sort((a, b) => b.dollars - a.dollars)
