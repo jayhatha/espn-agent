@@ -6,7 +6,7 @@ import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryptio
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
-import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID, DEFAULT_TOTAL_TEAMS } from "../../../shared/dist/index.js";
+import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID } from "../../../shared/dist/index.js";
 
 /**
  * Leagues API Routes
