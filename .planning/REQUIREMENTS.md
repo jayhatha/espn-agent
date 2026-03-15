@@ -15,9 +15,9 @@ Requirements for v4.0 Personal Season Setup. Each maps to roadmap phases.
 
 ### League Configuration
 
-- [ ] **CONF-01**: League 112523, team 13, 13 teams hardcoded as default config
-- [ ] **CONF-02**: Categories hardcoded: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
-- [ ] **CONF-03**: OPS wired as rate stat in component math (OBP + SLG)
+- [x] **CONF-01**: League 112523, team 13, 13 teams hardcoded as default config
+- [x] **CONF-02**: Categories hardcoded: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP
+- [x] **CONF-03**: OPS wired as rate stat in component math (OBP + SLG)
 - [ ] **CONF-04**: Extension uses hardcoded league config as primary, DOM detection as validation
 
 ### Draft Fixes
@@ -80,9 +80,9 @@ Deferred to future release. Tracked but not in current roadmap.
 | SIMP-01 | Phase 43 | Pending |
 | SIMP-02 | Phase 43 | Pending |
 | SIMP-03 | Phase 43 | Pending |
-| CONF-01 | Phase 44 | Pending |
-| CONF-02 | Phase 44 | Pending |
-| CONF-03 | Phase 44 | Pending |
+| CONF-01 | Phase 44 | Complete |
+| CONF-02 | Phase 44 | Complete |
+| CONF-03 | Phase 44 | Complete |
 | CONF-04 | Phase 45 | Pending |
 | DFIX-01 | Phase 45 | Pending |
 | DFIX-02 | Phase 45 | Pending |

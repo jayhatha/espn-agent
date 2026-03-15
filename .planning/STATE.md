@@ -33,6 +33,7 @@ Progress: [░░░░░░░░░░] 0% (v4.0)
 - [v4.0 start]: Categories: R, RBI, HR, SB, OPS / K, W, SV, ERA, WHIP (5x5 with OPS)
 - [v4.0 start]: ESPN creds via .env (SWID + espn_s2) primary, encrypted DB as fallback
 - [v4.0 start]: Keep all existing code for later expansion — don't delete, just bypass
+- [Phase 44]: OPS replaces AVG as default hitting rate stat; shared league-defaults.ts as single source of truth
 
 ### Pending Todos
 
