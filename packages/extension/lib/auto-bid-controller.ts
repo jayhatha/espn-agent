@@ -1,5 +1,6 @@
 import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
+import { getPositionalWeight, getSpTierCap, GS_CAP } from "./engine/draft-constants";
 import { scrapeESPNNominationQueue } from "./dom-observers";
 import { logger } from "./logger";
 
@@ -1718,6 +1719,36 @@ export class AutoBidController {
         capSource += ` → C slot filled, catcher dampened ×0.5 = $${autoBidCap} (raw $${rawCap})`;
         logger.log(
           `[AutoBidController] C slot filled — catcher dampening applied (0.5x): $${rawCap} → $${autoBidCap}`,
+        );
+      }
+    }
+
+    // Apply positional weight bonus: scarce hitting positions get a bid ceiling boost.
+    // SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1. Pitchers and flex get +0.
+    const playerPositions = ranking?.positions ?? (playerPosition ? [playerPosition] : []);
+    const posWeight = getPositionalWeight(playerPositions);
+    if (posWeight > 0) {
+      const rawCap = autoBidCap;
+      autoBidCap += posWeight;
+      capSource += ` → positional weight +${posWeight} (${playerPositions.join("/")}) = $${autoBidCap} (raw $${rawCap})`;
+    }
+
+    // Apply SP tier caps: limit spending on SPs based on how many are already drafted.
+    // SP1 $18, SP2 $12, SP3 $10, SP4 $5, SP5+ $3.
+    if (isSP) {
+      const spCount = state.myRoster.filter(
+        (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
+      ).length;
+      const tierCap = getSpTierCap(spCount);
+      if (autoBidCap > tierCap) {
+        const rawCap = autoBidCap;
+        autoBidCap = tierCap;
+        capSource += ` → SP tier ${spCount + 1} cap $${tierCap} (raw $${rawCap})`;
+      }
+      // GS cap awareness: log advisory for deep SP picks (SP4+)
+      if (spCount >= 3) {
+        logger.log(
+          `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
         );
       }
     }
