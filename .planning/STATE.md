@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v4.0 Personal Season Setup — Phase 43: Strip Auth & Env Config
+**Current focus:** v4.0 Personal Season Setup — Phase 45: Fix Draft Extension Detection
 
 ## Current Position
 
-Phase: 43 of 46 (Strip Auth & Env Config)
+Phase: 45 of 46 (Fix Draft Extension Detection)
 Plan: 1 of 1 -- COMPLETE
-Status: Phase 43 complete
-Last activity: 2026-03-15 -- Completed 43-01-PLAN.md (7 min)
+Status: Phase 45 complete
+Last activity: 2026-03-15 -- Completed 45-01-PLAN.md (3 min)
 
-Progress: [##░░░░░░░░] 25% (v4.0) -- Phase 43 done
+Progress: [####░░░░░░] 50% (v4.0) -- Phase 45 done
 
 ## Performance Metrics
 
@@ -37,6 +37,7 @@ Progress: [##░░░░░░░░] 25% (v4.0) -- Phase 43 done
 - [Phase 43]: AuthContext provides mock admin user for single-user mode
 - [Phase 43]: ESPN creds via ESPN_SWID/ESPN_S2 env vars, encrypted DB as fallback
 - [Phase 44]: OPS replaces AVG as default hitting rate stat; shared league-defaults.ts as single source of truth
+- [Phase 45]: myTeamId from DEFAULT_TEAM_ID (not URL param); myGridColumn from dropdown mapping; config-first pattern for league detection
 
 ### Pending Todos
 
@@ -49,5 +50,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-15
-Stopped at: Completed 43-01-PLAN.md
+Stopped at: Completed 45-01-PLAN.md
 Resume file: None
