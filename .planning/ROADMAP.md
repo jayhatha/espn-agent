@@ -43,7 +43,7 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 **Milestone Goal:** Align the draft engine with the original auction draft system spec — add endgame mode, rework nomination strategy, implement positional priority weights, SP tier caps, inflation interpretation bands, and budget allocation bands.
 
 - [ ] **Phase 47: Endgame Mode & Budget Bands** - Endgame mode at $20 budget threshold with value_per_dollar scoring, hitter/pitcher budget allocation bands
-- [ ] **Phase 48: Nomination Strategy Rework** - Nominate overpriced players (espn_price - model_value) to force league overspending
+- [x] **Phase 48: Nomination Strategy Rework** - Nominate overpriced players (espn_price - model_value) to force league overspending (completed 2026-03-15)
 - [x] **Phase 49: Positional Weights & SP Tiers** - Positional priority weights, SP1-SP5 tier caps, 200 GS cap awareness (completed 2026-03-15)
 - [ ] **Phase 50: Inflation Bands & Category Targets** - Inflation interpretation bands with bid ceiling adjustments, per-category competitive targets
 - [ ] **Phase 51: Data Pipeline for Extension** - Easy projection + ESPN value loading into extension via CSV upload or DOM scrape
@@ -108,7 +108,7 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 47. Endgame Mode & Budget Bands | v5.0 | 0/? | Not started | - |
-| 48. Nomination Strategy Rework | v5.0 | 0/? | Not started | - |
+| 48. Nomination Strategy Rework | 1/1 | Complete   | 2026-03-15 | - |
 | 49. Positional Weights & SP Tiers | 1/1 | Complete   | 2026-03-15 | - |
 | 50. Inflation Bands & Category Targets | v5.0 | 0/? | Not started | - |
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |

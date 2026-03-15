@@ -15,8 +15,8 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 
 ### Nomination
 
-- [ ] **NOM-07**: Nomination strategy uses espn_price - model_value to nominate overpriced players early
-- [ ] **NOM-08**: Nomination strategy goal is to force league overspending and increase inflation
+- [x] **NOM-07**: Nomination strategy uses espn_price - model_value to nominate overpriced players early
+- [x] **NOM-08**: Nomination strategy goal is to force league overspending and increase inflation
 
 ### Positional & Pitching
 
@@ -69,8 +69,8 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 | END-01 | Phase 47 | Pending |
 | END-02 | Phase 47 | Pending |
 | END-03 | Phase 47 | Pending |
-| NOM-07 | Phase 48 | Pending |
-| NOM-08 | Phase 48 | Pending |
+| NOM-07 | Phase 48 | Complete |
+| NOM-08 | Phase 48 | Complete |
 | POS-01 | Phase 49 | Complete |
 | POS-02 | Phase 49 | Complete |
 | POS-03 | Phase 49 | Complete |
