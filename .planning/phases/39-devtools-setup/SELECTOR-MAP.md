@@ -1,19 +1,15 @@
 # ESPN Auction Draft DOM Selector Map
 
 **Phase 39 — Generated: 2026-03-14**
-**Status: PARTIAL — NEEDS LIVE VERIFICATION**
+**Status: VERIFIED via Chrome DevTools MCP (2026-03-14 live draft)**
 
-> This map was generated from codebase analysis (dom-observers.ts, auto-bid-controller.ts, content.tsx).
-> Selectors marked CONFIRMED have inline "verified 2026" comments in source. All others are UNTESTED
-> against the current ESPN draft page and must be verified via Chrome DevTools MCP before Phase 40 ships.
+> Selectors verified against a live ESPN auction draft (Practice Draft, leagueId 1662791746).
+> Status key: CONFIRMED = verified present in live DOM, FAILED = selector returned 0 matches, NEW = discovered during live verification.
 
-## How to Use
+## iframe Status
 
-Phase 40 implementation should:
-1. Use CONFIRMED selectors as primary targets
-2. Replace FAILED selectors with alternatives from the fallback list
-3. Verify all UNTESTED selectors before shipping — do not guess
-4. Prefer selector stability order: `data-testid` > `aria-*` > `data-*` > BEM class > dynamic class
+**Draft content is NOT in an iframe.** All draft selectors work on the main frame.
+Iframes found: Disney ID auth (`oneid-iframe`), Nielsen tracking (`lsframe`) — none contain draft content.
 
 ## Selector Groups
 
@@ -26,19 +22,18 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `.draftBoardContainer` | UNTESTED | Primary placeholder |
-| `[class*="draftBoard"]` | UNTESTED | Wildcard fallback |
-| `[class*="DraftBoard"]` | UNTESTED | CamelCase variant |
-| `[id*="draftBoard"]` | UNTESTED | ID-based fallback |
-| `.draft-content-wrapper` | UNTESTED | Content wrapper |
-| `[class*="draft-columns"]` | UNTESTED | Column layout |
-| `[style*="grid-template"]` | UNTESTED | Grid-based detection |
-| `[data-testid*="draft"]` | UNTESTED | Test ID (preferred if exists) |
-| `.draft-board` | UNTESTED | Bootstrap narrower target |
-| `.players-table` | UNTESTED | Bootstrap fallback |
-| `#draft-content` | UNTESTED | ID fallback |
+| `.draft-content-wrapper` | CONFIRMED | `<div class="draft-content-wrapper flex flex-column">` — 4 children |
+| `[class*="draftBoard"]` | CONFIRMED | 3 matches: `.draftBoard`, `.draftBoardGrid__container`, `.draftBoardGrid` |
+| `.players-table` | CONFIRMED | 5 matches |
+| `[class*="draft-columns"]` | CONFIRMED | 1 match |
+| `.draftBoardContainer` | FAILED | Does not exist |
+| `[class*="DraftBoard"]` | FAILED | Does not exist |
+| `[id*="draftBoard"]` | FAILED | Does not exist |
+| `[data-testid*="draft"]` | CONFIRMED | But points to pick-train (`draft-order-set`), NOT the board |
+| `.draft-board` | FAILED | Does not exist |
+| `#draft-content` | FAILED | Does not exist |
 
-**Recommendation:** Use MCP to find the actual root container. Run `document.querySelector('[data-testid*="draft"]')` first — ESPN React apps often use data-testid. Fall back to grid-template detection.
+**Best root selectors:** `.draft-content-wrapper` (unique, stable) or `[class*="draftBoard"]` (matches board grid).
 
 ---
 
@@ -49,14 +44,15 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `[style*="grid-area"]` | CONFIRMED | ESPN uses inline grid-area styles for positioning |
-| `.draftBoardCell` | UNTESTED | Class-based |
-| `.pickCell` | UNTESTED | Class-based |
-| `[data-player-id]` | CONFIRMED | Data attribute on cells with drafted players |
-| `[data-pick-number]` | UNTESTED | May exist for pick ordering |
-| `[data-testid*="pick"]` | UNTESTED | Test ID preferred if exists |
+| `[style*="grid-area"]` | CONFIRMED | 377 matches — ESPN uses CSS Grid for board positioning |
+| `.draft-board-grid-pick-cell` | NEW CONFIRMED | 364 matches — actual pick cell class |
+| `[data-player-id]` | CONFIRMED | 15 matches (on buttons, not cells directly) |
+| `[data-testid="auction-pick"]` | NEW CONFIRMED | 13 matches — pick entries in pick train |
+| `[data-pick-number]` | CONFIRMED | 1 match (sparse) |
+| `.draftBoardCell` | FAILED | Does not exist |
+| `.pickCell` | FAILED | Does not exist |
 
-**Recommendation:** `[style*="grid-area"]` is confirmed and structurally stable (ESPN uses CSS Grid for the board). Use as primary.
+**Best pick cell selector:** `.draft-board-grid-pick-cell` (structural, unique to board).
 
 ---
 
@@ -67,14 +63,32 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `.completedPick` | UNTESTED | Class marker |
-| `[data-completed="true"]` | UNTESTED | Data attribute |
-| `[data-status="completed"]` | UNTESTED | Status attribute |
-| `[data-player-id]:not([data-player-id=""])` | CONFIRMED | Non-empty player-id = completed pick |
-| `.winningPrice` | CONFIRMED | Auction price element (only on completed picks) |
-| `[class*="winningPrice"]` | UNTESTED | Wildcard fallback |
+| `.completedPick` | CONFIRMED | Class on completed pick cells |
+| `.winningPrice` | CONFIRMED | Auction price child element |
+| `[class*="winningPrice"]` | CONFIRMED | Wildcard also works |
+| `[data-player-id]:not([data-player-id=""])` | CONFIRMED | Non-empty player-id |
+| `[data-completed="true"]` | FAILED | Does not exist |
+| `[data-status="completed"]` | FAILED | Does not exist |
 
-**Recommendation:** `[data-player-id]:not([data-player-id=""])` combined with `.winningPrice` child detection. Both confirmed.
+**Completed pick HTML structure:**
+```html
+<div class="draft-board-grid-pick-cell completedPick" style="grid-area: 8 / 1; --position-color: 223, 132, 255;">
+  <div class="pickCellTop">
+    <div class="rosterSlot">OF</div>
+    <div class="winningPrice">$76</div>
+  </div>
+  <div class="pickCellMiddle">
+    <span class="playerFirstName">Aaron</span>
+    <span class="playerLastName">Judge</span>
+  </div>
+  <div class="pickCellBottom">
+    <span class="playerProTeam">NYY</span>
+    <span class="positionPill">OF</span>
+  </div>
+</div>
+```
+
+**New structural selectors:** `.pickCellTop`, `.pickCellMiddle`, `.pickCellBottom`, `.rosterSlot` — all CONFIRMED.
 
 ---
 
@@ -88,15 +102,15 @@ Phase 40 implementation should:
 | `[data-testid="player-selected"]` | CONFIRMED | Primary — ESPN test ID |
 | `.player-selected` | CONFIRMED | Class fallback |
 | `.pickArea` | CONFIRMED | Container for auction UI |
-| `.playerinfo__playername` | CONFIRMED | Player name text |
-| `.playerinfo__playerpos` | CONFIRMED | Player position text |
-| `.playerinfo__playerteam` | CONFIRMED | MLB team abbreviation |
+| `.playerinfo__playername` | CONFIRMED | Player name text (20 matches across page) |
+| `.playerinfo__playerpos` | CONFIRMED | Player position text (20 matches) |
+| `.playerinfo__playerteam` | CONFIRMED | MLB team abbreviation (20 matches) |
 | `.current-amount` | CONFIRMED | Current bid dollar amount |
 | `img[src*="/players/full/"]` | CONFIRMED | Headshot URL → ESPN player ID extraction |
-| `[class*="currentPlayer"]` | UNTESTED | Generic fallback |
-| `[class*="activePlayer"]` | UNTESTED | Generic fallback |
+| `[class*="currentPlayer"]` | FAILED | Does not exist |
+| `[class*="activePlayer"]` | FAILED | Does not exist |
 
-**Recommendation:** All primary selectors CONFIRMED. This is the most reliable group. Use `[data-testid="player-selected"]` as root, then child queries for info fields.
+**Headshot URL format:** `https://a.espncdn.com/combiner/i?img=/i/headshots/mlb/players/full/{espnPlayerId}.png&w=188&h=140&cb=1`
 
 ---
 
@@ -107,16 +121,16 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `.fixedDataTableLayout_rowsContainer` | CONFIRMED | Table body container |
-| `.fixedDataTableRowLayout_main[role="row"]` | CONFIRMED | Individual rows (skip aria-rowindex="1" header) |
-| `.public_fixedDataTableCell_cellContent` | CONFIRMED | Cell content wrapper (first = dollar value) |
-| `a.player-news[title]` | CONFIRMED | Player name anchor with title attr |
-| `.positionPill` | CONFIRMED | Position badge element |
+| `.fixedDataTableLayout_rowsContainer` | CONFIRMED | 5 matches (multiple table sections) |
+| `.fixedDataTableRowLayout_main[role="row"]` | CONFIRMED | 49 rows |
+| `.public_fixedDataTableCell_cellContent` | CONFIRMED | 384 cell content wrappers |
+| `a.player-news[title]` | CONFIRMED | 23 player name anchors |
+| `.positionPill` | CONFIRMED | 23 position badges |
 | `.playerinfo__playerteam` | CONFIRMED | MLB team in table row |
-| `button[data-player-id]` | CONFIRMED | Action button per player |
-| `.fixedDataTableCellGroupLayout_cellGroupWrapper` | CONFIRMED | Cell group (fixed vs scrollable columns) |
+| `button[data-player-id]` | CONFIRMED | 15 action buttons |
+| `.fixedDataTableCellGroupLayout_cellGroupWrapper` | CONFIRMED | Cell groups |
 
-**Recommendation:** All selectors CONFIRMED. ESPN's fixedDataTable uses stable BEM-style class names. This is likely a third-party table library with consistent naming.
+All selectors CONFIRMED. fixedDataTable BEM classes are stable (third-party library).
 
 ---
 
@@ -127,21 +141,18 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `button.action-btn[data-player-id]` | CONFIRMED | Primary action button selector |
-| `button[data-player-id]` | CONFIRMED | Fallback (matches non-action buttons too) |
-| `button.Button--select[data-player-id]:not([disabled])` | CONFIRMED | Turn detection: enabled Select buttons |
+| `button.action-btn[data-player-id]` | CONFIRMED | 15 matches — primary action button |
+| `button[data-player-id]` | CONFIRMED | Same 15 (no extra matches in this draft) |
+| `button.Button--select[data-player-id]:not([disabled])` | UNVERIFIED | 0 during non-turn state (expected) — needs turn-state verification |
 
-**Button text values (from code analysis, NEEDS LIVE VERIFICATION):**
-- `"dequeue"` / `"deselect"` / `"remove"` → player IS queued
-- `"queue"` → player not queued (not user's turn)
-- `"select"` → player not queued (IS user's turn to nominate)
+**Button text values (LIVE VERIFIED):**
+- `"queue"` → CONFIRMED (player not queued, not user's turn). Class: `Button Button--sm Button--alt ttu Button--queue action-btn`
+- `"select"` → UNVERIFIED (missed turn window — draft auto-advanced)
+- `"dequeue"` / `"deselect"` / `"remove"` → UNVERIFIED (no players were queued during test)
 
-**Known issues:**
-- `button[data-player-id]` without `.action-btn` matched player name links and stat cells (quick task 90 fix)
-- Button text detection is case-insensitive toLowerCase() comparison
-- Queue state scraping walks `.fixedDataTableRowLayout_main[role='row']` rows and checks button text
+**Button class pattern:** `Button--queue` class present when text is "queue". Likely `Button--select` when text is "select".
 
-**Recommendation:** `button.action-btn[data-player-id]` is CONFIRMED primary. Always prefer over bare `button[data-player-id]`. **MUST verify actual button text values against live draft** — ESPN may change text between seasons.
+**Queue sidebar:** `.pick-queue` container (class `pick-queue w-100 ph4 empty` when no players queued).
 
 ---
 
@@ -152,15 +163,17 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `.playerName` | UNTESTED | Primary name class |
-| `[class*="playerName"]` | UNTESTED | Wildcard |
-| `.player-name` | UNTESTED | Kebab-case |
-| `.playerFirstName` / `.playerLastName` | UNTESTED | Split name fields |
-| `.teamAbbrev` | UNTESTED | MLB team abbreviation |
-| `[class*="teamAbbrev"]` | UNTESTED | Wildcard |
-| `.positionPill` | CONFIRMED | Position badge (shared with GROUP 5) |
+| `.playerFirstName` | CONFIRMED | 2 matches (inside `.pickCellMiddle`) |
+| `.playerLastName` | CONFIRMED | 2 matches |
+| `.playerProTeam` | NEW CONFIRMED | 4 matches — MLB team in pick cells (replaces `.teamAbbrev`) |
+| `.positionPill` | CONFIRMED | 23 matches (shared with GROUP 5) |
+| `.playerName` | FAILED | Does not exist |
+| `[class*="playerName"]` | FAILED | Does not exist |
+| `.player-name` | FAILED | Does not exist |
+| `.teamAbbrev` | FAILED | Does not exist |
+| `[class*="teamAbbrev"]` | FAILED | Does not exist |
 
-**Recommendation:** These selectors are used inside completed pick cells. Many are placeholders. Use MCP to inspect a completed pick cell and find actual class names. `.positionPill` is the only confirmed one.
+**Key discovery:** Player names in pick cells use `.playerFirstName` + `.playerLastName` (split), NOT `.playerName`. MLB team uses `.playerProTeam`, NOT `.teamAbbrev`.
 
 ---
 
@@ -170,39 +183,39 @@ Phase 40 implementation should:
 **Criticality:** CRITICAL — false positives nominate at wrong time, false negatives miss turns
 
 **Strategy 1 — Body text scan:**
-- `document.body.innerText` contains "nominate a player" or "select a player"
-- Status: UNTESTED against current ESPN text
+- Status: PARTIALLY VERIFIED — during observed turn window, pickArea contained "Your turn to nominate a player!" and "Select a player below to nominate"
+- `document.body.innerText` search should match these strings
 
 **Strategy 2 — Pick train active team:**
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `.pick-train` | UNTESTED | Container |
-| `[class*="pickTrain"]` | UNTESTED | Wildcard |
-| `.active` / `[class*="active"]` / `[class*="current"]` | UNTESTED | Active team indicator |
-- Checks active element text for "your" or "my turn"
+| `.pick-train` | FAILED | Direct class does not exist |
+| `[class*="pick-train"]` | CONFIRMED | 2 matches (`pick-train__content`, `pick-train__content__picks-container`) |
+| `.auction-pick-component--own` | NEW CONFIRMED | Marks OUR team in pick train |
+| `.auction-pick-component--selecting` | NEW CONFIRMED | Marks currently-nominating team |
+| `.picklist--item.picklist--pick` | NEW CONFIRMED | Individual pick entries in train |
 
 **Strategy 3 — Pick area text:**
 | Selector | Status | Notes |
 |----------|--------|-------|
 | `.pickArea` | CONFIRMED | Container |
-| `[data-testid="player-selected"]` | CONFIRMED | Player already in area |
-- Checks pickArea text for "nominate" or "select a player"
-- Aborts if `[data-testid="player-selected"]` exists (player already nominated)
+| `[data-testid="player-selected"]` | CONFIRMED | Player already in area (bidding active) |
+- During our turn: `<h3>Your turn to nominate a player!</h3><p>Select a player below to nominate</p>`
+- During others' turn: Shows nominated player info + bid form
 
 **Strategy 4 — Select buttons exist (MOST RELIABLE per code comments):**
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `button.Button--select[data-player-id]:not([disabled])` | CONFIRMED | Primary indicator |
-- If these buttons exist in the table, it's user's turn
+| `button.Button--select[data-player-id]:not([disabled])` | UNVERIFIED | 0 during non-turn (expected) |
+- Could not catch during the brief turn window
 
 **Strategy 5 — Queue buttons + no bidding form:**
 | Selector | Status | Notes |
 |----------|--------|-------|
 | `button[data-player-id]` | CONFIRMED | Queue buttons exist |
-| `form.bidding-form__default` | UNTESTED | No active bidding |
-- Combines enabled queue buttons with absence of bidding form
+| `form.bidding-form__default` | CONFIRMED | Present during bidding, absent otherwise |
 
-**Recommendation:** Strategy 4 is CONFIRMED and most reliable. Strategy 3 uses confirmed selectors. Strategies 1, 2, 5 need live verification. Phase 40 should consolidate to strategies 3+4 as primary, with others as fallback.
+**Recommendation:** Strategies 3 + 5 are fully CONFIRMED. Strategy 2 has new reliable selectors (`--own`, `--selecting`). Strategy 4 structurally sound but unverified timing-wise.
 
 ---
 
@@ -214,15 +227,15 @@ Phase 40 implementation should:
 | Selector | Status | Notes |
 |----------|--------|-------|
 | `.playersSearch input.form__control` | CONFIRMED | Search input field |
-| `input[placeholder="Player Name"]` | UNTESTED | Placeholder-based fallback |
-| `.player--search--matches` | CONFIRMED | Search dropdown container |
+| `input[placeholder="Player Name"]` | CONFIRMED | Placeholder text verified: "Player Name" |
+| `.player--search--matches` | CONFIRMED | Search dropdown container (0 when no search active) |
 | `button.player--search--match` | CONFIRMED | Individual search result |
 | `button.player--search--match[data-player-search-playerid="${id}"]` | CONFIRMED | Result by player ID |
 | `[data-player-search-playername]` | CONFIRMED | Name attribute on result |
 | `.player--search--clear` | CONFIRMED | Clear search button |
-| `div.player--search--clear svg` | UNTESTED | SVG child fallback |
+| `div.player--search--clear svg` | CONFIRMED | SVG child — 1 match |
 
-**Recommendation:** Search selectors are largely CONFIRMED. The `player--search--*` BEM naming is stable. Verify `input[placeholder="Player Name"]` text hasn't changed.
+All search selectors CONFIRMED.
 
 ---
 
@@ -233,25 +246,30 @@ Phase 40 implementation should:
 
 | Selector | Status | Notes |
 |----------|--------|-------|
-| `button.bid-player__button` | CONFIRMED | Primary nominate/bid confirm |
-| `button.nominate-button` | UNTESTED | Alternative |
-| `button[class*="nominate"]` | UNTESTED | Wildcard |
-| `.pickArea button` | UNTESTED | Defensive: any button in pick area |
-| `form.bidding-form__default button.bid-player__button` | UNTESTED | Scoped to bidding form |
+| `button.bid-player__button` | CONFIRMED | 2 matches during bidding: quick offer + manual offer |
+| `form.bidding-form__default button.bid-player__button` | CONFIRMED | Scoped to bidding form — 1 match |
+| `.pickArea button` | CONFIRMED | 2 matches (same as bid-player__button) |
+| `button.nominate-button` | FAILED | Does not exist |
+| `button[class*="nominate"]` | FAILED | Does not exist |
 
-**Recommendation:** `button.bid-player__button` is CONFIRMED. Verify it still works for both nomination and bid confirmation.
+**Bid button details:**
+- Quick offer: `Button Button--default bid-player__button` → "Offer $59" (enabled, red bg)
+- Manual offer: `Button Button--default Button--disabled bid-player__button ttu` → "Offer" (disabled until manual amount entered)
 
 ---
 
-## Stable Selector Recommendations for Phase 40
-
-These are CONFIRMED selectors only, ordered by group. Phase 40 should use these as primary targets.
+## Verified Stable Selectors (Primary Targets)
 
 | Group | Selector | Purpose |
 |-------|----------|---------|
+| 1 | `.draft-content-wrapper` | Draft board root container |
+| 1 | `[class*="draftBoard"]` | Board grid elements |
 | 2 | `[style*="grid-area"]` | Pick cells in draft board |
-| 3 | `[data-player-id]:not([data-player-id=""])` | Completed picks |
+| 2 | `.draft-board-grid-pick-cell` | Pick cell class (NEW) |
+| 3 | `.completedPick` | Completed pick marker |
 | 3 | `.winningPrice` | Auction price on completed picks |
+| 3 | `.playerFirstName` / `.playerLastName` | Player name in pick cells |
+| 3 | `.playerProTeam` | MLB team in pick cells (NEW) |
 | 4 | `[data-testid="player-selected"]` | Current auction player root |
 | 4 | `.playerinfo__playername` | Nominated player name |
 | 4 | `.playerinfo__playerpos` | Nominated player position |
@@ -263,36 +281,37 @@ These are CONFIRMED selectors only, ordered by group. Phase 40 should use these 
 | 5 | `.public_fixedDataTableCell_cellContent` | Cell content |
 | 5 | `a.player-news[title]` | Player name in table |
 | 5 | `.positionPill` | Position badge |
-| 5 | `button[data-player-id]` | Player action button |
-| 6 | `button.action-btn[data-player-id]` | Queue/Select action button (primary) |
-| 6 | `button.Button--select[data-player-id]:not([disabled])` | Turn detection |
+| 6 | `button.action-btn[data-player-id]` | Queue/Select action button |
 | 8 | `.pickArea` | Auction pick area container |
+| 8 | `.auction-pick-component--own` | Our team in pick train (NEW) |
+| 8 | `.auction-pick-component--selecting` | Nominating team (NEW) |
+| 8 | `form.bidding-form__default` | Bidding form presence |
 | 9 | `.playersSearch input.form__control` | Search input |
+| 9 | `input[placeholder="Player Name"]` | Search input fallback |
 | 9 | `.player--search--matches` | Search dropdown |
 | 9 | `button.player--search--match` | Search result button |
-| 9 | `[data-player-search-playerid]` | Result player ID attr |
 | 9 | `.player--search--clear` | Clear search |
 | 10 | `button.bid-player__button` | Nominate/bid confirm |
 
-## iframe Notes
+## data-testid Values Found
 
-**Is draft content in an iframe?** UNKNOWN — needs live verification via MCP.
-
-ESPN's main fantasy pages typically render in the main frame, but the draft room may use an iframe for the auction interface. During the first MCP session:
-
-1. Run `document.querySelectorAll('iframe')` on the main frame
-2. If iframes exist, check their `src` attributes for draft-related URLs
-3. If selectors return 0 matches on main frame, switch CDP target to the draft iframe
-4. Document the exact frame targeting sequence here
+```
+draft-order-set, clock, auction-pick, croppable-image, auto-pick,
+nominationTimeDropdown, bidTimeDropdown, message-filter-radio-group,
+player-selected
+```
 
 ## Live Verification Checklist
 
-Before Phase 40 ships, verify these against a real ESPN auction draft:
-
-- [ ] GROUP 1: Find the actual draft board root element
-- [ ] GROUP 2: Confirm `[style*="grid-area"]` still used for pick positioning
-- [ ] GROUP 6: Capture actual button text values (queue/select/dequeue)
-- [ ] GROUP 7: Find actual player name/team selectors inside completed picks
-- [ ] GROUP 8: Verify turn detection text strings ("nominate a player", etc.)
-- [ ] iframe: Determine if draft uses iframes
-- [ ] Overall: Run full selector battery via MCP and update Status columns
+- [x] GROUP 1: Found actual draft board root element (`.draft-content-wrapper`, `[class*="draftBoard"]`)
+- [x] GROUP 2: Confirmed `[style*="grid-area"]` (377 matches), discovered `.draft-board-grid-pick-cell` (364)
+- [x] GROUP 3: `.completedPick` CONFIRMED, full HTML structure documented
+- [x] GROUP 4: All primary selectors CONFIRMED, `currentPlayer`/`activePlayer` FAILED
+- [x] GROUP 5: All selectors CONFIRMED (fixedDataTable BEM stable)
+- [x] GROUP 6: Button text "queue" CONFIRMED, `Button--queue` class CONFIRMED
+- [ ] GROUP 6: Button text "select" / `Button--select` class — UNVERIFIED (missed turn window)
+- [x] GROUP 7: `.playerFirstName`/`.playerLastName` CONFIRMED, `.playerProTeam` NEW, `.playerName`/`.teamAbbrev` FAILED
+- [x] GROUP 8: Pick train `--own`/`--selecting` NEW, `form.bidding-form__default` CONFIRMED
+- [x] GROUP 9: All selectors CONFIRMED including placeholder text
+- [x] GROUP 10: `button.bid-player__button` CONFIRMED (2 buttons), `button.nominate-button` FAILED
+- [x] iframe: Draft NOT in iframe — CONFIRMED

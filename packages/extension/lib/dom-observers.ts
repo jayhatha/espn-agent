@@ -40,33 +40,23 @@ export function findFirstMatchingSelector(
  * broader matches for resilience against ESPN DOM changes.
  */
 const DRAFT_BOARD_SELECTORS = [
-  // Primary: ESPN's typical draft board containers
-  ".draftBoardContainer",
-  '[class*="draftBoard"]',
-  '[class*="DraftBoard"]',
-  '[id*="draftBoard"]',
+  // CONFIRMED (MCP verified 2026-03-14): Primary targets
+  ".draft-content-wrapper", // unique, stable — 1 match
+  '[class*="draftBoard"]', // 3 matches: draftBoard, draftBoardGrid__container, draftBoardGrid
 
-  // Fallback: Broader draft-related containers
-  '[class*="draft"][class*="board"]',
-  '[class*="draft"][class*="container"]',
-  ".draft-content-wrapper",
-  '[class*="draft-columns"]',
+  // CONFIRMED: Secondary
+  '[class*="draft-columns"]', // 1 match
+  ".players-table", // 5 matches
 
-  // Last resort: Look for grid-styled containers with pick cells
-  '[style*="grid-template"]',
-  '[data-testid*="draft"]',
+  // FAILED selectors removed: .draftBoardContainer, [class*="DraftBoard"], [id*="draftBoard"], .draft-board, #draft-content
 ].join(", ");
 
 const PICK_ROW_SELECTORS = [
-  // Primary: Cells with grid positioning (ESPN uses inline grid-area styles)
-  '[style*="grid-area"]',
+  // CONFIRMED (MCP verified 2026-03-14): Primary pick cell selectors
+  ".draft-board-grid-pick-cell", // 364 matches — actual pick cell class
+  '[style*="grid-area"]', // 377 matches — CSS Grid positioning
 
-  // Secondary: Pick cells by class
-  ".draftBoardCell",
-  ".pickCell",
-  '[class*="pickCell"]',
-  '[class*="PickCell"]',
-  '[class*="draftCell"]',
+  // FAILED selectors removed: .draftBoardCell, .pickCell
 
   // Tertiary: Data attributes (ESPN sometimes uses these)
   "[data-player-id]",
@@ -82,17 +72,10 @@ const COMPLETED_PICK_SELECTORS = [
   // Primary: ESPN marks completed picks with specific classes or data
   ".completedPick",
   '[class*="completed"]',
-  '[data-completed="true"]',
-  '[data-status="completed"]',
-
-  // Secondary: Picks that contain player data are likely completed
+  // CONFIRMED (MCP verified 2026-03-14)
   '[data-player-id]:not([data-player-id=""])',
-  '[style*="grid-area"]:has(.playerCard)',
-  '[style*="grid-area"]:has([class*="player"])',
 
-  // Fallback: Any cell with player name elements (defensive)
-  ":has(.playerName)",
-  ':has([class*="playerName"])',
+  // FAILED selectors removed: [data-completed="true"], [data-status="completed"], :has(.playerName)
 ].join(", ");
 
 function parseGridArea(
@@ -452,39 +435,19 @@ export function parsePickElement(pickElement: Element): DraftPick | null {
       return null;
     }
 
-    // Strategy 1: Look for player name in various ESPN patterns
-    const playerNameSelectors = [
-      ".playerName",
-      '[class*="playerName"]',
-      '[class*="PlayerName"]',
-      ".player-name",
-      ".name",
-      '[class*="name"]',
-      '[data-testid*="player-name"]',
-    ];
-
-    let playerNameEl: Element | null = null;
-    for (const selector of playerNameSelectors) {
-      playerNameEl = pickElement.querySelector(selector);
-      if (playerNameEl?.textContent?.trim()) break;
-    }
-
-    // Strategy 2: Try first/last name split pattern
+    // CONFIRMED (MCP verified 2026-03-14): ESPN uses .playerFirstName + .playerLastName inside .pickCellMiddle
     const firstName = pickElement
-      .querySelector(".playerFirstName, .firstName, [class*='firstName']")
+      .querySelector(".playerFirstName")
       ?.textContent?.trim();
     const lastName = pickElement
-      .querySelector(".playerLastName, .lastName, [class*='lastName']")
+      .querySelector(".playerLastName")
       ?.textContent?.trim();
 
-    const playerName = [
-      playerNameEl?.textContent?.trim(),
-      [firstName, lastName].filter(Boolean).join(" ").trim(),
-    ].find((value) => Boolean(value));
+    const playerName = [firstName, lastName].filter(Boolean).join(" ").trim() || undefined;
 
-    // Strategy 3: Extract MLB team abbreviation (NOT fantasy team)
+    // CONFIRMED (MCP verified 2026-03-14): ESPN uses .playerProTeam inside .pickCellBottom
     const teamEl = pickElement.querySelector(
-      '.teamAbbrev, .team-abbrev, [class*="teamAbbrev"], [class*="team"][class*="abbrev"], [data-testid*="team"]',
+      '.playerProTeam, .playerinfo__playerteam',
     );
 
     // Strategy 4: Extract position(s) with multiple fallbacks
@@ -1020,16 +983,13 @@ export function logRosterDiagnostics(): void {
  *     img src="/players/full/42404.png" → player ID
  */
 const CURRENT_AUCTION_PLAYER_SELECTORS = [
-  // CONFIRMED (Phase 39 Group 4): ESPN test ID — most stable
+  // CONFIRMED (MCP verified 2026-03-14): ESPN test ID — most stable
   '[data-testid="player-selected"]',
-  // CONFIRMED (Phase 39 Group 4): class selector
+  // CONFIRMED: class selector
   ".player-selected",
-  // CONFIRMED (Phase 39 Group 4): auction UI container
+  // CONFIRMED: auction UI container
   ".pickArea",
-  // UNTESTED — generic fallbacks, deprioritized
-  '[class*="currentPlayer"]',
-  '[class*="activePlayer"]',
-  '[data-testid*="current-player"]',
+  // FAILED selectors removed: [class*="currentPlayer"], [class*="activePlayer"]
 ].join(", ");
 
 export interface CurrentAuctionPlayer {

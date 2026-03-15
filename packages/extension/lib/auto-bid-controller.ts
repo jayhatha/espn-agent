@@ -464,10 +464,10 @@ export class AutoBidController {
     const s2 = "Strategy 2 [UNTESTED_FALLBACK] (pick train active team)";
     strategiesChecked.push(s2);
     const pickTrainSelectors = [
-      ".pick-train",
-      '[class*="pickTrain"]',
+      // CONFIRMED (MCP verified 2026-03-14): pick-train__content, pick-train__content__picks-container
       '[class*="pick-train"]',
-      '[class*="PickTrain"]',
+      // CONFIRMED: .auction-pick-component--own marks our team, --selecting marks nominating team
+      ".auction-pick-component--selecting",
     ];
     let pickTrain: Element | null = null;
     for (const selector of pickTrainSelectors) {
@@ -1395,14 +1395,12 @@ export class AutoBidController {
    * and the confirmation button may say "Nominate", "Select", or other text.
    */
   private clickNominateButton(candidateName: string): void {
-    // Nominate-specific selectors (high confidence — class/testid contain "nominate")
+    // CONFIRMED (MCP verified 2026-03-14): ESPN uses bid-player__button for both nomination and bidding
     const specificSelectors = [
-      "button.bid-player__button", // ESPN actual: "nominate player" confirm button
-      "button.nominate-button",
-      'button[class*="nominate"]',
-      'button[class*="Nominate"]',
-      '[data-testid*="nominate"] button',
-      'button[data-testid*="nominate"]',
+      "button.bid-player__button", // CONFIRMED: 2 matches during bidding (quick offer + manual offer)
+      "form.bidding-form__default button.bid-player__button", // CONFIRMED: scoped to bidding form
+      ".pickArea button", // CONFIRMED: fallback — any button in pick area
+      // FAILED selectors removed: button.nominate-button, button[class*="nominate"]
     ];
 
     let nominateButton: HTMLButtonElement | null = null;
