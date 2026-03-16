@@ -8,12 +8,19 @@ interface CategoryHeatmapProps {
   leagueCategories: Category[];
 }
 
+const RANK_COLORS = {
+  top: '#37872d',
+  mid: '#e0b400',
+  low: '#f2495c',
+  bottom: '#c4162a',
+} as const;
+
 function rankToColor(rank: number, totalTeams: number): string {
   const pct = (rank - 1) / Math.max(1, totalTeams - 1);
-  if (pct <= 0.25) return "#37872d";
-  if (pct <= 0.5) return "#e0b400";
-  if (pct <= 0.75) return "#f2495c";
-  return "#c4162a";
+  if (pct <= 0.25) return RANK_COLORS.top;
+  if (pct <= 0.5) return RANK_COLORS.mid;
+  if (pct <= 0.75) return RANK_COLORS.low;
+  return RANK_COLORS.bottom;
 }
 
 function rankToOrdinal(rank: number): string {
@@ -56,7 +63,7 @@ export default function CategoryHeatmap({
       {/* Section header — clickable to toggle view */}
       <button
         onClick={() => setView((v) => (v === "rank" ? "stat" : "rank"))}
-        className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1.5 w-full text-left hover:text-grafana-text transition-colors"
+        className="text-body-xs text-grafana-muted uppercase tracking-wide mb-1.5 w-full text-left hover:text-grafana-text transition-colors"
         aria-label={`Toggle category view (currently showing ${view === "rank" ? "rank points" : "stat totals"})`}
       >
         {view === "rank" ? "Category Ranks" : "Category Stats"}
@@ -66,13 +73,13 @@ export default function CategoryHeatmap({
       {isLoading ? (
         /* Empty state: skeleton bars */
         <div className="space-y-1.5">
-          <div className="text-[10px] text-grafana-muted mb-1">
+          <div className="text-label text-grafana-muted mb-1">
             Waiting for draft data...
           </div>
           {(leagueCategories.length > 0 ? leagueCategories : Array.from({ length: 8 })).map(
             (_, i) => (
               <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-grafana-muted w-8 shrink-0">
+                <span className="text-label text-grafana-muted w-8 shrink-0">
                   {leagueCategories[i]?.stat_key ?? "--"}
                 </span>
                 <div className="flex-1 h-2 rounded-full bg-grafana-border overflow-hidden">
@@ -81,7 +88,7 @@ export default function CategoryHeatmap({
                     style={{ width: `${30 + Math.random() * 40}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-grafana-muted w-8 text-right">
+                <span className="text-label text-grafana-muted w-8 text-right">
                   --
                 </span>
               </div>
@@ -100,7 +107,7 @@ export default function CategoryHeatmap({
 
             return (
               <div key={statKey} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-grafana-muted w-8 shrink-0">
+                <span className="text-label text-grafana-muted w-8 shrink-0">
                   {statKey}
                 </span>
                 <div className="flex-1 h-2 rounded-full bg-grafana-border overflow-hidden">
@@ -112,7 +119,7 @@ export default function CategoryHeatmap({
                     }}
                   />
                 </div>
-                <span className="text-[10px] text-grafana-text w-14 text-right font-mono">
+                <span className="text-label text-grafana-text w-14 text-right font-mono">
                   {view === "rank"
                     ? rankToOrdinal(rank)
                     : formatStatValue(statKey, value)}
@@ -123,7 +130,7 @@ export default function CategoryHeatmap({
 
           {/* Overall rank row */}
           <div className="flex items-center gap-1.5 pt-1 border-t border-grafana-border mt-1">
-            <span className="text-[10px] font-semibold text-grafana-text w-8 shrink-0">
+            <span className="text-label font-semibold text-grafana-text w-8 shrink-0">
               OVR
             </span>
             <div className="flex-1 h-2 rounded-full bg-grafana-border overflow-hidden">
@@ -138,7 +145,7 @@ export default function CategoryHeatmap({
                 }}
               />
             </div>
-            <span className="text-[10px] text-grafana-text w-14 text-right font-mono">
+            <span className="text-label text-grafana-text w-14 text-right font-mono">
               {view === "rank"
                 ? rankToOrdinal(projectedStandings.myTeamRank)
                 : Math.round(myTeamStanding.projectedRotoPts).toString()}

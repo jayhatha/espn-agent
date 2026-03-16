@@ -47,35 +47,35 @@ export default function NominationDiagnostics() {
   };
 
   return (
-    <div className="border-b border-surface-tertiary bg-surface-secondary">
+    <div className="border-b border-grafana-border bg-grafana-panel">
       {/* Collapsed summary row — always visible */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center justify-between px-4 py-1.5 text-left hover:bg-surface-tertiary transition-colors"
+        className="w-full flex items-center justify-between px-4 py-1.5 text-left hover:bg-grafana-border/50 transition-colors"
       >
         <div className="flex items-center gap-1.5">
-          <span className="text-body-xs text-content-secondary">Nomination</span>
+          <span className="text-body-xs text-grafana-muted uppercase tracking-wide">Nomination</span>
           <span
-            className={`text-body-xs font-semibold ${
+            className={`text-label font-semibold ${
               !diag.autoMode
-                ? "text-content-secondary"
+                ? "text-grafana-muted"
                 : isActive
-                ? "text-accent"
+                ? "text-grafana-info"
                 : attemptsAtMax
-                ? "text-negative"
-                : "text-content"
+                ? "text-grafana-negative"
+                : "text-grafana-text"
             }`}
           >
             {statusLabel}
           </span>
           {diag.lastTurnDetectionResult.matched &&
             diag.lastTurnDetectionResult.turnStrategyType === "fallback" && (
-              <span className="text-warning text-body-xs" title="Turn detected via UNTESTED fallback selector">
+              <span className="text-grafana-warning text-body-xs" title="Turn detected via UNTESTED fallback selector">
                 ⚠
               </span>
             )}
         </div>
-        <span className="text-body-xs text-content-secondary">{expanded ? "▲" : "▼"}</span>
+        <span className="text-body-xs text-grafana-muted">{expanded ? "▲" : "▼"}</span>
       </button>
 
       {/* Expanded detail panel */}
@@ -83,12 +83,12 @@ export default function NominationDiagnostics() {
         <div className="px-4 pb-3 space-y-1.5">
           {/* Candidate */}
           <div className="flex items-start justify-between">
-            <span className="text-body-xs text-content-secondary w-24 shrink-0">Candidate</span>
-            <span className="text-body-xs text-content text-right">
+            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Candidate</span>
+            <span className="text-body-xs text-grafana-text text-right">
               {diag.lastCandidateName
                 ? <>
                     {diag.lastCandidateName}{" "}
-                    <span className={diag.lastCandidateSource === 'queue' ? 'text-positive font-semibold' : ''}>
+                    <span className={diag.lastCandidateSource === 'queue' ? 'text-grafana-positive font-semibold' : ''}>
                       ({diag.lastCandidateSource ?? "unknown"})
                     </span>
                   </>
@@ -98,21 +98,21 @@ export default function NominationDiagnostics() {
 
           {/* Turn detection */}
           <div className="flex items-start justify-between">
-            <span className="text-body-xs text-content-secondary w-24 shrink-0">Turn</span>
-            <span className="text-body-xs text-content text-right">
+            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Turn</span>
+            <span className="text-body-xs text-grafana-text text-right">
               {diag.lastTurnDetectionResult.matched ? (
                 <>
                   {diag.lastTurnDetectionResult.strategy?.replace(/\s*\[.*?\]/g, "")}
                   {diag.lastTurnDetectionResult.turnStrategyType === "fallback" && (
                     <span
-                      className="ml-1 text-warning text-body-xs font-semibold"
+                      className="ml-1 text-grafana-warning text-body-xs font-semibold"
                       title="UNTESTED fallback strategy fired — verify selector in SELECTOR-MAP.md"
                     >
                       [UNTESTED]
                     </span>
                   )}
                   {diag.lastTurnDetectionResult.turnStrategyType === "primary" && (
-                    <span className="ml-1 text-positive text-body-xs">✓</span>
+                    <span className="ml-1 text-grafana-positive text-body-xs">✓</span>
                   )}
                 </>
               ) : (
@@ -123,10 +123,10 @@ export default function NominationDiagnostics() {
 
           {/* Attempts */}
           <div className="flex items-center justify-between">
-            <span className="text-body-xs text-content-secondary w-24 shrink-0">Attempts</span>
+            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Attempts</span>
             <span
               className={`text-body-xs font-semibold ${
-                attemptsAtMax ? "text-negative" : "text-positive"
+                attemptsAtMax ? "text-grafana-negative" : "text-grafana-positive"
               }`}
             >
               {diag.nominationAttempts}/{diag.maxAttempts}
@@ -135,8 +135,8 @@ export default function NominationDiagnostics() {
 
           {/* Cooldown */}
           <div className="flex items-center justify-between">
-            <span className="text-body-xs text-content-secondary w-24 shrink-0">Cooldown</span>
-            <span className="text-body-xs text-content">
+            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Cooldown</span>
+            <span className="text-body-xs text-grafana-text">
               {diag.cooldownRemainingMs > 0
                 ? `${Math.ceil(diag.cooldownRemainingMs / 1000)}s remaining`
                 : "Ready"}
@@ -145,13 +145,13 @@ export default function NominationDiagnostics() {
 
           {/* Queue population */}
           <div className="flex items-center justify-between">
-            <span className="text-body-xs text-content-secondary w-24 shrink-0">Queue</span>
-            <span className="text-body-xs text-content">
+            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Queue</span>
+            <span className="text-body-xs text-grafana-text">
               {diag.queuePopulationCount > 0
                 ? `${diag.queuePopulationCount} queued this session`
                 : "Empty"}
               {diag.lastQueuePopulateTime != null && (
-                <span className="text-body-xs text-content-secondary ml-1">
+                <span className="text-body-xs text-grafana-muted ml-1">
                   ({Math.round((Date.now() - diag.lastQueuePopulateTime) / 1000)}s ago)
                 </span>
               )}
@@ -161,8 +161,8 @@ export default function NominationDiagnostics() {
           {/* Last result */}
           {diag.lastAttemptResult && (
             <div className="flex items-start justify-between">
-              <span className="text-body-xs text-content-secondary w-24 shrink-0">Last result</span>
-              <span className="text-body-xs text-content text-right">{diag.lastAttemptResult}</span>
+              <span className="text-body-xs text-grafana-muted w-24 shrink-0">Last result</span>
+              <span className="text-body-xs text-grafana-text text-right">{diag.lastAttemptResult}</span>
             </div>
           )}
 
@@ -170,7 +170,7 @@ export default function NominationDiagnostics() {
           {diag.autoMode && (
             <button
               onClick={handleForceNominate}
-              className="mt-1 text-xs bg-accent text-white px-2 py-1 rounded hover:bg-accent-hover w-full"
+              className="mt-1 text-xs bg-grafana-info text-white px-2 py-1 rounded hover:bg-grafana-info/80 w-full"
             >
               Force Nominate
             </button>
