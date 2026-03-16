@@ -253,7 +253,7 @@ export default function DraftSidebar() {
               <span className="text-grafana-muted text-body-xs">remaining</span>
               {valueCaptured !== 0 && (
                 <span className={`text-body-xs font-semibold ${valueCaptured >= 0 ? "text-grafana-positive" : "text-grafana-negative"}`}>
-                  {valueCaptured >= 0 ? "+" : ""}{valueCaptured > 0 ? "+" : ""}${Math.abs(Math.round(valueCaptured))} value
+                  {valueCaptured >= 0 ? "+" : "-"}${Math.abs(Math.round(valueCaptured))} value
                 </span>
               )}
               <span className="text-grafana-muted text-body-xs">{myRoster.length} rostered</span>
