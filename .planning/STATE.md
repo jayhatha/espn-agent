@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 53 of 53 (UI Polish — Typography, Dark Mode, Inter Font)
-Plan: 01 (1 of N plans complete)
+Plan: 02 (2 of 3 plans complete)
 Status: In Progress
-Last activity: 2026-03-16 — Completed 53-01-PLAN.md
+Last activity: 2026-03-16 — Completed 53-02-PLAN.md
 
 Progress: [██████████] 100% (v5.0 — Phase 52 complete; Phase 53 in progress)
 
@@ -33,6 +33,8 @@ Progress: [██████████] 100% (v5.0 — Phase 52 complete; Pha
 - [Phase 52-02]: SignalStrip/CategoryHeatmap/PositionSupplyHeatmap/NextNominee components receive data via props; CategoryHeatmap toggle is local state; PositionSupplyHeatmap sorts by externalRank for top-N pool definition
 - [Phase 52-03]: DraftNarrator/AuctionBudgetTracker/PositionScarcityAlerts files preserved but not rendered; hit/pitch slider removed (engine value kept); snake path unchanged; EngineInsights kept as thin wrapper for clean ErrorBoundary structure
 - [Phase 53]: grafana-muted brightened from #8e9ab0 to #99a5bc for AA contrast on panel backgrounds; DM Serif Display removed from extension config; dark sidebar chrome colors applied in raw CSS before Tailwind loads
+- [Phase 53-02]: Section headers use text-body-xs (11px), badges/pills use text-label (10px) for density vs readability distinction
+- [Phase 53-02]: CategoryHeatmap RANK_COLORS constant bridges named semantic names to grafana rank token hex values for inline styles
 
 ### Roadmap Evolution
 
@@ -50,5 +52,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-16
-Stopped at: Completed 53-01-PLAN.md
+Stopped at: Completed 53-02-PLAN.md
 Resume file: None
