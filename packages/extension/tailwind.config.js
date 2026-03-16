@@ -68,6 +68,29 @@ export default {
           light: '#eff6ff',
           border: '#bfdbfe',
         },
+        // Grafana dark palette — used by auction draft sidebar components
+        // NOTE: No dark: variants — sidebar runs in Shadow DOM, must use explicit values
+        grafana: {
+          bg: '#181b1f',
+          panel: '#22252b',
+          border: '#2d3139',
+          text: '#d9dde6',
+          muted: '#8e9ab0',
+          endgame: {
+            normal: '#37872d',
+            active: '#c4162a',
+          },
+          inflation: {
+            overspending: '#c4162a',
+            neutral: '#5c6063',
+            buying: '#37872d',
+            strong: '#1f60c4',
+          },
+          positive: '#37872d',
+          warning: '#e0b400',
+          negative: '#c4162a',
+          info: '#1f60c4',
+        },
       },
       spacing: {
         'section': '6rem',
