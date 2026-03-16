@@ -43,7 +43,7 @@ export default function SignalStrip({
   const inflationConfig = INFLATION_BAND_CONFIG[inflationBand];
 
   const pillBase =
-    "text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap";
+    "text-label font-semibold px-2 py-0.5 rounded whitespace-nowrap";
 
   return (
     <div className="flex flex-wrap gap-1.5 px-3 py-2 bg-grafana-panel border-b border-grafana-border">

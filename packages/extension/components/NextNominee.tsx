@@ -39,7 +39,7 @@ export default function NextNominee({
     <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
       {isNominating ? (
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-grafana-muted uppercase tracking-wide animate-pulse">
+          <span className="text-body-xs text-grafana-muted uppercase tracking-wide animate-pulse">
             Nominating...
           </span>
           <span className="text-body-sm font-semibold text-grafana-text">
@@ -48,7 +48,7 @@ export default function NextNominee({
         </div>
       ) : (
         <div>
-          <div className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1">
+          <div className="text-body-xs text-grafana-muted uppercase tracking-wide mb-1">
             Next Nominee
           </div>
           <div className="flex items-center justify-between gap-2">
@@ -56,7 +56,7 @@ export default function NextNominee({
               {nominee.playerName}
             </span>
             <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap ${STRATEGY_TAG_STYLES[tag]}`}
+              className={`text-label font-semibold px-2 py-0.5 rounded whitespace-nowrap ${STRATEGY_TAG_STYLES[tag]}`}
             >
               {tag}
             </span>

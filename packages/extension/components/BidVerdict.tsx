@@ -40,7 +40,7 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
     <div className={`mx-3 my-1.5 border-2 ${borderClass} rounded-card p-3 bg-grafana-panel`}>
       {/* Verdict */}
       <div
-        className={`text-h4 font-display font-bold ${
+        className={`text-h4 font-bold ${
           shouldBid
             ? isRisky
               ? "text-grafana-warning"

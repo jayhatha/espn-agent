@@ -230,7 +230,7 @@ export default function DraftSidebar() {
     return (
       <button
         onClick={toggleSidebar}
-        className="fixed top-4 right-4 bg-accent text-white px-3 py-2 rounded-lg shadow-lg hover:bg-accent-hover"
+        className="fixed top-4 right-4 bg-grafana-info text-white px-3 py-2 rounded-lg shadow-lg hover:bg-grafana-info/80"
       >
         Show Assistant
       </button>
@@ -249,7 +249,7 @@ export default function DraftSidebar() {
           </p>
           {draftFormat === "auction" && (
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-h3 font-display text-grafana-text">${remainingBudget}</span>
+              <span className="text-h3 text-grafana-text">${remainingBudget}</span>
               <span className="text-grafana-muted text-body-xs">remaining</span>
               {valueCaptured !== 0 && (
                 <span className={`text-body-xs font-semibold ${valueCaptured >= 0 ? "text-grafana-positive" : "text-grafana-negative"}`}>
@@ -382,7 +382,7 @@ export default function DraftSidebar() {
 
         return (
           <div className="bg-grafana-panel/50 border-b-2 border-grafana-border px-4 py-3">
-            <div className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1">Now Nominated</div>
+            <div className="text-body-xs text-grafana-muted uppercase tracking-wide mb-1">Now Nominated</div>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-body-sm font-semibold text-grafana-text">
@@ -394,7 +394,7 @@ export default function DraftSidebar() {
                   </div>
                 )}
                 {tierLabel && (
-                  <span className={`mt-1 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ${tierBadgeClass}`}>
+                  <span className={`mt-1 inline-block text-label font-semibold px-1.5 py-0.5 rounded ${tierBadgeClass}`}>
                     {tierLabel}
                   </span>
                 )}
@@ -403,7 +403,7 @@ export default function DraftSidebar() {
                 {currentAuctionPlayer.currentBid !== undefined && (
                   <div>
                     <div className="text-xs text-grafana-muted">Current Bid</div>
-                    <div className="text-h3 font-display text-grafana-info">
+                    <div className="text-h3 text-grafana-info">
                       ${currentAuctionPlayer.currentBid}
                     </div>
                   </div>

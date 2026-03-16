@@ -55,10 +55,10 @@ export default function PositionSupplyHeatmap({
   if (rankings.length === 0) {
     return (
       <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
-        <div className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1.5">
+        <div className="text-body-xs text-grafana-muted uppercase tracking-wide mb-1.5">
           Position Supply
         </div>
-        <div className="text-[10px] text-grafana-muted">
+        <div className="text-label text-grafana-muted">
           Load rankings to see position supply
         </div>
       </div>
@@ -67,7 +67,7 @@ export default function PositionSupplyHeatmap({
 
   return (
     <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
-      <div className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1.5">
+      <div className="text-body-xs text-grafana-muted uppercase tracking-wide mb-1.5">
         Position Supply
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -79,10 +79,10 @@ export default function PositionSupplyHeatmap({
           return (
             <div key={pos} className="flex flex-col gap-0.5 min-w-[48px]">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-grafana-text">
+                <span className="text-label font-semibold text-grafana-text">
                   {pos}
                 </span>
-                <span className="text-[10px] text-grafana-muted ml-1">
+                <span className="text-label text-grafana-muted ml-1">
                   {drafted}/{total}
                 </span>
               </div>
