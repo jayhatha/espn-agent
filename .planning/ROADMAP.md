@@ -47,7 +47,7 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 - [x] **Phase 49: Positional Weights & SP Tiers** - Positional priority weights, SP1-SP5 tier caps, 200 GS cap awareness (completed 2026-03-15)
 - [x] **Phase 50: Inflation Bands & Category Targets** - Inflation interpretation bands with bid ceiling adjustments, per-category competitive targets (completed 2026-03-15)
 - [ ] **Phase 51: Data Pipeline for Extension** - Easy projection + ESPN value loading into extension via CSV upload or DOM scrape
-- [ ] **Phase 52: Extension Sidebar UI Update** - Display endgame mode, inflation bands, budget bands, SP tiers, positional weights, category targets, nomination reason
+- [x] **Phase 52: Extension Sidebar UI Update** - Display endgame mode, inflation bands, budget bands, SP tiers, positional weights, category targets, nomination reason (completed 2026-03-16)
 
 ## Phase Details
 
@@ -131,4 +131,4 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 49. Positional Weights & SP Tiers | 1/1 | Complete   | 2026-03-15 | - |
 | 50. Inflation Bands & Category Targets | 1/1 | Complete   | 2026-03-15 | - |
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
-| 52. Extension Sidebar UI Update | 2/3 | In Progress|  | - |
+| 52. Extension Sidebar UI Update | 3/3 | Complete   | 2026-03-16 | - |

@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 52 of 52 (Extension Sidebar UI Update)
-Plan: 03 (plans 01-02 complete)
-Status: In Progress
-Last activity: 2026-03-16 — Completed 52-02-PLAN.md
+Plan: 03 (all 3 plans complete — phase done)
+Status: Complete
+Last activity: 2026-03-16 — Completed 52-03-PLAN.md
 
-Progress: [████████░░] 80% (v5.0 — 4/6 phases complete)
+Progress: [██████████] 100% (v5.0 — Phase 52 complete)
 
 ## Accumulated Context
 
@@ -31,6 +31,7 @@ Progress: [████████░░] 80% (v5.0 — 4/6 phases complete)
 - [Phase 52]: Grafana tokens use explicit hex values, no dark: variants (Shadow DOM constraint)
 - [Phase 52]: pitcherHitterSplit default changed to 75 with v6 migration; autoMode defaults to true but is session-only
 - [Phase 52-02]: SignalStrip/CategoryHeatmap/PositionSupplyHeatmap/NextNominee components receive data via props; CategoryHeatmap toggle is local state; PositionSupplyHeatmap sorts by externalRank for top-N pool definition
+- [Phase 52-03]: DraftNarrator/AuctionBudgetTracker/PositionScarcityAlerts files preserved but not rendered; hit/pitch slider removed (engine value kept); snake path unchanged; EngineInsights kept as thin wrapper for clean ErrorBoundary structure
 
 ### Roadmap Evolution
 
@@ -47,5 +48,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-16
-Stopped at: Completed 52-02-PLAN.md
+Stopped at: Completed 52-03-PLAN.md (Phase 52 complete)
 Resume file: None
