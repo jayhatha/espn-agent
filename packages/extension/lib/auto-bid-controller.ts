@@ -641,7 +641,7 @@ export class AutoBidController {
     const rosterFillPct = state.myRoster.length / Math.max(1, AutoBidController.TARGET_ROSTER_SIZE);
     const isEarlyDraft = rosterFillPct <= 0.3;
 
-    AutoBidController.diagnostics.queueStrategy = isEarlyDraft ? "poison-pills" : "own-targets";
+    this.queueStrategy = isEarlyDraft ? "poison-pills" : "own-targets";
 
     // Build candidate lists from engine signals
     const draftedPlayerIds = new Set(state.allPicks.map((p) => p.playerId));
