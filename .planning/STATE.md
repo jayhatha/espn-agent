@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 52 of 52 (Extension Sidebar UI Update)
-Plan: Ready to plan
-Status: Ready to plan
-Last activity: 2026-03-16 — Phase 52 added
+Plan: 02 (plan 01 complete)
+Status: In Progress
+Last activity: 2026-03-16 — Completed 52-01-PLAN.md
 
 Progress: [████████░░] 80% (v5.0 — 4/6 phases complete)
 
@@ -28,6 +28,8 @@ Progress: [████████░░] 80% (v5.0 — 4/6 phases complete)
 - [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
 - [Phase 50]: Inflation bands use clamped factor; +2 adjustment after endgame dampening; CATEGORY_RANK_TARGETS separate from stat total targets
 - [Phase 51]: Client-side CSV parsing for FanGraphs/ESPN data import in extension popup
+- [Phase 52]: Grafana tokens use explicit hex values, no dark: variants (Shadow DOM constraint)
+- [Phase 52]: pitcherHitterSplit default changed to 75 with v6 migration; autoMode defaults to true but is session-only
 
 ### Roadmap Evolution
 
@@ -44,5 +46,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-16
-Stopped at: Phase 52 added, ready to plan
+Stopped at: Completed 52-01-PLAN.md
 Resume file: None
