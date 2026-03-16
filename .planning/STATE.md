@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 53 of 53 (UI Polish — Typography, Dark Mode, Inter Font)
 Plan: 03 (3 of 3 plans complete)
 Status: Complete
-Last activity: 2026-03-16 — Completed 53-03-PLAN.md
+Last activity: 2026-03-16 - Completed quick task 91: Fix nominated player detection after reload
 
 Progress: [██████████] 100% (v5.0 — Phase 52 complete; Phase 53 complete)
 
@@ -49,6 +49,12 @@ None yet.
 ### Blockers/Concerns
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 91 | Fix nominated player detection after reload | 2026-03-16 | 6052020 | [91-fix-nominated-player-detection-after-rel](./quick/91-fix-nominated-player-detection-after-rel/) |
 
 ## Session Continuity
 
