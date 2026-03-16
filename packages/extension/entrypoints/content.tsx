@@ -814,16 +814,6 @@ export default defineContentScript({
       logger.log("[ESPN Draft Assistant] Started pick train budget polling (5s interval)");
     };
 
-    if (resolvedDraftFormat === "auction") {
-      auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
-        useDraftStore.getState().setCurrentAuctionPlayer(player);
-      });
-      startAuctionTableScraping();
-      startQueueScraping();
-      startQueuePopulating();
-      startPickTrainBudgetPolling();
-    }
-
     const sidebarMountObserver = new MutationObserver(() => {
       if (!document.getElementById(SIDEBAR_ROOT_ID)) {
         mountSidebar();
@@ -872,6 +862,19 @@ export default defineContentScript({
     }
 
     refreshAssistantData();
+
+    // Start auction observers AFTER the initial refresh so the DOM has stabilized.
+    // Starting before refreshAssistantData() risks attaching the MutationObserver to
+    // a container node that ESPN's React will replace during the initial DOM scrape.
+    if (resolvedDraftFormat === "auction") {
+      auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
+        useDraftStore.getState().setCurrentAuctionPlayer(player);
+      });
+      startAuctionTableScraping();
+      startQueueScraping();
+      startQueuePopulating();
+      startPickTrainBudgetPolling();
+    }
 
     // Check format once after page stabilizes (not every 1.5s)
     setTimeout(() => {
