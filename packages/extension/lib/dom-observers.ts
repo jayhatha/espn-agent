@@ -1319,7 +1319,8 @@ export function scrapeESPNNominationQueue(): ESPNQueueEntry[] {
  * Observes ESPN auction draft page for current player up for bid
  * Returns cleanup function to disconnect observer
  *
- * Debounces updates since ESPN may refresh DOM rapidly during bidding
+ * Debounces updates since ESPN may refresh DOM rapidly during bidding.
+ * Uses polling fallback + observer re-anchoring to survive ESPN DOM re-renders.
  */
 export function observeCurrentAuctionPlayer(
   onPlayerChange: (player: CurrentAuctionPlayer | null) => void,
@@ -1378,27 +1379,58 @@ export function observeCurrentAuctionPlayer(
     checkCurrentPlayer();
   });
 
-  // Try narrower container for auction UI — reduces mutation events vs. observing document.body.
-  // Falls back to document.body if none of the known ESPN auction selectors match.
+  // Find the current auction container to observe, falling back to document.body.
   // UNTESTED: auction container selectors — need live verification
-  const auctionContainer =
-    document.querySelector('[class*="auction"]') ||
-    document.querySelector('[class*="Auction"]') ||
-    document.querySelector(".player-card") ||
-    document.body;
+  const findAuctionContainer = (): Element => {
+    return (
+      document.querySelector('[class*="auction"]') ||
+      document.querySelector('[class*="Auction"]') ||
+      document.querySelector(".player-card") ||
+      document.body
+    );
+  };
 
-  if (auctionContainer) {
-    observer.observe(auctionContainer, {
+  const attachObserver = (container: Element) => {
+    observer.disconnect();
+    observer.observe(container, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "data-player-id", "data-bid"],
+      attributes: false,
+      characterData: true,
     });
-  }
+  };
 
-  // Return cleanup function — no setInterval to clear (MutationObserver + 200ms debounce is sufficient)
+  // Track which node the observer is currently watching so we can detect replacement.
+  let observedNode: Element = findAuctionContainer();
+  attachObserver(observedNode);
+
+  // Polling fallback: fires every 2 seconds to catch mutations the observer missed.
+  // The debounce inside checkCurrentPlayer prevents duplicate emissions.
+  const pollingInterval = window.setInterval(() => {
+    checkCurrentPlayer();
+  }, 2000);
+
+  // Re-anchor interval: every 5 seconds, check if the observed container is still
+  // attached to the DOM. If ESPN replaced it during a React re-render, re-attach
+  // the observer to the new container so we don't silently watch a detached node.
+  const reAnchorInterval = window.setInterval(() => {
+    if (!document.contains(observedNode)) {
+      const newContainer = findAuctionContainer();
+      logger.log(
+        "[ESPN Draft Assistant] Auction observer container detached — re-anchoring to",
+        newContainer.tagName,
+      );
+      observedNode = newContainer;
+      attachObserver(observedNode);
+      checkCurrentPlayer();
+    }
+  }, 5000);
+
+  // Return cleanup function — clears polling/re-anchor intervals and disconnects observer
   return () => {
     observer.disconnect();
+    window.clearInterval(pollingInterval);
+    window.clearInterval(reAnchorInterval);
     if (debounceTimeout) {
       clearTimeout(debounceTimeout);
     }
