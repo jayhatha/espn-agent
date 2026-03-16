@@ -36,6 +36,7 @@ Progress: [██████████] 100% (v5.0 — Phase 52 complete)
 ### Roadmap Evolution
 
 - Phase 52 added: Extension sidebar UI update for v5.0 engine signals
+- Phase 53 added: UI Polish — consistent typography, legible dark-mode colors, professional dashboard styling with Inter font
 
 ### Pending Todos
 

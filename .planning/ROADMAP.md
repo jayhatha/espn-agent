@@ -132,3 +132,12 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 50. Inflation Bands & Category Targets | 1/1 | Complete   | 2026-03-15 | - |
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
 | 52. Extension Sidebar UI Update | 3/3 | Complete    | 2026-03-16 | - |
+
+### Phase 53: UI Polish: Consistent typography, legible dark-mode colors, and professional operations dashboard styling across all sidebar components using Inter font family
+
+**Goal:** [To be planned]
+**Depends on:** Phase 52
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 53 to break down)
