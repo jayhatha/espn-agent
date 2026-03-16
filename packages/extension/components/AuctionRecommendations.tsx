@@ -98,15 +98,15 @@ export default function AuctionRecommendations() {
   const positions = ["C", "1B", "2B", "3B", "SS", "OF", "SP", "RP"];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-grafana-panel">
       {/* Filter controls */}
-      <div className="p-3 bg-surface-secondary border-b space-y-2">
+      <div className="p-3 bg-grafana-panel border-b border-grafana-border space-y-2">
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => setPositionFilter(null)}
             className={`
               px-2 py-1 text-xs rounded
-              ${!selectedPosition ? "bg-accent text-content-inverse" : "bg-surface text-content-secondary border border-surface-tertiary"}
+              ${!selectedPosition ? "bg-grafana-text text-grafana-bg" : "bg-grafana-panel text-grafana-muted border border-grafana-border"}
             `}
           >
             All
@@ -117,7 +117,7 @@ export default function AuctionRecommendations() {
               onClick={() => setPositionFilter(pos)}
               className={`
                 px-2 py-1 text-xs rounded
-                ${selectedPosition === pos ? "bg-accent text-content-inverse" : "bg-surface text-content-secondary border border-surface-tertiary"}
+                ${selectedPosition === pos ? "bg-grafana-text text-grafana-bg" : "bg-grafana-panel text-grafana-muted border border-grafana-border"}
               `}
             >
               {pos}
@@ -125,22 +125,22 @@ export default function AuctionRecommendations() {
           ))}
         </div>
 
-        <div className="text-xs text-content-secondary">
-          {affordablePlayers.length} affordable (≤${pacing.recommendedMaxBid})
+        <div className="text-xs text-grafana-muted">
+          {affordablePlayers.length} affordable (&#8804;${pacing.recommendedMaxBid})
         </div>
       </div>
 
       {/* Player list */}
       <div className="flex-1 overflow-y-auto">
         {filteredPlayers.length === 0 ? (
-          <div className="p-4 text-center text-content-tertiary">
+          <div className="p-4 text-center text-grafana-muted">
             {auctionValues.length === 0
               ? "Loading values..."
               : "No players match filters"}
           </div>
         ) : (
           filteredPlayers
-            .slice(0, 50)
+            .slice(0, 10)
             .map((player, index) => (
               <AuctionPlayerCard
                 key={player.playerId}
