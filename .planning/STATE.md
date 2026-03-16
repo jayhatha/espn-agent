@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v5.0 Draft Engine Spec Alignment — Phase 52
+**Current focus:** Phase 53 — UI Polish
 
 ## Current Position
 
-Phase: 52 of 52 (Extension Sidebar UI Update)
-Plan: 03 (all 3 plans complete — phase done)
-Status: Complete
-Last activity: 2026-03-16 — Completed 52-03-PLAN.md
+Phase: 53 of 53 (UI Polish — Typography, Dark Mode, Inter Font)
+Plan: 01 (1 of N plans complete)
+Status: In Progress
+Last activity: 2026-03-16 — Completed 53-01-PLAN.md
 
-Progress: [██████████] 100% (v5.0 — Phase 52 complete)
+Progress: [██████████] 100% (v5.0 — Phase 52 complete; Phase 53 in progress)
 
 ## Accumulated Context
 
@@ -32,6 +32,7 @@ Progress: [██████████] 100% (v5.0 — Phase 52 complete)
 - [Phase 52]: pitcherHitterSplit default changed to 75 with v6 migration; autoMode defaults to true but is session-only
 - [Phase 52-02]: SignalStrip/CategoryHeatmap/PositionSupplyHeatmap/NextNominee components receive data via props; CategoryHeatmap toggle is local state; PositionSupplyHeatmap sorts by externalRank for top-N pool definition
 - [Phase 52-03]: DraftNarrator/AuctionBudgetTracker/PositionScarcityAlerts files preserved but not rendered; hit/pitch slider removed (engine value kept); snake path unchanged; EngineInsights kept as thin wrapper for clean ErrorBoundary structure
+- [Phase 53]: grafana-muted brightened from #8e9ab0 to #99a5bc for AA contrast on panel backgrounds; DM Serif Display removed from extension config; dark sidebar chrome colors applied in raw CSS before Tailwind loads
 
 ### Roadmap Evolution
 
@@ -49,5 +50,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-16
-Stopped at: Completed 52-03-PLAN.md (Phase 52 complete)
+Stopped at: Completed 53-01-PLAN.md
 Resume file: None
