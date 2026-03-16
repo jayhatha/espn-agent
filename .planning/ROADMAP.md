@@ -38,7 +38,7 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 
 </details>
 
-### 🚧 v5.0 Draft Engine Spec Alignment (In Progress)
+### v5.0 Draft Engine Spec Alignment (In Progress)
 
 **Milestone Goal:** Align the draft engine with the original auction draft system spec — add endgame mode, rework nomination strategy, implement positional priority weights, SP tier caps, inflation interpretation bands, and budget allocation bands.
 
@@ -52,11 +52,11 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 ## Phase Details
 
 ### Phase 47: Endgame Mode & Budget Bands
-**Goal**: Engine activates endgame mode when budget ≤ $20 with value_per_dollar scoring, and enforces hitter/pitcher budget allocation bands
+**Goal**: Engine activates endgame mode when budget <= $20 with value_per_dollar scoring, and enforces hitter/pitcher budget allocation bands
 **Depends on**: Nothing (first v5.0 phase)
 **Requirements**: END-01, END-02, END-03
 **Success Criteria** (what must be TRUE):
-  1. When budget_remaining ≤ $20, bidding switches to value_per_dollar scoring
+  1. When budget_remaining <= $20, bidding switches to value_per_dollar scoring
   2. Endgame mode prioritizes breakout hitters, cheap OF, K pitchers; avoids backup C
   3. Budget allocation suggests hitter target $185-205, pitcher target $55-70, bench $5
 **Plans**: TBD
@@ -106,7 +106,7 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 **Depends on**: Phases 47-51
 **Requirements**: UI-THEME, UI-STORE-DEFAULTS, UI-SIGNAL-STRIP, UI-CATEGORY-HEATMAP, UI-POSITION-SUPPLY, UI-NEXT-NOMINEE, UI-SECTION-ORDER, UI-DARK-RESKIN, UI-REMOVALS, UI-NOMINATED-PLAYER, UI-HEADER, UI-AUCTION-RECS
 **Success Criteria** (what must be TRUE):
-  1. Sidebar shows endgame mode indicator (red badge when budget ≤ $20)
+  1. Sidebar shows endgame mode indicator (red badge when budget <= $20)
   2. Inflation band displayed with color coding (red/yellow/green/blue)
   3. Budget allocation shows hitter/pitcher spent vs target bands
   4. SP tier progress shows drafted count and next tier cap
@@ -118,6 +118,24 @@ Plans:
 - [ ] 52-01-PLAN.md — Grafana dark palette tokens + store defaults
 - [ ] 52-02-PLAN.md — New display components (SignalStrip, CategoryHeatmap, PositionSupplyHeatmap, NextNominee)
 - [ ] 52-03-PLAN.md — DraftSidebar rewrite + component reskins
+
+### Phase 53: UI Polish: Consistent typography, legible dark-mode colors, and professional operations dashboard styling across all sidebar components using Inter font family
+
+**Goal:** Consistent Inter typography, AA-compliant dark-mode colors, and uniform dashboard styling across all extension sidebar components
+**Depends on:** Phase 52
+**Requirements:** UI-TYPOGRAPHY, UI-LEGIBILITY, UI-CONSISTENCY
+**Success Criteria** (what must be TRUE):
+  1. All components use Inter font (no DM Serif Display references)
+  2. All text meets WCAG AA contrast on dark backgrounds
+  3. Zero light-mode tokens (text-content-*, bg-surface-*) in auction sidebar components
+  4. Consistent section headers, badges, player names, and dollar amounts across all components
+  5. No arbitrary text-[10px] values — all using text-label or text-caption tokens
+**Plans**: 3 plans
+
+Plans:
+- [ ] 53-01-PLAN.md — Tailwind config tokens + content.css cleanup
+- [ ] 53-02-PLAN.md — Active sidebar component typography and color migration
+- [ ] 53-03-PLAN.md — AuctionPlayerCard and preserved component migration
 
 ## Progress
 
@@ -132,12 +150,4 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 50. Inflation Bands & Category Targets | 1/1 | Complete   | 2026-03-15 | - |
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
 | 52. Extension Sidebar UI Update | 3/3 | Complete    | 2026-03-16 | - |
-
-### Phase 53: UI Polish: Consistent typography, legible dark-mode colors, and professional operations dashboard styling across all sidebar components using Inter font family
-
-**Goal:** [To be planned]
-**Depends on:** Phase 52
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 53 to break down)
+| 53. UI Polish | v5.0 | 0/3 | Planned | - |
