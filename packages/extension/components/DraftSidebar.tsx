@@ -1,19 +1,17 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
 import { autoBidController } from "../lib/auto-bid-controller";
-import { useNarrator } from "../lib/use-narrator";
-import { useNarratorStore } from "../lib/narrator-state";
-import { calculateFgVsMarket, getValueColorClasses } from "../lib/value-detection";
-import AuctionBudgetTracker from "./AuctionBudgetTracker";
 import AuctionRecommendations from "./AuctionRecommendations";
 import BidVerdict from "./BidVerdict";
-import DraftNarrator from "./DraftNarrator";
+import CategoryHeatmap from "./CategoryHeatmap";
 import DraftRecommendations from "./DraftRecommendations";
 import EngineInsights from "./EngineInsights";
+import NextNominee from "./NextNominee";
 import NominationDiagnostics from "./NominationDiagnostics";
-import PositionScarcityAlerts from "./PositionScarcityAlerts";
+import PositionSupplyHeatmap from "./PositionSupplyHeatmap";
 import RosterSummary from "./RosterSummary";
+import SignalStrip from "./SignalStrip";
 import SnakeTurnPairs from "./SnakeTurnPairs";
 import { ErrorBoundary } from "./ErrorBoundary";
 
@@ -33,19 +31,19 @@ export default function DraftSidebar() {
     currentAuctionPlayer,
     rankings,
     auctionValues,
-    espnDomAuctionValues,
     pitcherHitterSplit,
-    setPitcherHitterSplit,
     autoMode,
     setAutoMode,
     espnNominationQueue,
     autoNominateMode,
     skippedPlayerIds,
+    allPicks,
+    leagueCategories,
+    myTeamId,
+    detectedRosterSlots,
   } = useDraftStore();
 
   const engineSignals = useDraftEngineSignals();
-  const { requestAdvice } = useNarrator(engineSignals);
-  const sessionCallCount = useNarratorStore((state) => state.sessionCallCount);
 
   // Pipe latest engine signals into the AutoBidController so it can evaluate shouldBid/maxBid
   // without needing to call a React hook (controller runs outside React lifecycle)
@@ -206,6 +204,28 @@ export default function DraftSidebar() {
     dispatchAssistantEvent("espn-draft-assistant-popout");
   };
 
+  // Value captured running total (header)
+  const valueCaptured = useMemo(() => {
+    return myRoster.reduce((sum, p) => {
+      const marketVal = p.playerId !== undefined
+        ? (auctionValues.find(av => av.playerId === p.playerId)?.dollarValue ?? 0)
+        : 0;
+      return sum + (marketVal - (p.cost ?? 0));
+    }, 0);
+  }, [myRoster, auctionValues]);
+
+  // SP count for signal strip
+  const spCount = myRoster.filter(p =>
+    p.positions?.some(pos => pos.toUpperCase().includes('SP'))
+  ).length;
+  const totalSpSlots = detectedRosterSlots?.SP ?? 5;
+
+  // Next nominee derivation
+  const nextNominee = engineSignals?.simulation?.nominationStrategy?.[0] ?? null;
+
+  // Nominating state (per research pattern)
+  const isNominating = autoMode && !currentAuctionPlayer && nextNominee != null;
+
   if (!sidebarVisible) {
     return (
       <button
@@ -218,196 +238,94 @@ export default function DraftSidebar() {
   }
 
   return (
-    <div className="h-full bg-white flex flex-col">
+    <div className="h-full bg-grafana-bg flex flex-col">
       {/* Header */}
-      <div className="bg-surface-secondary text-content p-4 flex justify-between items-center border-b border-surface-tertiary">
+      <div className="bg-grafana-panel border-b border-grafana-border p-3 flex justify-between items-start">
         <div>
-          <h1 className="text-base font-semibold text-content">ESPN Draft Assistant</h1>
-          <p className="text-body-sm text-content-secondary">
-            League {leagueId} • {draftFormat === "snake" ? "Snake" : "Auction"}{" "}
+          <h1 className="text-base font-semibold text-grafana-text">ESPN Draft Assistant</h1>
+          <p className="text-body-sm text-grafana-muted">
+            League {leagueId} &bull; {draftFormat === "snake" ? "Snake" : "Auction"}{" "}
             Draft
           </p>
+          {draftFormat === "auction" && (
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-h3 font-display text-grafana-text">${remainingBudget}</span>
+              <span className="text-grafana-muted text-body-xs">remaining</span>
+              {valueCaptured !== 0 && (
+                <span className={`text-body-xs font-semibold ${valueCaptured >= 0 ? "text-grafana-positive" : "text-grafana-negative"}`}>
+                  {valueCaptured >= 0 ? "+" : ""}{valueCaptured > 0 ? "+" : ""}${Math.abs(Math.round(valueCaptured))} value
+                </span>
+              )}
+              <span className="text-grafana-muted text-body-xs">{myRoster.length} rostered</span>
+            </div>
+          )}
+          {draftFormat === "snake" && (
+            <div className="mt-1 text-body-xs text-grafana-muted">Pick #{currentPick} &bull; {myRoster.length} rostered</div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={handleRefresh}
-            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
+            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
           >
             Refresh
           </button>
           <button
             onClick={handleDockLeft}
-            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
+            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
           >
             Left
           </button>
           <button
             onClick={handleDockRight}
-            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
+            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
           >
             Right
           </button>
           <button
             onClick={handlePopOut}
-            className="text-content-secondary text-xs hover:bg-surface-tertiary px-2 py-1 rounded border border-surface-tertiary"
+            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
           >
             Pop Out
           </button>
           <button
             onClick={toggleSidebar}
-            className="text-content-secondary hover:bg-surface-tertiary px-2 py-1 rounded"
+            className="text-grafana-muted hover:bg-grafana-border px-2 py-1 rounded"
           >
-            ✕
+            &#10005;
           </button>
         </div>
       </div>
 
       {/* Config Detection Warning Banner */}
       {configWarnings.length > 0 && (
-        <div className="bg-warning-light border-l-4 border-warning p-4 relative">
+        <div className="bg-grafana-warning/10 border-l-4 border-grafana-warning p-4 relative">
           <button
             onClick={dismissConfigWarnings}
-            className="absolute top-2 right-2 text-warning hover:text-warning/70 text-sm px-1"
+            className="absolute top-2 right-2 text-grafana-warning hover:text-grafana-warning/70 text-sm px-1"
             aria-label="Dismiss warnings"
           >
-            ✕
+            &#10005;
           </button>
-          <p className="text-sm text-warning pr-6">
+          <p className="text-sm text-grafana-warning pr-6">
             <strong>Warning:</strong> League config detection incomplete. Using 5x5 defaults.
           </p>
-          <ul className="text-xs text-warning mt-2">
+          <ul className="text-xs text-grafana-warning mt-2">
             {configWarnings.map((warning, i) => (
-              <li key={i}>• {warning}</li>
+              <li key={i}>&bull; {warning}</li>
             ))}
           </ul>
         </div>
       )}
 
-      {/* Draft Status */}
-      <div className="bg-surface-secondary p-4 border-b border-surface-tertiary">
-        <div className="flex justify-between text-sm">
-          <span>Pick #{currentPick}</span>
-          {draftFormat === "auction" && (
-            <span className="font-semibold">
-              ${remainingBudget} remaining
-            </span>
-          )}
-        </div>
-        <div className="mt-2 text-sm text-content-secondary">
-          Roster: {myRoster.length} players
-        </div>
-      </div>
-
-      {/* Nominated Player Banner — fixed position, does not scroll */}
-      {draftFormat === "auction" && currentAuctionPlayer && (
-        <div className="p-4 bg-accent/5 border-b-2 border-accent">
-          <div className="text-xs font-semibold tracking-wide text-accent uppercase mb-1">Now Nominated</div>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-base font-semibold text-content">
-                {currentAuctionPlayer.playerName}
-              </div>
-              {currentAuctionPlayer.positions && currentAuctionPlayer.positions.length > 0 && (
-                <div className="text-body-sm text-content-secondary">
-                  {currentAuctionPlayer.positions.join(" / ")}
-                </div>
-              )}
-            </div>
-            <div className="text-right">
-              {currentAuctionPlayer.currentBid !== undefined && (
-                <div>
-                  <div className="text-xs text-content-secondary">Current Bid</div>
-                  <div className="text-h3 font-display text-accent">
-                    ${currentAuctionPlayer.currentBid}
-                  </div>
-                </div>
-              )}
-              {(() => {
-                const matchedAuction = auctionValues.find(av =>
-                  av.playerId === currentAuctionPlayer.playerId ||
-                  av.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
-                );
-                const matchedRanking = rankings.find(r =>
-                  r.playerId === currentAuctionPlayer.playerId ||
-                  r.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
-                );
-
-                // Prefer DOM-scraped ESPN value for the nominated player
-                const domEspnValue =
-                  currentAuctionPlayer.playerId !== undefined
-                    ? espnDomAuctionValues[currentAuctionPlayer.playerId]
-                    : undefined;
-
-                const fgValue = matchedAuction?.dollarValue;
-
-                // Compute FG vs market badge when both values exist
-                const fgBadge = (fgValue !== undefined && domEspnValue !== undefined)
-                  ? calculateFgVsMarket(fgValue, domEspnValue)
-                  : null;
-
-                if (domEspnValue === undefined && fgValue === undefined && !matchedRanking?.tierName && !matchedRanking?.externalRank) return null;
-                return (
-                  <div className="mt-1 space-y-0.5">
-                    {domEspnValue !== undefined ? (
-                      <div>
-                        <div className="text-xs text-content-secondary">Market Value</div>
-                        <div className="font-semibold text-sm text-content">
-                          ${domEspnValue}
-                          <span className="ml-1 text-positive text-xs">(live)</span>
-                        </div>
-                        {fgBadge && (() => {
-                          const colors = getValueColorClasses(fgBadge.color);
-                          return (
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>
-                              {fgBadge.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    ) : fgValue !== undefined ? (
-                      <div>
-                        <div className="text-xs text-content-secondary">FG Value</div>
-                        <div className="font-semibold text-sm text-content">${fgValue}</div>
-                      </div>
-                    ) : null}
-                    {(matchedRanking?.tierName || matchedRanking?.externalRank) && (
-                      <div className="flex items-center gap-1 justify-end">
-                        {matchedRanking.tierName && (
-                          <span className="text-xs bg-surface-tertiary text-content-secondary px-1.5 py-0.5 rounded">
-                            {matchedRanking.tierName}
-                          </span>
-                        )}
-                        {matchedRanking.externalRank && (
-                          <span className="text-xs text-content-secondary">
-                            {matchedRanking.rankSource || "PL"} #{matchedRanking.externalRank}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* BidVerdict — consolidated bid/pass decision card, auction only */}
+      {/* Auto-Pilot toggle — auction only, above scroll area */}
       {draftFormat === "auction" && (
-        <ErrorBoundary sectionName="Bid Verdict">
-          <BidVerdict engineSignals={engineSignals} />
-        </ErrorBoundary>
-      )}
-
-      {/* Auto-Pilot toggle — always visible during auction drafts */}
-      {draftFormat === "auction" && (
-        <div className="px-4 py-2 bg-surface-secondary border-b border-surface-tertiary">
+        <div className="px-4 py-2 bg-grafana-panel border-b border-grafana-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-body-xs font-semibold text-content">Auto-Pilot</span>
+              <span className="text-body-xs font-semibold text-grafana-text">Auto-Pilot</span>
               {autoMode && currentAuctionPlayer && engineSignals?.optimization && (
-                <span className="text-body-xs text-content-secondary">
+                <span className="text-body-xs text-grafana-muted">
                   (max ${engineSignals.optimization.maxBid})
                 </span>
               )}
@@ -415,7 +333,7 @@ export default function DraftSidebar() {
             <button
               onClick={() => setAutoMode(!autoMode)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                autoMode ? "bg-accent" : "bg-surface-tertiary"
+                autoMode ? "bg-grafana-positive" : "bg-grafana-border"
               }`}
               role="switch"
               aria-checked={autoMode}
@@ -430,40 +348,82 @@ export default function DraftSidebar() {
           </div>
           {autoMode && (
             currentAuctionPlayer ? (
-              <div className="mt-1 text-body-xs text-warning">
+              <div className="mt-1 text-body-xs text-grafana-warning">
                 Auto-pilot: bidding +1 up to engine max bid
               </div>
             ) : (
-              <div className="mt-1 text-body-xs text-accent">
+              <div className="mt-1 text-body-xs text-grafana-positive">
                 Waiting to nominate...
               </div>
             )
           )}
-          <div className="mt-2 pt-2 border-t border-surface-tertiary">
-            <div className="flex items-center justify-between text-body-xs mb-1">
-              <span className="text-content-secondary">Hit/Pitch Split</span>
-              <span className="font-semibold text-content">{pitcherHitterSplit}/{100 - pitcherHitterSplit}</span>
-            </div>
-            <input
-              type="range"
-              min={20}
-              max={80}
-              value={pitcherHitterSplit}
-              onChange={(e) => setPitcherHitterSplit(Number(e.target.value))}
-              className="w-full h-1.5 bg-surface-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-            />
-            <div className="flex justify-between text-body-xs text-content-secondary mt-0.5">
-              <span>Pitch</span>
-              <span>Hit</span>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Nomination diagnostics panel — auction only */}
+      {/* Nominated Player Banner + BidVerdict — auction only, fixed above scroll */}
+      {draftFormat === "auction" && currentAuctionPlayer && (() => {
+        const matchedAuction = auctionValues.find(av =>
+          av.playerId === currentAuctionPlayer.playerId ||
+          av.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
+        );
+
+        const marketVal = matchedAuction?.dollarValue;
+
+        // Derive tier badge from market value
+        const tierLabel = marketVal !== undefined
+          ? (marketVal > 20 ? "anchor" : marketVal >= 5 ? "core" : "value")
+          : null;
+
+        const tierBadgeClass = tierLabel === "anchor"
+          ? "bg-grafana-warning/20 text-grafana-warning"
+          : tierLabel === "core"
+          ? "bg-grafana-info/20 text-grafana-info"
+          : "bg-grafana-border text-grafana-muted";
+
+        return (
+          <div className="bg-grafana-panel/50 border-b-2 border-grafana-border px-4 py-3">
+            <div className="text-[10px] text-grafana-muted uppercase tracking-wide mb-1">Now Nominated</div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-body-sm font-semibold text-grafana-text">
+                  {currentAuctionPlayer.playerName}
+                </div>
+                {currentAuctionPlayer.positions && currentAuctionPlayer.positions.length > 0 && (
+                  <div className="text-grafana-muted text-body-xs">
+                    {currentAuctionPlayer.positions.join(" / ")}
+                  </div>
+                )}
+                {tierLabel && (
+                  <span className={`mt-1 inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded ${tierBadgeClass}`}>
+                    {tierLabel}
+                  </span>
+                )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                {currentAuctionPlayer.currentBid !== undefined && (
+                  <div>
+                    <div className="text-xs text-grafana-muted">Current Bid</div>
+                    <div className="text-h3 font-display text-grafana-info">
+                      ${currentAuctionPlayer.currentBid}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-1">
+                  <div className="text-xs text-grafana-muted">Market</div>
+                  <div className="font-semibold text-sm text-grafana-text">
+                    {marketVal !== undefined ? `$${marketVal}` : "--"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* BidVerdict — consolidated bid/pass decision card, auction only */}
       {draftFormat === "auction" && (
-        <ErrorBoundary sectionName="Nomination Diagnostics">
-          <NominationDiagnostics />
+        <ErrorBoundary sectionName="Bid Verdict">
+          <BidVerdict engineSignals={engineSignals} />
         </ErrorBoundary>
       )}
 
@@ -471,22 +431,48 @@ export default function DraftSidebar() {
       <div className="flex-1 overflow-y-auto flex flex-col">
         {draftFormat === "auction" ? (
           <>
-            {/* AI Advisor -- narrator above data-dense engine signals */}
-            <ErrorBoundary sectionName="AI Narrator">
-              <DraftNarrator
-                onAskAdvice={requestAdvice}
-                sessionCallCount={sessionCallCount}
+            {/* Signal Strip */}
+            <ErrorBoundary sectionName="Signal Strip">
+              <SignalStrip
+                endgameMode={engineSignals?.budgetCurve?.endgameMode ?? false}
+                inflationBand={engineSignals?.inflation?.inflationBand ?? 'neutral'}
+                hitterSpent={engineSignals?.budgetCurve?.hitterSpent ?? 0}
+                pitcherSpent={engineSignals?.budgetCurve?.pitcherSpent ?? 0}
+                spCount={spCount}
+                totalSpSlots={totalSpSlots}
               />
             </ErrorBoundary>
-            <ErrorBoundary sectionName="Auction Budget Tracker">
-              <AuctionBudgetTracker engineSignals={engineSignals} />
+
+            {/* Next Nominee */}
+            <ErrorBoundary sectionName="Next Nominee">
+              <NextNominee nominee={nextNominee} isNominating={isNominating} />
             </ErrorBoundary>
+
+            {/* Nomination Diagnostics — kept collapsed below NextNominee */}
+            <ErrorBoundary sectionName="Nomination Diagnostics">
+              <NominationDiagnostics />
+            </ErrorBoundary>
+
+            {/* Category Heatmap */}
+            <ErrorBoundary sectionName="Category Heatmap">
+              <CategoryHeatmap
+                projectedStandings={engineSignals?.projectedStandings ?? null}
+                myTeamId={myTeamId}
+                leagueCategories={leagueCategories}
+              />
+            </ErrorBoundary>
+
+            {/* Position Supply Heatmap */}
+            <ErrorBoundary sectionName="Position Supply">
+              <PositionSupplyHeatmap rankings={rankings} allPicks={allPicks} />
+            </ErrorBoundary>
+
+            {/* Engine Insights (wraps IdealRosterPanel) */}
             <ErrorBoundary sectionName="Engine Insights">
               <EngineInsights engineSignals={engineSignals} />
             </ErrorBoundary>
-            <ErrorBoundary sectionName="Position Scarcity Alerts">
-              <PositionScarcityAlerts />
-            </ErrorBoundary>
+
+            {/* Auction Recommendations */}
             <ErrorBoundary sectionName="Auction Recommendations">
               <AuctionRecommendations />
             </ErrorBoundary>
@@ -495,9 +481,6 @@ export default function DraftSidebar() {
           <>
             <ErrorBoundary sectionName="Roster Summary">
               <RosterSummary />
-            </ErrorBoundary>
-            <ErrorBoundary sectionName="Position Scarcity Alerts">
-              <PositionScarcityAlerts />
             </ErrorBoundary>
             <ErrorBoundary sectionName="Snake Turn Pairs">
               <SnakeTurnPairs />
@@ -511,7 +494,7 @@ export default function DraftSidebar() {
 
       {/* DEV-only performance indicator */}
       {import.meta.env.DEV && engineSignals && (
-        <div className="text-body-xs text-content-secondary p-2 border-t border-surface-tertiary">
+        <div className="text-body-xs text-grafana-muted p-2 border-t border-grafana-border">
           Engine: {engineSignals.computeTimeMs}ms
         </div>
       )}
