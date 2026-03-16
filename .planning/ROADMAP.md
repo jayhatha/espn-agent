@@ -47,6 +47,7 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
 - [x] **Phase 49: Positional Weights & SP Tiers** - Positional priority weights, SP1-SP5 tier caps, 200 GS cap awareness (completed 2026-03-15)
 - [x] **Phase 50: Inflation Bands & Category Targets** - Inflation interpretation bands with bid ceiling adjustments, per-category competitive targets (completed 2026-03-15)
 - [ ] **Phase 51: Data Pipeline for Extension** - Easy projection + ESPN value loading into extension via CSV upload or DOM scrape
+- [ ] **Phase 52: Extension Sidebar UI Update** - Display endgame mode, inflation bands, budget bands, SP tiers, positional weights, category targets, nomination reason
 
 ## Phase Details
 
@@ -100,6 +101,24 @@ Phase 43: Strip Auth & Env Config, Phase 44: Hardcode League & OPS Math, Phase 4
   3. Loaded data persists in extension storage across page reloads
 **Plans**: TBD
 
+### Phase 52: Extension Sidebar UI Update
+**Goal**: Grafana-inspired dark mode sidebar displaying all v5.0 engine signals with streamlined section layout
+**Depends on**: Phases 47-51
+**Requirements**: UI-THEME, UI-STORE-DEFAULTS, UI-SIGNAL-STRIP, UI-CATEGORY-HEATMAP, UI-POSITION-SUPPLY, UI-NEXT-NOMINEE, UI-SECTION-ORDER, UI-DARK-RESKIN, UI-REMOVALS, UI-NOMINATED-PLAYER, UI-HEADER, UI-AUCTION-RECS
+**Success Criteria** (what must be TRUE):
+  1. Sidebar shows endgame mode indicator (red badge when budget ≤ $20)
+  2. Inflation band displayed with color coding (red/yellow/green/blue)
+  3. Budget allocation shows hitter/pitcher spent vs target bands
+  4. SP tier progress shows drafted count and next tier cap
+  5. Nomination reason shows strategy tag (Budget Drain, Own Target, Overpriced)
+  6. Category heatmap with rank-colored bars and click-toggle
+**Plans**: 3 plans
+
+Plans:
+- [ ] 52-01-PLAN.md — Grafana dark palette tokens + store defaults
+- [ ] 52-02-PLAN.md — New display components (SignalStrip, CategoryHeatmap, PositionSupplyHeatmap, NextNominee)
+- [ ] 52-03-PLAN.md — DraftSidebar rewrite + component reskins
+
 ## Progress
 
 **Execution Order:**
@@ -112,3 +131,4 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 49. Positional Weights & SP Tiers | 1/1 | Complete   | 2026-03-15 | - |
 | 50. Inflation Bands & Category Targets | 1/1 | Complete   | 2026-03-15 | - |
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
+| 52. Extension Sidebar UI Update | v5.0 | 0/3 | Planned | - |
