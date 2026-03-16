@@ -7,17 +7,17 @@ interface AlertBadgeProps {
 
 function AlertBadge({ alert }: AlertBadgeProps) {
   const colorMap: Record<DraftAlert["type"], string> = {
-    inflation: "bg-info-light border-info-border text-info",
-    scarcity: "bg-negative-light border-negative text-negative",
-    category_gap: "bg-warning-light border-warning text-warning",
-    budget: "bg-info-light border-info-border text-info",
-    tier_break: "bg-negative-light border-negative text-negative",
+    inflation: "bg-grafana-info/20 border-grafana-info text-grafana-text",
+    scarcity: "bg-grafana-negative/20 border-grafana-negative text-grafana-negative",
+    category_gap: "bg-grafana-warning/20 border-grafana-warning text-grafana-warning",
+    budget: "bg-grafana-info/20 border-grafana-info text-grafana-text",
+    tier_break: "bg-grafana-negative/20 border-grafana-negative text-grafana-negative",
   };
 
   const severityBarColor =
-    alert.severity >= 0.85 ? "bg-negative" :
-    alert.severity >= 0.75 ? "bg-warning" :
-    "bg-info";
+    alert.severity >= 0.85 ? "bg-grafana-negative" :
+    alert.severity >= 0.75 ? "bg-grafana-warning" :
+    "bg-grafana-info";
 
   const colorClasses = colorMap[alert.type];
 
@@ -55,10 +55,10 @@ export default function EngineAlerts({ alerts }: EngineAlertsProps) {
   }
 
   return (
-    <div className="p-3 border-b border-surface-tertiary">
+    <div className="p-3 border-b border-grafana-border">
       <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-body-sm font-semibold text-content">Engine Alerts</h3>
-        <span className="bg-negative text-white text-body-xs font-semibold px-1.5 py-0.5 rounded-full leading-none">
+        <h3 className="text-body-sm font-semibold text-grafana-text">Engine Alerts</h3>
+        <span className="bg-grafana-negative text-grafana-text text-body-xs font-semibold px-1.5 py-0.5 rounded-full leading-none">
           {visibleAlerts.length}
         </span>
       </div>

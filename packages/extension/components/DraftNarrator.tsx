@@ -38,20 +38,20 @@ export default function DraftNarrator({
   const isDisabled = isLoading || callsRemaining <= 0;
 
   return (
-    <div className="border-b border-surface-tertiary">
+    <div className="border-b border-grafana-border">
       {/* Header bar */}
-      <div className="bg-surface-secondary px-3 py-2 flex items-center justify-between">
-        <span className="text-body-sm font-semibold text-content">AI Advisor</span>
+      <div className="bg-grafana-panel px-3 py-2 flex items-center justify-between">
+        <span className="text-body-sm font-semibold text-grafana-text">AI Advisor</span>
         <div className="flex items-center gap-2">
           {enabled && (
             <>
-              <span className="text-body-xs text-content-secondary">
+              <span className="text-body-xs text-grafana-muted">
                 {callsRemaining} left
               </span>
               <button
                 onClick={onAskAdvice}
                 disabled={isDisabled}
-                className="text-body-xs text-accent hover:text-accent-hover border border-accent/30 hover:border-accent/60 px-2 py-0.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-body-xs text-grafana-info hover:text-grafana-info/80 border border-grafana-info/30 hover:border-grafana-info/60 px-2 py-0.5 rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Ask
               </button>
@@ -60,7 +60,7 @@ export default function DraftNarrator({
           <button
             onClick={() => setEnabled(!enabled)}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              enabled ? "bg-accent" : "bg-surface-tertiary"
+              enabled ? "bg-grafana-info" : "bg-grafana-border"
             }`}
             role="switch"
             aria-checked={enabled}
@@ -77,15 +77,15 @@ export default function DraftNarrator({
 
       {/* Content area — only shown when enabled */}
       {enabled && (
-        <div className="bg-surface px-3 py-2 min-h-[3rem]">
+        <div className="bg-grafana-bg px-3 py-2 min-h-[3rem]">
           {isLoading ? (
-            <p className="text-body-sm text-content-secondary animate-pulse">
+            <p className="text-body-sm text-grafana-muted animate-pulse">
               Analyzing...
             </p>
           ) : narration ? (
-            <p className="text-body-sm text-content leading-relaxed">{narration}</p>
+            <p className="text-body-sm text-grafana-text leading-relaxed">{narration}</p>
           ) : (
-            <p className="text-body-xs text-content-secondary italic">
+            <p className="text-body-xs text-grafana-muted italic">
               Waiting for a significant draft moment...
             </p>
           )}

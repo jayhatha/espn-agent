@@ -185,13 +185,13 @@ export default function DraftRecommendations() {
   return (
     <div className="flex flex-col h-full">
       {/* Filter controls */}
-      <div className="p-3 bg-surface-secondary border-b border-surface-tertiary space-y-2">
+      <div className="p-3 bg-grafana-panel border-b border-grafana-border space-y-2">
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => setPositionFilter(null)}
             className={`
               px-2 py-1 text-xs rounded
-              ${!selectedPosition ? "bg-accent text-white" : "bg-surface text-content-secondary border border-surface-tertiary"}
+              ${!selectedPosition ? "bg-grafana-text text-grafana-bg" : "bg-grafana-panel text-grafana-muted border border-grafana-border"}
             `}
           >
             All
@@ -202,7 +202,7 @@ export default function DraftRecommendations() {
               onClick={() => setPositionFilter(pos)}
               className={`
                 px-2 py-1 text-xs rounded
-                ${selectedPosition === pos ? "bg-accent text-white" : "bg-surface text-content-secondary border border-surface-tertiary"}
+                ${selectedPosition === pos ? "bg-grafana-text text-grafana-bg" : "bg-grafana-panel text-grafana-muted border border-grafana-border"}
               `}
             >
               {pos}
@@ -210,7 +210,7 @@ export default function DraftRecommendations() {
           ))}
         </div>
 
-        <label className="flex items-center text-body-sm text-content-secondary cursor-pointer">
+        <label className="flex items-center text-body-sm text-grafana-muted cursor-pointer">
           <input
             type="checkbox"
             checked={showOnlyNeeds}
@@ -222,9 +222,9 @@ export default function DraftRecommendations() {
       </div>
 
       {/* Player list */}
-      <div className="flex-1 overflow-y-auto divide-y divide-surface-tertiary">
+      <div className="flex-1 overflow-y-auto divide-y divide-grafana-border">
         {filteredPlayers.length === 0 ? (
-          <div className="p-4 text-center text-content-tertiary">
+          <div className="p-4 text-center text-grafana-muted">
             {rankings.length === 0
               ? "Loading rankings..."
               : "No players match filters"}
