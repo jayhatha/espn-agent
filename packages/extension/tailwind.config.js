@@ -7,7 +7,6 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['DM Serif Display', 'Georgia', 'serif'],
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
@@ -24,6 +23,7 @@ export default {
         'body': ['1rem', { lineHeight: '1.6' }],
         'body-sm': ['0.875rem', { lineHeight: '1.5' }],
         'caption': ['0.75rem', { lineHeight: '1.5', letterSpacing: '0.02em' }],
+        'label': ['0.625rem', { lineHeight: '1.4', letterSpacing: '0.04em' }],
         'body-xs': ['0.6875rem', { lineHeight: '1.4' }],
         // Data-specific (tables, stats)
         'data': ['0.8125rem', { lineHeight: '1.4', fontFamily: 'ui-monospace' }],
@@ -75,7 +75,7 @@ export default {
           panel: '#22252b',
           border: '#2d3139',
           text: '#d9dde6',
-          muted: '#8e9ab0',
+          muted: '#99a5bc',
           endgame: {
             normal: '#37872d',
             active: '#c4162a',
@@ -90,6 +90,12 @@ export default {
           warning: '#e0b400',
           negative: '#c4162a',
           info: '#1f60c4',
+          rank: {
+            top: '#37872d',     // top 25% (same as grafana-positive)
+            mid: '#e0b400',     // 25-50% (same as grafana-warning)
+            low: '#f2495c',     // 50-75%
+            bottom: '#c4162a',  // bottom 25% (same as grafana-negative)
+          },
         },
       },
       spacing: {
