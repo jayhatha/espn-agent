@@ -184,8 +184,8 @@ export const useDraftStore = create<DraftState>()(
       userRankingOverrides: {},
       teamRosters: new Map(),
       currentAuctionPlayer: null,
-      pitcherHitterSplit: 65,
-      autoMode: false,
+      pitcherHitterSplit: 75,
+      autoMode: true,
       espnNominationQueue: [],
       espnDomAuctionValues: {},
       allTeamBudgets: [],
@@ -422,7 +422,7 @@ export const useDraftStore = create<DraftState>()(
     }),
     {
       name: "espn-draft-assistant-state",
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => {
         const state = (persistedState as Partial<DraftState>) ?? {};
 
@@ -477,7 +477,18 @@ export const useDraftStore = create<DraftState>()(
           };
         }
 
-        // v5+: pass state through — merge() handles Map deserialization
+        if (version < 6) {
+          // v5 -> v6: pitcherHitterSplit default changed from 65 to 75.
+          // The UI slider is being removed in Phase 52, so reset any stale
+          // persisted value to the new engine-aligned default.
+          return {
+            ...state,
+            teamRosters,
+            pitcherHitterSplit: 75,
+          };
+        }
+
+        // v6+: pass state through — merge() handles Map deserialization
         return {
           ...state,
           teamRosters,
