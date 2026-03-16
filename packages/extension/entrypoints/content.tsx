@@ -242,12 +242,18 @@ export default defineContentScript({
       ? Object.values(cachedLeagueConfig.rosterSlots).reduce((a, b) => a + b, 0)
       : 25;
 
+    // Attempt early team ID detection before initializeDraft so we pass the
+    // correct ID from the start. Practice drafts assign arbitrary team IDs, so
+    // the hardcoded DEFAULT_TEAM_ID = 13 often fails for them.
+    const earlyDetection = detectMyTeam();
+    let detectedTeamId = earlyDetection?.teamId || String(DEFAULT_TEAM_ID);
+
     state.initializeDraft({
       leagueId,
       draftFormat: resolvedDraftFormat,
       totalTeams: cachedLeagueConfig?.totalTeams || 12,
       rosterSize: totalRosterSize,
-      myTeamId: String(DEFAULT_TEAM_ID),
+      myTeamId: detectedTeamId,
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default
     });
 
@@ -261,12 +267,17 @@ export default defineContentScript({
     // existing draft session rather than starting fresh.
     const statePreserved = useDraftStore.getState().allPicks.length > 0;
 
-    logger.log("[ESPN Draft Assistant] Draft state initialized (hardcoded myTeamId=" + DEFAULT_TEAM_ID + ")", {
-      statePreserved,
-      myTeamId: String(DEFAULT_TEAM_ID),
-      myRoster: useDraftStore.getState().myRoster.length,
-      allPicks: useDraftStore.getState().allPicks.length,
-    });
+    logger.log(
+      earlyDetection
+        ? "[ESPN Draft Assistant] Draft state initialized (myTeamId=" + detectedTeamId + " detected from DOM)"
+        : "[ESPN Draft Assistant] Draft state initialized (myTeamId=" + detectedTeamId + " fallback DEFAULT_TEAM_ID)",
+      {
+        statePreserved,
+        myTeamId: detectedTeamId,
+        myRoster: useDraftStore.getState().myRoster.length,
+        allPicks: useDraftStore.getState().allPicks.length,
+      }
+    );
     // Store league categories for the deterministic draft engine
     if (cachedLeagueConfig) {
       useDraftStore.getState().setLeagueCategories(cachedLeagueConfig.categories);
@@ -283,7 +294,7 @@ export default defineContentScript({
       const columnMap = getTeamColumnMapping();
       if (columnMap.size === 0) return null;
       for (const [column, entry] of columnMap) {
-        if (entry.teamId === String(DEFAULT_TEAM_ID)) {
+        if (entry.teamId === detectedTeamId) {
           return String(column);
         }
       }
@@ -292,12 +303,14 @@ export default defineContentScript({
 
     myGridColumn = computeMyGridColumn();
     if (myGridColumn) {
-      logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from dropdown mapping for teamId=" + DEFAULT_TEAM_ID + ")");
+      logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from dropdown mapping for teamId=" + detectedTeamId + ")");
     }
 
     // Fallback: detect from pick train if dropdown mapping failed
     const myTeamDetection = detectMyTeam();
     if (myTeamDetection) {
+      detectedTeamId = myTeamDetection.teamId;
+      useDraftStore.getState().setMyTeamId(myTeamDetection.teamId);
       useDraftStore.getState().setRemainingBudget(myTeamDetection.remainingBudget);
       if (!myGridColumn && myTeamDetection.gridColumn) {
         myGridColumn = String(myTeamDetection.gridColumn);
@@ -331,6 +344,24 @@ export default defineContentScript({
         }
       }, 3000);
     }
+
+    // Late re-detection at 5s: handles cases where .auction-pick-component--own
+    // CSS class appears after the initial DOM load (common in practice drafts).
+    setTimeout(() => {
+      const lateDetection = detectMyTeam();
+      if (lateDetection) {
+        const currentState = useDraftStore.getState();
+        if (currentState.myTeamId !== lateDetection.teamId) {
+          logger.log("[ESPN Draft Assistant] Late team detection updated myTeamId from " + currentState.myTeamId + " to " + lateDetection.teamId);
+          currentState.setMyTeamId(lateDetection.teamId);
+          detectedTeamId = lateDetection.teamId;
+        }
+        if (!myGridColumn && lateDetection.gridColumn) {
+          myGridColumn = String(lateDetection.gridColumn);
+          logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from late detection at 5s)");
+        }
+      }
+    }, 5000);
 
     // Detect roster slots from players-table DOM (more accurate than settings panel)
     const playersTableSlots = detectRosterSlotsFromPlayersTable();
