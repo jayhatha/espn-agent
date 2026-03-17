@@ -1210,6 +1210,21 @@ export class AutoBidController {
     const isSP = ranking?.primaryPosition === "SP";
     const isRP = ranking?.primaryPosition === "RP";
     const isPitcher = isSP || isRP;
+
+    // Hard limit: max 2 catchers (1 C slot + 1 UTIL backup). Skip unless ideal target.
+    const playerPosition = ranking?.primaryPosition;
+    if (playerPosition === "C") {
+      const catcherCount = state.myRoster.filter(
+        p => p.positions.some(pos => pos.toUpperCase() === "C"),
+      ).length;
+      if (catcherCount >= 2 && !isIdealTarget) {
+        logger.log(
+          `[AutoBidController] Catcher hard limit: ${catcherCount} catchers already drafted — skipping ${nominatedName}`,
+        );
+        return;
+      }
+    }
+
     const opportunityRankThreshold = isSP ? 100 : 50;
     const hasHighExternalRank =
       ranking?.externalRank != null &&
