@@ -1225,7 +1225,6 @@ export class AutoBidController {
       isSP,
       positions: playerPositions,
       primaryPosition: playerPosition ?? null,
-      pitcherHitterSplit: state.pitcherHitterSplit ?? 75,
       spCount,
       catcherSlotsRemaining: this.lastEngineSignals?.remainingSlots?.["C"] ?? 0,
       isEndgame,

@@ -138,7 +138,6 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         isSP,
         positions: ranking?.positions ?? [],
         primaryPosition: ranking?.primaryPosition ?? null,
-        pitcherHitterSplit: pitcherHitterSplit ?? 75,
         spCount,
         catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
         isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,

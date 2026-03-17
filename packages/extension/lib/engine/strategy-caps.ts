@@ -27,8 +27,6 @@ export interface StrategyCapInput {
   positions: string[];
   /** Primary position (for catcher dampening) */
   primaryPosition: string | null;
-  /** Pitcher/hitter budget split preference (0-100, default 75) */
-  pitcherHitterSplit: number;
   /** Number of SPs already on my roster */
   spCount: number;
   /** Remaining C slots (0 = filled) */
@@ -67,12 +65,11 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   let bidCap = input.rawMaxBid;
   let capSource = `engine maxBid $${input.rawMaxBid}`;
 
-  // Apply pitcher dampening
-  if (input.isPitcher) {
-    const pitcherMultiplier = (100 - input.pitcherHitterSplit) / 50;
-    bidCap = Math.max(1, Math.ceil(bidCap * pitcherMultiplier));
-    capSource += ` → pitcher ×${pitcherMultiplier.toFixed(2)}`;
-  }
+  // Pitcher spending is controlled by SP tier caps ($18/$12/$10/$5/$3) — no
+  // additional bid dampening needed. The SGP split (pitcherHitterSplit) already
+  // reduces pitcher SGP values in the optimizer, so the binary search maxBid
+  // naturally produces lower bids for pitchers. Applying a bid cap multiplier
+  // on top would double-dampen.
 
   // Apply catcher dampening (50% when C slot already filled)
   if (input.primaryPosition === "C" && input.catcherSlotsRemaining <= 0) {
