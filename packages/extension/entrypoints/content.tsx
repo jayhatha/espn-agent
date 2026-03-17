@@ -417,7 +417,7 @@ export default defineContentScript({
     const { [SIDEBAR_DOCK_STORAGE_KEY]: storedDockSide } =
       await chrome.storage.local.get(SIDEBAR_DOCK_STORAGE_KEY);
     let currentDockSide: "left" | "right" =
-      storedDockSide === "left" ? "left" : "right";
+      storedDockSide === "right" ? "right" : "left";
 
     const applySidebarPosition = (side: "left" | "right") => {
       const sidebarRoot = document.getElementById(SIDEBAR_ROOT_ID);

@@ -271,18 +271,6 @@ export default function DraftSidebar() {
             Refresh
           </button>
           <button
-            onClick={handleDockLeft}
-            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
-          >
-            Left
-          </button>
-          <button
-            onClick={handleDockRight}
-            className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
-          >
-            Right
-          </button>
-          <button
             onClick={handlePopOut}
             className="text-grafana-muted text-xs hover:bg-grafana-border px-2 py-1 rounded border border-grafana-border"
           >

@@ -302,18 +302,33 @@ export function detectMyTeam(): {
   remainingBudget: number;
   gridColumn: number | null;
 } | null {
-  // CONFIRMED (MCP verified 2026-03-14): .auction-pick-component--own is on the
-  // .content div inside .picklist--item. Walk up to the parent item for full context.
+  // Strategy 1: .auction-pick-component--own CSS class (works for real drafts)
   const ownContent = document.querySelector(".auction-pick-component--own");
+
+  // Strategy 2: Find by team name in pick train (reliable for practice drafts
+  // where --own class may not appear). Personal tool — name is hardcoded.
+  const MY_TEAM_NAME = "Nathan Fielders";
+  let matchedItem: Element | null = null;
   if (!ownContent) {
-    return null;
+    const allItems = document.querySelectorAll(".picklist--item");
+    for (const item of allItems) {
+      const nameEl = item.querySelector(".team-name");
+      const name = (nameEl?.textContent || "").replace(/^\d+\.\s*/, "").trim();
+      if (name === MY_TEAM_NAME) {
+        matchedItem = item;
+        break;
+      }
+    }
+    if (!matchedItem) return null;
   }
 
   // Walk up to the picklist item — .team-name and .cash may be at item level, not inside .content
-  const picklistItem = ownContent.closest(".picklist--item") || ownContent;
+  const picklistItem = ownContent
+    ? (ownContent.closest(".picklist--item") || ownContent)
+    : matchedItem!;
 
-  const teamNameEl = picklistItem.querySelector(".team-name") || ownContent.querySelector(".team-name");
-  const cashEl = picklistItem.querySelector(".cash") || ownContent.querySelector(".cash");
+  const teamNameEl = picklistItem.querySelector(".team-name") || (ownContent ? ownContent.querySelector(".team-name") : null);
+  const cashEl = picklistItem.querySelector(".cash") || (ownContent ? ownContent.querySelector(".cash") : null);
 
   if (!teamNameEl) {
     logger.warn("[ESPN Draft Assistant] detectMyTeam: found --own marker but no .team-name element");
@@ -335,8 +350,9 @@ export function detectMyTeam(): {
   // ESPN's draft board uses CSS grid where column N = the Nth team in the pick train.
   let gridColumn: number | null = null;
   const allItems = document.querySelectorAll(".picklist--item");
+  const targetEl = ownContent || matchedItem;
   allItems.forEach((item, idx) => {
-    if (item.contains(ownContent) || item === ownContent || ownContent.contains(item)) {
+    if (targetEl && (item.contains(targetEl) || item === targetEl || targetEl.contains(item))) {
       gridColumn = idx + 1; // grid columns are 1-based
     }
   });
