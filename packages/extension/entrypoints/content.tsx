@@ -246,7 +246,13 @@ export default defineContentScript({
     // correct ID from the start. Practice drafts assign arbitrary team IDs, so
     // the hardcoded DEFAULT_TEAM_ID = 13 often fails for them.
     const earlyDetection = detectMyTeam();
-    let detectedTeamId = earlyDetection?.teamId || String(DEFAULT_TEAM_ID);
+    // On same-draft reload, prefer the persisted myTeamId (already detected in
+    // prior session) over the hardcoded fallback. Only use DEFAULT_TEAM_ID as
+    // an absolute last resort when nothing else is available.
+    const isSameDraft = state.leagueId === leagueId && state.allPicks.length > 0;
+    let detectedTeamId = earlyDetection?.teamId
+      || (isSameDraft && state.myTeamId ? state.myTeamId : null)
+      || String(DEFAULT_TEAM_ID);
 
     state.initializeDraft({
       leagueId,
@@ -345,23 +351,28 @@ export default defineContentScript({
       }, 3000);
     }
 
-    // Late re-detection at 5s: handles cases where .auction-pick-component--own
-    // CSS class appears after the initial DOM load (common in practice drafts).
-    setTimeout(() => {
-      const lateDetection = detectMyTeam();
-      if (lateDetection) {
-        const currentState = useDraftStore.getState();
-        if (currentState.myTeamId !== lateDetection.teamId) {
-          logger.log("[ESPN Draft Assistant] Late team detection updated myTeamId from " + currentState.myTeamId + " to " + lateDetection.teamId);
-          currentState.setMyTeamId(lateDetection.teamId);
-          detectedTeamId = lateDetection.teamId;
+    // Periodic re-detection: practice drafts assign arbitrary team IDs and the
+    // .auction-pick-component--own class may appear late. Retry at 2s, 5s, 10s.
+    const retryTeamDetection = (delayMs: number) => {
+      setTimeout(() => {
+        const lateDetection = detectMyTeam();
+        if (lateDetection) {
+          const currentState = useDraftStore.getState();
+          if (currentState.myTeamId !== lateDetection.teamId) {
+            logger.log(`[ESPN Draft Assistant] Team detection at ${delayMs}ms updated myTeamId from ${currentState.myTeamId} to ${lateDetection.teamId}`);
+            currentState.setMyTeamId(lateDetection.teamId);
+            detectedTeamId = lateDetection.teamId;
+          }
+          if (!myGridColumn && lateDetection.gridColumn) {
+            myGridColumn = String(lateDetection.gridColumn);
+            logger.log(`[ESPN Draft Assistant] myGridColumn=${myGridColumn} (from detection at ${delayMs}ms)`);
+          }
         }
-        if (!myGridColumn && lateDetection.gridColumn) {
-          myGridColumn = String(lateDetection.gridColumn);
-          logger.log("[ESPN Draft Assistant] myGridColumn=" + myGridColumn + " (from late detection at 5s)");
-        }
-      }
-    }, 5000);
+      }, delayMs);
+    };
+    retryTeamDetection(2000);
+    retryTeamDetection(5000);
+    retryTeamDetection(10000);
 
     // Detect roster slots from players-table DOM (more accurate than settings panel)
     const playersTableSlots = detectRosterSlotsFromPlayersTable();
