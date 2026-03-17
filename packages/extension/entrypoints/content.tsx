@@ -451,14 +451,19 @@ export default defineContentScript({
 
       const currentState = useDraftStore.getState();
       let matchReason: string | null = null;
-      if (pick.teamId === currentState.myTeamId) {
-        matchReason = "teamId=" + pick.teamId + " matches myTeamId=" + currentState.myTeamId;
+      // Match via grid column (primary) — pick.teamId is a grid column string
+      // from parsePickElement, NOT an ESPN team ID. Don't compare directly to
+      // myTeamId (ESPN ID) — the numbers are from different namespaces.
+      if (myGridColumn !== null && pick.teamId === myGridColumn) {
+        matchReason = "teamId=" + pick.teamId + " matches myGridColumn=" + myGridColumn;
       } else if (pick.teamId === "myTeam") {
         matchReason = "teamId is myTeam";
       } else if (pick.teamName === "My Team") {
         matchReason = "teamName is My Team";
-      } else if (myGridColumn !== null && pick.teamId === myGridColumn) {
-        matchReason = "teamId=" + pick.teamId + " matches myGridColumn=" + myGridColumn;
+      } else if (pick.teamId === currentState.myTeamId && !/^\d+$/.test(pick.teamId)) {
+        // Only match ESPN team ID directly when pick.teamId is NOT a numeric
+        // grid column (i.e., came from a data-team-id attribute).
+        matchReason = "teamId=" + pick.teamId + " matches myTeamId=" + currentState.myTeamId;
       }
       const isMyPick = matchReason !== null;
 
@@ -579,10 +584,10 @@ export default defineContentScript({
           const currentState = useDraftStore.getState();
           const myTeamId = currentState.myTeamId;
           const isMyPickFilter = (p: DraftPick) =>
-            p.teamId === myTeamId ||
+            (myGridColumn !== null && p.teamId === myGridColumn) ||
             p.teamId === "myTeam" ||
             p.teamName === "My Team" ||
-            (myGridColumn !== null && p.teamId === myGridColumn);
+            (p.teamId === myTeamId && !/^\d+$/.test(p.teamId));
           const myPicksFromStore = currentState.allPicks.filter(isMyPickFilter);
 
           if (currentState.myRoster.length !== myPicksFromStore.length) {

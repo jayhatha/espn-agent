@@ -371,8 +371,11 @@ export const useDraftStore = create<DraftState>()(
           // When team ID changes (e.g., practice draft detected late),
           // rebuild myRoster from allPicks to drop picks from the old team
           // and include picks from the newly detected team.
+          // Match picks by teamId — but only when teamId is NOT a numeric grid
+          // column, to avoid collisions between grid columns and ESPN team IDs.
           const myPicks = state.allPicks.filter(
-            (p) => p.teamId === teamId || p.teamId === "myTeam" || p.teamName === "My Team"
+            (p) => p.teamId === "myTeam" || p.teamName === "My Team" ||
+              (p.teamId === teamId && !/^\d+$/.test(p.teamId))
           );
           const rebuiltRoster = myPicks.map((pick) => {
             const existing = state.myRoster.find((r) => r.playerId === pick.playerId);
