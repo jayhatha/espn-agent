@@ -233,10 +233,9 @@ export default defineContentScript({
     // Always initialize draft state from current URL context
     const state = useDraftStore.getState();
     const resolvedDraftFormat: "snake" | "auction" =
-      detectedDraftFormat === "auction" ||
-      (state.leagueId === leagueId && state.draftFormat === "auction")
-        ? "auction"
-        : "snake";
+      detectedDraftFormat === "snake"
+        ? "snake"
+        : "auction";
 
     const totalRosterSize = cachedLeagueConfig
       ? Object.values(cachedLeagueConfig.rosterSlots).reduce((a, b) => a + b, 0)
