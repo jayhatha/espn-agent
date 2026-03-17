@@ -1069,7 +1069,7 @@ export function parseCurrentAuctionPlayer(
     return {
       playerName,
       currentBid,
-      positions: positions.length > 0 ? positions : undefined,
+      positions: positions.length > 0 ? positions : [],
       playerId,
     };
   } catch (error) {
