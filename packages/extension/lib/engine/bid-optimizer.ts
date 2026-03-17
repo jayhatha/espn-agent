@@ -97,13 +97,13 @@ export function computeMaxBid(
   // ------------------------------------------------------------------
   // Step 3: Compute upper bound for binary search
   // ------------------------------------------------------------------
-  // Upper bound: inflation-adjusted dollar value * 1.1, capped at budget minus reserves.
-  // The 1.1x cap aligns with value strategy — never recommend paying more than 10%
-  // above inflation-adjusted value. The auto-bid controller applies additional caps
-  // (SP tiers, positional dampening, endgame) on top of this.
+  // Upper bound: use the higher of FG model value or ESPN ASV (market price),
+  // adjusted for inflation, then cap at 1.1x. This prevents the binary search
+  // from being artificially limited when FG undervalues a player vs market.
   const totalSlots = Object.values(rosterSlots).reduce((s, v) => s + v, 0);
   const minReserves = Math.max(0, totalSlots - 1); // at least $1 per other slot
-  const inflatedValue = nominatedPlayer.dollars * Math.max(1, inflationFactor);
+  const baseValue = Math.max(nominatedPlayer.dollars, asvMarketPrice ?? 0);
+  const inflatedValue = baseValue * Math.max(1, inflationFactor);
   const maxReasonableBid = Math.max(1, Math.ceil(inflatedValue * 1.1));
   const hi_initial = Math.min(Math.max(1, budget - minReserves), maxReasonableBid);
 
