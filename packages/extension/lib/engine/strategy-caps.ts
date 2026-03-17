@@ -43,6 +43,10 @@ export interface StrategyCapInput {
   isEndgame: boolean;
   /** Current inflation factor */
   inflationFactor: number;
+  /** Total spent on hitters so far */
+  hitterSpent: number;
+  /** Total spent on pitchers so far */
+  pitcherSpent: number;
 }
 
 export interface StrategyCapResult {
@@ -126,6 +130,27 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   if (posWeight > 0) {
     bidCap += posWeight;
     capSource += ` → pos +${posWeight}`;
+  }
+
+  // Apply hitter/pitcher budget allocation guard.
+  // Target: $185-200 on hitters, $55-70 on pitchers (from budget-curve.ts).
+  // When hitter spending exceeds $200, dampen non-ideal hitter bids to preserve
+  // pitcher budget. When pitcher spending is behind, this indirectly helps by
+  // making the controller pass on marginal hitters.
+  const HITTER_BUDGET_MAX = 200;
+  const PITCHER_BUDGET_MIN = 55;
+  const totalBudget = input.hitterSpent + input.pitcherSpent + bidCap; // projected after this bid
+  if (!input.isPitcher) {
+    // Hitter bid: check if spending would exceed hitter allocation
+    const projectedHitterSpend = input.hitterSpent + bidCap;
+    if (projectedHitterSpend > HITTER_BUDGET_MAX && !input.isEndgame) {
+      // Cap the bid so hitter spending stays at/near $200
+      const headroom = Math.max(1, HITTER_BUDGET_MAX - input.hitterSpent);
+      if (bidCap > headroom) {
+        bidCap = headroom;
+        capSource += ` → hitter budget cap $${HITTER_BUDGET_MAX} (spent $${input.hitterSpent})`;
+      }
+    }
   }
 
   // Apply SP tier cap

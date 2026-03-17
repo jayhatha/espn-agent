@@ -1226,6 +1226,8 @@ export class AutoBidController {
       catcherSlotsRemaining: this.lastEngineSignals?.remainingSlots?.["C"] ?? 0,
       isEndgame,
       inflationFactor: this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0,
+      hitterSpent: this.lastEngineSignals?.budgetCurve?.hitterSpent ?? 0,
+      pitcherSpent: this.lastEngineSignals?.budgetCurve?.pitcherSpent ?? 0,
     });
 
     if (!capResult.shouldBid) {

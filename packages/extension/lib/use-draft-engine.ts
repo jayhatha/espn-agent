@@ -175,6 +175,8 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
         isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,
         inflationFactor: baseSignals.inflation?.inflationFactor ?? 1.0,
+        hitterSpent: baseSignals.budgetCurve?.hitterSpent ?? 0,
+        pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
       });
 
       mergedOptimization = {
