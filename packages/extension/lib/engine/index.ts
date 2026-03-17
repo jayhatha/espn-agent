@@ -621,7 +621,17 @@ function computeIdealRoster(
 
       const floorPick = findBestFloorPick(statKey, availableForFloor, maxFloorCost);
       if (floorPick) {
-        floorLockedPlayers.push({ player: floorPick, cost: floorPick.dollars });
+        // Apply SP tier cap to floor-locked pitchers (same as strategy-adjusted pool)
+        let floorCost = floorPick.dollars;
+        const isFloorSP = floorPick.positions.some(pos => pos.toUpperCase() === "SP");
+        if (isFloorSP) {
+          const floorSpCount = spCount + floorLockedPlayers.filter(
+            lp => lp.player.positions.some(pos => pos.toUpperCase() === "SP"),
+          ).length;
+          const tierCap = getSpTierCap(floorSpCount);
+          if (floorCost > tierCap) floorCost = tierCap;
+        }
+        floorLockedPlayers.push({ player: { ...floorPick, dollars: floorCost }, cost: floorCost });
         // Remove from available pool to prevent double-selection
         availableForFloor = availableForFloor.filter(
           p => p.normalizedName !== floorPick.normalizedName
