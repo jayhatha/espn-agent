@@ -747,8 +747,8 @@ function computeIdealRoster(
   // Build optimizer picks with their slot assignments.
   // Match by normalizedName (not object identity) because ASV-overlaid players
   // are spread copies and won't === the originals in allPlayers.
-  // Use the original allPlayers entry for FanGraphs dollars (tier display)
-  // and raw SGP values — ASV overlay only affects optimizer budget math.
+  // Display the price the optimizer actually used (market price / strategy-adjusted),
+  // not the original FG value — so the budget math in the UI matches reality.
   const optimizerPlayers: IdealRosterPlayer[] = result.roster.map((player, i) => {
     const originalPlayer = allPlayers.find(p => p.normalizedName === player.normalizedName) ?? player;
     const poolIdx = allPlayers.indexOf(originalPlayer);
@@ -756,8 +756,8 @@ function computeIdealRoster(
     return {
       name: player.name,
       positions: player.positions,
-      dollars: originalPlayer.dollars,    // FanGraphs $ for tier display (not ASV)
-      tier: classifyTier(originalPlayer.dollars),
+      dollars: player.dollars,    // Market price (ASV/strategy-adjusted) used by optimizer
+      tier: classifyTier(player.dollars),
       sgpValue,
       slot: result.slotAssignments[i] ?? "BN",
       isDrafted: false,
