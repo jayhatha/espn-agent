@@ -153,9 +153,23 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
           </div>
         )}
 
-        {/* Total SGP + budget summary */}
-        <div className="text-body-xs text-grafana-muted mt-2 border-t border-grafana-border pt-2">
-          {totalSGPValue.toFixed(1)} projected SGP &middot; ${Math.round(budgetUsed)} remaining to spend
+        {/* Budget split summary */}
+        <div className="text-body-xs text-grafana-muted mt-2 border-t border-grafana-border pt-2 space-y-0.5">
+          {(() => {
+            const PITCHER_POS = new Set(["SP", "RP", "P"]);
+            const hitterTotal = Math.round(players
+              .filter(p => !p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
+              .reduce((s, p) => s + p.dollars, 0));
+            const pitcherTotal = Math.round(players
+              .filter(p => p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
+              .reduce((s, p) => s + p.dollars, 0));
+            return (
+              <div>
+                ${hitterTotal} hitters &middot; ${pitcherTotal} pitchers &middot; ${Math.round(budgetUsed)} total
+              </div>
+            );
+          })()}
+          <div>{totalSGPValue.toFixed(1)} projected SGP</div>
         </div>
       </div>
     </details>
