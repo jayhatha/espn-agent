@@ -151,6 +151,8 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
 | 52. Extension Sidebar UI Update | 3/3 | Complete    | 2026-03-16 | - |
 | 53. UI Polish | 3/3 | Complete    | 2026-03-16 | - |
+| 54. Auction Engine Test Suite | v5.0 | 3/3 | Complete | 2026-03-17 |
+| 55. Extension Draft Reliability | v5.0 | 0/3 | Not started | - |
 
 ### Phase 54: Auction engine test suite: unit tests for bid ceiling, inflation, SGP, roster constraints; simulation tests for strategy validation; scenario tests for edge cases
 
@@ -169,3 +171,21 @@ Plans:
 - [ ] 54-01-PLAN.md — Unit tests for inflation, budget-curve, draft-constants
 - [ ] 54-02-PLAN.md — Bid ceiling decision tests + roster constraint enforcement tests
 - [ ] 54-03-PLAN.md — Simulation strategy validation + scenario edge case tests
+
+### Phase 55: Extension draft reliability — opponent model fix, inflation wiring, test stabilization
+
+**Goal:** Fix broken opponent model position tracking, wire live inflation into runtime engine, stabilize failing tests
+**Depends on:** Phase 54
+**Requirements:** RELIABILITY-01, RELIABILITY-02, RELIABILITY-03
+**Success Criteria** (what must be TRUE):
+  1. Opponent model uses pick.positions directly (not broken index-based pool lookup)
+  2. competitionFactors and teamNeeds reflect actual draft state
+  3. computeInflation called with real data (not neutral placeholder)
+  4. generateAlerts receives inflation parameter (fixes type mismatch)
+  5. All 10 previously-failing tests pass (archetype fixtures + perf thresholds)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 55-01-PLAN.md — Fix opponent model position tracking + tests
+- [ ] 55-02-PLAN.md — Wire inflation into runtime engine
+- [ ] 55-03-PLAN.md — Fix failing archetype, draft-simulator, monte-carlo tests

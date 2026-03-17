@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 54 — Auction Engine Test Suite
+**Current focus:** Phase 55 — Extension Draft Reliability
 
 ## Current Position
 
-Phase: 54 of 54 (Auction Engine Test Suite)
-Plan: 03 (3 of 3 plans complete)
-Status: Complete
-Last activity: 2026-03-17 - Completed 54-03: simulation strategy and scenario edge case tests
+Phase: 55 of 55 (Extension Draft Reliability)
+Plan: 00 (0 of 3 plans complete)
+Status: Executing
+Last activity: 2026-03-17 - Phase 54 complete, Phase 55 created
 
-Progress: [██████████] 100% (v5.0 — Phase 52-53 complete; Phase 54 in progress)
+Progress: [█████████░] 90% (v5.0 — Phase 54 complete; Phase 55 executing)
 
 ## Accumulated Context
 
@@ -45,6 +45,7 @@ Progress: [██████████] 100% (v5.0 — Phase 52-53 complete; 
 - Phase 52 added: Extension sidebar UI update for v5.0 engine signals
 - Phase 53 added: UI Polish — consistent typography, legible dark-mode colors, professional dashboard styling with Inter font
 - Phase 54 added: Auction engine test suite — unit, simulation, and scenario tests
+- Phase 55 added: Extension draft reliability — opponent model fix, inflation wiring, test stabilization
 
 ### Pending Todos
 
