@@ -10,6 +10,7 @@ export default defineConfig({
     permissions: ["storage", "tabs"],
     host_permissions: [
       "https://fantasy.espn.com/*",
+      "https://lm-api-reads.fantasy.espn.com/*",
       "http://localhost/*",
       "https://localhost/*",
       "http://127.0.0.1/*",

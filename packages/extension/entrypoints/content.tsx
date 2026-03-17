@@ -287,28 +287,41 @@ export default defineContentScript({
 
     // Fetch ESPN live auction values (ASV) from API instead of scraping DOM.
     // Runs async — doesn't block draft initialization.
-    chrome.runtime.sendMessage(
-      { type: "GET_AUCTION_VALUES", payload: { leagueId: String(leagueId) } },
-      (response) => {
-        if (response?.values?.length > 0) {
-          const asvRecord: Record<number, number> = {};
-          const asvByName: Record<string, number> = {};
-          for (const v of response.values) {
-            // Prefer averageAuctionValue (live draft trends) over espnAuctionValue (calculated)
-            const asv = v.averageAuctionValue > 0 ? v.averageAuctionValue : v.espnAuctionValue;
-            if (asv > 0) {
-              asvRecord[v.playerId] = asv;
-              asvByName[normalizePlayerName(v.playerName)] = asv;
-            }
+    try {
+      chrome.runtime.sendMessage(
+        { type: "GET_AUCTION_VALUES", payload: { leagueId: String(leagueId) } },
+        (response) => {
+          // Check for messaging errors (service worker not ready, channel closed, etc.)
+          if (chrome.runtime.lastError) {
+            logger.warn("[ESPN Draft Assistant] ASV fetch message error:", chrome.runtime.lastError.message);
+            return;
           }
-          useDraftStore.getState().setEspnDomAuctionValues(asvRecord);
-          useDraftStore.setState({ espnAsvByName: asvByName });
-          logger.log(`[ESPN Draft Assistant] Loaded ${Object.keys(asvRecord).length} ESPN ASVs from API (${Object.keys(asvByName).length} by name)`);
-        } else {
-          logger.log("[ESPN Draft Assistant] No ESPN ASVs from API — will fall back to DOM scraping");
-        }
-      },
-    );
+          if (response?.error) {
+            logger.warn("[ESPN Draft Assistant] ASV fetch returned error:", response.error);
+            return;
+          }
+          if (response?.values?.length > 0) {
+            const asvRecord: Record<number, number> = {};
+            const asvByName: Record<string, number> = {};
+            for (const v of response.values) {
+              // Prefer averageAuctionValue (live draft trends) over espnAuctionValue (calculated)
+              const asv = v.averageAuctionValue > 0 ? v.averageAuctionValue : v.espnAuctionValue;
+              if (asv > 0) {
+                asvRecord[v.playerId] = asv;
+                asvByName[normalizePlayerName(v.playerName)] = asv;
+              }
+            }
+            useDraftStore.getState().setEspnDomAuctionValues(asvRecord);
+            useDraftStore.setState({ espnAsvByName: asvByName });
+            logger.log(`[ESPN Draft Assistant] Loaded ${Object.keys(asvRecord).length} ESPN ASVs from API (${Object.keys(asvByName).length} by name)`);
+          } else {
+            logger.log("[ESPN Draft Assistant] No ESPN ASVs from API — will fall back to DOM scraping");
+          }
+        },
+      );
+    } catch (err) {
+      logger.warn("[ESPN Draft Assistant] Failed to send ASV fetch message:", err);
+    }
 
     // Compute myGridColumn from team column mapping (dropdown → grid column).
     // parsePickElement sets pick.teamId to the grid column string (e.g., "5"),
