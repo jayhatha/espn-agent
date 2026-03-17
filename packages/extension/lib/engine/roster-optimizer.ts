@@ -10,6 +10,7 @@
  */
 
 import type { PoolPlayer, RosterOptimizationResult } from "./types";
+import { getSpTierCap } from "./draft-constants";
 
 // ============================================================
 // Constants
@@ -181,6 +182,12 @@ export function optimizeRoster(
 
   let remainingBudget = budget - budgetUsed;
 
+  // Count SP/P slots already filled by locked players (for tier cap enforcement)
+  let spCount = 0;
+  for (const assignment of slotAssignments) {
+    if (assignment === "SP" || assignment === "P") spCount++;
+  }
+
   // ------------------------------------------------------------------
   // Phase 2: Sort players by SGP/$ efficiency (descending)
   // ------------------------------------------------------------------
@@ -201,15 +208,18 @@ export function optimizeRoster(
   const totalSlots = Array.from(remainingSlots.values()).reduce((s, v) => s + v, 0);
   let slotsToFill = totalSlots;
 
-  // Track slot assignments for budget upgrade pass
-  const greedyEntries: { player: PoolPlayer; sgp: number; slot: string; rosterIdx: number }[] = [];
-
   for (const { player, sgp } of indexed) {
     if (slotsToFill === 0) break;
 
     // Find the best slot for this player
     const slot = findBestSlot(player.positions, remainingSlots);
     if (slot === null) continue;
+
+    // SP tier cap enforcement: skip SPs that exceed the tier cap for their slot
+    if (slot === "SP" || slot === "P") {
+      const tierCap = getSpTierCap(spCount);
+      if (player.dollars > tierCap) continue;
+    }
 
     // Budget check: reserve $1 per remaining unfilled slot (excluding this one)
     // maxSpend = remainingBudget - (slotsToFill - 1)
@@ -228,7 +238,7 @@ export function optimizeRoster(
 
     roster.push(player);
     slotAssignments.push(slot);
-    greedyEntries.push({ player, sgp, slot, rosterIdx: roster.length - 1 });
+    if (slot === "SP" || slot === "P") spCount++;
     totalSGPValue += sgp;
     budgetUsed += player.dollars;
     remainingBudget -= player.dollars;
@@ -248,11 +258,29 @@ export function optimizeRoster(
     for (const slot of SLOT_PRIORITY) {
       const count = remainingSlots.get(slot) ?? 0;
       for (let s = 0; s < count; s++) {
+        const isSpSlot = slot === "SP" || slot === "P";
+        const tierCap = isSpSlot ? getSpTierCap(spCount) : Infinity;
+
         // Find cheapest eligible player not already in roster
+        // Prefer players within SP tier cap; fall back to cheapest if none qualify.
         let cheapest: { player: PoolPlayer; sgp: number } | null = null;
+        let cheapestFallback: { player: PoolPlayer; sgp: number } | null = null;
         for (const entry of indexed) {
           if (usedInRoster.has(entry.player)) continue;
           if (!canFillSlot(entry.player.positions, slot)) continue;
+
+          // Track cheapest regardless of tier cap for fallback
+          if (
+            !cheapestFallback ||
+            entry.player.dollars < cheapestFallback.player.dollars ||
+            (entry.player.dollars === cheapestFallback.player.dollars && entry.sgp > cheapestFallback.sgp)
+          ) {
+            cheapestFallback = { player: entry.player, sgp: entry.sgp };
+          }
+
+          // Skip SPs over tier cap for primary selection
+          if (isSpSlot && entry.player.dollars > tierCap) continue;
+
           if (
             !cheapest ||
             entry.player.dollars < cheapest.player.dollars ||
@@ -261,15 +289,18 @@ export function optimizeRoster(
             cheapest = { player: entry.player, sgp: entry.sgp };
           }
         }
-        if (cheapest) {
+
+        // Use tier-cap-compliant pick if available, otherwise fall back to cheapest
+        const pick = cheapest ?? cheapestFallback;
+        if (pick) {
           // Place regardless of budget (fill is mandatory)
-          roster.push(cheapest.player);
+          roster.push(pick.player);
           slotAssignments.push(slot);
-          greedyEntries.push({ player: cheapest.player, sgp: cheapest.sgp, slot, rosterIdx: roster.length - 1 });
-          usedInRoster.add(cheapest.player);
-          totalSGPValue += cheapest.sgp;
-          budgetUsed += cheapest.player.dollars;
-          remainingBudget -= cheapest.player.dollars;
+          if (isSpSlot) spCount++;
+          usedInRoster.add(pick.player);
+          totalSGPValue += pick.sgp;
+          budgetUsed += pick.player.dollars;
+          remainingBudget -= pick.player.dollars;
           slotsToFill--;
 
           // Decrement slot count in remainingSlots so outer loop doesn't double-count
@@ -277,58 +308,6 @@ export function optimizeRoster(
           if (c > 1) remainingSlots.set(slot, c - 1);
           else remainingSlots.delete(slot);
         }
-      }
-    }
-  }
-
-  // ------------------------------------------------------------------
-  // Phase 4: Budget upgrade pass
-  // ------------------------------------------------------------------
-  // Greedy efficiency fill picks cheap high-SGP/$ players, leaving budget
-  // unspent. Upgrade cheapest picks to more expensive alternatives with
-  // higher raw SGP when budget allows.
-  if (slotsToFill === 0 && remainingBudget > 1) {
-    const usedPlayers = new Set(roster);
-
-    // Upgrade cheapest players first
-    greedyEntries.sort((a, b) => a.player.dollars - b.player.dollars);
-
-    for (const entry of greedyEntries) {
-      if (remainingBudget < 2) break;
-
-      const maxCost = entry.player.dollars + remainingBudget;
-      let bestUpgrade: { player: PoolPlayer; sgp: number } | null = null;
-
-      for (const cand of indexed) {
-        if (usedPlayers.has(cand.player)) continue;
-        if (cand.player.dollars <= entry.player.dollars) continue;
-        if (cand.player.dollars > maxCost) continue;
-        if (cand.sgp <= entry.sgp) continue;
-
-        // Candidate must fit the same slot the current player occupies
-        const normPos = cand.player.positions.map(normalizePosition);
-        const fits = DEDICATED_SLOTS.has(entry.slot)
-          ? normPos.includes(entry.slot)
-          : (FLEX_ELIGIBILITY[entry.slot]?.some(p => normPos.includes(p)) ?? false);
-        if (!fits) continue;
-
-        if (!bestUpgrade || cand.sgp > bestUpgrade.sgp) {
-          bestUpgrade = { player: cand.player, sgp: cand.sgp };
-        }
-      }
-
-      if (bestUpgrade) {
-        const costDiff = bestUpgrade.player.dollars - entry.player.dollars;
-        roster[entry.rosterIdx] = bestUpgrade.player;
-
-        usedPlayers.delete(entry.player);
-        usedPlayers.add(bestUpgrade.player);
-        totalSGPValue += (bestUpgrade.sgp - entry.sgp);
-        budgetUsed += costDiff;
-        remainingBudget -= costDiff;
-
-        entry.player = bestUpgrade.player;
-        entry.sgp = bestUpgrade.sgp;
       }
     }
   }
