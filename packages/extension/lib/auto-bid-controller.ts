@@ -1,6 +1,7 @@
 import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
 import { getPositionalWeight, getSpTierCap, GS_CAP } from "./engine/draft-constants";
+import { computeStrategyBidCap, isPLUndervaluedCheck } from "./engine/strategy-caps";
 import { logger } from "./logger";
 
 /** Find an action button for a specific player, preferring .action-btn class */
@@ -1123,20 +1124,9 @@ export class AutoBidController {
     const isOpportunity = hasHighExternalRank && isBelowMarket;
 
     // Path 3: PL UNDERVALUED — high PL rank but low ASV (market mispricing)
-    // SP-specific thresholds are more generous because PL SP rankings are deep and reliable
-    let isPLUndervalued = false;
-    if (ranking?.externalRank != null && espnAsv != null) {
-      const rank = ranking.externalRank;
-      if (isSP) {
-        // SP thresholds (more generous — PL SP rankings most valuable)
-        isPLUndervalued =
-          (rank <= 50 && espnAsv < 15) || (rank <= 100 && espnAsv < 10);
-      } else {
-        // General thresholds
-        isPLUndervalued =
-          (rank <= 30 && espnAsv < 20) || (rank <= 75 && espnAsv < 12);
-      }
-    }
+    const isPLUndervalued = isPLUndervaluedCheck(
+      ranking?.externalRank ?? null, espnAsv ?? null, isSP,
+    );
 
     // Path 4: RANKED VALUE — sub-$5 players with any external ranking
     // When everyone is cheap, external rank is the best differentiator.
@@ -1204,130 +1194,52 @@ export class AutoBidController {
       return;
     }
 
-    // Compute bid cap based on bid path (priority: IDEAL > PL UNDERVALUED > RANKED VALUE > OPPORTUNITY):
-    // - Ideal targets: ASV + 10% (bid as much as it takes for our strategy)
-    // - PL Undervalued: ASV + 15% (PL says they're better than market thinks)
-    // - Ranked Value: ASV + rank-scaled premium (cheap + ranked = grab them)
-    // - Opportunities: ASV only (we're buying value, not overpaying)
-    let autoBidCap: number;
-    let capSource: string;
-
-    if (isIdealTarget) {
-      if (espnAsv != null) {
-        autoBidCap = Math.ceil(espnAsv * 1.1);
-        capSource = `IDEAL TARGET, ASV $${espnAsv} +10%`;
-      } else {
-        // No ASV — use optimization maxBid if worker has completed, else defer
-        const maxBid = this.lastEngineSignals?.optimization?.maxBid;
-        if (maxBid != null && maxBid > 0) {
-          autoBidCap = maxBid;
-          capSource = `IDEAL TARGET, engine maxBid $${maxBid}`;
-        } else {
-          // Worker hasn't completed yet — will retry on next updateSignals() call
-          logger.log(
-            "[AutoBidController] Ideal target but no ASV or maxBid yet — deferring",
-          );
-          return;
-        }
-      }
-    } else if (isPLUndervalued) {
-      // PL says they're better than market thinks — willing to go 15% above ASV
-      autoBidCap = Math.ceil(espnAsv! * 1.15);
-      capSource = `PL UNDERVALUED, rank #${ranking!.externalRank} ${isSP ? "(SP)" : ""} ASV $${espnAsv} +15%`;
-    } else if (isRankedValue) {
-      // Sub-$5 player with an external ranking — the cheaper the player and
-      // better the rank, the more premium we're willing to pay.
-      // Top-50 ranked: ASV + $2 premium (e.g., $3 → $5)
-      // Top-100: ASV + $1 (e.g., $3 → $4)
-      // 100-200: at ASV (still worth grabbing at market)
-      const rank = ranking!.externalRank;
-      const premium = rank <= 50 ? 2 : rank <= 100 ? 1 : 0;
-      autoBidCap = Math.ceil(espnAsv! + premium);
-      capSource = `RANKED VALUE, rank #${rank} ASV $${espnAsv} +$${premium}`;
-    } else {
-      // Opportunity: cap at market value (espnAsv is guaranteed non-null here by isBelowMarket check)
-      autoBidCap = espnAsv!;
-      capSource = `OPPORTUNITY, ASV $${espnAsv}`;
-    }
-
-    // Apply pitcher/hitter split dampening to bid caps for pitchers.
-    // Same formula as engine/index.ts: pitcherMultiplier = (100 - split) / 50
-    // At default split=65: pitcherMultiplier = 0.7, so a $22 IDEAL TARGET cap becomes $16.
-    // At 50/50 split: multiplier = 1.0, no change for either pitchers or hitters.
-    const pitcherHitterSplit = state.pitcherHitterSplit ?? 65;
-    if (isPitcher) {
-      const pitcherMultiplier = (100 - pitcherHitterSplit) / 50;
-      const rawCap = autoBidCap;
-      autoBidCap = Math.max(1, Math.ceil(autoBidCap * pitcherMultiplier));
-      capSource += ` → pitcher dampened ×${pitcherMultiplier.toFixed(2)} = $${autoBidCap} (raw $${rawCap})`;
-    }
-
-    // Apply catcher slot dampening: when the dedicated C slot is already filled, a catcher
-    // can only go to UTIL or BN. We still want to draft utility catchers but shouldn't
-    // overpay since they're now bench-eligible only. Cut the bid cap by 50% to reflect
-    // reduced value of a second catcher slotted to UTIL/BN.
+    // Compute strategy-adjusted bid cap using shared logic (same as sidebar display)
     const playerPosition = ranking?.primaryPosition;
-    if (playerPosition === "C") {
-      const remainingSlots = this.lastEngineSignals?.remainingSlots;
-      const catcherSlotsRemaining = remainingSlots?.["C"] ?? 0;
-      if (catcherSlotsRemaining <= 0) {
-        const rawCap = autoBidCap;
-        autoBidCap = Math.max(1, Math.ceil(autoBidCap * 0.5));
-        capSource += ` → C slot filled, catcher dampened ×0.5 = $${autoBidCap} (raw $${rawCap})`;
-        logger.log(
-          `[AutoBidController] C slot filled — catcher dampening applied (0.5x): $${rawCap} → $${autoBidCap}`,
-        );
-      }
-    }
-
-    // Apply positional weight bonus: scarce hitting positions get a bid ceiling boost.
-    // SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1. Pitchers and flex get +0.
     const playerPositions = ranking?.positions ?? (playerPosition ? [playerPosition] : []);
-    const posWeight = getPositionalWeight(playerPositions);
-    if (posWeight > 0) {
-      const rawCap = autoBidCap;
-      autoBidCap += posWeight;
-      capSource += ` → positional weight +${posWeight} (${playerPositions.join("/")}) = $${autoBidCap} (raw $${rawCap})`;
+    const rawMaxBid = this.lastEngineSignals?.optimization?.maxBid ?? 0;
+
+    // IDEAL TARGET with no ASV and no engine maxBid yet — defer
+    if (isIdealTarget && espnAsv == null && (rawMaxBid == null || rawMaxBid <= 0)) {
+      logger.log("[AutoBidController] Ideal target but no ASV or maxBid yet — deferring");
+      return;
     }
 
-    // Apply SP tier caps: limit spending on SPs based on how many are already drafted.
-    // SP1 $18, SP2 $12, SP3 $10, SP4 $5, SP5+ $3.
-    if (isSP) {
-      const spCount = state.myRoster.filter(
-        (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
-      ).length;
-      const tierCap = getSpTierCap(spCount);
-      if (autoBidCap > tierCap) {
-        const rawCap = autoBidCap;
-        autoBidCap = tierCap;
-        capSource += ` → SP tier ${spCount + 1} cap $${tierCap} (raw $${rawCap})`;
-      }
-      // GS cap awareness: log advisory for deep SP picks (SP4+)
-      if (spCount >= 3) {
-        logger.log(
-          `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
-        );
-      }
+    const spCount = state.myRoster.filter(
+      (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
+    ).length;
+
+    const capResult = computeStrategyBidCap({
+      rawMaxBid,
+      espnAsv: espnAsv ?? null,
+      isIdealTarget,
+      isPLUndervalued,
+      isOpportunity,
+      isRankedValue,
+      externalRank: ranking?.externalRank ?? null,
+      isPitcher,
+      isSP,
+      positions: playerPositions,
+      primaryPosition: playerPosition ?? null,
+      pitcherHitterSplit: state.pitcherHitterSplit ?? 75,
+      spCount,
+      catcherSlotsRemaining: this.lastEngineSignals?.remainingSlots?.["C"] ?? 0,
+      isEndgame,
+      inflationFactor: this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0,
+    });
+
+    if (!capResult.shouldBid) {
+      logger.log(`[AutoBidController] Strategy cap says no bid: ${capResult.capSource}`);
+      return;
     }
 
-    // Apply endgame dampening: when in endgame mode, reduce all bid caps by 30%
-    // to preserve remaining budget for high-value-per-dollar pickups.
-    if (isEndgame) {
-      const rawCap = autoBidCap;
-      autoBidCap = Math.max(1, Math.ceil(autoBidCap * 0.7));
-      capSource += ` → ENDGAME dampened ×0.70 = $${autoBidCap} (raw $${rawCap})`;
-    }
+    let autoBidCap = capResult.bidCap;
+    const capSource = capResult.capSource;
 
-    // Apply inflation bid adjustment (INF-02): when inflation > 1.10 (buying_window
-    // or strong_value band), opponents are overspending relative to remaining value —
-    // extend bid ceiling by +2 to capture bargains.
-    const inflationFactor = this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0;
-    const inflationBand = this.lastEngineSignals?.inflation?.inflationBand ?? "neutral";
-    if (inflationFactor > 1.10) {
-      autoBidCap += 2;
-      capSource += ` → inflation adjustment +2 (inflation=${inflationFactor.toFixed(2)}, band=${inflationBand})`;
+    // GS cap awareness: log advisory for deep SP picks (SP4+)
+    if (isSP && spCount >= 3) {
       logger.log(
-        `[AutoBid] Inflation adjustment: +2 (inflation=${inflationFactor.toFixed(2)}, band=${inflationBand})`,
+        `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
       );
     }
 

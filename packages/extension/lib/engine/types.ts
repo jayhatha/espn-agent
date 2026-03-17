@@ -155,6 +155,12 @@ export interface RosterOptimizationSignal {
   expectedMarketPrice: number;
   valueSurplus: number;
   shouldBid: boolean;
+  /** Strategy-adjusted bid cap (after pitcher dampening, SP tier caps, etc.) */
+  strategyBidCap: number | null;
+  /** Bid path classification */
+  bidPath: "IDEAL" | "PL_UNDERVALUED" | "RANKED_VALUE" | "OPPORTUNITY" | "NONE" | null;
+  /** Human-readable cap explanation */
+  capSource: string | null;
   topTargets: TargetRecommendation[];
   opponentPressure: Record<string, number>;
   simulationEV: number;

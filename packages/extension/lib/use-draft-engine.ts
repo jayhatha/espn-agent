@@ -3,6 +3,8 @@ import { useDraftStore } from "./draft-state";
 import { computeDraftEngine } from "./engine";
 import type { DraftEngineSignals, ForwardSimulationSignal } from "./engine";
 import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
+import { computeStrategyBidCap, isPLUndervaluedCheck } from "./engine/strategy-caps";
+import { normalizeName } from "./engine/normalizer";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -98,10 +100,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   ]);
 
   // Merge async simulation and bid results into signals — async results take priority when available
+  // Apply strategy caps to make maxBid/shouldBid match auto-bid controller behavior
   return useMemo(() => {
     if (!baseSignals) return null;
 
-    const mergedOptimization = baseSignals.optimization && asyncBid
+    let mergedOptimization = baseSignals.optimization && asyncBid
       ? {
           ...baseSignals.optimization,
           maxBid: asyncBid.maxBid,
@@ -113,10 +116,89 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         }
       : baseSignals.optimization;
 
+    // Apply strategy caps to the merged optimization result
+    if (mergedOptimization && currentPlayerName) {
+      const nominatedName = currentPlayerName.toLowerCase();
+
+      // Find ranking for nominated player
+      const ranking = rankings.find(
+        (r) => r.playerName.toLowerCase() === nominatedName,
+      );
+
+      // Find ideal roster match
+      const idealPlayers = baseSignals.idealRoster?.players ?? [];
+      const idealMatch = idealPlayers.find(
+        (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName,
+      );
+
+      // Get ESPN ASV
+      const espnAsv = currentPlayerId != null
+        ? espnDomAuctionValues[currentPlayerId] ?? null
+        : null;
+
+      // Classify player
+      const isSP = ranking?.primaryPosition === "SP";
+      const isRP = ranking?.primaryPosition === "RP";
+      const isPitcher = isSP || isRP;
+      const isIdealTarget = idealMatch != null &&
+        (idealMatch.tier === "anchor" || idealMatch.tier === "core");
+      const opportunityRankThreshold = isSP ? 100 : 50;
+      const hasHighExternalRank = ranking?.externalRank != null &&
+        ranking.externalRank <= opportunityRankThreshold;
+      const isOpportunity = hasHighExternalRank && espnAsv != null;
+      const plUndervalued = isPLUndervaluedCheck(
+        ranking?.externalRank ?? null, espnAsv, isSP,
+      );
+      const isRankedValue = !isIdealTarget && !plUndervalued && !isOpportunity &&
+        espnAsv != null && espnAsv <= 5 &&
+        ranking?.externalRank != null && ranking.externalRank <= 200;
+
+      // Count SPs on roster
+      const spCount = myRoster.filter(
+        (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
+      ).length;
+
+      const capResult = computeStrategyBidCap({
+        rawMaxBid: mergedOptimization.maxBid,
+        espnAsv,
+        isIdealTarget,
+        isPLUndervalued: plUndervalued,
+        isOpportunity,
+        isRankedValue,
+        externalRank: ranking?.externalRank ?? null,
+        isPitcher,
+        isSP,
+        positions: ranking?.positions ?? [],
+        primaryPosition: ranking?.primaryPosition ?? null,
+        pitcherHitterSplit: pitcherHitterSplit ?? 75,
+        spCount,
+        catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
+        isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,
+        inflationFactor: baseSignals.inflation?.inflationFactor ?? 1.0,
+      });
+
+      mergedOptimization = {
+        ...mergedOptimization,
+        maxBid: capResult.shouldBid
+          ? Math.min(mergedOptimization.maxBid, capResult.bidCap)
+          : mergedOptimization.maxBid,
+        shouldBid: capResult.shouldBid
+          ? mergedOptimization.shouldBid
+          : false,
+        valueSurplus: capResult.shouldBid
+          ? Math.min(mergedOptimization.maxBid, capResult.bidCap) - mergedOptimization.expectedMarketPrice
+          : mergedOptimization.maxBid - mergedOptimization.expectedMarketPrice,
+        strategyBidCap: capResult.bidCap,
+        bidPath: capResult.bidPath,
+        capSource: capResult.capSource,
+      };
+    }
+
     return {
       ...baseSignals,
       optimization: mergedOptimization,
       simulation: asyncSimulation ?? baseSignals.simulation,
     };
-  }, [baseSignals, asyncSimulation, asyncBid]);
+  }, [baseSignals, asyncSimulation, asyncBid, currentPlayerName, currentPlayerId,
+      rankings, myRoster, espnDomAuctionValues, pitcherHitterSplit]);
 }

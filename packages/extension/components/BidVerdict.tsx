@@ -14,7 +14,7 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
     return null;
   }
 
-  const { maxBid, shouldBid, expectedMarketPrice } = engineSignals.optimization;
+  const { maxBid, shouldBid, expectedMarketPrice, bidPath, capSource } = engineSignals.optimization;
   const winProbability =
     engineSignals.simulation?.winProbability?.winProbability;
 
@@ -36,6 +36,13 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
     ? `BID up to $${maxBid}`
     : "PASS";
 
+  // Bid path label for display
+  const pathLabel = bidPath === "IDEAL" ? "Ideal Target"
+    : bidPath === "PL_UNDERVALUED" ? "PL Undervalued"
+    : bidPath === "RANKED_VALUE" ? "Ranked Value"
+    : bidPath === "OPPORTUNITY" ? "Opportunity"
+    : null;
+
   return (
     <div className={`mx-3 my-1.5 border-2 ${borderClass} rounded-card p-3 bg-grafana-panel`}>
       {/* Verdict */}
@@ -52,13 +59,18 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
       </div>
 
       {/* Stat pills */}
-      <div className="flex items-center gap-2 mt-1">
+      <div className="flex items-center gap-2 mt-1 flex-wrap">
         <span className="text-caption bg-grafana-border text-grafana-muted rounded px-2 py-0.5">
           Market ${expectedMarketPrice}
         </span>
+        {pathLabel && (
+          <span className="text-caption bg-grafana-info/20 text-grafana-info rounded px-2 py-0.5">
+            {pathLabel}
+          </span>
+        )}
         {winProbability !== undefined && (
           <span className="text-caption bg-grafana-border text-grafana-muted rounded px-2 py-0.5">
-            Win Prob {Math.round(winProbability * 100)}%
+            Win {Math.round(winProbability * 100)}%
           </span>
         )}
         {isRisky && (
