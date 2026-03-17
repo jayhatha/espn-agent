@@ -312,6 +312,74 @@ export function optimizeRoster(
     }
   }
 
+  // ------------------------------------------------------------------
+  // Phase 4: Budget upgrade pass
+  // ------------------------------------------------------------------
+  // The greedy fill picks by SGP/$ efficiency, which favors cheap players.
+  // This can leave significant budget unspent. Iterate through the roster
+  // and try to swap cheap players for more expensive (higher SGP) alternatives
+  // until the budget is fully utilized.
+  //
+  // For each roster slot (cheapest first), find the best available upgrade:
+  // a player with higher SGP who costs more but fits within remaining budget.
+  {
+    const usedNames = new Set(roster.map(p => p.normalizedName));
+
+    // Sort roster indices by cost ascending (upgrade cheapest first)
+    const upgradeOrder = roster
+      .map((_, i) => i)
+      .filter(i => !lockedPlayers?.some(lp => lp.player.normalizedName === roster[i].normalizedName))
+      .sort((a, b) => roster[a].dollars - roster[b].dollars);
+
+    for (const rosterIdx of upgradeOrder) {
+      if (remainingBudget <= 0) break;
+
+      const currentPlayer = roster[rosterIdx];
+      const currentSlot = slotAssignments[rosterIdx];
+      const currentSgpIdx = players.indexOf(currentPlayer);
+      const currentSgp = currentSgpIdx >= 0 ? (sgpValues[currentSgpIdx] ?? 0) : 0;
+
+      // Find best upgrade: higher SGP, fits the slot, affordable
+      let bestUpgrade: { player: PoolPlayer; sgp: number; cost: number } | null = null;
+
+      for (const entry of indexed) {
+        if (usedNames.has(entry.player.normalizedName)) continue;
+        if (!canFillSlot(entry.player.positions, currentSlot)) continue;
+
+        const extraCost = entry.player.dollars - currentPlayer.dollars;
+        if (extraCost <= 0) continue; // Not an upgrade in cost
+        if (extraCost > remainingBudget) continue; // Can't afford
+        if (entry.sgp <= currentSgp) continue; // Not an SGP upgrade
+
+        // SP tier cap check for pitcher slots
+        if (currentSlot === "SP" || currentSlot === "P") {
+          // Find this slot's tier position
+          const slotSpIndex = slotAssignments
+            .filter((s, i) => (s === "SP" || s === "P") && i < rosterIdx)
+            .length;
+          const tierCap = getSpTierCap(slotSpIndex);
+          if (entry.player.dollars > tierCap) continue;
+        }
+
+        if (!bestUpgrade || entry.sgp > bestUpgrade.sgp) {
+          bestUpgrade = { player: entry.player, sgp: entry.sgp, cost: entry.player.dollars };
+        }
+      }
+
+      if (bestUpgrade) {
+        const extraCost = bestUpgrade.cost - currentPlayer.dollars;
+        const sgpGain = bestUpgrade.sgp - currentSgp;
+
+        usedNames.delete(currentPlayer.normalizedName);
+        usedNames.add(bestUpgrade.player.normalizedName);
+        roster[rosterIdx] = bestUpgrade.player;
+        totalSGPValue += sgpGain;
+        budgetUsed += extraCost;
+        remainingBudget -= extraCost;
+      }
+    }
+  }
+
   // Count unfilled slots
   const unfilledSlots = Array.from(remainingSlots.values()).reduce((s, v) => s + v, 0);
 
