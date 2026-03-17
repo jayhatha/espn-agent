@@ -1196,9 +1196,11 @@ export class AutoBidController {
     const idealMatch = idealPlayers.find(
       (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName,
     );
+    // Only core/value ideal targets get aggressive bidding (ASV+10%).
+    // Anchor-tier ($20+ market) players are too expensive for value strategy —
+    // we'll only bid on them opportunistically (at or below market).
     const isIdealTarget =
-      idealMatch != null &&
-      (idealMatch.tier === "anchor" || idealMatch.tier === "core");
+      idealMatch != null && idealMatch.tier === "core";
 
     // Opportunity: high externally ranked player currently below market price
     // SPs get wider threshold (top-100) because PL rankings are deepest for SP

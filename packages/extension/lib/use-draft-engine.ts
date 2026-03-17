@@ -141,7 +141,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       const isRP = ranking?.primaryPosition === "RP";
       const isPitcher = isSP || isRP;
       const isIdealTarget = idealMatch != null &&
-        (idealMatch.tier === "anchor" || idealMatch.tier === "core");
+        idealMatch.tier === "core";
       const opportunityRankThreshold = isSP ? 100 : 50;
       const hasHighExternalRank = ranking?.externalRank != null &&
         ranking.externalRank <= opportunityRankThreshold;
