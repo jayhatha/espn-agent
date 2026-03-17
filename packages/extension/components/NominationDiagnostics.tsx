@@ -88,7 +88,7 @@ export default function NominationDiagnostics() {
               {diag.lastCandidateName
                 ? <>
                     {diag.lastCandidateName}{" "}
-                    <span className={diag.lastCandidateSource === 'queue' ? 'text-grafana-positive font-semibold' : ''}>
+                    <span>
                       ({diag.lastCandidateSource ?? "unknown"})
                     </span>
                   </>
@@ -140,21 +140,6 @@ export default function NominationDiagnostics() {
               {diag.cooldownRemainingMs > 0
                 ? `${Math.ceil(diag.cooldownRemainingMs / 1000)}s remaining`
                 : "Ready"}
-            </span>
-          </div>
-
-          {/* Queue population */}
-          <div className="flex items-center justify-between">
-            <span className="text-body-xs text-grafana-muted w-24 shrink-0">Queue</span>
-            <span className="text-body-xs text-grafana-text">
-              {diag.queuePopulationCount > 0
-                ? `${diag.queuePopulationCount} queued this session`
-                : "Empty"}
-              {diag.lastQueuePopulateTime != null && (
-                <span className="text-body-xs text-grafana-muted ml-1">
-                  ({Math.round((Date.now() - diag.lastQueuePopulateTime) / 1000)}s ago)
-                </span>
-              )}
             </span>
           </div>
 
