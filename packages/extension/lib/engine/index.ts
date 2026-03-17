@@ -3,6 +3,7 @@ import { computeEnhancedScarcity } from "./scarcity";
 import { computeCategoryGaps } from "./category-gap";
 import { computeBudgetCurve } from "./budget-curve";
 import { generateAlerts } from "./alerts";
+import { computeInflation } from "./inflation";
 import { buildFgPlayerPool } from "./archetype";
 import { normalizeName } from "./normalizer";
 import { computeProjectedStandings } from "./projected-standings";
@@ -788,15 +789,14 @@ export function computeDraftEngine(
   // Build rankingsMap for O(1) lookups
   const rankingsMap = new Map(input.rankings.map(r => [r.playerId, r]));
 
-  // 1. Inflation model — disabled (neutral 1.0 factor), kept as placeholder for type compatibility
-  const inflation: InflationSignal = {
-    inflationFactor: 1.0,
-    rawInflationFactor: 1.0,
-    totalRemainingBudget: 0,
-    totalRemainingValue: 0,
-    confidence: "high",
-    percentOverMarket: 0,
-  };
+  // 1. Inflation model — live computation from draft state
+  const inflation = computeInflation(
+    input.allPicks,
+    input.auctionValues,
+    input.allTeamBudgets ?? [],
+    input.totalTeams,
+    input.remainingBudget,
+  );
 
   // 2. Enhanced scarcity model (uses external rankings + auction $ for tier drops)
   const scarcity = computeEnhancedScarcity(
@@ -856,7 +856,7 @@ export function computeDraftEngine(
   );
 
   // 5. Generate alerts from all signals
-  const alerts = generateAlerts(scarcity, categoryGaps, budgetCurve);
+  const alerts = generateAlerts(inflation, scarcity, categoryGaps, budgetCurve);
 
   // 5b. Compute per-team drafted stat totals (needed by projected standings + simulation)
   let teamDraftedTotals: Map<string, Record<string, number>> | null = null;
