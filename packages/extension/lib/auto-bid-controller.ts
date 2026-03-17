@@ -231,6 +231,15 @@ export class AutoBidController {
 
     const state = useDraftStore.getState();
 
+    // Guard: don't act before the draft has started. If no picks have been
+    // made and no bidding form is visible, the draft lobby is still open.
+    const draftHasActivity = state.allPicks.length > 0
+      || !!document.querySelector("form.bidding-form__default")
+      || !!document.querySelector(".auction-pick-component--own");
+    if (!draftHasActivity) {
+      return; // Pre-draft lobby — do nothing
+    }
+
     if (state.autoMode && state.currentAuctionPlayer == null) {
       // No active auction — try to nominate, then populate queue for upcoming rounds
       this.evaluateAndNominate();
