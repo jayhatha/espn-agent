@@ -545,10 +545,43 @@ function computeIdealRoster(
     }
   }
 
-  // Skip ASV overlay for ideal roster: use FanGraphs model dollars so SGP/$
-  // efficiency reflects true projected value, not inflated ESPN market prices.
-  // ASV overlay is still applied in bid-optimizer for market-aware bidding.
-  const playersForOptimizer = allPlayers;
+  // Use ESPN ASV (market price) as the cost for ideal roster construction.
+  // This makes the ideal roster a realistic shopping list that sums to remaining
+  // budget at market prices. As we draft below market, the savings flow into
+  // upgrading remaining targets. Fall back to FG model dollars when no ASV available.
+  const espnAsv = input.espnDomAuctionValues ?? {};
+  const hasAsvData = Object.keys(espnAsv).length > 0;
+
+  // Build name→ASV lookup (ESPN IDs in espnAsv may differ from pool player IDs)
+  const nameToAsv = new Map<string, number>();
+  if (hasAsvData) {
+    // Map ESPN player IDs to names via auctionValues and rankings
+    const idToName = new Map<number, string>();
+    for (const av of input.auctionValues) {
+      idToName.set(av.playerId, normalizeName(av.playerName));
+    }
+    for (const r of input.rankings) {
+      if (!idToName.has(r.playerId)) {
+        idToName.set(r.playerId, normalizeName(r.playerName));
+      }
+    }
+    for (const [idStr, asvVal] of Object.entries(espnAsv)) {
+      if (asvVal > 0) {
+        const name = idToName.get(Number(idStr));
+        if (name) nameToAsv.set(name, asvVal);
+      }
+    }
+  }
+
+  const playersForOptimizer = hasAsvData
+    ? allPlayers.map(p => {
+        const asv = nameToAsv.get(p.normalizedName);
+        if (asv != null && asv > 0) {
+          return { ...p, dollars: asv };
+        }
+        return p;
+      })
+    : allPlayers;
 
   // ------------------------------------------------------------------
   // Category floor enforcement: detect zero-coverage active scoring
