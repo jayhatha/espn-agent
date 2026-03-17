@@ -207,13 +207,13 @@ export const useDraftStore = create<DraftState>()(
 
         if (isSameDraft) {
           // Same-draft reload: update config only, preserve accumulated draft data.
-          // Keep the persisted myTeamId if valid (already detected) — don't overwrite
-          // with a hardcoded fallback that may be wrong for practice drafts.
+          // Prefer freshly detected myTeamId over persisted value — the persisted
+          // value may be stale from a prior session (e.g., old hardcoded team ID).
           set({
             draftFormat: config.draftFormat,
             totalTeams: config.totalTeams,
             rosterSize: config.rosterSize,
-            myTeamId: current.myTeamId || config.myTeamId,
+            myTeamId: config.myTeamId ?? current.myTeamId,
             remainingBudget: config.budget || current.remainingBudget,
           });
           return;
