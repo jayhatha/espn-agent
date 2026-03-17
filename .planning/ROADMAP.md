@@ -154,9 +154,18 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 
 ### Phase 54: Auction engine test suite: unit tests for bid ceiling, inflation, SGP, roster constraints; simulation tests for strategy validation; scenario tests for edge cases
 
-**Goal:** [To be planned]
+**Goal:** Comprehensive test coverage for v5.0 auction engine — unit tests for inflation, budget curve, draft constants, bid ceiling, and roster constraints; simulation tests for strategy validation; scenario tests for edge cases
 **Depends on:** Phase 53
-**Plans:** 0 plans
+**Requirements:** TEST-UNIT, TEST-SIM, TEST-SCENARIO
+**Success Criteria** (what must be TRUE):
+  1. All v5.0 engine modules (inflation, budget-curve, draft-constants) have dedicated test files
+  2. Bid ceiling tests verify BID/PASS decisions with inflation and positional adjustments
+  3. Roster constraint tests verify budget limits, slot filling, SP tier caps, and backfill
+  4. Simulation tests confirm value-drafting strategy outperforms random
+  5. Scenario tests verify correct behavior under early value run, late inflation, position scarcity, and endgame conditions
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 54 to break down)
+- [ ] 54-01-PLAN.md — Unit tests for inflation, budget-curve, draft-constants
+- [ ] 54-02-PLAN.md — Bid ceiling decision tests + roster constraint enforcement tests
+- [ ] 54-03-PLAN.md — Simulation strategy validation + scenario edge case tests
