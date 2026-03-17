@@ -114,6 +114,8 @@ export interface DraftEngineInput {
   currentAuctionPlayerId?: number;
   currentAuctionPlayerName?: string;
   espnDomAuctionValues?: Record<number, number>;
+  /** ESPN ASVs keyed by normalized player name (from API response). Reliable cross-ID matching. */
+  espnAsvByName?: Record<string, number>;
   /**
    * Budget allocation preference: 0-100 where value = % allocated to hitting.
    * Default 65. Applied as SGP multiplier: hitters get split/50, pitchers get (100-split)/50.

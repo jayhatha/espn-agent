@@ -292,15 +292,18 @@ export default defineContentScript({
       (response) => {
         if (response?.values?.length > 0) {
           const asvRecord: Record<number, number> = {};
+          const asvByName: Record<string, number> = {};
           for (const v of response.values) {
             // Prefer averageAuctionValue (live draft trends) over espnAuctionValue (calculated)
             const asv = v.averageAuctionValue > 0 ? v.averageAuctionValue : v.espnAuctionValue;
             if (asv > 0) {
               asvRecord[v.playerId] = asv;
+              asvByName[normalizePlayerName(v.playerName)] = asv;
             }
           }
           useDraftStore.getState().setEspnDomAuctionValues(asvRecord);
-          logger.log(`[ESPN Draft Assistant] Loaded ${Object.keys(asvRecord).length} ESPN ASVs from API`);
+          useDraftStore.setState({ espnAsvByName: asvByName });
+          logger.log(`[ESPN Draft Assistant] Loaded ${Object.keys(asvRecord).length} ESPN ASVs from API (${Object.keys(asvByName).length} by name)`);
         } else {
           logger.log("[ESPN Draft Assistant] No ESPN ASVs from API — will fall back to DOM scraping");
         }

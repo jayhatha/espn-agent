@@ -86,6 +86,9 @@ interface DraftState {
   // Scraped from the fixedDataTable on the draft page — more accurate than
   // backend API values. Merged incrementally as the user scrolls the table.
   espnDomAuctionValues: Record<number, number>;
+  // ESPN auction values keyed by normalized player name (populated from API response).
+  // Used by ideal roster optimizer for cross-ID matching when ESPN IDs != FG IDs.
+  espnAsvByName: Record<string, number>;
 
   // All team budgets from pick train DOM scraping (populated every 5s in auction drafts)
   allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>;
@@ -188,6 +191,7 @@ export const useDraftStore = create<DraftState>()(
       autoMode: true,
       espnNominationQueue: [],
       espnDomAuctionValues: {},
+      espnAsvByName: {},
       allTeamBudgets: [],
       leagueCategories: [],
       detectedRosterSlots: null,
@@ -232,6 +236,7 @@ export const useDraftStore = create<DraftState>()(
           currentPick: 1,
           teamRosters: new Map(),
           espnDomAuctionValues: {},
+      espnAsvByName: {},
           allTeamBudgets: [],
           currentAuctionPlayer: null,
           espnNominationQueue: [],
@@ -445,6 +450,7 @@ export const useDraftStore = create<DraftState>()(
           currentAuctionPlayer: null,
           espnNominationQueue: [],
           espnDomAuctionValues: {},
+      espnAsvByName: {},
           allTeamBudgets: [],
           leagueCategories: [],
           detectedRosterSlots: null,

@@ -549,71 +549,15 @@ function computeIdealRoster(
   // This makes the ideal roster a realistic shopping list that sums to remaining
   // budget at market prices. As we draft below market, the savings flow into
   // upgrading remaining targets. Fall back to FG model dollars when no ASV available.
-  const espnAsv = input.espnDomAuctionValues ?? {};
-  const hasAsvData = Object.keys(espnAsv).length > 0;
-
-  // Build name→ASV lookup. ESPN IDs in espnAsv may differ from FG pool player IDs,
-  // so we map ESPN ID → name using all available sources, then name → ASV.
-  const nameToAsvIdeal = new Map<string, number>();
-  if (hasAsvData) {
-    const idToName = new Map<number, string>();
-    // Source 1: auctionValues (FG CSV — has ESPN-matched IDs when available)
-    for (const av of input.auctionValues) {
-      idToName.set(av.playerId, normalizeName(av.playerName));
-    }
-    // Source 2: rankings (may have different IDs)
-    for (const r of input.rankings) {
-      if (!idToName.has(r.playerId)) {
-        idToName.set(r.playerId, normalizeName(r.playerName));
-      }
-    }
-    // Source 3: allPicks (DOM-parsed picks have ESPN player IDs + names)
-    for (const pick of input.allPicks) {
-      if (pick.playerId > 0 && !idToName.has(pick.playerId)) {
-        idToName.set(pick.playerId, normalizeName(pick.playerName));
-      }
-    }
-    // Source 4: the pool players themselves may have matching IDs
-    // (when FG CSV player IDs happen to match ESPN IDs)
-    for (const [idStr, asvVal] of Object.entries(espnAsv)) {
-      if (asvVal > 0) {
-        const name = idToName.get(Number(idStr));
-        if (name) {
-          nameToAsvIdeal.set(name, asvVal);
-        }
-      }
-    }
-    // Source 5: direct name match from pool — for any pool player whose name
-    // we haven't mapped yet, check if any ESPN ASV entry shares the same name.
-    // This handles the common case where FG and ESPN use different player IDs
-    // but the same player name.
-    if (nameToAsvIdeal.size < Object.keys(espnAsv).length * 0.5) {
-      // Less than half mapped by ID — build reverse lookup by scanning pool
-      // This is O(n*m) but both are small (pool ~200, ASV ~500)
-      const unmappedAsvEntries: [number, number][] = [];
-      for (const [idStr, asvVal] of Object.entries(espnAsv)) {
-        const id = Number(idStr);
-        if (asvVal > 0 && !idToName.has(id)) {
-          unmappedAsvEntries.push([id, asvVal]);
-        }
-      }
-      if (unmappedAsvEntries.length > 0) {
-        // Try matching pool player names against auctionValues playerNames
-        // since auctionValues has both ESPN IDs and full names
-        for (const av of input.auctionValues) {
-          const avName = normalizeName(av.playerName);
-          const asvVal = espnAsv[av.playerId];
-          if (asvVal != null && asvVal > 0 && !nameToAsvIdeal.has(avName)) {
-            nameToAsvIdeal.set(avName, asvVal);
-          }
-        }
-      }
-    }
-  }
+  //
+  // espnAsvByName (normalized name → ASV) is built directly from the ESPN API
+  // response in the content script — no cross-ID mapping needed.
+  const asvByName = input.espnAsvByName ?? {};
+  const hasAsvData = Object.keys(asvByName).length > 0;
 
   const playersForOptimizer = hasAsvData
     ? allPlayers.map(p => {
-        const asv = nameToAsvIdeal.get(p.normalizedName);
+        const asv = asvByName[p.normalizedName];
         if (asv != null && asv > 0) {
           return { ...p, dollars: asv };
         }
@@ -623,7 +567,7 @@ function computeIdealRoster(
 
   if (import.meta.env.DEV && hasAsvData) {
     const mapped = playersForOptimizer.filter((p, i) => p.dollars !== allPlayers[i].dollars).length;
-    logger.log(`[IdealRoster] ASV overlay: ${mapped}/${allPlayers.length} players repriced (${nameToAsvIdeal.size} ASVs available)`);
+    logger.log(`[IdealRoster] ASV overlay: ${mapped}/${allPlayers.length} players repriced (${Object.keys(asvByName).length} ASVs by name)`);
   }
 
   // ------------------------------------------------------------------
@@ -1533,9 +1477,12 @@ export function computeDraftEngine(
   }
 
   // 6b. Ideal roster optimizer (Phase 29)
-  // Cache invalidates on allPicks.length, split change, or categoryTargets change — recomputes when a new pick is made, split changes, or targets change.
+  // Cache invalidates on: picks, budget, split, targets, ASV availability.
+  // Must include remainingBudget so upgrades recalc when budget changes.
+  // Must include ASV count so ideal roster reprices when ESPN API data arrives.
   const targetsKey = input.categoryTargets ? JSON.stringify(input.categoryTargets) : "";
-  const newIdealRosterCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}_${splitValue}_${targetsKey}_${input.optimizeForTargets ? '1' : '0'}`;
+  const asvNameCount = input.espnAsvByName ? Object.keys(input.espnAsvByName).length : 0;
+  const newIdealRosterCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}_${input.remainingBudget}_${splitValue}_${targetsKey}_${input.optimizeForTargets ? '1' : '0'}_${asvNameCount}`;
   let idealRoster: IdealRosterSignal | null = null;
   if (idealRosterCacheKey !== newIdealRosterCacheKey || cachedIdealRoster === null) {
     try {

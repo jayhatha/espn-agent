@@ -69,6 +69,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         currentAuctionPlayerId: currentPlayerId,
         currentAuctionPlayerName: currentPlayerName,
         espnDomAuctionValues,
+        espnAsvByName: useDraftStore.getState().espnAsvByName,
         pitcherHitterSplit,
         categoryTargets,
         optimizeForTargets,
