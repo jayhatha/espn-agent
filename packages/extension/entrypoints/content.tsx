@@ -28,7 +28,6 @@ import {
   DEFAULT_TOTAL_TEAMS,
   DEFAULT_ROSTER_SLOTS,
   DEFAULT_BUDGET,
-  DEFAULT_TEAM_ID,
 } from "@espn-fantasy/shared";
 import DraftSidebar from "../components/DraftSidebar";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -179,7 +178,7 @@ export default defineContentScript({
       rosterSlots: DEFAULT_ROSTER_SLOTS,
       budget: DEFAULT_BUDGET,
     };
-    logger.log("[ESPN Draft Assistant] Using hardcoded league 112523 config as primary:", {
+    logger.log("[ESPN Draft Assistant] Using default league config as primary:", {
       totalTeams: DEFAULT_TOTAL_TEAMS,
       categories: DEFAULT_CATEGORIES.length,
       rosterSlots: Object.keys(DEFAULT_ROSTER_SLOTS).length,
@@ -241,16 +240,14 @@ export default defineContentScript({
       : 25;
 
     // Attempt early team ID detection before initializeDraft so we pass the
-    // correct ID from the start. Practice drafts assign arbitrary team IDs, so
-    // the hardcoded DEFAULT_TEAM_ID = 13 often fails for them.
+    // correct ID from the start. Practice drafts assign arbitrary team IDs.
     const earlyDetection = detectMyTeam();
     // On same-draft reload, prefer the persisted myTeamId (already detected in
-    // prior session) over the hardcoded fallback. Only use DEFAULT_TEAM_ID as
-    // an absolute last resort when nothing else is available.
+    // prior session). Fall back to null — periodic re-detection will find it.
     const isSameDraft = state.leagueId === leagueId && state.allPicks.length > 0;
     let detectedTeamId = earlyDetection?.teamId
       || (isSameDraft && state.myTeamId ? state.myTeamId : null)
-      || String(DEFAULT_TEAM_ID);
+      || null;
 
     state.initializeDraft({
       leagueId,
@@ -274,7 +271,7 @@ export default defineContentScript({
     logger.log(
       earlyDetection
         ? "[ESPN Draft Assistant] Draft state initialized (myTeamId=" + detectedTeamId + " detected from DOM)"
-        : "[ESPN Draft Assistant] Draft state initialized (myTeamId=" + detectedTeamId + " fallback DEFAULT_TEAM_ID)",
+        : "[ESPN Draft Assistant] Draft state initialized (myTeamId=" + detectedTeamId + " pending detection)",
       {
         statePreserved,
         myTeamId: detectedTeamId,
@@ -291,7 +288,7 @@ export default defineContentScript({
     // Compute myGridColumn from team column mapping (dropdown → grid column).
     // parsePickElement sets pick.teamId to the grid column string (e.g., "5"),
     // NOT the ESPN team ID. So we need to find which grid column corresponds to
-    // our ESPN team ID (DEFAULT_TEAM_ID) to match our picks correctly.
+    // our detected team ID to match our picks correctly.
     let myGridColumn: string | null = null;
 
     const computeMyGridColumn = (): string | null => {
@@ -460,9 +457,7 @@ export default defineContentScript({
         matchReason = "teamId is myTeam";
       } else if (pick.teamName === "My Team") {
         matchReason = "teamName is My Team";
-      } else if (myGridColumn !== null && pick.teamId === myGridColumn && myGridColumn !== String(DEFAULT_TEAM_ID)) {
-        // Only use myGridColumn as fallback when it's been verified (not the default).
-        // This prevents claiming team 13's picks in practice drafts where we're a different team.
+      } else if (myGridColumn !== null && pick.teamId === myGridColumn) {
         matchReason = "teamId=" + pick.teamId + " matches myGridColumn=" + myGridColumn;
       }
       const isMyPick = matchReason !== null;
@@ -587,7 +582,7 @@ export default defineContentScript({
             p.teamId === myTeamId ||
             p.teamId === "myTeam" ||
             p.teamName === "My Team" ||
-            (myGridColumn !== null && p.teamId === myGridColumn && myGridColumn !== String(DEFAULT_TEAM_ID));
+            (myGridColumn !== null && p.teamId === myGridColumn);
           const myPicksFromStore = currentState.allPicks.filter(isMyPickFilter);
 
           if (currentState.myRoster.length !== myPicksFromStore.length) {
@@ -920,7 +915,7 @@ export default defineContentScript({
         draftFormat: "auction",
         totalTeams: latestState.totalTeams,
         rosterSize: latestState.rosterSize,
-        myTeamId: latestState.myTeamId || String(DEFAULT_TEAM_ID),
+        myTeamId: latestState.myTeamId,
         budget: latestState.remainingBudget || cachedLeagueConfig?.budget || 260,
       });
 
