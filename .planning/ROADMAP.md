@@ -152,7 +152,7 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 52. Extension Sidebar UI Update | 3/3 | Complete    | 2026-03-16 | - |
 | 53. UI Polish | 3/3 | Complete    | 2026-03-16 | - |
 | 54. Auction Engine Test Suite | v5.0 | 3/3 | Complete | 2026-03-17 |
-| 55. Extension Draft Reliability | v5.0 | 0/3 | Not started | - |
+| 55. Extension Draft Reliability | 1/3 | In Progress|  | - |
 
 ### Phase 54: Auction engine test suite: unit tests for bid ceiling, inflation, SGP, roster constraints; simulation tests for strategy validation; scenario tests for edge cases
 
