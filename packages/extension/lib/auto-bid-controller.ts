@@ -732,9 +732,31 @@ export class AutoBidController {
     button.click();
 
     // Click the confirmation button after ESPN processes the selection.
-    setTimeout(() => {
-      this.clickNominateButton(candidateName);
-    }, 500);
+    // ESPN may take a moment to render the "Select and Nominate Player" confirm button.
+    // Poll for it rather than using a fixed timeout.
+    this.pollForNominateButton(candidateName, 0);
+  }
+
+  /**
+   * Poll for the nomination confirmation button to appear after clicking Select.
+   * ESPN renders "Select and Nominate Player" asynchronously — a fixed 500ms timeout
+   * is unreliable. Poll every 200ms for up to 3 seconds.
+   */
+  private pollForNominateButton(candidateName: string, elapsed: number): void {
+    const MAX_WAIT = 3000;
+    const POLL_INTERVAL = 200;
+
+    if (elapsed >= MAX_WAIT) {
+      logger.warn(
+        `[AutoNominate] Confirmation button not found after ${MAX_WAIT}ms for ${candidateName} — may have auto-submitted`,
+      );
+      return;
+    }
+
+    const found = this.clickNominateButton(candidateName);
+    if (!found) {
+      setTimeout(() => this.pollForNominateButton(candidateName, elapsed + POLL_INTERVAL), POLL_INTERVAL);
+    }
   }
 
   /**
@@ -879,9 +901,10 @@ export class AutoBidController {
           this.lastNominationTime = Date.now();
           this.lastAttemptResult = `Clicked search dropdown match for ${candidateName}`;
 
-          // After ESPN processes the dropdown selection, click the Nominate/Select confirm button
+          // After ESPN processes the dropdown selection, click the "Nominate Player" confirm button.
+          // Two separate clicks: search match click selects the player, then "Nominate Player" finalizes.
           setTimeout(() => {
-            this.clickNominateButton(candidateName);
+            this.pollForNominateButton(candidateName, 0);
           }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS);
 
           // Clear the search input after the nomination flow completes
@@ -970,13 +993,16 @@ export class AutoBidController {
    * When it's your turn to nominate, ESPN changes "Queue" buttons to "Select"
    * and the confirmation button may say "Nominate", "Select", or other text.
    */
-  private clickNominateButton(candidateName: string): void {
+  /**
+   * Find and click the nomination confirmation button.
+   * Returns true if a button was found and clicked, false otherwise.
+   */
+  private clickNominateButton(candidateName: string): boolean {
     // CONFIRMED (MCP verified 2026-03-14): ESPN uses bid-player__button for both nomination and bidding
     const specificSelectors = [
       "button.bid-player__button", // CONFIRMED: 2 matches during bidding (quick offer + manual offer)
       "form.bidding-form__default button.bid-player__button", // CONFIRMED: scoped to bidding form
       ".pickArea button", // CONFIRMED: fallback — any button in pick area
-      // FAILED selectors removed: button.nominate-button, button[class*="nominate"]
     ];
 
     let nominateButton: HTMLButtonElement | null = null;
@@ -991,52 +1017,59 @@ export class AutoBidController {
     }
 
     // Try generic ESPN action area selectors — accept any action button text
-    // (nominate, select, submit, confirm) since ESPN varies the label
+    // (nominate, select, submit, confirm) since ESPN varies the label.
+    // "Select and Nominate Player" is the common confirmation button text.
     if (!nominateButton) {
       const actionAreaSelectors = [
         ".pickArea button",
         "form.bidding-form__default button.bid-player__button",
         ".bid-player button",
         '[class*="pickArea"] button',
+        '[class*="nominate"] button',
+        '[class*="Nominate"] button',
       ];
-      const actionWords = ["nominate", "select", "submit", "confirm"];
+      const actionWords = ["nominate", "select and nominate", "select", "submit", "confirm"];
 
       for (const selector of actionAreaSelectors) {
-        const btn = document.querySelector<HTMLButtonElement>(selector);
-        if (btn && !btn.disabled) {
+        const buttons = document.querySelectorAll<HTMLButtonElement>(selector);
+        for (const btn of buttons) {
+          if (btn.disabled) continue;
           const text = btn.textContent?.trim().toLowerCase() || "";
           if (actionWords.some((word) => text.includes(word))) {
             nominateButton = btn;
             break;
           }
         }
+        if (nominateButton) break;
       }
     }
 
-    // Fallback: scan all buttons for nomination/selection action text
+    // Fallback: scan ALL buttons for "Nominate Player" (the exact ESPN confirmation text)
     if (!nominateButton) {
-      const actionWords = ["nominate player", "nominate", "submit"];
+      const actionPhrases = ["nominate player", "nominate", "submit nomination"];
       const allButtons = document.querySelectorAll<HTMLButtonElement>("button");
-      for (const btn of allButtons) {
-        const text = btn.textContent?.trim().toLowerCase() || "";
-        if (actionWords.some((word) => text.includes(word)) && !btn.disabled) {
-          nominateButton = btn;
-          break;
+      for (const phrase of actionPhrases) {
+        for (const btn of allButtons) {
+          if (btn.disabled) continue;
+          const text = btn.textContent?.trim().toLowerCase() || "";
+          if (text.includes(phrase)) {
+            nominateButton = btn;
+            break;
+          }
         }
+        if (nominateButton) break;
       }
     }
 
     if (!nominateButton) {
-      logger.warn(
-        `[AutoNominate] Submit button not found after selecting ${candidateName} — click may have auto-submitted`,
-      );
-      return;
+      return false;
     }
 
     logger.log(
       `[AutoNominate] Clicking "${nominateButton.textContent?.trim()}" button for ${candidateName}`,
     );
     nominateButton.click();
+    return true;
   }
 
   // ── Auto-bidding logic ─────────────────────────────────────────────────

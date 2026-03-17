@@ -53,10 +53,10 @@ export default function NominationDiagnostics() {
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between px-4 py-1.5 text-left hover:bg-grafana-border/50 transition-colors"
       >
-        <div className="flex items-center gap-1.5">
-          <span className="text-body-xs text-grafana-muted uppercase tracking-wide">Nomination</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-body-xs text-grafana-muted uppercase tracking-wide flex-shrink-0">Nomination</span>
           <span
-            className={`text-label font-semibold ${
+            className={`text-label font-semibold flex-shrink-0 ${
               !diag.autoMode
                 ? "text-grafana-muted"
                 : isActive
@@ -68,9 +68,14 @@ export default function NominationDiagnostics() {
           >
             {statusLabel}
           </span>
+          {diag.lastCandidateName && !expanded && (
+            <span className="text-body-xs text-grafana-text truncate">
+              {diag.lastCandidateName}
+            </span>
+          )}
           {diag.lastTurnDetectionResult.matched &&
             diag.lastTurnDetectionResult.turnStrategyType === "fallback" && (
-              <span className="text-grafana-warning text-body-xs" title="Turn detected via UNTESTED fallback selector">
+              <span className="text-grafana-warning text-body-xs flex-shrink-0" title="Turn detected via UNTESTED fallback selector">
                 ⚠
               </span>
             )}

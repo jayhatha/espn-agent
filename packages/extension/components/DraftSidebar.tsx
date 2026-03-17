@@ -367,12 +367,16 @@ export default function DraftSidebar() {
 
       {/* Nominated Player Banner + BidVerdict — auction only, fixed above scroll */}
       {draftFormat === "auction" && currentAuctionPlayer && (() => {
+        // Market value: prefer ESPN ASV (live draft trends), fall back to FG model value
+        const espnAsv = currentAuctionPlayer.playerId != null
+          ? espnDomAuctionValues[currentAuctionPlayer.playerId]
+          : undefined;
         const matchedAuction = auctionValues.find(av =>
           av.playerId === currentAuctionPlayer.playerId ||
           av.playerName.toLowerCase() === currentAuctionPlayer.playerName.toLowerCase()
         );
 
-        const marketVal = matchedAuction?.dollarValue;
+        const marketVal = espnAsv ?? matchedAuction?.dollarValue;
 
         // Derive tier badge from market value
         const tierLabel = marketVal !== undefined
