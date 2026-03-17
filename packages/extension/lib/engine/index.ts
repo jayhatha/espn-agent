@@ -9,7 +9,7 @@ import { normalizeName } from "./normalizer";
 import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
-import { getZeroCoverageCategories, findBestFloorPick } from "./category-floor";
+// category-floor imports removed — SGP naturally handles category coverage
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { computeExternalRankBoost } from "./rank-boost";
 import { getSpTierCap } from "./draft-constants";
@@ -582,87 +582,8 @@ function computeIdealRoster(
     (unmappedSample.length > 0 ? ` Unmapped: [${unmappedSample.join(", ")}]` : ""),
   );
 
-  // ------------------------------------------------------------------
-  // Category floor enforcement: detect zero-coverage active scoring
-  // categories and force-lock 1 contributor per zero-coverage category.
-  // Uses lockedPlayers so optimizeRoster treats them as pre-assigned.
-  // ------------------------------------------------------------------
-  const floorLockedPlayers: { player: PoolPlayer; cost: number }[] = [];
-
-  // Compute total remaining slots to determine budget feasibility
-  const totalRemainingSlots = Object.values(remainingSlots).reduce((s, v) => s + v, 0);
-  const budgetPerSlot = totalRemainingSlots > 0
-    ? input.remainingBudget / totalRemainingSlots
-    : 0;
-
-  // Only enforce floors when budget is not critically tight (>= $2 per slot average)
-  if (budgetPerSlot >= 2) {
-    const zeroCats = getZeroCoverageCategories(
-      input.myRoster,
-      input.leagueCategories,
-      cachedPitcherProjMap ?? new Map(),
-      cachedHitterProjMap ?? new Map(),
-      playersForOptimizer,
-    );
-
-    if (import.meta.env.DEV && zeroCats.length > 0) {
-      logger.log(`[IdealRoster] Zero-coverage categories: ${zeroCats.join(', ')}`);
-    }
-
-    // Track which players have been locked to avoid double-selection
-    let availableForFloor = [...playersForOptimizer];
-
-    for (const statKey of zeroCats) {
-      // Max cost for floor pick: leave at least $1 per remaining slot (after this pick)
-      const slotsAfterThis = totalRemainingSlots - floorLockedPlayers.length - 1;
-      const maxFloorCost = Math.max(1, input.remainingBudget
-        - floorLockedPlayers.reduce((s, lp) => s + lp.cost, 0)
-        - slotsAfterThis);
-
-      const floorPick = findBestFloorPick(statKey, availableForFloor, maxFloorCost);
-      if (floorPick) {
-        // Apply SP tier cap to floor-locked pitchers (same as strategy-adjusted pool)
-        let floorCost = floorPick.dollars;
-        const isFloorSP = floorPick.positions.some(pos => pos.toUpperCase() === "SP");
-        if (isFloorSP) {
-          const floorSpCount = spCount + floorLockedPlayers.filter(
-            lp => lp.player.positions.some(pos => pos.toUpperCase() === "SP"),
-          ).length;
-          const tierCap = getSpTierCap(floorSpCount);
-          if (floorCost > tierCap) floorCost = tierCap;
-        }
-        floorLockedPlayers.push({ player: { ...floorPick, dollars: floorCost }, cost: floorCost });
-        // Remove from available pool to prevent double-selection
-        availableForFloor = availableForFloor.filter(
-          p => p.normalizedName !== floorPick.normalizedName
-        );
-
-        if (import.meta.env.DEV) {
-          logger.log(
-            `[IdealRoster] Floor pick for ${statKey}: ${floorPick.name} ($${floorPick.dollars}, ` +
-            `${statKey}=${floorPick.stats[statKey] ?? floorPick.stats['SO'] ?? floorPick.stats['K'] ?? 0})`
-          );
-        }
-      }
-    }
-  }
-
-  // Remove floor-locked players from main pool to prevent double-selection
-  const poolAfterFloor = floorLockedPlayers.length > 0
-    ? playersForOptimizer.filter(p =>
-        !floorLockedPlayers.some(lp => lp.player.normalizedName === p.normalizedName)
-      )
-    : playersForOptimizer;
-
-  // Rebuild SGP values aligned to poolAfterFloor by name-lookup into
-  // allPlayers (which adjustedSgpValues is indexed against). This avoids
-  // index misalignment when ASV overlay causes playersForOptimizer !== allPlayers.
-  const sgpAfterFloor = floorLockedPlayers.length > 0
-    ? poolAfterFloor.map(p => {
-        const idx = allPlayers.findIndex(ap => ap.normalizedName === p.normalizedName);
-        return idx >= 0 ? sgpValuesForOptimizer[idx] : 0;
-      })
-    : sgpValuesForOptimizer;
+  // SGP already reflects category contributions — value-drafted rosters naturally
+  // cover categories. Category progress bars in the UI show any gaps.
 
   // Cap pitcher prices by SP tier and enforce hitter budget allocation.
   // Without this, the optimizer selects $50 pitchers that the strategy would
@@ -677,7 +598,7 @@ function computeIdealRoster(
   const HITTER_BUDGET_MAX = 200;
   const hitterBudgetRemaining = Math.max(0, HITTER_BUDGET_MAX - hitterSpent);
 
-  const strategyAdjustedPool = poolAfterFloor.map((player) => {
+  const strategyAdjustedPool = playersForOptimizer.map((player) => {
     const isSP = player.positions.some(pos => pos.toUpperCase() === "SP");
     const isPitcher = player.isPitcher;
 
@@ -701,13 +622,18 @@ function computeIdealRoster(
     return player;
   });
 
+  // Rebuild SGP values aligned to strategyAdjustedPool
+  const sgpForOptimizer = strategyAdjustedPool.map(p => {
+    const idx = allPlayers.findIndex(ap => ap.normalizedName === p.normalizedName);
+    return idx >= 0 ? sgpValuesForOptimizer[idx] : 0;
+  });
+
   // Optimizer fills remaining slots with remaining budget
   const result = optimizeRoster(
     strategyAdjustedPool,
-    sgpAfterFloor,
+    sgpForOptimizer,
     input.remainingBudget,
     remainingSlots,
-    floorLockedPlayers.length > 0 ? floorLockedPlayers : undefined,
   );
 
   // Cross-validate myRoster against allPicks to discard stale persisted entries.
