@@ -1211,17 +1211,24 @@ export class AutoBidController {
     const isRP = ranking?.primaryPosition === "RP";
     const isPitcher = isSP || isRP;
 
-    // Hard limit: max 2 catchers (1 C slot + 1 UTIL backup). Skip unless ideal target.
+    // Catcher guard: once C slot is filled, only bid on catchers who are
+    // multi-position eligible (can play 1B, OF, etc.) or are an ideal target.
+    // Pure catchers going to UTIL/BN are a waste of a roster spot.
     const playerPosition = ranking?.primaryPosition;
+    const playerPositions = ranking?.positions ?? (playerPosition ? [playerPosition] : []);
     if (playerPosition === "C") {
-      const catcherCount = state.myRoster.filter(
-        p => p.positions.some(pos => pos.toUpperCase() === "C"),
-      ).length;
-      if (catcherCount >= 2 && !isIdealTarget) {
-        logger.log(
-          `[AutoBidController] Catcher hard limit: ${catcherCount} catchers already drafted — skipping ${nominatedName}`,
+      const catcherSlotsRemaining = this.lastEngineSignals?.remainingSlots?.["C"] ?? 0;
+      if (catcherSlotsRemaining <= 0 && !isIdealTarget) {
+        const NON_CATCHER_POSITIONS = ["1B", "2B", "3B", "SS", "OF", "DH"];
+        const isMultiPosition = playerPositions.some(pos =>
+          NON_CATCHER_POSITIONS.includes(pos.toUpperCase()),
         );
-        return;
+        if (!isMultiPosition) {
+          logger.log(
+            `[AutoBidController] C slot filled, pure catcher — skipping ${nominatedName}`,
+          );
+          return;
+        }
       }
     }
 
