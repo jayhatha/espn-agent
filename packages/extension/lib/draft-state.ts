@@ -206,12 +206,14 @@ export const useDraftStore = create<DraftState>()(
         const isSameDraft = current.leagueId === config.leagueId && current.allPicks.length > 0;
 
         if (isSameDraft) {
-          // Same-draft reload: update config only, preserve accumulated draft data
+          // Same-draft reload: update config only, preserve accumulated draft data.
+          // Keep the persisted myTeamId if valid (already detected) — don't overwrite
+          // with a hardcoded fallback that may be wrong for practice drafts.
           set({
             draftFormat: config.draftFormat,
             totalTeams: config.totalTeams,
             rosterSize: config.rosterSize,
-            myTeamId: config.myTeamId,
+            myTeamId: current.myTeamId || config.myTeamId,
             remainingBudget: config.budget || current.remainingBudget,
           });
           return;
@@ -363,7 +365,36 @@ export const useDraftStore = create<DraftState>()(
           return { espnDomAuctionValues: { ...state.espnDomAuctionValues, ...values } };
         }),
 
-      setMyTeamId: (teamId) => set({ myTeamId: teamId }),
+      setMyTeamId: (teamId) =>
+        set((state) => {
+          if (state.myTeamId === teamId) return state;
+          // When team ID changes (e.g., practice draft detected late),
+          // rebuild myRoster from allPicks to drop picks from the old team
+          // and include picks from the newly detected team.
+          const myPicks = state.allPicks.filter(
+            (p) => p.teamId === teamId || p.teamId === "myTeam" || p.teamName === "My Team"
+          );
+          const rebuiltRoster = myPicks.map((pick) => {
+            const existing = state.myRoster.find((r) => r.playerId === pick.playerId);
+            if (existing) return existing;
+            return {
+              playerId: pick.playerId,
+              playerName: pick.playerName,
+              positions: pick.positions,
+              pickNumber: pick.pickNumber,
+              cost: pick.cost,
+              projectedStats: {},
+            };
+          });
+          // Recompute remaining budget from roster costs
+          const totalSpent = rebuiltRoster.reduce((sum, p) => sum + (p.cost || 0), 0);
+          const initialBudget = state.draftFormat === "auction" ? 260 : 0;
+          return {
+            myTeamId: teamId,
+            myRoster: rebuiltRoster,
+            remainingBudget: state.draftFormat === "auction" ? initialBudget - totalSpent : state.remainingBudget,
+          };
+        }),
 
       setRemainingBudget: (budget) => set({ remainingBudget: budget }),
 
