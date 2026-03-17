@@ -922,7 +922,17 @@ export default defineContentScript({
     // a container node that ESPN's React will replace during the initial DOM scrape.
     if (resolvedDraftFormat === "auction") {
       auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
+        const prevPlayer = useDraftStore.getState().currentAuctionPlayer;
         useDraftStore.getState().setCurrentAuctionPlayer(player);
+
+        // When a NEW player is nominated (not just a bid update), refresh budgets
+        // so the engine has current opponent budget data for bid decisions.
+        if (player && player.playerName !== prevPlayer?.playerName) {
+          const budgets = detectAllTeamBudgets();
+          if (budgets.length > 0) {
+            useDraftStore.getState().setAllTeamBudgets(budgets);
+          }
+        }
       });
       startAuctionTableScraping();
       startQueueScraping();
@@ -949,7 +959,14 @@ export default defineContentScript({
       // Start auction player observer since we just switched to auction format
       if (!auctionPlayerCleanup) {
         auctionPlayerCleanup = observeCurrentAuctionPlayer((player) => {
+          const prevPlayer = useDraftStore.getState().currentAuctionPlayer;
           useDraftStore.getState().setCurrentAuctionPlayer(player);
+          if (player && player.playerName !== prevPlayer?.playerName) {
+            const budgets = detectAllTeamBudgets();
+            if (budgets.length > 0) {
+              useDraftStore.getState().setAllTeamBudgets(budgets);
+            }
+          }
         });
         logger.log("[ESPN Draft Assistant] Started auction player observer after delayed detection");
       }

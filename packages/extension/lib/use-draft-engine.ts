@@ -40,10 +40,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
 
   // Reset async results when the cache key changes (new pick or new nomination)
   // so stale results don't persist after state transitions.
+  // Include currentPlayerName — playerId may be a hash fallback that doesn't change.
   useEffect(() => {
     setAsyncSimulation(null);
     setAsyncBid(null);
-  }, [allPicks.length, currentPlayerId]);
+  }, [allPicks.length, currentPlayerId, currentPlayerName]);
 
   const baseSignals = useMemo(() => {
     // Only compute for auction drafts with data
