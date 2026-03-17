@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 53 of 53 (UI Polish — Typography, Dark Mode, Inter Font)
 Plan: 03 (3 of 3 plans complete)
 Status: Complete
-Last activity: 2026-03-16 - Completed quick task 93: Fix ideal roster optimizer for value drafting
+Last activity: 2026-03-16 - Completed quick task 94: Simplify nomination — overpriced-first
 
 Progress: [██████████] 100% (v5.0 — Phase 52 complete; Phase 53 complete)
 
@@ -57,9 +57,10 @@ None yet.
 | 91 | Fix nominated player detection after reload | 2026-03-16 | 6052020 | [91-fix-nominated-player-detection-after-rel](./quick/91-fix-nominated-player-detection-after-rel/) |
 | 92 | Detect myTeamId from ESPN draft DOM | 2026-03-16 | ab29825 | [92-detect-myteamid-from-espn-draft-dom-inst](./quick/92-detect-myteamid-from-espn-draft-dom-inst/) |
 | 93 | Fix ideal roster optimizer for value drafting | 2026-03-16 | 1768f8a | [93-fix-ideal-roster-optimizer-for-value-dra](./quick/93-fix-ideal-roster-optimizer-for-value-dra/) |
+| 94 | Simplify nomination — overpriced-first | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/) |
 
 ## Session Continuity
 
 Last session: 2026-03-16
-Stopped at: Completed quick task 93
+Stopped at: Completed quick task 94
 Resume file: None
