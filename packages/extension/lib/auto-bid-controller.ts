@@ -1,7 +1,7 @@
 import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
-import { getPositionalWeight, getSpTierCap, GS_CAP } from "./engine/draft-constants";
-import { computeStrategyBidCap, isPLUndervaluedCheck } from "./engine/strategy-caps";
+import { GS_CAP } from "./engine/draft-constants";
+import { computeStrategyBidCap } from "./engine/strategy-caps";
 import { logger } from "./logger";
 
 /** Find an action button for a specific player, preferring .action-btn class */
@@ -1172,38 +1172,10 @@ export class AutoBidController {
         : undefined) ??
       null;
 
-    // ── Strategy filter: only auto-bid on players we actually want ──
-    //
-    // NOTE: We intentionally do NOT gate on optimization.shouldBid here.
-    // The bid optimizer runs in an async Web Worker, so shouldBid is false
-    // (placeholder) when the controller first evaluates after a nomination.
-    // Instead, we use our own two-path strategy filter which relies on
-    // synchronously-available idealRoster and rankings data.
-    //
-    // Path 1: IDEAL ROSTER targets (anchor/core from our suggested roster)
-    //   → bid aggressively up to ASV + 10%
-    //
-    // Path 2: OPPORTUNITY bids (high external rank + below market)
-    //   → bid up to ASV (at market, not above — we're getting a deal)
-    //   → SPs use wider threshold (top-100 vs top-50) because PL SP rankings are deepest
-    //
-    // Path 3: PL UNDERVALUED (high PL rank but low ASV — market mispricing)
-    //   → bid up to ASV + 15% (PL says they're better than market thinks)
-    //
-    // Everyone else: skip.
-
-    const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
-    const idealMatch = idealPlayers.find(
-      (p) => !p.isDrafted && p.name.toLowerCase() === nominatedName,
-    );
-    // Only core/value ideal targets get aggressive bidding (ASV+10%).
-    // Anchor-tier ($20+ market) players are too expensive for value strategy —
-    // we'll only bid on them opportunistically (at or below market).
-    const isIdealTarget =
-      idealMatch != null && idealMatch.tier === "core";
-
-    // Opportunity: high externally ranked player currently below market price
-    // SPs get wider threshold (top-100) because PL rankings are deepest for SP
+    // ── Value strategy: bid up to the engine's SGP-based maxBid ──
+    // The engine's maxBid is the highest price where adding this player still
+    // improves total team SGP. Strategy caps (SP tier, pitcher dampening,
+    // hitter budget) apply on top. No tier-based bid path multipliers.
     const ranking = nominatedName
       ? state.rankings?.find(
           (r) => r.playerName.toLowerCase() === nominatedName,
@@ -1212,15 +1184,13 @@ export class AutoBidController {
     const isSP = ranking?.primaryPosition === "SP";
     const isRP = ranking?.primaryPosition === "RP";
     const isPitcher = isSP || isRP;
-
-    // Catcher guard: once C slot is filled, only bid on catchers who are
-    // multi-position eligible (can play 1B, OF, etc.) or are an ideal target.
-    // Pure catchers going to UTIL/BN are a waste of a roster spot.
     const playerPosition = ranking?.primaryPosition;
     const playerPositions = ranking?.positions ?? (playerPosition ? [playerPosition] : []);
+
+    // Catcher guard: once C slot is filled, only bid on multi-position catchers.
     if (playerPosition === "C") {
       const catcherSlotsRemaining = this.lastEngineSignals?.remainingSlots?.["C"] ?? 0;
-      if (catcherSlotsRemaining <= 0 && !isIdealTarget) {
+      if (catcherSlotsRemaining <= 0) {
         const NON_CATCHER_POSITIONS = ["1B", "2B", "3B", "SS", "OF", "DH"];
         const isMultiPosition = playerPositions.some(pos =>
           NON_CATCHER_POSITIONS.includes(pos.toUpperCase()),
@@ -1234,92 +1204,16 @@ export class AutoBidController {
       }
     }
 
-    const opportunityRankThreshold = isSP ? 100 : 50;
-    const hasHighExternalRank =
-      ranking?.externalRank != null &&
-      ranking.externalRank <= opportunityRankThreshold;
-    const isBelowMarket = espnAsv != null && currentBid < espnAsv;
-    const isOpportunity = hasHighExternalRank && isBelowMarket;
+    // Get engine's SGP-based maxBid — if not available yet, defer
+    const rawMaxBid = this.lastEngineSignals?.optimization?.maxBid ?? 0;
+    if (rawMaxBid <= 0) {
+      logger.log("[AutoBidController] Engine maxBid not available yet — deferring");
+      return;
+    }
 
-    // Path 3: PL UNDERVALUED — high PL rank but low ASV (market mispricing)
-    const isPLUndervalued = isPLUndervaluedCheck(
-      ranking?.externalRank ?? null, espnAsv ?? null, isSP,
-    );
-
-    // Path 4: RANKED VALUE — sub-$5 players with any external ranking
-    // When everyone is cheap, external rank is the best differentiator.
-    // Wider rank thresholds than other paths since we're spending very little.
-    const isRankedValue =
-      !isIdealTarget &&
-      !isPLUndervalued &&
-      !isOpportunity &&
-      espnAsv != null &&
-      espnAsv <= 5 &&
-      ranking?.externalRank != null &&
-      ranking.externalRank <= 200;
-
-    // ── Endgame mode: value_per_dollar scoring when budget <= $20 ──
+    // Apply strategy caps (same computation as sidebar display)
     const budgetCurve = this.lastEngineSignals?.budgetCurve;
     const isEndgame = budgetCurve?.endgameMode === true;
-
-    if (isEndgame) {
-      logger.log(
-        `[AutoBid] ENDGAME MODE activated ($${budgetCurve?.remainingBudget ?? "?"} remaining)`,
-      );
-
-      // In endgame, only bid on high value-per-dollar players
-      // Value source: idealMatch SGP value, or external rank as proxy
-      const playerValue = idealMatch?.sgpValue ?? (ranking?.externalRank != null ? Math.max(0, 200 - ranking.externalRank) / 20 : 0);
-      const valuePerDollar = currentBid > 0 ? playerValue / currentBid : playerValue;
-
-      // Endgame preferences:
-      // - Prefer: breakout hitters (high projected HR/SB via high SGP), cheap OF, K pitchers
-      // - Avoid: backup catchers (C slot filled - already handled by catcher dampening below),
-      //          weak OPS hitters (low value hitters)
-      const isOF = ranking?.primaryPosition === "OF";
-      const isKPitcher = isSP || isRP; // All pitchers contribute K
-      const isBreakoutHitter = !isPitcher && idealMatch != null && idealMatch.sgpValue > 3;
-      const isDesirableEndgame = isBreakoutHitter || (isOF && valuePerDollar > 0.5) || (isKPitcher && valuePerDollar > 0.5);
-
-      // In endgame, skip low-value players entirely (value_per_dollar < 0.3)
-      // unless they're an ideal target or a desirable endgame pickup
-      if (valuePerDollar < 0.3 && !isIdealTarget && !isDesirableEndgame) {
-        logger.log(
-          `[AutoBid] ENDGAME skip: low value_per_dollar=${valuePerDollar.toFixed(2)} for ${nominatedName ?? "unknown"}`,
-        );
-        return;
-      }
-
-      // Weak OPS filter: skip non-pitcher players with very low SGP (weak hitters)
-      // Only applies when NOT an ideal target
-      if (!isPitcher && !isIdealTarget && idealMatch != null && idealMatch.sgpValue < 1) {
-        logger.log(
-          `[AutoBid] ENDGAME skip: weak hitter (sgp=${idealMatch.sgpValue.toFixed(2)}) ${nominatedName ?? "unknown"}`,
-        );
-        return;
-      }
-    }
-
-    if (
-      !isIdealTarget &&
-      !isOpportunity &&
-      !isPLUndervalued &&
-      !isRankedValue
-    ) {
-      logger.log(
-        `[AutoBidController] Not a target — skipping (ideal=${!!idealMatch}, tier=${idealMatch?.tier ?? "none"}, extRank=${ranking?.externalRank ?? "none"}, pos=${ranking?.primaryPosition ?? "?"}, belowMkt=${isBelowMarket}, plUnderval=${isPLUndervalued})`,
-      );
-      return;
-    }
-
-    // Compute strategy-adjusted bid cap using shared logic (same as sidebar display)
-    const rawMaxBid = this.lastEngineSignals?.optimization?.maxBid ?? 0;
-
-    // IDEAL TARGET with no ASV and no engine maxBid yet — defer
-    if (isIdealTarget && espnAsv == null && (rawMaxBid == null || rawMaxBid <= 0)) {
-      logger.log("[AutoBidController] Ideal target but no ASV or maxBid yet — deferring");
-      return;
-    }
 
     const spCount = state.myRoster.filter(
       (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
@@ -1327,12 +1221,6 @@ export class AutoBidController {
 
     const capResult = computeStrategyBidCap({
       rawMaxBid,
-      espnAsv: espnAsv ?? null,
-      isIdealTarget,
-      isPLUndervalued,
-      isOpportunity,
-      isRankedValue,
-      externalRank: ranking?.externalRank ?? null,
       isPitcher,
       isSP,
       positions: playerPositions,
@@ -1342,14 +1230,9 @@ export class AutoBidController {
       catcherSlotsRemaining: this.lastEngineSignals?.remainingSlots?.["C"] ?? 0,
       isEndgame,
       inflationFactor: this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0,
-      hitterSpent: this.lastEngineSignals?.budgetCurve?.hitterSpent ?? 0,
-      pitcherSpent: this.lastEngineSignals?.budgetCurve?.pitcherSpent ?? 0,
+      hitterSpent: budgetCurve?.hitterSpent ?? 0,
+      pitcherSpent: budgetCurve?.pitcherSpent ?? 0,
     });
-
-    if (!capResult.shouldBid) {
-      logger.log(`[AutoBidController] Strategy cap says no bid: ${capResult.capSource}`);
-      return;
-    }
 
     let autoBidCap = capResult.bidCap;
     const capSource = capResult.capSource;

@@ -5,6 +5,12 @@
  * auto-bid controller (for actual bidding). Keeps the sidebar's BidVerdict
  * and the controller's bid ceiling in sync.
  *
+ * Value strategy: bid up to the engine's SGP-based maxBid (the highest price
+ * where adding the player still improves total team SGP). Strategy adjustments
+ * (SP tier caps, pitcher dampening, hitter budget, endgame, inflation) apply
+ * on top. No tier-based bid path multipliers — every player gets the same
+ * value-driven treatment.
+ *
  * Pure functions: no Zustand reads, no DOM access, no side effects.
  */
 
@@ -13,18 +19,6 @@ import { getPositionalWeight, getSpTierCap } from "./draft-constants";
 export interface StrategyCapInput {
   /** Raw maxBid from bid optimizer binary search */
   rawMaxBid: number;
-  /** ESPN Average Salary for this player (null if not available) */
-  espnAsv: number | null;
-  /** Whether this player is in the ideal roster as anchor/core */
-  isIdealTarget: boolean;
-  /** Whether this player is PL undervalued (high rank, low ASV) */
-  isPLUndervalued: boolean;
-  /** Whether this player is an opportunity (ranked + below market) */
-  isOpportunity: boolean;
-  /** Whether this player is ranked value (sub-$5, ranked ≤200) */
-  isRankedValue: boolean;
-  /** External ranking position (e.g., PitcherList) */
-  externalRank: number | null;
   /** Whether this player is a pitcher (SP or RP) */
   isPitcher: boolean;
   /** Whether this player is specifically SP */
@@ -52,10 +46,6 @@ export interface StrategyCapInput {
 export interface StrategyCapResult {
   /** Strategy-adjusted bid cap */
   bidCap: number;
-  /** Whether the player qualifies for any bid path */
-  shouldBid: boolean;
-  /** Which bid path was used */
-  bidPath: "IDEAL" | "PL_UNDERVALUED" | "RANKED_VALUE" | "OPPORTUNITY" | "NONE";
   /** Human-readable explanation of cap computation */
   capSource: string;
 }
@@ -63,54 +53,19 @@ export interface StrategyCapResult {
 /**
  * Compute the strategy-adjusted bid cap for a nominated player.
  *
- * Applies the same caps used by the auto-bid controller:
- * 1. Base cap from bid path (IDEAL/PL_UNDERVALUED/RANKED_VALUE/OPPORTUNITY)
- * 2. Pitcher dampening (×pitcherMultiplier)
- * 3. Catcher dampening (×0.5 when C slot filled)
- * 4. Positional weight bonus (+1 to +4)
+ * Base: engine's SGP-based maxBid (highest profitable price).
+ * Then applies structural adjustments:
+ * 1. Pitcher dampening (×pitcherMultiplier)
+ * 2. Catcher dampening (×0.5 when C slot filled)
+ * 3. Positional weight bonus (+1 to +4)
+ * 4. Hitter budget allocation cap ($200 max)
  * 5. SP tier cap ($18/$12/$10/$5/$3)
  * 6. Endgame dampening (×0.7)
  * 7. Inflation adjustment (+2 when > 1.10)
  */
 export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResult {
-  // Determine bid path and base cap
-  let bidCap: number;
-  let bidPath: StrategyCapResult["bidPath"];
-  let capSource: string;
-
-  if (input.isIdealTarget) {
-    bidPath = "IDEAL";
-    if (input.espnAsv != null) {
-      bidCap = Math.ceil(input.espnAsv * 1.1);
-      capSource = `IDEAL, ASV $${input.espnAsv} +10%`;
-    } else {
-      // No ASV — use raw engine maxBid
-      bidCap = input.rawMaxBid;
-      capSource = `IDEAL, engine maxBid $${input.rawMaxBid}`;
-    }
-  } else if (input.isPLUndervalued) {
-    bidPath = "PL_UNDERVALUED";
-    bidCap = Math.ceil(input.espnAsv! * 1.15);
-    capSource = `PL UNDERVALUED, rank #${input.externalRank} ASV $${input.espnAsv} +15%`;
-  } else if (input.isRankedValue) {
-    bidPath = "RANKED_VALUE";
-    const rank = input.externalRank!;
-    const premium = rank <= 50 ? 2 : rank <= 100 ? 1 : 0;
-    bidCap = Math.ceil(input.espnAsv! + premium);
-    capSource = `RANKED VALUE, rank #${rank} ASV $${input.espnAsv} +$${premium}`;
-  } else if (input.isOpportunity) {
-    bidPath = "OPPORTUNITY";
-    bidCap = input.espnAsv!;
-    capSource = `OPPORTUNITY, ASV $${input.espnAsv}`;
-  } else {
-    // No qualifying path — use raw maxBid but mark as no-bid
-    return {
-      bidCap: input.rawMaxBid,
-      shouldBid: false,
-      bidPath: "NONE",
-      capSource: "no qualifying bid path",
-    };
-  }
+  let bidCap = input.rawMaxBid;
+  let capSource = `engine maxBid $${input.rawMaxBid}`;
 
   // Apply pitcher dampening
   if (input.isPitcher) {
@@ -132,23 +87,15 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     capSource += ` → pos +${posWeight}`;
   }
 
-  // Apply hitter/pitcher budget allocation guard.
-  // Target: $185-200 on hitters, $55-70 on pitchers (from budget-curve.ts).
-  // When hitter spending exceeds $200, dampen non-ideal hitter bids to preserve
-  // pitcher budget. When pitcher spending is behind, this indirectly helps by
-  // making the controller pass on marginal hitters.
+  // Apply hitter budget allocation cap ($200 max for hitters)
   const HITTER_BUDGET_MAX = 200;
-  const PITCHER_BUDGET_MIN = 55;
-  const totalBudget = input.hitterSpent + input.pitcherSpent + bidCap; // projected after this bid
-  if (!input.isPitcher) {
-    // Hitter bid: check if spending would exceed hitter allocation
+  if (!input.isPitcher && !input.isEndgame) {
     const projectedHitterSpend = input.hitterSpent + bidCap;
-    if (projectedHitterSpend > HITTER_BUDGET_MAX && !input.isEndgame) {
-      // Cap the bid so hitter spending stays at/near $200
+    if (projectedHitterSpend > HITTER_BUDGET_MAX) {
       const headroom = Math.max(1, HITTER_BUDGET_MAX - input.hitterSpent);
       if (bidCap > headroom) {
         bidCap = headroom;
-        capSource += ` → hitter budget cap $${HITTER_BUDGET_MAX} (spent $${input.hitterSpent})`;
+        capSource += ` → hitter cap $${HITTER_BUDGET_MAX} (spent $${input.hitterSpent})`;
       }
     }
   }
@@ -174,42 +121,5 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     capSource += ` → inflation +2`;
   }
 
-  return {
-    bidCap,
-    shouldBid: true,
-    bidPath,
-    capSource,
-  };
-}
-
-/**
- * Classify a player's bid path based on ideal roster match, external rank,
- * and ESPN ASV. Used by both the engine and auto-bid controller.
- */
-export function classifyBidPath(params: {
-  isIdealTarget: boolean;
-  isPLUndervalued: boolean;
-  isOpportunity: boolean;
-  isRankedValue: boolean;
-}): "IDEAL" | "PL_UNDERVALUED" | "RANKED_VALUE" | "OPPORTUNITY" | "NONE" {
-  if (params.isIdealTarget) return "IDEAL";
-  if (params.isPLUndervalued) return "PL_UNDERVALUED";
-  if (params.isRankedValue) return "RANKED_VALUE";
-  if (params.isOpportunity) return "OPPORTUNITY";
-  return "NONE";
-}
-
-/**
- * Check if a player is PL undervalued based on external rank and ASV.
- */
-export function isPLUndervaluedCheck(
-  externalRank: number | null,
-  espnAsv: number | null,
-  isSP: boolean,
-): boolean {
-  if (externalRank == null || espnAsv == null) return false;
-  if (isSP) {
-    return (externalRank <= 50 && espnAsv < 15) || (externalRank <= 100 && espnAsv < 10);
-  }
-  return (externalRank <= 30 && espnAsv < 20) || (externalRank <= 75 && espnAsv < 12);
+  return { bidCap, capSource };
 }
