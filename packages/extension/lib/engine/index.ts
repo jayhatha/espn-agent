@@ -1180,38 +1180,32 @@ export function computeDraftEngine(
     }
 
     if (nominatedPlayer) {
-      // Build nameToAsv lookup for ESPN ASV market price override
-      const nameToAsvBid = new Map<string, number>();
-      if (input.espnDomAuctionValues && Object.keys(input.espnDomAuctionValues).length > 0) {
-        const idToNameBid = new Map<number, string>();
-        for (const av of input.auctionValues) {
-          idToNameBid.set(av.playerId, normalizeName(av.playerName));
-        }
-        for (const r of input.rankings) {
-          if (!idToNameBid.has(r.playerId)) {
-            idToNameBid.set(r.playerId, normalizeName(r.playerName));
-          }
-        }
-        for (const pick of input.allPicks) {
-          if (!idToNameBid.has(pick.playerId)) {
-            idToNameBid.set(pick.playerId, normalizeName(pick.playerName));
-          }
-        }
-        for (const [id, asv] of Object.entries(input.espnDomAuctionValues)) {
-          if (asv > 0) {
-            const name = idToNameBid.get(Number(id));
-            if (name) nameToAsvBid.set(name, asv);
-          }
-        }
-      }
+      // Use espnAsvByName for reliable name-based ASV lookup
+      const asvByNameBid = input.espnAsvByName ?? {};
 
-      // Look up ESPN ASV by player ID first, then nameToAsv fallback
+      // Look up ESPN ASV for nominated player (ID first, name fallback)
       const nominatedAsv =
         (input.currentAuctionPlayerId != null
           ? input.espnDomAuctionValues?.[input.currentAuctionPlayerId]
           : undefined)
-        ?? nameToAsvBid.get(nominatedPlayer.normalizedName)
+        ?? asvByNameBid[nominatedPlayer.normalizedName]
         ?? null;
+
+      // Overlay ASV prices onto the bid optimizer pool — same as ideal roster.
+      // Without this, the baseline roster uses FG prices (artificially cheap),
+      // making it hard for the nominated player to beat baseline → low maxBid.
+      const hasAsvBid = Object.keys(asvByNameBid).length > 0;
+      const bidPoolPlayers = hasAsvBid
+        ? allPlayersOpt.map(p => {
+            const asv = asvByNameBid[p.normalizedName];
+            return (asv != null && asv > 0) ? { ...p, dollars: asv } : p;
+          })
+        : allPlayersOpt;
+
+      // Find nominated player in the ASV-overlaid pool
+      const bidNominatedPlayer = bidPoolPlayers.find(
+        p => p.normalizedName === nominatedPlayer.normalizedName,
+      ) ?? nominatedPlayer;
 
       // Opponent budgets for Monte Carlo
       const opponentBudgets: number[] = [];
@@ -1240,9 +1234,9 @@ export function computeDraftEngine(
 
       const capturedBidKey = newBidWorkerCacheKey;
       runBidOptimizerInWorker({
-        nominatedPlayer,
+        nominatedPlayer: bidNominatedPlayer,
         nominatedAsv,
-        availablePlayers: allPlayersOpt,
+        availablePlayers: bidPoolPlayers,
         sgpValues: adjustedSgpValuesOpt,
         budget: input.remainingBudget,
         rosterSlots: remainingSlotsOpt,
