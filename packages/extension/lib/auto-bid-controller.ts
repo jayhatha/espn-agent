@@ -622,22 +622,81 @@ export class AutoBidController {
       return;
     }
 
-    // ── Overpriced-first candidate selection ──
+    // ── Candidate selection (strategy depends on draft phase) ──
     // Filter by both playerId AND normalized name — DOM-parsed picks use hash-based
     // fallback IDs that don't match ESPN playerIds in auctionValues.
     const draftedIds = new Set(state.allPicks.map(p => p.playerId));
     const draftedNames = new Set(state.allPicks.map(p => normalizeName(p.playerName)));
-    const candidates = state.auctionValues
-      .filter(av => !draftedIds.has(av.playerId) && !draftedNames.has(normalizeName(av.playerName)) && av.dollarValue > 0)
-      .map(av => {
-        const ranking = state.rankings.find(r => r.playerId === av.playerId);
-        const modelValue = ranking?.vbdScore ?? av.dollarValue;
-        const espnPrice = av.dollarValue;
-        return { ...av, nominationScore: espnPrice - modelValue, modelValue };
-      })
-      .sort((a, b) => b.nominationScore - a.nominationScore);
+    const undrafted = state.auctionValues
+      .filter(av => !draftedIds.has(av.playerId) && !draftedNames.has(normalizeName(av.playerName)) && av.dollarValue > 0);
 
-    const topCandidate = candidates[0];
+    const budgetCurve = this.lastEngineSignals?.budgetCurve;
+    const isEndgame = budgetCurve?.endgameMode === true;
+
+    let topCandidate: typeof undrafted[0] & { nominationScore: number; modelValue: number } | undefined;
+    let candidateReason: string;
+    let candidateSource: string;
+
+    if (isEndgame) {
+      // ENDGAME: Nominate our own targets — cheap players we actually want.
+      // Nominating expensive overpriced stars is wasteful since we can't afford them.
+      // Priority: ideal roster players we still need, sorted by SGP/$ (best value first).
+      const idealPlayers = this.lastEngineSignals?.idealRoster?.players ?? [];
+      const idealNames = new Set(
+        idealPlayers
+          .filter(p => !p.isDrafted)
+          .map(p => normalizeName(p.name)),
+      );
+
+      const ownTargets = undrafted
+        .filter(av => idealNames.has(normalizeName(av.playerName)))
+        .map(av => {
+          const ranking = state.rankings.find(r => r.playerId === av.playerId);
+          const modelValue = ranking?.vbdScore ?? av.dollarValue;
+          // Score by value per dollar — cheapest high-value players first
+          const nominationScore = modelValue / Math.max(1, av.dollarValue);
+          return { ...av, nominationScore, modelValue };
+        })
+        .sort((a, b) => b.nominationScore - a.nominationScore);
+
+      topCandidate = ownTargets[0];
+      if (topCandidate) {
+        candidateReason = `endgame own target: $${topCandidate.dollarValue} market, ${topCandidate.nominationScore.toFixed(1)} value/$`;
+        candidateSource = "endgame-target";
+      } else {
+        // No ideal targets left — fall back to cheapest available (fill roster)
+        const cheapest = undrafted
+          .map(av => {
+            const ranking = state.rankings.find(r => r.playerId === av.playerId);
+            const modelValue = ranking?.vbdScore ?? av.dollarValue;
+            return { ...av, nominationScore: modelValue, modelValue };
+          })
+          .sort((a, b) => a.dollarValue - b.dollarValue);
+        topCandidate = cheapest[0];
+        candidateReason = topCandidate
+          ? `endgame filler: cheapest available at $${topCandidate.dollarValue}`
+          : "";
+        candidateSource = "endgame-filler";
+      }
+    } else {
+      // EARLY/MID DRAFT: Nominate overpriced players to drain opponent budgets.
+      // Score = espnPrice - modelValue (highest = most overpriced).
+      const candidates = undrafted
+        .map(av => {
+          const ranking = state.rankings.find(r => r.playerId === av.playerId);
+          const modelValue = ranking?.vbdScore ?? av.dollarValue;
+          const espnPrice = av.dollarValue;
+          return { ...av, nominationScore: espnPrice - modelValue, modelValue };
+        })
+        .sort((a, b) => b.nominationScore - a.nominationScore);
+
+      topCandidate = candidates[0];
+      candidateReason = topCandidate
+        ? `overpriced: ESPN $${topCandidate.dollarValue} vs model $${topCandidate.modelValue.toFixed(0)} (score=${topCandidate.nominationScore.toFixed(1)})`
+        : "";
+      candidateSource = "overpriced";
+    }
+
     if (!topCandidate) {
       this.lastAttemptResult = "no candidates available";
       logger.log("[AutoNominate] No nomination candidates available — skipping");
@@ -645,12 +704,11 @@ export class AutoBidController {
     }
 
     const candidateName = topCandidate.playerName;
-    const candidateReason = `overpriced: ESPN $${topCandidate.dollarValue} vs model $${topCandidate.modelValue.toFixed(0)} (score=${topCandidate.nominationScore.toFixed(1)})`;
     this.lastCandidateName = candidateName;
-    this.lastCandidateSource = "overpriced";
+    this.lastCandidateSource = candidateSource;
 
     logger.log(
-      `[AutoNominate] Candidate source=overpriced: ${candidateName} (espnPrice=$${topCandidate.dollarValue}, modelValue=$${topCandidate.modelValue.toFixed(1)}, nominationScore=${topCandidate.nominationScore.toFixed(1)})`,
+      `[AutoNominate] Candidate source=${candidateSource}: ${candidateName} (${candidateReason})`,
     );
 
     // Try direct ID lookup first (we already have the ESPN playerId)
