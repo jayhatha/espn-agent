@@ -157,15 +157,16 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
         <div className="text-body-xs text-grafana-muted mt-2 border-t border-grafana-border pt-2 space-y-0.5">
           {(() => {
             const PITCHER_POS = new Set(["SP", "RP", "P"]);
-            const hitterTotal = Math.round(players
+            const undrafted = players.filter(p => !p.isDrafted);
+            const hitterTotal = Math.round(undrafted
               .filter(p => !p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
               .reduce((s, p) => s + p.dollars, 0));
-            const pitcherTotal = Math.round(players
+            const pitcherTotal = Math.round(undrafted
               .filter(p => p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
               .reduce((s, p) => s + p.dollars, 0));
             return (
               <div>
-                ${hitterTotal} hitters &middot; ${pitcherTotal} pitchers &middot; ${Math.round(budgetUsed)} total
+                ${hitterTotal} hitters &middot; ${pitcherTotal} pitchers &middot; ${hitterTotal + pitcherTotal} remaining
               </div>
             );
           })()}
