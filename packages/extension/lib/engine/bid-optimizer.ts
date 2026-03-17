@@ -97,11 +97,14 @@ export function computeMaxBid(
   // ------------------------------------------------------------------
   // Step 3: Compute upper bound for binary search
   // ------------------------------------------------------------------
-  // Upper bound: inflation-adjusted dollar value * 1.5, capped at budget minus reserves
+  // Upper bound: inflation-adjusted dollar value * 1.1, capped at budget minus reserves.
+  // The 1.1x cap aligns with value strategy — never recommend paying more than 10%
+  // above inflation-adjusted value. The auto-bid controller applies additional caps
+  // (SP tiers, positional dampening, endgame) on top of this.
   const totalSlots = Object.values(rosterSlots).reduce((s, v) => s + v, 0);
   const minReserves = Math.max(0, totalSlots - 1); // at least $1 per other slot
   const inflatedValue = nominatedPlayer.dollars * Math.max(1, inflationFactor);
-  const maxReasonableBid = Math.max(1, Math.ceil(inflatedValue * 1.5));
+  const maxReasonableBid = Math.max(1, Math.ceil(inflatedValue * 1.1));
   const hi_initial = Math.min(Math.max(1, budget - minReserves), maxReasonableBid);
 
   // ------------------------------------------------------------------
