@@ -623,9 +623,12 @@ export class AutoBidController {
     }
 
     // ── Overpriced-first candidate selection ──
+    // Filter by both playerId AND normalized name — DOM-parsed picks use hash-based
+    // fallback IDs that don't match ESPN playerIds in auctionValues.
     const draftedIds = new Set(state.allPicks.map(p => p.playerId));
+    const draftedNames = new Set(state.allPicks.map(p => normalizeName(p.playerName)));
     const candidates = state.auctionValues
-      .filter(av => !draftedIds.has(av.playerId) && av.dollarValue > 0)
+      .filter(av => !draftedIds.has(av.playerId) && !draftedNames.has(normalizeName(av.playerName)) && av.dollarValue > 0)
       .map(av => {
         const ranking = state.rankings.find(r => r.playerId === av.playerId);
         const modelValue = ranking?.vbdScore ?? av.dollarValue;
