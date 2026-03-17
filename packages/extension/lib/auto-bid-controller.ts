@@ -1311,8 +1311,6 @@ export class AutoBidController {
     }
 
     // Compute strategy-adjusted bid cap using shared logic (same as sidebar display)
-    const playerPosition = ranking?.primaryPosition;
-    const playerPositions = ranking?.positions ?? (playerPosition ? [playerPosition] : []);
     const rawMaxBid = this.lastEngineSignals?.optimization?.maxBid ?? 0;
 
     // IDEAL TARGET with no ASV and no engine maxBid yet — defer
