@@ -21,6 +21,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     leagueCategories,
     currentAuctionPlayer,
     espnDomAuctionValues,
+    espnAsvByName,
     draftFormat,
     detectedRosterSlots,
     pitcherHitterSplit,
@@ -69,7 +70,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         currentAuctionPlayerId: currentPlayerId,
         currentAuctionPlayerName: currentPlayerName,
         espnDomAuctionValues,
-        espnAsvByName: useDraftStore.getState().espnAsvByName,
+        espnAsvByName,
         pitcherHitterSplit,
         categoryTargets,
         optimizeForTargets,
@@ -94,6 +95,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     currentPlayerId, // Recompute on new nomination (not bid changes)
     currentPlayerName, // Name-based fallback for nominated player matching
     espnDomAuctionValues,
+    espnAsvByName, // Recompute when ESPN ASV data arrives from API
     detectedRosterSlots, // Recompute when roster slots are detected for the first time
     pitcherHitterSplit, // Recompute when pitcher/hitter split preference changes
     categoryTargets, // Recompute when category targets change

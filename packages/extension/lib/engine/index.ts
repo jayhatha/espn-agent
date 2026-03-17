@@ -553,7 +553,10 @@ function computeIdealRoster(
   // espnAsvByName (normalized name → ASV) is built directly from the ESPN API
   // response in the content script — no cross-ID mapping needed.
   const asvByName = input.espnAsvByName ?? {};
-  const hasAsvData = Object.keys(asvByName).length > 0;
+  const asvByNameCount = Object.keys(asvByName).length;
+  const hasAsvData = asvByNameCount > 0;
+
+  logger.log(`[IdealRoster] ASV data: espnAsvByName has ${asvByNameCount} entries, espnDomAuctionValues has ${Object.keys(input.espnDomAuctionValues ?? {}).length} entries`);
 
   const playersForOptimizer = hasAsvData
     ? allPlayers.map(p => {
@@ -565,10 +568,19 @@ function computeIdealRoster(
       })
     : allPlayers;
 
-  if (import.meta.env.DEV && hasAsvData) {
-    const mapped = playersForOptimizer.filter((p, i) => p.dollars !== allPlayers[i].dollars).length;
-    logger.log(`[IdealRoster] ASV overlay: ${mapped}/${allPlayers.length} players repriced (${Object.keys(asvByName).length} ASVs by name)`);
-  }
+  const mappedCount = playersForOptimizer.filter((p, i) => p.dollars !== allPlayers[i].dollars).length;
+  const unmappedSample = hasAsvData
+    ? allPlayers.filter(p => !(p.normalizedName in asvByName)).slice(0, 3).map(p => p.normalizedName)
+    : [];
+  const mappedSample = hasAsvData
+    ? allPlayers.filter(p => p.normalizedName in asvByName).slice(0, 3).map(p => `${p.name}: FG $${p.dollars} → ASV $${asvByName[p.normalizedName]}`)
+    : [];
+
+  logger.log(
+    `[IdealRoster] ASV overlay: ${mappedCount}/${allPlayers.length} repriced.` +
+    (mappedSample.length > 0 ? ` Mapped: [${mappedSample.join(", ")}]` : "") +
+    (unmappedSample.length > 0 ? ` Unmapped: [${unmappedSample.join(", ")}]` : ""),
+  );
 
   // ------------------------------------------------------------------
   // Category floor enforcement: detect zero-coverage active scoring
