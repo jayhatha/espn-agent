@@ -121,25 +121,33 @@ function convertHitterLeaderboard(): void {
 
   const output = rows
     .filter((r) => r["Name"] && r["MLBAMID"])
-    .map((r) => ({
-      name: r["Name"],
-      team: r["Team"],
-      mlbamId: num(r["MLBAMID"]),
-      fgId: r["PlayerId"] || "",
-      HR: num(r["HR"]),
-      R: num(r["R"]),
-      RBI: num(r["RBI"]),
-      SB: num(r["SB"]),
-      AVG: num(r["AVG"]),
-      OPS: num(r["OPS"]),
-      AB: num(r["AB"]),
-      H: num(r["H"]),
-      BB: num(r["BB"]),
-      HBP: num(r["HBP"]),
-      SF: num(r["SF"]),
-      TB: num(r["TB"]),
-      PA: num(r["PA"]),
-    }));
+    .map((r) => {
+      const singles = num(r["1B"]);
+      const doubles = num(r["2B"]);
+      const triples = num(r["3B"]);
+      const hr = num(r["HR"]);
+      // TB may not be in the CSV — compute from hit components if missing
+      const tb = num(r["TB"]) || (singles + 2 * doubles + 3 * triples + 4 * hr);
+      return {
+        name: r["Name"],
+        team: r["Team"],
+        mlbamId: num(r["MLBAMID"]),
+        fgId: r["PlayerId"] || "",
+        HR: hr,
+        R: num(r["R"]),
+        RBI: num(r["RBI"]),
+        SB: num(r["SB"]),
+        AVG: num(r["AVG"]),
+        OPS: num(r["OPS"]),
+        AB: num(r["AB"]),
+        H: num(r["H"]),
+        BB: num(r["BB"]),
+        HBP: num(r["HBP"]),
+        SF: num(r["SF"]),
+        TB: tb,
+        PA: num(r["PA"]),
+      };
+    });
 
   fs.writeFileSync(OUT_HITTER_LEADERBOARD, JSON.stringify(output));
   console.log(`  -> ${output.length} hitters written to fangraphs-leaderboard-hitters.json`);

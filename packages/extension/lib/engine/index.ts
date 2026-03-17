@@ -899,11 +899,15 @@ export function computeDraftEngine(
         const pitcher = cachedPitcherProjMap.get(nName);
         const hitter = cachedHitterProjMap.get(nName);
         if (pitcher) {
-          for (const [k, v] of Object.entries({ W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO, IP: pitcher.IP, HA: pitcher.HA, ER: pitcher.ER, BBA: pitcher.BBA, QS: pitcher.QS, HRA: pitcher.HRA, ERA: pitcher.ERA, WHIP: pitcher.WHIP })) {
+          // Only accumulate COMPONENTS — never sum rate stats (ERA, WHIP).
+          // Rate stats are recomputed from components via calculateFinalRate.
+          for (const [k, v] of Object.entries({ W: pitcher.W, SV: pitcher.SV, HLD: pitcher.HLD, K: pitcher.SO, SO: pitcher.SO, IP: pitcher.IP, HA: pitcher.HA, ER: pitcher.ER, BBA: pitcher.BBA, QS: pitcher.QS, HRA: pitcher.HRA })) {
             teamComponents[k] = (teamComponents[k] ?? 0) + v;
           }
         } else if (hitter) {
-          for (const [k, v] of Object.entries({ HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB, AVG: hitter.AVG, OPS: hitter.OPS, AB: hitter.AB, H: hitter.H, BB: hitter.BB, HBP: hitter.HBP, SF: hitter.SF, TB: hitter.TB, PA: hitter.PA })) {
+          // Only accumulate COMPONENTS — never sum rate stats (AVG, OPS).
+          // Rate stats are recomputed from components via calculateFinalRate.
+          for (const [k, v] of Object.entries({ HR: hitter.HR, R: hitter.R, RBI: hitter.RBI, SB: hitter.SB, AB: hitter.AB, H: hitter.H, BB: hitter.BB, HBP: hitter.HBP, SF: hitter.SF, TB: hitter.TB, PA: hitter.PA })) {
             teamComponents[k] = (teamComponents[k] ?? 0) + v;
           }
         }
