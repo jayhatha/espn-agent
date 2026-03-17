@@ -216,9 +216,100 @@ async function handleGetRankings(payload: { leagueId: string }) {
   return { rankings: [] };
 }
 
+// ESPN position slot ID → position string mapping
+const ESPN_SLOT_MAP: Record<number, string> = {
+  0: "C", 1: "1B", 2: "2B", 3: "SS", 4: "3B", 5: "OF",
+  9: "DH", 13: "SP", 14: "RP", 15: "P",
+};
+
 async function handleGetAuctionValues(payload: { leagueId: string }) {
-  // This will be implemented in a future plan
-  // For now, return empty array to allow extension to load
-  logger.log('[ESPN Draft Assistant] GET_AUCTION_VALUES requested for league:', payload.leagueId);
-  return { values: [] };
+  logger.log('[ESPN Draft Assistant] Fetching live auction values from ESPN API for league:', payload.leagueId);
+
+  const season = new Date().getFullYear();
+  const batchSize = 50;
+  const maxPlayers = 500; // Top 500 covers all draftable players
+  const allValues: Array<{
+    playerId: number;
+    playerName: string;
+    positions: string[];
+    espnAuctionValue: number;
+    averageAuctionValue: number;
+    rank: number;
+  }> = [];
+
+  try {
+    for (let offset = 0; offset < maxPlayers; offset += batchSize) {
+      const filterHeader = JSON.stringify({
+        players: {
+          limit: batchSize,
+          offset,
+          sortDraftRanks: {
+            sortPriority: 100,
+            sortAsc: true,
+            value: "STANDARD",
+          },
+        },
+      });
+
+      const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${season}/segments/0/leaguedefaults/1?view=kona_player_info&scoringPeriodId=0`;
+
+      const response = await fetch(url, {
+        headers: { "x-fantasy-filter": filterHeader },
+      });
+
+      if (!response.ok) {
+        logger.error(`[ESPN Draft Assistant] ESPN API returned ${response.status}`);
+        break;
+      }
+
+      const data = await response.json() as any;
+      const batch = (data?.players as any[]) || [];
+
+      if (batch.length === 0) break;
+
+      for (const entry of batch) {
+        const player = entry?.player;
+        if (!player) continue;
+
+        const ranks = player.draftRanksByRankType || {};
+        const std = ranks.STANDARD || {};
+        const roto = ranks.ROTO || {};
+        const ownership = player.ownership || {};
+
+        const espnAuctionValue = std.auctionValue ?? roto.auctionValue ?? 0;
+        const averageAuctionValue = ownership.auctionValueAverage ?? 0;
+        const rank = std.rank ?? 9999;
+
+        // Skip players with no meaningful draft data
+        if (espnAuctionValue <= 0 && rank >= 9999 && averageAuctionValue <= 0) continue;
+
+        const positions = (player.eligibleSlots || [])
+          .filter((s: number) => s <= 15 && s !== 12 && s !== 6 && s !== 7)
+          .map((s: number) => ESPN_SLOT_MAP[s])
+          .filter(Boolean) as string[];
+
+        allValues.push({
+          playerId: entry.id,
+          playerName: player.fullName || `Player ${entry.id}`,
+          positions: [...new Set(positions)],
+          espnAuctionValue,
+          averageAuctionValue,
+          rank,
+        });
+      }
+
+      logger.log(`[ESPN Draft Assistant] Fetched ${allValues.length} players (offset=${offset})`);
+
+      // Respect rate limits
+      if (offset + batchSize < maxPlayers && batch.length === batchSize) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    logger.log(`[ESPN Draft Assistant] ESPN auction values loaded: ${allValues.length} players`);
+    return { values: allValues };
+  } catch (error) {
+    logger.error('[ESPN Draft Assistant] Failed to fetch ESPN auction values:', error);
+    return { values: [], error: error instanceof Error ? error.message : String(error) };
+  }
 }

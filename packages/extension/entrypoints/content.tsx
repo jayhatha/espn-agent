@@ -285,6 +285,28 @@ export default defineContentScript({
     }
     useDraftStore.setState({ sidebarVisible: true });
 
+    // Fetch ESPN live auction values (ASV) from API instead of scraping DOM.
+    // Runs async — doesn't block draft initialization.
+    chrome.runtime.sendMessage(
+      { type: "GET_AUCTION_VALUES", payload: { leagueId: String(leagueId) } },
+      (response) => {
+        if (response?.values?.length > 0) {
+          const asvRecord: Record<number, number> = {};
+          for (const v of response.values) {
+            // Prefer averageAuctionValue (live draft trends) over espnAuctionValue (calculated)
+            const asv = v.averageAuctionValue > 0 ? v.averageAuctionValue : v.espnAuctionValue;
+            if (asv > 0) {
+              asvRecord[v.playerId] = asv;
+            }
+          }
+          useDraftStore.getState().setEspnDomAuctionValues(asvRecord);
+          logger.log(`[ESPN Draft Assistant] Loaded ${Object.keys(asvRecord).length} ESPN ASVs from API`);
+        } else {
+          logger.log("[ESPN Draft Assistant] No ESPN ASVs from API — will fall back to DOM scraping");
+        }
+      },
+    );
+
     // Compute myGridColumn from team column mapping (dropdown → grid column).
     // parsePickElement sets pick.teamId to the grid column string (e.g., "5"),
     // NOT the ESPN team ID. So we need to find which grid column corresponds to
