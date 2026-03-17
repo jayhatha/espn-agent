@@ -359,13 +359,17 @@ export function detectMyTeam(): {
 
   // CONFIRMED (MCP verified 2026-03-14): The roster <select> dropdown maps
   // grid column → ESPN team ID. Use this for the real team ID instead of the
-  // pick-train prefix number, which is just a display order.
-  let teamId = prefixMatch ? prefixMatch[1] : rawTeamName;
+  // pick-train prefix number, which is just a display order (NOT the ESPN ID).
+  let teamId: string | null = null;
   if (gridColumn) {
     const dropdown = document.querySelector("select");
     if (dropdown && dropdown.options[gridColumn - 1]) {
       teamId = dropdown.options[gridColumn - 1].value;
     }
+  }
+  // Fallback: use team name as ID (never the prefix number — it's display order, not ESPN ID)
+  if (!teamId) {
+    teamId = teamName;
   }
 
   logger.log(

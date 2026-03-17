@@ -126,7 +126,7 @@ interface DraftState {
     draftFormat: "snake" | "auction";
     totalTeams: number;
     rosterSize: number;
-    myTeamId: string;
+    myTeamId: string | null;
     budget?: number; // Detected from ESPN DOM (default: 260)
   }) => void;
   addPick: (pick: DraftPick) => void;
