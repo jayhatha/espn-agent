@@ -151,3 +151,12 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 51. Data Pipeline for Extension | v5.0 | 0/? | Not started | - |
 | 52. Extension Sidebar UI Update | 3/3 | Complete    | 2026-03-16 | - |
 | 53. UI Polish | 3/3 | Complete    | 2026-03-16 | - |
+
+### Phase 54: Auction engine test suite: unit tests for bid ceiling, inflation, SGP, roster constraints; simulation tests for strategy validation; scenario tests for edge cases
+
+**Goal:** [To be planned]
+**Depends on:** Phase 53
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 54 to break down)

@@ -41,6 +41,7 @@ Progress: [██████████] 100% (v5.0 — Phase 52 complete; Pha
 
 - Phase 52 added: Extension sidebar UI update for v5.0 engine signals
 - Phase 53 added: UI Polish — consistent typography, legible dark-mode colors, professional dashboard styling with Inter font
+- Phase 54 added: Auction engine test suite — unit, simulation, and scenario tests
 
 ### Pending Todos
 
