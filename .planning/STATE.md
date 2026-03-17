@@ -12,18 +12,15 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 55 of 55 (Extension Draft Reliability)
 Plan: 03 (3 of 3 plans complete)
 Status: Complete
-Last activity: 2026-03-17 - Phase 55 all plans complete
+Last activity: 2026-03-17 - Phase 55 all plans complete (55-01 SUMMARY.md added)
 
-Progress: [█████████░] 90% (v5.0 — Phase 54 complete; Phase 55 executing)
+Progress: [██████████] 100% (v5.0 — Phase 55 complete)
 
 ## Accumulated Context
 
 ### Decisions
 
 - [v5.0 start]: Keep simulation-based BID/PASS (more sophisticated than spec formula)
-- [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
-- [v5.0 start]: Add spec gaps as enhancements, not replacements
-- [Phase 47]: Endgame at - [v5.0 start]: Keep simulation-based BID/PASS (more sophisticated than spec formula)
 - [v5.0 start]: Keep SGP bid optimizer (more accurate than model_value - 2)
 - [v5.0 start]: Add spec gaps as enhancements, not replacements
 - [Phase 47]: Endgame at $20 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
@@ -42,25 +39,10 @@ Progress: [█████████░] 90% (v5.0 — Phase 54 complete; Phas
 - [Phase 54-01]: Inflation test scenarios constructed by algebraically solving for inputs that produce target factor — normalization cancels naive input approaches
 - [Phase 54-03]: Statistical test tolerance relaxed to 5/10 wins for greedy vs random comparison — CI environments run slower; directional superiority is still verified
 - [Phase 54-03]: Category balance threshold relaxed to 6/10 for small 50-player pool — production pools naturally fill all category slots
+- [Phase 55-01]: Removed getFilledPositions; use pick.positions directly; SLOT_ORDER assigns dedicated slots before flex
+- [Phase 55-01]: playerPool param kept in buildOpponentModel for API compatibility; unused for position resolution
 - [Phase 55-02]: No new decisions — inflation wiring followed plan exactly as specified
-0 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
-- [Phase 48]: Overpricing-based nomination scoring: 60% overpricing, 20% opponent need, 20% my non-need
-- [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
-- [Phase 50]: Inflation bands use clamped factor; +2 adjustment after endgame dampening; CATEGORY_RANK_TARGETS separate from stat total targets
-- [Phase 51]: Client-side CSV parsing for FanGraphs/ESPN data import in extension popup
-- [Phase 52]: Grafana tokens use explicit hex values, no dark: variants (Shadow DOM constraint)
-- [Phase 52]: pitcherHitterSplit default changed to 75 with v6 migration; autoMode defaults to true but is session-only
-- [Phase 52-02]: SignalStrip/CategoryHeatmap/PositionSupplyHeatmap/NextNominee components receive data via props; CategoryHeatmap toggle is local state; PositionSupplyHeatmap sorts by externalRank for top-N pool definition
-- [Phase 52-03]: DraftNarrator/AuctionBudgetTracker/PositionScarcityAlerts files preserved but not rendered; hit/pitch slider removed (engine value kept); snake path unchanged; EngineInsights kept as thin wrapper for clean ErrorBoundary structure
-- [Phase 53]: grafana-muted brightened from #8e9ab0 to #99a5bc for AA contrast on panel backgrounds; DM Serif Display removed from extension config; dark sidebar chrome colors applied in raw CSS before Tailwind loads
-- [Phase 53-02]: Section headers use text-body-xs (11px), badges/pills use text-label (10px) for density vs readability distinction
-- [Phase 53-02]: CategoryHeatmap RANK_COLORS constant bridges named semantic names to grafana rank token hex values for inline styles
-- [Phase 53-03]: AuctionRecommendations confirmed already migrated — no changes needed
-- [Phase 54-01]: Inflation test scenarios constructed by algebraically solving for inputs that produce target factor — normalization cancels naive input approaches
-- [Phase 54-03]: Statistical test tolerance relaxed to 5/10 wins for greedy vs random comparison — CI environments run slower; directional superiority is still verified
-- [Phase 54-03]: Category balance threshold relaxed to 6/10 for small 50-player pool — production pools naturally fill all category slots
-- [Phase 55-02]: No new decisions — inflation wiring followed plan exactly as specified
-- [Phase 55]: Increase monte-carlo replacement-level test from 100→300 sims with larger pool to make stochastic test reliable
+- [Phase 55]: Increase monte-carlo replacement-level test from 100 to 300 sims with larger pool to make stochastic test reliable
 
 ### Roadmap Evolution
 
@@ -89,5 +71,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-17
-Stopped at: Completed 55-03-PLAN.md (Phase 55 complete — all 3 plans done)
+Stopped at: Completed 55-01-PLAN.md SUMMARY.md (all Phase 55 plans now have SUMMARYs)
 Resume file: None
