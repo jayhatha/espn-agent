@@ -19,50 +19,57 @@ import type { PoolPlayer, OpponentModel } from "./types";
 
 /**
  * Normalize a position string to uppercase for consistent matching.
- * Handles SP/RP/P pitcher normalization.
+ * Handles OF sub-position variants (LF/CF/RF → OF).
  */
 function normalizePos(pos: string): string {
   const upper = pos.toUpperCase();
-  if (upper === "SP" || upper.includes("SP")) return "SP";
-  if (upper === "RP" || upper.includes("RP")) return "RP";
+  if (upper === "LF" || upper === "CF" || upper === "RF") return "OF";
   return upper;
 }
 
 /**
- * Given a player pool and a set of playerIds that a team has drafted,
- * return the set of normalized positions that team has filled (one slot per pick).
- *
- * A pick may fill a dedicated slot OR a flex slot. We use a simplified approach:
- * for each pick, record all the player's positions. The caller (buildOpponentModel)
- * then compares against rosterSlots to determine which slots are still needed.
+ * Slot assignment priority: most restrictive first, flex/bench last.
+ * When assigning a pick to a slot, we consume the most dedicated slot
+ * before falling back to flex (CI/MI/UTIL) or bench (BN).
  */
-function getFilledPositions(
-  playerIds: number[],
-  playerPool: PoolPlayer[],
-  allPicks: Array<{ playerId: number; teamId: string; cost?: number }>,
-): string[] {
-  const filled: string[] = [];
+const SLOT_ORDER = ["C", "SS", "2B", "3B", "1B", "OF", "SP", "RP", "CI", "MI", "UTIL", "P", "BN"];
 
-  for (const pick of allPicks) {
-    if (!playerIds.includes(pick.playerId)) continue;
+/**
+ * For each flex slot, which player positions can fill it.
+ */
+const FLEX_ELIGIBLE: Record<string, string[]> = {
+  CI: ["1B", "3B"],
+  MI: ["2B", "SS"],
+  UTIL: ["C", "1B", "2B", "3B", "SS", "OF", "DH"],
+  P: ["SP", "RP"],
+  BN: ["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"],
+};
 
-    // Find the player in the pool to get their positions
-    const player = playerPool.find(p => {
-      // Match by name is unreliable; for this function, picks include playerId.
-      // The pool doesn't have an id field — we'll match by order in pool.
-      // Actually, we need a different strategy: use pick index in playerPool.
-      return false;
-    });
+/** Dedicated (non-flex) slots that require an exact position match. */
+const DEDICATED_SLOTS = new Set(["C", "SS", "2B", "3B", "1B", "OF", "SP", "RP"]);
 
-    // If no pool match, we can't determine position — skip
-    if (!player) continue;
+/**
+ * Find the best slot for a player's positions, consuming the most restrictive
+ * available slot first. Returns null if no slot is available.
+ */
+function findBestSlot(
+  positions: string[],
+  remaining: Map<string, number>,
+): string | null {
+  const normed = positions.map(normalizePos);
 
-    for (const pos of player.positions) {
-      filled.push(normalizePos(pos));
+  for (const slot of SLOT_ORDER) {
+    if ((remaining.get(slot) ?? 0) <= 0) continue;
+
+    if (DEDICATED_SLOTS.has(slot)) {
+      if (normed.includes(slot)) return slot;
+    } else {
+      const eligible = FLEX_ELIGIBLE[slot];
+      if (eligible && normed.some(p => eligible.includes(p))) return slot;
     }
   }
 
-  return filled;
+  return null;
 }
 
 // ============================================================
@@ -73,9 +80,8 @@ function getFilledPositions(
  * Build an opponent model from current draft state.
  *
  * Algorithm:
- * 1. For each team, look at their drafted picks via allPicks.
- *    Resolve each pick's position by matching playerId against the playerPool index.
- *    Count filled slots per position.
+ * 1. For each pick, use pick.positions directly (DraftPick carries positions[]).
+ *    Assign each pick to the most restrictive available slot for the team.
  * 2. Compare filled slots to rosterSlots to determine still-needed positions.
  * 3. Compute competition factor per position = teamsNeedingPosition / totalTeams.
  * 4. Copy budgets into teamBudgets Map.
@@ -83,8 +89,8 @@ function getFilledPositions(
  * @param teamRosters       Current team rosters from DraftState (teamId → roster info)
  * @param allTeamBudgets    Remaining budgets per team (from DOM scraping or initial budget tracking)
  * @param rosterSlots       Slot definitions for the league (e.g. { C:1, OF:3, P:6 })
- * @param playerPool        FG player pool for resolving playerIds to positions
- * @param allPicks          All auction picks so far (with playerId, teamId, cost)
+ * @param playerPool        FG player pool (unused for position resolution — kept for API compatibility)
+ * @param allPicks          All auction picks so far (with playerId, teamId, positions, cost)
  * @param inflationFactor   Current league inflation factor (from computeInflation)
  */
 export function buildOpponentModel(
@@ -92,7 +98,17 @@ export function buildOpponentModel(
   allTeamBudgets: Array<{ teamName: string; remainingBudget: number }>,
   rosterSlots: Record<string, number>,
   playerPool: PoolPlayer[],
-  allPicks: Array<{ playerId: number; teamId: string; teamName?: string; cost?: number; round?: number; pickNumber?: number; timestamp?: number }>,
+  allPicks: Array<{
+    playerId: number;
+    teamId: string;
+    teamName?: string;
+    cost?: number;
+    positions?: string[];
+    playerName?: string;
+    round?: number;
+    pickNumber?: number;
+    timestamp?: number;
+  }>,
   inflationFactor: number,
 ): OpponentModel {
   const teamNeeds = new Map<string, Set<string>>();
@@ -103,7 +119,6 @@ export function buildOpponentModel(
   // ------------------------------------------------------------------
   // Match budgets to team rosters by team name or key
   for (const budgetEntry of allTeamBudgets) {
-    // Try to find the matching team key in teamRosters
     let matchedKey: string | null = null;
 
     for (const [key, roster] of teamRosters) {
@@ -125,52 +140,52 @@ export function buildOpponentModel(
   }
 
   // ------------------------------------------------------------------
-  // Build per-team position fill counts from allPicks
+  // Build per-team slot fill counts from pick.positions
   // ------------------------------------------------------------------
-  // Build a map of playerIndex → positions using the pool
-  // Picks reference playerIds; we need to map those to positions.
-  // Since the pool uses name-based matching (no id), we use pick order:
-  // picks[0] corresponds to playerPool[0], etc. — but that's not reliable.
+  // For each team, track how many of each slot have been consumed.
+  // We process picks in order, assigning each pick to the most restrictive
+  // available slot (dedicated before flex before bench).
   //
-  // Better approach: for each pick, find the player by index in the pool.
-  // The pool is indexed 0..n-1 but playerId is an external ID.
-  // We don't have a reliable mapping without a lookup table.
-  //
-  // Strategy: use pick-to-pool matching by index.
-  // allPicks are ordered by pick; playerPool entries by rank order.
-  // The playerId field in allPicks corresponds to ESPN player IDs.
-  // The playerPool does NOT have a numeric id field.
-  //
-  // For the purposes of this model, we use a simpler approach:
-  // Count picks per team, then infer unfilled positions from total pick count
-  // vs. total roster slots. This is a conservative estimate.
-  //
-  // More precise: for teams whose picks we know, look at the pick's position
-  // from the allPicks array if it has a position field, or fall back to
-  // playerPool by index if available.
+  // teamFilledSlots: teamId → slot → count consumed
+  const teamFilledSlots = new Map<string, Map<string, number>>();
 
-  // Count picks per team by position (using pick index as pool index)
-  const teamFilledSlots = new Map<string, Map<string, number>>(); // teamId → position → count
-
+  // Group picks by team to process each team independently
+  const picksByTeam = new Map<string, Array<{ positions: string[] }>>();
   for (const pick of allPicks) {
     const teamId = pick.teamId;
-    if (!teamFilledSlots.has(teamId)) {
-      teamFilledSlots.set(teamId, new Map());
+    if (!picksByTeam.has(teamId)) {
+      picksByTeam.set(teamId, []);
     }
-    const slotMap = teamFilledSlots.get(teamId)!;
+    picksByTeam.get(teamId)!.push({ positions: pick.positions ?? [] });
+  }
 
-    // Find the player in the pool by pick order (pick index into playerPool)
-    // Since we don't have ESPN ID → pool index mapping, use the pick's position
-    // by finding the pick's index in the allPicks array and mapping to playerPool.
-    const pickIdx = allPicks.indexOf(pick);
-    const poolPlayer = pickIdx < playerPool.length ? playerPool[pickIdx] : null;
+  for (const [teamId, teamPicks] of picksByTeam) {
+    // Start with a mutable copy of the team's slot capacity
+    const remainingSlots = new Map<string, number>(
+      Object.entries(rosterSlots).filter(([, v]) => v > 0),
+    );
+    const filledSlots = new Map<string, number>();
 
-    if (poolPlayer) {
-      for (const pos of poolPlayer.positions) {
-        const normPos = normalizePos(pos);
-        slotMap.set(normPos, (slotMap.get(normPos) ?? 0) + 1);
+    for (const { positions } of teamPicks) {
+      if (positions.length === 0) {
+        // Unknown positions — skip slot assignment for this pick
+        continue;
+      }
+
+      const slot = findBestSlot(positions, remainingSlots);
+      if (slot) {
+        // Consume the slot
+        const remaining = remainingSlots.get(slot)!;
+        if (remaining <= 1) {
+          remainingSlots.delete(slot);
+        } else {
+          remainingSlots.set(slot, remaining - 1);
+        }
+        filledSlots.set(slot, (filledSlots.get(slot) ?? 0) + 1);
       }
     }
+
+    teamFilledSlots.set(teamId, filledSlots);
   }
 
   // ------------------------------------------------------------------
@@ -181,16 +196,13 @@ export function buildOpponentModel(
   // Competition factor counter: position → number of teams that need it
   const needCount: Record<string, number> = {};
 
-  for (const [teamId, roster] of teamRosters) {
+  for (const [teamId] of teamRosters) {
     const filled = teamFilledSlots.get(teamId) ?? new Map();
     const stillNeeds = new Set<string>();
 
     for (const [slot, required] of Object.entries(rosterSlots)) {
       if (required <= 0) continue;
 
-      // Count how many of this slot have been filled
-      // Dedicated slots: use exact position match
-      // For simplicity, check how many picks match this slot's position
       const filledCount = filled.get(slot) ?? 0;
       if (filledCount < required) {
         stillNeeds.add(slot);
