@@ -362,9 +362,15 @@ export default defineContentScript({
             currentState.setMyTeamId(lateDetection.teamId);
             detectedTeamId = lateDetection.teamId;
           }
-          if (!myGridColumn && lateDetection.gridColumn) {
-            myGridColumn = String(lateDetection.gridColumn);
-            logger.log(`[ESPN Draft Assistant] myGridColumn=${myGridColumn} (from detection at ${delayMs}ms)`);
+          // ALWAYS update myGridColumn when detection succeeds — even if it was
+          // already set. A stale myGridColumn pointing to the wrong team's column
+          // causes picks from team 13 to be claimed as ours in practice drafts.
+          if (lateDetection.gridColumn) {
+            const newGridColumn = String(lateDetection.gridColumn);
+            if (myGridColumn !== newGridColumn) {
+              logger.log(`[ESPN Draft Assistant] myGridColumn updated from ${myGridColumn} to ${newGridColumn} (from detection at ${delayMs}ms)`);
+              myGridColumn = newGridColumn;
+            }
           }
         }
       }, delayMs);
@@ -455,7 +461,9 @@ export default defineContentScript({
         matchReason = "teamId is myTeam";
       } else if (pick.teamName === "My Team") {
         matchReason = "teamName is My Team";
-      } else if (myGridColumn !== null && pick.teamId === myGridColumn) {
+      } else if (myGridColumn !== null && pick.teamId === myGridColumn && myGridColumn !== String(DEFAULT_TEAM_ID)) {
+        // Only use myGridColumn as fallback when it's been verified (not the default).
+        // This prevents claiming team 13's picks in practice drafts where we're a different team.
         matchReason = "teamId=" + pick.teamId + " matches myGridColumn=" + myGridColumn;
       }
       const isMyPick = matchReason !== null;
@@ -580,7 +588,7 @@ export default defineContentScript({
             p.teamId === myTeamId ||
             p.teamId === "myTeam" ||
             p.teamName === "My Team" ||
-            (myGridColumn !== null && p.teamId === myGridColumn);
+            (myGridColumn !== null && p.teamId === myGridColumn && myGridColumn !== String(DEFAULT_TEAM_ID));
           const myPicksFromStore = currentState.allPicks.filter(isMyPickFilter);
 
           if (currentState.myRoster.length !== myPicksFromStore.length) {
