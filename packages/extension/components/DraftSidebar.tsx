@@ -204,15 +204,32 @@ export default function DraftSidebar() {
     dispatchAssistantEvent("espn-draft-assistant-popout");
   };
 
+  const espnDomAuctionValues = useDraftStore(s => s.espnDomAuctionValues);
+
   // Value captured running total (header)
+  // Market value: try ESPN ASV first (DOM-scraped), then FG dollar value by ID, then by name
   const valueCaptured = useMemo(() => {
     return myRoster.reduce((sum, p) => {
-      const marketVal = p.playerId !== undefined
-        ? (auctionValues.find(av => av.playerId === p.playerId)?.dollarValue ?? 0)
-        : 0;
-      return sum + (marketVal - (p.cost ?? 0));
+      // 1. ESPN ASV (most accurate market price)
+      const espnAsv = p.playerId != null ? espnDomAuctionValues[p.playerId] : undefined;
+      if (espnAsv != null) {
+        return sum + (espnAsv - (p.cost ?? 0));
+      }
+      // 2. FG dollar value by playerId
+      const byId = auctionValues.find(av => av.playerId === p.playerId);
+      if (byId) {
+        return sum + (byId.dollarValue - (p.cost ?? 0));
+      }
+      // 3. FG dollar value by name match
+      const pName = p.playerName.toLowerCase();
+      const byName = auctionValues.find(av => av.playerName.toLowerCase() === pName);
+      if (byName) {
+        return sum + (byName.dollarValue - (p.cost ?? 0));
+      }
+      // No market value found — don't count this player
+      return sum;
     }, 0);
-  }, [myRoster, auctionValues]);
+  }, [myRoster, auctionValues, espnDomAuctionValues]);
 
   // SP count for signal strip
   const spCount = myRoster.filter(p =>
