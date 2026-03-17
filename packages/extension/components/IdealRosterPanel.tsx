@@ -6,28 +6,14 @@ interface IdealRosterPanelProps {
   idealRoster: IdealRosterSignal | null;
 }
 
-function buildTierSummary(
-  anchorCount: number,
-  coreCount: number,
-  valueCount: number
-): string {
-  const parts: string[] = [];
-  if (anchorCount > 0) parts.push(`${anchorCount} anchor${anchorCount !== 1 ? "s" : ""}`);
-  if (coreCount > 0) parts.push(`${coreCount} core`);
-  if (valueCount > 0) parts.push(`${valueCount} value`);
-  return parts.join(" + ");
-}
-
 export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps) {
   if (!idealRoster || idealRoster.players.length === 0) {
     return null;
   }
 
-  const { players, totalSGPValue, budgetUsed, unfilledSlots, anchorCount, coreCount, valueCount } =
-    idealRoster;
+  const { players, totalSGPValue, budgetUsed, unfilledSlots } = idealRoster;
 
   const draftedCount = players.filter(p => p.isDrafted).length;
-  const tierSummary = buildTierSummary(anchorCount, coreCount, valueCount);
 
   const optimizeForTargets = useDraftStore(s => s.optimizeForTargets);
   const setOptimizeForTargets = useDraftStore(s => s.setOptimizeForTargets);
@@ -39,7 +25,6 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
           <span className="text-body-sm font-semibold text-grafana-text flex-shrink-0">Ideal Roster</span>
           <span className="text-body-xs text-grafana-muted truncate">
             {draftedCount}/{players.length} filled
-            {tierSummary && ` \u00b7 ${tierSummary}`}
           </span>
           <button
             onClick={(e) => {
@@ -62,21 +47,15 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
       <div className="px-3 pb-3 pt-2 bg-grafana-bg">
         <div className="space-y-1">
           {players.map((player, i) => {
-            const tierBadgeClass = player.isDrafted
-              ? "bg-grafana-positive/20 text-grafana-positive"
-              : player.tier === "anchor"
-              ? "bg-grafana-warning/20 text-grafana-warning"
-              : player.tier === "core"
-              ? "bg-grafana-info/20 text-grafana-info"
-              : "bg-grafana-border text-grafana-muted";
+            const sgpPerDollar = player.dollars > 0 ? player.sgpValue / player.dollars : 0;
 
             return (
               <div
                 key={`${player.name}-${i}`}
-                className={`flex items-center justify-between text-body-xs gap-2${player.isDrafted ? " opacity-60" : ""}`}
+                className={`flex items-center justify-between text-body-xs gap-1${player.isDrafted ? " opacity-60" : ""}`}
               >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="text-body-xs text-grafana-muted w-6 flex-shrink-0 text-right">
+                  <span className="text-grafana-muted w-5 flex-shrink-0 text-right">
                     {player.slot}
                   </span>
                   {player.externalRank != null && (
@@ -90,16 +69,23 @@ export default function IdealRosterPanel({ idealRoster }: IdealRosterPanelProps)
                       {player.externalRank}
                     </span>
                   )}
-                  <span
-                    className={`text-body-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${tierBadgeClass}`}
-                  >
-                    {player.isDrafted ? "\u2713" : player.tier}
-                  </span>
+                  {player.isDrafted && (
+                    <span className="text-body-xs font-semibold px-1 py-0.5 rounded flex-shrink-0 bg-grafana-positive/20 text-grafana-positive">
+                      ✓
+                    </span>
+                  )}
                   <span className={`truncate ${player.isDrafted ? "text-grafana-muted" : "font-semibold text-grafana-text"}`}>
                     {player.name}
                   </span>
                 </div>
-                <span className="text-grafana-muted flex-shrink-0">${Math.round(player.dollars)}</span>
+                <div className="flex items-center gap-2 flex-shrink-0 text-right">
+                  {!player.isDrafted && (
+                    <span className="text-grafana-muted font-mono w-8">{player.sgpValue.toFixed(1)}</span>
+                  )}
+                  <span className={`font-mono w-7 ${!player.isDrafted && sgpPerDollar >= 0.5 ? "text-grafana-positive" : "text-grafana-muted"}`}>
+                    ${Math.round(player.dollars)}
+                  </span>
+                </div>
               </div>
             );
           })}
