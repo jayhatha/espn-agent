@@ -251,11 +251,8 @@ export function detectLeagueConfig(): DetectionResult {
     warnings.push("Practice draft detected - using DOM-based detection");
   }
 
-  // 1. Detect total teams
+  // 1. Detect total teams (defaults to 13 if not detected — single-user tool)
   const totalTeams = detectTeamCount();
-  if (!totalTeams) {
-    warnings.push("Could not detect team count from draft board");
-  }
 
   // 2. Detect scoring categories
   const categories = detectCategories();
