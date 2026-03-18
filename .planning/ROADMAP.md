@@ -200,3 +200,15 @@ Plans:
 Plans:
 - [ ] 56-01-PLAN.md — Fix totalTeams default (12→13), consolidate HITTER_BUDGET_MAX, fix hardcoded budget in UI
 - [ ] 56-02-PLAN.md — Consolidate nomination scoring, verify BidVerdict async bid display
+
+### Phase 57: Auction simulation test suite — run value strategy against simulated opponents with real FanGraphs player pool, verify spec targets: roster value >= $320, profit >= $70, top-4 category finishes >= 60%
+
+**Goal:** Build auction simulation test suite AND standalone CLI simulator using real FanGraphs player pool, verifying spec targets (roster value >= $320, profit >= $70, top-4 category finishes >= 60%)
+**Depends on:** Phase 56
+**Requirements:** SIM-01, SIM-02
+**Plans:** 3 plans
+
+Plans:
+- [ ] 57-01-PLAN.md — Shared auction simulation harness (data loading, auction loop, result aggregation)
+- [ ] 57-02-PLAN.md — Vitest spec target verification tests
+- [ ] 57-03-PLAN.md — Standalone CLI simulator with aggregated output
