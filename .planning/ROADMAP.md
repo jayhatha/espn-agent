@@ -189,3 +189,14 @@ Plans:
 - [ ] 55-01-PLAN.md — Fix opponent model position tracking + tests
 - [ ] 55-02-PLAN.md — Wire inflation into runtime engine
 - [ ] 55-03-PLAN.md — Fix failing archetype, draft-simulator, monte-carlo tests
+
+### Phase 56: Audit draft logic for value strategy consistency and spec compliance — verify bid controller, engine signals, UI components, and constants against auction draft spec (13 teams)
+
+**Goal:** Audit all draft logic for consistency with value draft strategy and spec compliance (13 teams)
+**Depends on:** Phase 55
+**Requirements:** AUDIT-01, AUDIT-02
+**Plans:** 2 plans
+
+Plans:
+- [ ] 56-01-PLAN.md — Fix totalTeams default (12→13), consolidate HITTER_BUDGET_MAX, fix hardcoded budget in UI
+- [ ] 56-02-PLAN.md — Consolidate nomination scoring, verify BidVerdict async bid display
