@@ -72,13 +72,25 @@ export function buildSGPVectors(
   const statVectors: Record<string, number[]> = {};
   const categoryStats: Record<string, CategoryStats> = {};
 
-  // Compute total replacement index
-  // For hitter categories: use total hitter slots
-  // For pitcher categories: use total pitcher slots
-  // For simplicity: use total slots (sum all position slots) * totalTeams
-  // This is the Nth ranked player across all eligible players
-  const totalSlots = Object.values(rosterSlots).reduce((s, v) => s + v, 0);
-  const replacementIndex = totalSlots * totalTeams;
+  // Compute replacement index separately for hitters and pitchers.
+  // Using total slots for both overshoots the pool size and clips replacement
+  // to the worst player, compressing SGP spread to near-zero.
+  const PITCHER_SLOT_KEYS = new Set(["SP", "RP", "P"]);
+  const HITTER_SLOT_KEYS = new Set(["C", "1B", "2B", "3B", "SS", "OF", "DH", "CI", "MI", "UTIL"]);
+  let pitcherSlots = 0;
+  let hitterSlots = 0;
+  for (const [slot, count] of Object.entries(rosterSlots)) {
+    const upper = slot.toUpperCase();
+    if (PITCHER_SLOT_KEYS.has(upper)) pitcherSlots += count;
+    else if (HITTER_SLOT_KEYS.has(upper)) hitterSlots += count;
+    else if (upper === "BN") {
+      // Bench slots split roughly proportional — use 60/40 hitter/pitcher
+      hitterSlots += Math.ceil(count * 0.6);
+      pitcherSlots += Math.floor(count * 0.4);
+    }
+  }
+  const hitterReplacementIndex = hitterSlots * totalTeams;
+  const pitcherReplacementIndex = pitcherSlots * totalTeams;
 
   // ------------------------------------------------------------------
   // Phase 1: extract stat vectors and compute category stats
@@ -121,7 +133,8 @@ export function buildSGPVectors(
       ? [...values].sort((a, b) => a - b)   // ascending: best pitcher (low ERA) first
       : [...values].sort((a, b) => b - a);  // descending: best hitter (high HR) first
 
-    // The replacement player is at index (replacementIndex - 1), or last if fewer players
+    // Use position-appropriate replacement index
+    const replacementIndex = isPitchingCategory ? pitcherReplacementIndex : hitterReplacementIndex;
     const replIdx = Math.min(replacementIndex, sortedDesc.length) - 1;
     const replacementValue = replIdx >= 0 ? sortedDesc[Math.max(0, replIdx)] : (sortedDesc[sortedDesc.length - 1] ?? 0);
 

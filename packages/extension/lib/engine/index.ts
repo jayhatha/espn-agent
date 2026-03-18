@@ -12,7 +12,7 @@ import { optimizeRoster } from "./roster-optimizer";
 // category-floor imports removed — SGP naturally handles category coverage
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { computeExternalRankBoost } from "./rank-boost";
-import { getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
+import { HITTER_BUDGET_MAX } from "./draft-constants";
 import { calculateFinalRate } from "@espn-fantasy/shared";
 import { logger } from "../logger";
 import { runSimulationInWorker } from "./simulation-worker-client";
@@ -585,51 +585,21 @@ function computeIdealRoster(
   // SGP already reflects category contributions — value-drafted rosters naturally
   // cover categories. Category progress bars in the UI show any gaps.
 
-  // Cap pitcher prices by SP tier and enforce hitter budget allocation.
-  // Without this, the optimizer selects $50 pitchers that the strategy would
-  // never pay more than $18 for (SP1 cap), distorting the ideal roster.
-  const PITCHER_POS = new Set(["SP", "RP"]);
-  const spCount = input.myRoster.filter(
-    p => p.positions.some(pos => pos.toUpperCase() === "SP"),
-  ).length;
-  const hitterSpent = input.myRoster
-    .filter(p => !p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
-    .reduce((s, p) => s + (p.cost ?? 0), 0);
-  const hitterBudgetRemaining = Math.max(0, HITTER_BUDGET_MAX - hitterSpent);
+  // The ideal roster uses ESPN ASV as player costs (set above). The optimizer
+  // picks the best SGP/$ roster within remaining budget — no artificial price
+  // caps needed. SP tier caps and hitter budget caps belong in strategy-caps.ts
+  // (bid decisions), not here. The optimizer's budget constraint naturally
+  // prevents overspending, and ASV prices reflect what players actually cost.
 
-  const strategyAdjustedPool = playersForOptimizer.map((player) => {
-    const isSP = player.positions.some(pos => pos.toUpperCase() === "SP");
-    const isPitcher = player.isPitcher;
-
-    if (isSP) {
-      // Cap SP prices at their tier ceiling based on how many SPs are already drafted.
-      // The optimizer's greedy fill will pick SPs in SGP/$ order, so the first SP
-      // selected gets the SP(N+1) tier cap, the second gets SP(N+2), etc.
-      // Using the current tier cap for ALL SPs is conservative but prevents the
-      // optimizer from suggesting $50 pitchers the strategy would never pay for.
-      const tierCap = getSpTierCap(spCount);
-      if (player.dollars > tierCap) {
-        return { ...player, dollars: tierCap };
-      }
-    }
-
-    // Cap hitter costs to remaining hitter budget allocation
-    if (!isPitcher && player.dollars > hitterBudgetRemaining) {
-      return { ...player, dollars: Math.max(1, hitterBudgetRemaining) };
-    }
-
-    return player;
-  });
-
-  // Rebuild SGP values aligned to strategyAdjustedPool
-  const sgpForOptimizer = strategyAdjustedPool.map(p => {
+  // SGP values aligned to playersForOptimizer (same order as allPlayers)
+  const sgpForOptimizer = playersForOptimizer.map(p => {
     const idx = allPlayers.findIndex(ap => ap.normalizedName === p.normalizedName);
     return idx >= 0 ? sgpValuesForOptimizer[idx] : 0;
   });
 
   // Optimizer fills remaining slots with remaining budget
   const result = optimizeRoster(
-    strategyAdjustedPool,
+    playersForOptimizer,
     sgpForOptimizer,
     input.remainingBudget,
     remainingSlots,
