@@ -1259,6 +1259,18 @@ export class AutoBidController {
       );
     }
 
+    // Monte Carlo shouldBid gate: if simulation explicitly says don't bid, pass
+    const shouldBid = this.lastEngineSignals?.optimization?.shouldBid;
+    if (shouldBid === false) {
+      const simEV = this.lastEngineSignals?.optimization?.simulationEV;
+      const simStdDev = this.lastEngineSignals?.optimization?.simulationStdDev;
+      logger.log(
+        `[AutoBidController] Monte Carlo shouldBid=false (passEV > bidEV) -- passing on ${nominatedName} at $${currentBid}` +
+          (simEV != null ? ` (simEV=${simEV.toFixed(2)}, stdDev=${simStdDev?.toFixed(2) ?? "N/A"})` : ""),
+      );
+      return;
+    }
+
     // Guard: price has reached or exceeded the cap
     if (currentBid >= autoBidCap) {
       logger.log(
