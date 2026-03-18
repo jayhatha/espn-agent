@@ -146,13 +146,13 @@ describe("computeStrategyBidCap — SP tier caps", () => {
 });
 
 describe("computeStrategyBidCap — hitter budget cap", () => {
-  it("caps bid when hitterSpent + bid would exceed $200", () => {
+  it("caps bid when hitterSpent + bid would exceed $220", () => {
     const result = computeStrategyBidCap(
-      makeInput({ rawMaxBid: 30, hitterSpent: 185, positions: ["OF"] }),
+      makeInput({ rawMaxBid: 30, hitterSpent: 205, positions: ["OF"] }),
     );
-    // Headroom: 200 - 185 = 15. rawMaxBid 30 + pos 3 = 33, capped to 15.
+    // Headroom: 220 - 205 = 15. rawMaxBid 30 + pos 3 = 33, capped to 15.
     expect(result.bidCap).toBe(15);
-    expect(result.capSource).toContain("hitter cap $200");
+    expect(result.capSource).toContain("hitter cap $220");
   });
 
   it("does not cap when under budget", () => {
@@ -258,12 +258,12 @@ describe("computeStrategyBidCap — combined adjustments", () => {
         positions: ["C"],
         primaryPosition: "C",
         catcherSlotsRemaining: 0,
-        hitterSpent: 190,
+        hitterSpent: 210,
       }),
     );
     // 40 × 0.5 = 20 (C filled dampening)
     // 20 + 1 (C weight) = 21
-    // Hitter cap: 190 + 21 = 211 > 200, headroom = 10 → cap to 10
+    // Hitter cap: 210 + 21 = 231 > 220, headroom = 10 → cap to 10
     expect(result.bidCap).toBe(10);
     expect(result.capSource).toContain("C filled");
     expect(result.capSource).toContain("hitter cap");

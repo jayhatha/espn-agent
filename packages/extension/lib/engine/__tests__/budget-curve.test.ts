@@ -164,8 +164,8 @@ describe("computeBudgetCurve", () => {
   // 5. Budget targets always fixed
   it("always returns correct hitter, pitcher, and bench budget targets", () => {
     const result = makeBudgetCurve();
-    expect(result.hitterBudgetTarget).toEqual({ min: 185, max: 205 });
-    expect(result.pitcherBudgetTarget).toEqual({ min: 55, max: 70 });
+    expect(result.hitterBudgetTarget).toEqual({ min: 195, max: 220 });
+    expect(result.pitcherBudgetTarget).toEqual({ min: 35, max: 60 });
     expect(result.benchBudget).toBe(5);
   });
 

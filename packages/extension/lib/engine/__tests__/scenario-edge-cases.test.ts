@@ -365,10 +365,10 @@ describe("Scenario 8: Budget allocation tracking (hitter/pitcher split)", () => 
     // Verify budget targets are present
     expect(signal.hitterBudgetTarget).toBeDefined();
     expect(signal.pitcherBudgetTarget).toBeDefined();
-    expect(signal.hitterBudgetTarget.min).toBe(185);
-    expect(signal.hitterBudgetTarget.max).toBe(205);
-    expect(signal.pitcherBudgetTarget.min).toBe(55);
-    expect(signal.pitcherBudgetTarget.max).toBe(70);
+    expect(signal.hitterBudgetTarget.min).toBe(195);
+    expect(signal.hitterBudgetTarget.max).toBe(220);
+    expect(signal.pitcherBudgetTarget.min).toBe(35);
+    expect(signal.pitcherBudgetTarget.max).toBe(60);
   });
 
   it("computeBudgetCurve returns correct remainingBudget and remainingRosterSpots", () => {

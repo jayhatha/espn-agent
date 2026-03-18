@@ -96,10 +96,11 @@ export const GS_CAP = 200;
 // ============================================================
 
 /**
- * Maximum total budget allocated to hitters. Prevents over-investing
- * in bats at the expense of pitching depth.
+ * Maximum total budget allocated to hitters. With 14 hitter starting
+ * slots (C/1B/2B/SS/3B/MI/CI/4OF/3UTIL) + 2 bench hitters = 16 hitters,
+ * $220 allows ~$13.75 avg per hitter while reserving $40 for pitching.
  */
-export const HITTER_BUDGET_MAX = 200;
+export const HITTER_BUDGET_MAX = 220;
 
 // ============================================================
 // Category Rank Targets (INF-03)
