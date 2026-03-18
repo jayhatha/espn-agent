@@ -1,7 +1,7 @@
 import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
 import { GS_CAP } from "./engine/draft-constants";
-import { computeStrategyBidCap } from "./engine/strategy-caps";
+
 import { computeNominationScore } from "./engine/nomination-strategy";
 import { logger } from "./logger";
 
@@ -1220,43 +1220,28 @@ export class AutoBidController {
       }
     }
 
-    // Get engine's SGP-based maxBid — if not available yet, defer
-    const rawMaxBid = this.lastEngineSignals?.optimization?.maxBid ?? 0;
-    if (rawMaxBid <= 0) {
+    // Use the strategy-capped maxBid from engine signals. Strategy caps
+    // (SP tier, positional weight, hitter budget, endgame, inflation) are
+    // already applied by use-draft-engine.ts before signals reach us.
+    // Do NOT apply computeStrategyBidCap again — that would double-apply
+    // positional weights, endgame dampening, etc.
+    const autoBidCap = this.lastEngineSignals?.optimization?.maxBid ?? 0;
+    if (autoBidCap <= 0) {
       logger.log("[AutoBidController] Engine maxBid not available yet — deferring");
       return;
     }
-
-    // Apply strategy caps (same computation as sidebar display)
-    const budgetCurve = this.lastEngineSignals?.budgetCurve;
-    const isEndgame = budgetCurve?.endgameMode === true;
-
-    const spCount = state.myRoster.filter(
-      (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
-    ).length;
-
-    const capResult = computeStrategyBidCap({
-      rawMaxBid,
-      isPitcher,
-      isSP,
-      positions: playerPositions,
-      primaryPosition: playerPosition ?? null,
-      spCount,
-      catcherSlotsRemaining: this.lastEngineSignals?.remainingSlots?.["C"] ?? 0,
-      isEndgame,
-      inflationFactor: this.lastEngineSignals?.inflation?.inflationFactor ?? 1.0,
-      hitterSpent: budgetCurve?.hitterSpent ?? 0,
-      pitcherSpent: budgetCurve?.pitcherSpent ?? 0,
-    });
-
-    let autoBidCap = capResult.bidCap;
-    const capSource = capResult.capSource;
+    const capSource = this.lastEngineSignals?.optimization?.capSource ?? "engine";
 
     // GS cap awareness: log advisory for deep SP picks (SP4+)
-    if (isSP && spCount >= 3) {
-      logger.log(
-        `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
-      );
+    if (isSP) {
+      const spCount = state.myRoster.filter(
+        (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
+      ).length;
+      if (spCount >= 3) {
+        logger.log(
+          `[AutoBidController] GS cap awareness: ${spCount} SPs drafted, ${GS_CAP} GS limit suggests preserving budget for high-K relievers`,
+        );
+      }
     }
 
     // Monte Carlo shouldBid gate: if simulation explicitly says don't bid, pass
