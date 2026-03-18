@@ -2,6 +2,7 @@ import { useDraftStore, normalizeName } from "./draft-state";
 import type { DraftEngineSignals } from "./engine/types";
 import { GS_CAP } from "./engine/draft-constants";
 import { computeStrategyBidCap } from "./engine/strategy-caps";
+import { computeNominationScore } from "./engine/nomination-strategy";
 import { logger } from "./logger";
 
 /** Find an action button for a specific player, preferring .action-btn class */
@@ -61,7 +62,8 @@ export interface NominationDiagnostics {
  * - Everyone else: skip
  *
  * Nomination strategy:
- * - Overpriced-first: nomination_score = espn_price - model_value, highest score wins
+ * - Overpriced-first: delegates to computeNominationScore() from nomination-strategy.ts
+ *   (60% overpricing + 20% opponent need + 20% my non-need)
  * - Goal: force league overspending, increase inflation, preserve value in remaining pool
  *
  * Safety guarantees:
@@ -550,7 +552,7 @@ export class AutoBidController {
    * 3. It is our turn to nominate (DOM detection)
    * 4. Cooldown has elapsed and attempt limit not exceeded
    *
-   * Uses overpriced-first selection: nomination_score = espn_price - model_value.
+   * Uses overpriced-first selection via computeNominationScore() from nomination-strategy.ts.
    */
   evaluateAndNominate(): void {
     const state = useDraftStore.getState();
@@ -680,19 +682,33 @@ export class AutoBidController {
       }
     } else {
       // EARLY/MID DRAFT: Nominate overpriced players to drain opponent budgets.
-      // Score = espnPrice - modelValue (highest = most overpriced).
+      // Delegates to shared computeNominationScore() from nomination-strategy.ts
+      // (60% overpricing + 20% opponent need + 20% my non-need).
+      // Controller lacks full opponent/team state, so uses neutral 0.5 defaults
+      // for secondary factors — overpricing (60%) still dominates.
+      const remainingSlots = this.lastEngineSignals?.remainingSlots ?? {};
       const candidates = undrafted
         .map(av => {
           const ranking = state.rankings.find(r => r.playerId === av.playerId);
           const modelValue = ranking?.vbdScore ?? av.dollarValue;
           const espnPrice = av.dollarValue;
-          return { ...av, nominationScore: espnPrice - modelValue, modelValue };
+          const hasEspnAsv = espnPrice > 0;
+          // Approximate myNonNeedFactor: if I still need any of this player's positions, 0; else 1
+          const positions = (ranking?.positions ?? av.positions ?? []) as string[];
+          const iNeedPosition = positions.some(
+            pos => (remainingSlots[pos.toUpperCase()] ?? 0) > 0,
+          );
+          const myNonNeedFactor = iNeedPosition ? 0.0 : 1.0;
+          const { trapScore } = computeNominationScore(
+            espnPrice, modelValue, hasEspnAsv, 0.5, myNonNeedFactor,
+          );
+          return { ...av, nominationScore: trapScore, modelValue };
         })
         .sort((a, b) => b.nominationScore - a.nominationScore);
 
       topCandidate = candidates[0];
       candidateReason = topCandidate
-        ? `overpriced: ESPN $${topCandidate.dollarValue} vs model $${topCandidate.modelValue.toFixed(0)} (score=${topCandidate.nominationScore.toFixed(1)})`
+        ? `overpriced: ESPN $${topCandidate.dollarValue} vs model $${topCandidate.modelValue.toFixed(0)} (score=${topCandidate.nominationScore.toFixed(2)})`
         : "";
       candidateSource = "overpriced";
     }

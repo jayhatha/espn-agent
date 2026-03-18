@@ -23,6 +23,50 @@ import type { PoolPlayer, SimTeamState, OpponentModel, NominationRecommendation 
 const MAX_OVERPRICING = 30;
 
 // ============================================================
+// computeNominationScore — shared scoring function
+// ============================================================
+
+/**
+ * Compute nomination score for a single player.
+ *
+ * Formula:
+ *   nominationScore = normalizedOverpricing * 0.6 + opponentNeedFactor * 0.2 + myNonNeedFactor * 0.2
+ *
+ * When opponent/need data is unavailable, callers should pass neutral defaults
+ * (opponentNeedFactor=0.5, myNonNeedFactor=0.5) so the overpricing factor dominates.
+ *
+ * @param espnPrice        ESPN average salary (0 if unavailable)
+ * @param modelValue       Model dollar value for the player
+ * @param hasEspnAsv       Whether ESPN ASV data is available
+ * @param opponentNeedFactor  0-1 fraction of opponents needing this position (default 0.5)
+ * @param myNonNeedFactor     0-1 reward for positions I've already filled (default 0.5)
+ * @returns                Object with trapScore (0.01-1.0) and overpricingRaw for logging
+ */
+export function computeNominationScore(
+  espnPrice: number,
+  modelValue: number,
+  hasEspnAsv: boolean,
+  opponentNeedFactor: number = 0.5,
+  myNonNeedFactor: number = 0.5,
+): { trapScore: number; overpricingRaw: number } {
+  let overpricingRaw: number;
+
+  if (hasEspnAsv && espnPrice > 0) {
+    overpricingRaw = espnPrice - modelValue;
+  } else {
+    // Fallback: budget drain heuristic (expensive players drain budgets)
+    overpricingRaw = modelValue / 50 * MAX_OVERPRICING;
+  }
+
+  const normalizedOverpricing = Math.max(0, Math.min(1, overpricingRaw / MAX_OVERPRICING));
+
+  const rawScore = normalizedOverpricing * 0.6 + opponentNeedFactor * 0.2 + myNonNeedFactor * 0.2;
+  const trapScore = Math.max(0.01, Math.min(1.0, rawScore));
+
+  return { trapScore, overpricingRaw };
+}
+
+// ============================================================
 // recommendNomination
 // ============================================================
 
@@ -60,25 +104,11 @@ export function recommendNomination(
     if (!player) continue;
 
     // ------------------------------------------------------------------
-    // Factor 1: Overpricing (0-1, weight 0.6)
-    // ESPN avg salary minus model dollar value — positive = overpriced.
-    // When ESPN ASV unavailable, fall back to budget drain heuristic.
+    // Factor 1 inputs: Overpricing
     // ------------------------------------------------------------------
-    let overpricingRaw: number;
-    let hasEspnAsv = false;
-    let espnPrice = 0;
-    let modelValue = player.dollars;
-
-    if (player.espnAvgSalary != null && player.espnAvgSalary > 0) {
-      hasEspnAsv = true;
-      espnPrice = player.espnAvgSalary;
-      overpricingRaw = espnPrice - modelValue;
-    } else {
-      // Fallback: budget drain heuristic (expensive players drain budgets)
-      overpricingRaw = player.dollars / 50 * MAX_OVERPRICING;
-    }
-
-    const normalizedOverpricing = Math.max(0, Math.min(1, overpricingRaw / MAX_OVERPRICING));
+    const hasEspnAsv = player.espnAvgSalary != null && player.espnAvgSalary > 0;
+    const espnPrice = hasEspnAsv ? player.espnAvgSalary! : 0;
+    const modelValue = player.dollars;
 
     // ------------------------------------------------------------------
     // Factor 2: Opponent need factor (0-1, weight 0.2)
@@ -110,10 +140,11 @@ export function recommendNomination(
     const myNonNeedFactor = iNeedThisPosition ? 0.0 : 1.0;
 
     // ------------------------------------------------------------------
-    // nominationScore = weighted sum, floored at 0.01
+    // Compute score via shared function
     // ------------------------------------------------------------------
-    const rawScore = normalizedOverpricing * 0.6 + opponentNeedFactor * 0.2 + myNonNeedFactor * 0.2;
-    const trapScore = Math.max(0.01, Math.min(1.0, rawScore));
+    const { trapScore, overpricingRaw } = computeNominationScore(
+      espnPrice, modelValue, hasEspnAsv, opponentNeedFactor, myNonNeedFactor,
+    );
 
     // ------------------------------------------------------------------
     // Reason generation: build human-readable explanation
