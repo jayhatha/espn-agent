@@ -197,4 +197,30 @@ describe("computeMaxBid — binary search convergence", () => {
     expect(result.maxBid).toBeGreaterThanOrEqual(1);
     expect(result.maxBid).toBeLessThanOrEqual(260);
   });
+
+  it("finds nominated player by name even when object references differ (structured clone regression)", () => {
+    // Simulate what happens in a web worker: nominated player is a separate
+    // object with the same data, not a reference from the availablePlayers array.
+    const availablePlayers: PoolPlayer[] = [
+      makeHitter("Star", 50, ["OF"]),
+      makeHitter("Good1", 20, ["OF"]),
+      makeHitter("Mid1", 15, ["1B"]),
+    ];
+    const sgpValues = [10, 4, 3];
+
+    // Create a structurally identical but referentially distinct copy
+    const clonedNominated: PoolPlayer = JSON.parse(JSON.stringify(availablePlayers[0]));
+
+    const result = computeMaxBid(
+      clonedNominated,
+      availablePlayers,
+      sgpValues,
+      100,
+      rosterSlots,
+      simpleOpponentModel,
+    );
+
+    // Must find the player and produce a real maxBid (not $1 fallback)
+    expect(result.maxBid).toBeGreaterThan(1);
+  });
 });
