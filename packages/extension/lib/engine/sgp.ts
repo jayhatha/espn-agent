@@ -84,9 +84,10 @@ export function buildSGPVectors(
     if (PITCHER_SLOT_KEYS.has(upper)) pitcherSlots += count;
     else if (HITTER_SLOT_KEYS.has(upper)) hitterSlots += count;
     else if (upper === "BN") {
-      // Bench slots split roughly proportional — use 60/40 hitter/pitcher
-      hitterSlots += Math.ceil(count * 0.6);
-      pitcherSlots += Math.floor(count * 0.4);
+      // Bench split for replacement level: assume league-average 3 hitter / 2 pitcher.
+      // Our strategy is 2/3 but replacement level reflects what the whole league rosters.
+      hitterSlots += Math.min(3, count);
+      pitcherSlots += Math.max(0, count - 3);
     }
   }
   const hitterReplacementIndex = hitterSlots * totalTeams;
