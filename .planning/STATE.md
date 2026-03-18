@@ -50,6 +50,7 @@ Progress: [██████████] 100% (v5.0 — Phase 55 complete)
 - Phase 53 added: UI Polish — consistent typography, legible dark-mode colors, professional dashboard styling with Inter font
 - Phase 54 added: Auction engine test suite — unit, simulation, and scenario tests
 - Phase 55 added: Extension draft reliability — opponent model fix, inflation wiring, test stabilization
+- Phase 56 added: Audit draft logic for value strategy consistency and spec compliance (13 teams)
 
 ### Pending Todos
 
@@ -67,9 +68,10 @@ None yet.
 | 92 | Detect myTeamId from ESPN draft DOM | 2026-03-16 | ab29825 | [92-detect-myteamid-from-espn-draft-dom-inst](./quick/92-detect-myteamid-from-espn-draft-dom-inst/) |
 | 93 | Fix ideal roster optimizer for value drafting | 2026-03-16 | 1768f8a | [93-fix-ideal-roster-optimizer-for-value-dra](./quick/93-fix-ideal-roster-optimizer-for-value-dra/) |
 | 94 | Simplify nomination — overpriced-first | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/) |
+| 95 | Wire shouldBid from Monte Carlo into auto-bid | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/) |
 
 ## Session Continuity
 
-Last session: 2026-03-17
-Stopped at: Completed 55-01-PLAN.md SUMMARY.md (all Phase 55 plans now have SUMMARYs)
+Last session: 2026-03-18
+Stopped at: Completed quick task 95 - wire shouldBid into auto-bid controller
 Resume file: None
