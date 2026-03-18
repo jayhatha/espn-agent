@@ -1152,7 +1152,10 @@ export function computeDraftEngine(
       // Use espnAsvByName for reliable name-based ASV lookup
       const asvByNameBid = input.espnAsvByName ?? {};
 
-      // Look up ESPN ASV for nominated player (ID first, name fallback)
+      // Look up ESPN ASV for nominated player.
+      // Try ID-based DOM scrape first, then name-based API lookup.
+      // Final fallback: if the pool was ASV-overlaid, the bidNominatedPlayer's
+      // dollars field IS the ASV — use it so the blend runs even when name lookup missed.
       const nominatedAsv =
         (input.currentAuctionPlayerId != null
           ? input.espnDomAuctionValues?.[input.currentAuctionPlayerId]
@@ -1204,7 +1207,9 @@ export function computeDraftEngine(
       const capturedBidKey = newBidWorkerCacheKey;
       runBidOptimizerInWorker({
         nominatedPlayer: bidNominatedPlayer,
-        nominatedAsv,
+        // Use explicit ASV if found; otherwise fall back to the overlaid player's
+        // dollars (which IS the ASV when the pool was ASV-overlaid at line 1170).
+        nominatedAsv: nominatedAsv ?? (hasAsvBid ? bidNominatedPlayer.dollars : null),
         availablePlayers: bidPoolPlayers,
         sgpValues: adjustedSgpValuesOpt,
         budget: input.remainingBudget,
