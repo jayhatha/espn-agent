@@ -170,8 +170,20 @@ export function computeMaxBid(
     }
   }
 
-  // lo is the max profitable bid
-  const maxBid = lo;
+  // lo is the SGP breakeven — highest price where adding the player is profitable.
+  // In deep pools, marginal value is small so this can be far below market price.
+  // Blend with ASV so bids are competitive: use ASV as the market anchor,
+  // weighted by how much SGP supports the price (SGP quality signal).
+  const sgpBreakeven = lo;
+  let maxBid = sgpBreakeven;
+
+  if (asvMarketPrice != null && asvMarketPrice > 0 && sgpBreakeven > 1) {
+    // Player has positive marginal value — blend with market price.
+    // 40% SGP breakeven + 60% ASV: respects value signal but stays competitive.
+    const SGP_WEIGHT = 0.4;
+    const blended = Math.round(sgpBreakeven * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT));
+    maxBid = Math.min(blended, Math.max(1, budget - minReserves));
+  }
 
   // ------------------------------------------------------------------
   // Step 5: Compute withPlayerValue at maxBid
