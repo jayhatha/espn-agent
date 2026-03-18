@@ -95,19 +95,19 @@ export const DEFAULT_CATEGORIES: Category[] = [
   },
 ];
 
-// ── Roster slots ──────────────────────────────────────────────
+// ── Roster slots (28 total: 14 hitters, 9 pitchers, 5 bench) ─
 export const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
   C: 1,
   "1B": 1,
   "2B": 1,
   "3B": 1,
   SS: 1,
-  OF: 3,
-  UTIL: 1,
-  SP: 4,
-  RP: 2,
-  P: 2,
-  BN: 3,
+  MI: 1,   // 2B/SS eligible
+  CI: 1,   // 1B/3B eligible
+  OF: 4,
+  UTIL: 3,
+  P: 9,    // ESPN uses flex P slot (SP or RP eligible)
+  BN: 5,
 };
 
 // ── Composite config ──────────────────────────────────────────
