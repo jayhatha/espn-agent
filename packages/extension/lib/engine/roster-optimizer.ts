@@ -208,12 +208,29 @@ export function optimizeRoster(
   const totalSlots = Array.from(remainingSlots.values()).reduce((s, v) => s + v, 0);
   let slotsToFill = totalSlots;
 
+  // Track bench composition: max 2 hitter bench, 3 pitcher bench.
+  // Without this, hitters (with higher SGP from the split multiplier) fill
+  // all bench spots, leaving no room for RP ratio/saves help.
+  const MAX_BENCH_HITTERS = 2;
+  const MAX_BENCH_PITCHERS = 3;
+  let benchHitters = 0;
+  let benchPitchers = 0;
+
   for (const { player, sgp } of indexed) {
     if (slotsToFill === 0) break;
 
     // Find the best slot for this player
     const slot = findBestSlot(player.positions, remainingSlots);
     if (slot === null) continue;
+
+    // Enforce bench composition: 2 hitter bench + 3 pitcher bench
+    if (slot === "BN") {
+      if (player.isPitcher) {
+        if (benchPitchers >= MAX_BENCH_PITCHERS) continue;
+      } else {
+        if (benchHitters >= MAX_BENCH_HITTERS) continue;
+      }
+    }
 
     // SP tier cap enforcement: skip SPs that exceed the tier cap for their slot
     if (slot === "SP" || slot === "P") {
@@ -239,6 +256,10 @@ export function optimizeRoster(
     roster.push(player);
     slotAssignments.push(slot);
     if (slot === "SP" || slot === "P") spCount++;
+    if (slot === "BN") {
+      if (player.isPitcher) benchPitchers++;
+      else benchHitters++;
+    }
     totalSGPValue += sgp;
     budgetUsed += player.dollars;
     remainingBudget -= player.dollars;
