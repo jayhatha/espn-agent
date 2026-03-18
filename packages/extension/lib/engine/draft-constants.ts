@@ -92,6 +92,16 @@ export function getSpTierCap(spCount: number): number {
 export const GS_CAP = 200;
 
 // ============================================================
+// Hitter Budget Cap
+// ============================================================
+
+/**
+ * Maximum total budget allocated to hitters. Prevents over-investing
+ * in bats at the expense of pitching depth.
+ */
+export const HITTER_BUDGET_MAX = 200;
+
+// ============================================================
 // Category Rank Targets (INF-03)
 // ============================================================
 

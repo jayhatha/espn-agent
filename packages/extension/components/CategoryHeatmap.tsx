@@ -46,7 +46,7 @@ export default function CategoryHeatmap({
 }: CategoryHeatmapProps) {
   const [view, setView] = useState<"rank" | "stat">("rank");
 
-  const totalTeams = projectedStandings?.totalTeamCount ?? 12;
+  const totalTeams = projectedStandings?.totalTeamCount ?? 13;
 
   const myTeamStanding = projectedStandings?.standings.find(
     (s) => s.teamId === myTeamId

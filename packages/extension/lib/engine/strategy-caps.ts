@@ -14,7 +14,7 @@
  * Pure functions: no Zustand reads, no DOM access, no side effects.
  */
 
-import { getPositionalWeight, getSpTierCap } from "./draft-constants";
+import { getPositionalWeight, getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
 
 export interface StrategyCapInput {
   /** Raw maxBid from bid optimizer binary search */
@@ -85,7 +85,6 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   }
 
   // Apply hitter budget allocation cap ($200 max for hitters)
-  const HITTER_BUDGET_MAX = 200;
   if (!input.isPitcher && !input.isEndgame) {
     const projectedHitterSpend = input.hitterSpent + bidCap;
     if (projectedHitterSpend > HITTER_BUDGET_MAX) {

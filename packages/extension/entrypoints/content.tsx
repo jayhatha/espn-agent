@@ -252,7 +252,7 @@ export default defineContentScript({
     state.initializeDraft({
       leagueId,
       draftFormat: resolvedDraftFormat,
-      totalTeams: cachedLeagueConfig?.totalTeams || 12,
+      totalTeams: cachedLeagueConfig?.totalTeams || 13,
       rosterSize: totalRosterSize,
       myTeamId: detectedTeamId,
       budget: cachedLeagueConfig?.budget || 260, // Auction only - detected from ESPN or default

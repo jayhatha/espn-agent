@@ -12,7 +12,7 @@ import { optimizeRoster } from "./roster-optimizer";
 // category-floor imports removed — SGP naturally handles category coverage
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { computeExternalRankBoost } from "./rank-boost";
-import { getSpTierCap } from "./draft-constants";
+import { getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
 import { calculateFinalRate } from "@espn-fantasy/shared";
 import { logger } from "../logger";
 import { runSimulationInWorker } from "./simulation-worker-client";
@@ -595,7 +595,6 @@ function computeIdealRoster(
   const hitterSpent = input.myRoster
     .filter(p => !p.positions.some(pos => PITCHER_POS.has(pos.toUpperCase())))
     .reduce((s, p) => s + (p.cost ?? 0), 0);
-  const HITTER_BUDGET_MAX = 200;
   const hitterBudgetRemaining = Math.max(0, HITTER_BUDGET_MAX - hitterSpent);
 
   const strategyAdjustedPool = playersForOptimizer.map((player) => {

@@ -174,7 +174,7 @@ export const useDraftStore = create<DraftState>()(
       // Initial state
       leagueId: null,
       draftFormat: "snake",
-      totalTeams: 12,
+      totalTeams: 13,
       currentPick: 1,
       rosterSize: 25,
       myTeamId: null,
@@ -482,7 +482,7 @@ export const useDraftStore = create<DraftState>()(
             ...state,
             leagueId: null,
             draftFormat: "snake",
-            totalTeams: 12,
+            totalTeams: 13,
             currentPick: 1,
             rosterSize: 25,
             myTeamId: null,

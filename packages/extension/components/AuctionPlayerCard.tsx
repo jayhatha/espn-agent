@@ -32,7 +32,7 @@ export default function AuctionPlayerCard({
   actualPrice,
 }: AuctionPlayerCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { myRoster, rosterSize, rankings, espnDomAuctionValues } = useDraftStore();
+  const { myRoster, rosterSize, rankings, espnDomAuctionValues, remainingBudget } = useDraftStore();
 
   // Find player's ranking data (for external rank, tier, projected stats)
   const normalizedName = normalizePlayerName(player.playerName);
@@ -61,8 +61,10 @@ export default function AuctionPlayerCard({
     ? calculateFgVsMarket(auctionDollarValue, espnDisplayValue)
     : null;
 
-  // Calculate if player is affordable (use market value for budget pacing)
-  const pacing = calculateBudgetPacing(260, myRoster, rosterSize);
+  // Calculate if player is affordable (derive total budget from remaining + spent)
+  const spent = myRoster.reduce((sum, p) => sum + (p.cost ?? 0), 0);
+  const totalBudget = remainingBudget + spent;
+  const pacing = calculateBudgetPacing(totalBudget, myRoster, rosterSize);
   const isAffordable = marketValue <= pacing.recommendedMaxBid;
 
   const projectedStats = playerRanking?.projectedStats || {};

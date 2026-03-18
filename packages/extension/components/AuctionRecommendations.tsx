@@ -14,12 +14,15 @@ export default function AuctionRecommendations() {
     rosterSize,
     allPicks,
     espnDomAuctionValues,
+    remainingBudget,
   } = useDraftStore();
 
-  // Calculate budget pacing for filtering
+  // Calculate budget pacing for filtering (derive total budget from remaining + spent)
   const pacing = useMemo(() => {
-    return calculateBudgetPacing(260, myRoster, rosterSize);
-  }, [myRoster, rosterSize]);
+    const spent = myRoster.reduce((sum, p) => sum + (p.cost ?? 0), 0);
+    const totalBudget = remainingBudget + spent;
+    return calculateBudgetPacing(totalBudget, myRoster, rosterSize);
+  }, [myRoster, rosterSize, remainingBudget]);
 
   // Filter out already-drafted players — Sets are inside useMemo so they're only
   // rebuilt when allPicks changes, not on every render caused by espnDomAuctionValues updates.
