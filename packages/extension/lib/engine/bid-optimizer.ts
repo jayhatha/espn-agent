@@ -50,7 +50,11 @@ export function computeMaxBid(
   // ------------------------------------------------------------------
   // Step 1: Find nominated player's index in the available pool
   // ------------------------------------------------------------------
-  const nominatedIndex = availablePlayers.indexOf(nominatedPlayer);
+  // Use normalizedName matching — not reference equality — because the
+  // worker receives structured-cloned objects (new references).
+  const nominatedIndex = availablePlayers.findIndex(
+    p => p.normalizedName === nominatedPlayer.normalizedName,
+  );
 
   // If player is not in the pool, can't compute a meaningful bid
   if (nominatedIndex === -1) {
