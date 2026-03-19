@@ -81,6 +81,8 @@ export interface StrategyCapInput {
   remainingSlots?: Record<string, number>;
   /** External ranking (e.g. PitcherList) — used for SP quality gating */
   externalRank?: number;
+  /** Prices paid for each drafted SP (for tier savings reallocation) */
+  draftedSpPrices?: number[];
 }
 
 export interface StrategyCapResult {
@@ -231,8 +233,43 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       capSource += ` → SP${input.spCount + 1} cap $${tierCap} (no rank)`;
     }
 
+    // Reallocate savings from SPs drafted below their tier cap.
+    // If you got an SP3-tier guy for $6 instead of $10, the $4 savings
+    // rolls up to the current SP (if it's a higher tier) or to RPs.
+    // Compute: ideal spending for drafted SPs vs actual spending.
+    if (input.draftedSpPrices && input.draftedSpPrices.length > 0) {
+      // Ideal: each drafted SP should have cost their rank-based tier cap.
+      // We don't know their ranks, so use the slot-based tier caps as ideal.
+      // The sum of tier caps for spCount SPs = sum of SP_TIER_CAPS[0..spCount-1]
+      let idealSpSpend = 0;
+      for (let s = 0; s < input.draftedSpPrices.length; s++) {
+        idealSpSpend += getSpTierCap(s); // $18 + $12 + $10 + ...
+      }
+      const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
+      const savings = Math.max(0, idealSpSpend - actualSpSpend);
+      if (savings > 0) {
+        tierCap += savings;
+        capSource += ` → +$${savings} SP savings`;
+      }
+    }
+
     if (bidCap > tierCap) {
       bidCap = tierCap;
+    }
+  }
+
+  // Reallocate SP savings to RPs when starting SP slots (SP1-5) are filled.
+  // If you saved $10 across your SP picks, that budget flows to RP bids.
+  if (!input.isSP && input.isPitcher && input.draftedSpPrices && input.spCount >= 5) {
+    let idealSpSpend = 0;
+    for (let s = 0; s < input.draftedSpPrices.length; s++) {
+      idealSpSpend += getSpTierCap(s);
+    }
+    const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
+    const savings = Math.max(0, idealSpSpend - actualSpSpend);
+    if (savings > 0) {
+      bidCap += savings;
+      capSource += ` → +$${savings} SP savings (to RP)`;
     }
   }
 

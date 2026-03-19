@@ -130,9 +130,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       const isSP = ranking?.primaryPosition === "SP";
       const isRP = ranking?.primaryPosition === "RP";
 
-      const spCount = myRoster.filter(
+      const draftedSPs = myRoster.filter(
         (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
-      ).length;
+      );
+      const spCount = draftedSPs.length;
+      const draftedSpPrices = draftedSPs.map(p => p.cost ?? 0);
 
       const capResult = computeStrategyBidCap({
         rawMaxBid: mergedOptimization.maxBid,
@@ -141,6 +143,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         positions: ranking?.positions ?? [],
         primaryPosition: ranking?.primaryPosition ?? null,
         spCount,
+        draftedSpPrices,
         catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
         externalRank: ranking?.externalRank,
         isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,
