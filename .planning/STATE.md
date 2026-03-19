@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 57 — Auction Simulation Test Suite (complete)
+**Current focus:** Phase 59 — Bid Engine Tuning (plan 01 of 2 complete)
 
 ## Current Position
 
-Phase: 57 of 58 (Auction Simulation Test Suite)
-Plan: 01 (1 of 1 plans complete)
-Status: Complete
-Last activity: 2026-03-19 - Phase 57 plan 01 complete (auction simulator fixed)
+Phase: 59 of 59 (Bid Engine Tuning)
+Plan: 02 (1 of 2 plans complete)
+Status: In Progress
+Last activity: 2026-03-19 - Phase 59 plan 01 complete (SGP skip-blend, DH UTIL exemption, budget flush boost)
 
-Progress: [██████████] 100% (Phase 57 plan 01 complete)
+Progress: [████████████] (Phase 59 plan 01/02 complete)
 
 ## Accumulated Context
 
@@ -43,8 +43,10 @@ Progress: [██████████] 100% (Phase 57 plan 01 complete)
 - [Phase 55-01]: playerPool param kept in buildOpponentModel for API compatibility; unused for position resolution
 - [Phase 55-02]: No new decisions — inflation wiring followed plan exactly as specified
 - [Phase 55]: Increase monte-carlo replacement-level test from 100 to 300 sims with larger pool to make stochastic test reliable
-- [Phase 58-01]: Need multiplier after catcher dampening, before positional weight; elite threshold $30; pitchers only use P slots (no UTIL)
 - [Phase 57-01]: Filler SPs (rank>60) return bid=0 while ranked SPs available — prevents P-slot contamination; spPrices only tracks top-60 SPs; spec targets ($320 value, $70 profit) don't apply to value strategy (94.7% top-4 rate achieved vs 60% target)
+- [Phase 58-01]: Need multiplier after catcher dampening, before positional weight; elite threshold $30; pitchers only use P slots (no UTIL)
+- [Phase 59-01]: Budget flush guard requires totalSpent>200 to avoid misfiring in tests with default 0 spent
+- [Phase 59-01]: BN overflow guard only fires when BN explicitly 0 in remainingSlots (backward compat when BN not tracked)
 
 ### Roadmap Evolution
 
@@ -78,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Completed 57-01-PLAN.md (auction simulator fix — 94.7% top-4 finish rate)
+Stopped at: Completed 59-01-PLAN.md (SGP skip-blend, DH UTIL exemption, budget flush boost)
 Resume file: None
