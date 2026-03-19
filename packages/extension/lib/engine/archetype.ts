@@ -48,20 +48,11 @@ export function buildFgPlayerPool(
     pitcherProjMap.set(normalizeName(p.name), p);
   }
 
-  // Build pitcher name set for deduplication: if a player appears in both
-  // hitter and pitcher auction data (e.g. Ohtani as DH + SP), skip the
-  // hitter entry — their pitching role drives their true value.
-  const pitcherNames = new Set<string>();
-  for (const ap of fgAuctionPitchers) {
-    if (ap.dollars > 0) pitcherNames.add(normalizeName(ap.name));
-  }
-
   const undraftedHitters: PoolPlayer[] = [];
   for (const ah of fgAuctionHitters) {
     const nName = normalizeName(ah.name);
     if (draftedNormalizedNames.has(nName)) continue;
     if (ah.dollars <= 0) continue; // Skip $0 or negative value players
-    if (pitcherNames.has(nName)) continue; // Deduplicate: pitcher entry takes priority
 
     const proj = hitterProjMap.get(nName);
     const stats: Record<string, number> = {};
