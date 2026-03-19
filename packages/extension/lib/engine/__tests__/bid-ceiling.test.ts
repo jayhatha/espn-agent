@@ -698,6 +698,40 @@ describe("SP savings reallocation", () => {
     expect(ceiling.bidCap).toBe(18);
   });
 
+  it("endgame dampening does not violate ranked SP tier floor", () => {
+    // PL#25 = SP2-tier = $12 floor.
+    // Endgame dampening would reduce $12 to ceil(12*0.7)=9,
+    // but the re-enforce guard must restore $12.
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 12,
+      externalRank: 25,
+      spCount: 2,
+      isEndgame: true,
+      inflationFactor: 1.0,
+      hitterSpent: 200,
+      pitcherSpent: 40,
+    }));
+    expect(result.bidCap).toBe(12);
+    expect(result.capSource).toContain("re-enforce SP tier floor");
+  });
+
+  it("endgame dampening DOES apply to filler SPs (rank > 60)", () => {
+    // Filler SP (rank 75) tier cap=$3, endgame reduces to ceil(3*0.7)=3.
+    // No floor re-enforcement for filler SPs (rank > 60).
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 3,
+      externalRank: 75,
+      spCount: 6,
+      isEndgame: true,
+      inflationFactor: 1.0,
+      hitterSpent: 200,
+      pitcherSpent: 40,
+    }));
+    // Filler SPs get endgame dampened normally — no floor guard
+    expect(result.bidCap).toBeLessThanOrEqual(3);
+    expect(result.capSource).not.toContain("re-enforce SP tier floor");
+  });
+
   it("10. current-player tierCap uses rank not slot position — PL#28 gets $12, not $5 as slot-4", () => {
     // 3 SP4-tier arms already drafted (slot-based getSpTierCap(3) would return $5)
     // but evaluated player is PL#28 (SP2-tier, cap=$12)

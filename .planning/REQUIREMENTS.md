@@ -24,6 +24,15 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 - [x] **POS-02**: SP tier caps enforced: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
 - [x] **POS-03**: 200 GS cap awareness in pitching strategy (limit SP spending)
 
+### Phase 60: SP Logic Audit
+
+- [x] **SP-TIER**: SP tier cap determined by PitcherList rank (1-20→$18, 21-30→$12, 31-40→$10, 41-60→$5, 61+→$3)
+- [x] **SP-SAVINGS**: SP savings reallocation uses per-SP rank-based tier caps, not slot-position ideal
+- [x] **SP-COMP**: Target 7SP+5RP composition in draft strategy
+- [x] **RP-CAP**: RP hard cap $15 even with SP savings reallocation
+- [x] **PITCHER-SGP**: No pitcher SGP multiplier in bid pipeline
+- [x] **HIT-PITCH-CONFLICT**: Pitching vs hitting conflict audit documented with recommendations
+
 ### Inflation & Signals
 
 - [x] **INF-01**: Inflation interpretation bands: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
@@ -79,10 +88,17 @@ Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
 | INF-03 | Phase 50 | Complete |
 | DATA-01 | Phase 51 | Pending |
 | DATA-02 | Phase 51 | Pending |
+| SP-TIER | Phase 60 | Complete |
+| SP-SAVINGS | Phase 60 | Complete |
+| SP-COMP | Phase 60 | Complete |
+| RP-CAP | Phase 60 | Complete |
+| PITCHER-SGP | Phase 60 | Complete |
+| HIT-PITCH-CONFLICT | Phase 60 | Complete |
 
 **Coverage:**
 - v5.0 requirements: 13 total
-- Mapped to phases: 11
+- Phase 60 requirements: 6 total
+- Mapped to phases: 17
 - Unmapped: 0 ✓
 
 ---

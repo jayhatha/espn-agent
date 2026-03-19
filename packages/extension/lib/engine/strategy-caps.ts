@@ -315,6 +315,16 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     capSource += ` → endgame ×0.7`;
   }
 
+  // Re-enforce ranked SP tier floor after endgame dampening.
+  // Locked decision: tier cap is both floor AND ceiling for top-60 SPs.
+  // Endgame dampening must NOT reduce below the committed tier spend.
+  // Exception: 7+ SPs already drafted — those are capped at $3 (full), no floor applies.
+  if (input.isSP && input.externalRank != null && input.externalRank <= 60 && input.spCount < 7) {
+    const spFloor = getRankBasedTierCap(input.externalRank);
+    bidCap = Math.max(spFloor, bidCap);
+    capSource += ` → re-enforce SP tier floor $${spFloor}`;
+  }
+
   // Apply inflation adjustment (+$2 when inflation > 1.10)
   if (input.inflationFactor > 1.10) {
     bidCap += 2;
