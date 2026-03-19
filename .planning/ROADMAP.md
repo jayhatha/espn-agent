@@ -236,7 +236,7 @@ Plans:
 **Goal:** Fix SP savings reallocation bug (slot-position ideal vs per-SP rank-based tier caps), verify all SP/RP rules, add 7SP+5RP composition targeting, audit pitching-vs-hitting conflicts
 **Depends on:** Phase 59
 **Requirements:** SP-TIER, SP-SAVINGS, SP-COMP, RP-CAP, PITCHER-SGP, HIT-PITCH-CONFLICT
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 60-01-PLAN.md — Fix SP savings to use per-SP rank-based tier caps + tests for all SP/RP rules

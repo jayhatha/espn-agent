@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 60 of 60 (Evaluate and Fix SP Logic)
-Plan: 01 (1 of 2 plans complete)
-Status: In progress
-Last activity: 2026-03-19 - Phase 60 plan 01 complete (SP tier cap and savings reallocation fix)
+Plan: 02 (2 of 2 plans complete)
+Status: Complete
+Last activity: 2026-03-19 - Phase 60 plan 02 complete (simulator SP savings fix + conflict audit)
 
-Progress: [█████░░░░░] 50% (Phase 60: 1/2 plans complete)
+Progress: [██████████] 100% (Phase 60: 2/2 plans complete)
 
 ## Accumulated Context
 
@@ -79,6 +79,9 @@ Progress: [█████░░░░░] 50% (Phase 60: 1/2 plans complete)
 - [Phase 59]: Budget flush in simulator uses budgetRemaining < 200 threshold (not totalSpent > 200 from engine) — teams rarely spend > 200 before flush is needed
 - [Phase 59]: Simulator flush slot threshold is 20 (engine uses 5) — simulator has many cheap filler slots that need flushing over many picks
 - [Phase 60]: getRankBasedTierCap always falls back to $3 when rank is undefined; draftedSpTierCaps falls back to getSpTierCap(s) for backward compat
+- [Phase 60-02]: Ranked SP tier cap is final — early return before endgame dampening and budget flush to prevent override; spTierCaps[] tracks rank-based cap per drafted SP
+- [Phase 60-02]: RP composition cap (max 5) enforced via rpCount guard in computeOurBid; budget split improves to 77/23 (target 76/24)
+- [Phase 60-02]: Endgame dampening can reduce ranked SP bids below tier floor in engine (strategy-caps.ts) — follow-up item, low priority
 
 ### Roadmap Evolution
 
@@ -113,5 +116,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Completed 60-01-PLAN.md (SP tier cap and savings reallocation fix).
+Stopped at: Completed 60-02-PLAN.md (simulator SP savings fix + pitching vs hitting conflict audit).
 Resume file: None
