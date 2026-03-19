@@ -137,12 +137,13 @@ describe("computeStrategyBidCap — SP tier caps", () => {
     expect(result.bidCap).toBe(3);
   });
 
-  it("does not apply SP tier cap to RP", () => {
+  it("caps RP at $15 hard max", () => {
     const result = computeStrategyBidCap(
       makeInput({ rawMaxBid: 30, isPitcher: true, isSP: false, positions: ["RP"] }),
     );
-    // RP: no positional weight, no SP cap → rawMaxBid unchanged
-    expect(result.bidCap).toBe(30);
+    // RP: no SP tier cap, but hard RP cap at $15 — relievers are replaceable
+    expect(result.bidCap).toBe(15);
+    expect(result.capSource).toContain("RP cap $15");
   });
 });
 

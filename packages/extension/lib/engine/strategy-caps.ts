@@ -254,7 +254,9 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   }
 
   // Reallocate SP savings to RPs when starting SP slots (SP1-5) are filled.
-  // If you saved $10 across your SP picks, that budget flows to RP bids.
+  // Cap total RP bid at $15 — savings help stretch for good closers but
+  // don't let you overpay. Relievers are replaceable.
+  const RP_MAX_BID = 15;
   if (!input.isSP && input.isPitcher && input.draftedSpPrices && input.spCount >= 5) {
     let idealSpSpend = 0;
     for (let s = 0; s < input.draftedSpPrices.length; s++) {
@@ -263,9 +265,18 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
     const savings = Math.max(0, idealSpSpend - actualSpSpend);
     if (savings > 0) {
-      bidCap += savings;
-      capSource += ` → +$${savings} SP savings (to RP)`;
+      const rpHeadroom = Math.max(0, RP_MAX_BID - bidCap);
+      const applied = Math.min(savings, rpHeadroom);
+      if (applied > 0) {
+        bidCap += applied;
+        capSource += ` → +$${applied} SP savings (to RP, max $${RP_MAX_BID})`;
+      }
     }
+  }
+  // Hard cap for all RPs regardless of savings
+  if (!input.isSP && input.isPitcher && bidCap > RP_MAX_BID) {
+    bidCap = RP_MAX_BID;
+    capSource += ` → RP cap $${RP_MAX_BID}`;
   }
 
   // Apply endgame dampening (30% reduction)
