@@ -410,6 +410,12 @@ export function optimizeRoster(
   // Swap cheapest roster players for the most expensive eligible alternative
   // that fits the remaining budget, even if SGP is equal or slightly lower.
   if (remainingBudget > 0) {
+    // Pool average SGP/$ efficiency — used to reject overpriced players
+    const positiveEfficiency = indexed.filter(e => e.efficiency > 0);
+    const poolAvgEfficiency = positiveEfficiency.length > 0
+      ? positiveEfficiency.reduce((s, e) => s + e.efficiency, 0) / positiveEfficiency.length
+      : 0;
+
     const usedNames = new Set(roster.map(p => p.normalizedName));
 
     const exhaustOrder = roster
@@ -439,6 +445,10 @@ export function optimizeRoster(
 
         // Allow up to 10% SGP loss to spend remaining budget
         if (entry.sgp < currentSgp * 0.9) continue;
+
+        // Don't pick up massively overpriced players just to burn budget.
+        // Skip if SGP/$ efficiency is less than half the pool average.
+        if (poolAvgEfficiency > 0 && entry.efficiency < poolAvgEfficiency * 0.5) continue;
 
         // SP tier cap check
         if (currentSlot === "SP" || currentSlot === "P") {
