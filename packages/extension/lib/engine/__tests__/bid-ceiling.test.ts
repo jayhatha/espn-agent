@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { computeMaxBid } from "../bid-optimizer";
+import { computeStrategyBidCap } from "../strategy-caps";
 import type { PoolPlayer, OpponentModel } from "../types";
 
 // ============================================================
@@ -514,5 +515,202 @@ describe("computeMaxBid — SGP skip blend", () => {
     // No asvMarketPrice → rawBlendedValue = sgpDollars
     const result = computeMaxBid(players[0], players, sgpValues, 100, { OF: 1, "1B": 1 }, model);
     expect(result.rawBlendedValue).toBe(result.sgpBreakeven);
+  });
+});
+
+// ============================================================
+// SP savings reallocation tests
+// ============================================================
+
+/** Base input for SP bid cap tests — no savings, no endgame, neutral inflation */
+function makeSpInput(overrides: Partial<Parameters<typeof computeStrategyBidCap>[0]> = {}) {
+  return {
+    rawMaxBid: 15,
+    isPitcher: true,
+    isSP: true,
+    positions: ["SP"],
+    primaryPosition: "SP",
+    spCount: 0,
+    catcherSlotsRemaining: 1,
+    isEndgame: false,
+    inflationFactor: 1.0,
+    hitterSpent: 0,
+    pitcherSpent: 0,
+    ...overrides,
+  };
+}
+
+describe("SP savings reallocation", () => {
+  it("1. out-of-order drafting: SP4 arms before SP1 — no fake savings generated", () => {
+    // Draft 2 SP4-tier arms ($5 cap each) for $5 each
+    // If we used slot-based ideal: getSpTierCap(0)=$18 + getSpTierCap(1)=$12 = $30
+    // actual=$10, fake savings=$20 → wrong
+    // With rank-based caps: $5+$5=$10 ideal vs $10 actual = $0 savings → correct
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 15,
+      spCount: 2,
+      externalRank: 15, // SP1-tier player being evaluated
+      draftedSpPrices: [5, 5],
+      draftedSpTierCaps: [5, 5], // SP4-tier caps for the two already-drafted arms
+    }));
+    // tierCap = $18 for PL#15, savings = (5+5)-(5+5)=0, so bidCap = $18
+    expect(result.bidCap).toBe(18);
+    expect(result.capSource).not.toContain("SP savings");
+  });
+
+  it("2. normal order savings: SP1 drafted below cap, next SP gets boost", () => {
+    // SP1 drafted for $14 (cap was $18), saving $4
+    // Next player: SP2-tier (rank=25, cap=$12)
+    // tierCap = 12 + 4 = $16
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 20,
+      spCount: 1,
+      externalRank: 25,
+      draftedSpPrices: [14],
+      draftedSpTierCaps: [18],
+    }));
+    expect(result.bidCap).toBe(16);
+    expect(result.capSource).toContain("+$4 SP savings");
+  });
+
+  it("3. no savings when SP1 paid exactly the cap", () => {
+    // SP1 drafted at $18 (exactly cap), no savings
+    // Next player: SP3-tier (rank=35, cap=$10)
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 20,
+      spCount: 1,
+      externalRank: 35,
+      draftedSpPrices: [18],
+      draftedSpTierCaps: [18],
+    }));
+    expect(result.bidCap).toBe(10);
+    expect(result.capSource).not.toContain("SP savings");
+  });
+
+  it("4. RP gets SP savings when 5+ SPs drafted", () => {
+    // 5 SPs drafted: each had $18 cap and paid $14 (saving $4 each = $20 total savings)
+    // RP rawMaxBid=$8, savings added up to $15 cap → min($8+$20, $15) = $15
+    const result = computeStrategyBidCap({
+      rawMaxBid: 8,
+      isPitcher: true,
+      isSP: false,
+      positions: ["RP"],
+      primaryPosition: "RP",
+      spCount: 5,
+      catcherSlotsRemaining: 1,
+      isEndgame: false,
+      inflationFactor: 1.0,
+      hitterSpent: 0,
+      pitcherSpent: 0,
+      draftedSpPrices: [14, 14, 14, 14, 14],
+      draftedSpTierCaps: [18, 18, 18, 18, 18],
+    });
+    // savings = (18*5) - (14*5) = 90 - 70 = 20
+    // rpHeadroom = 15 - 8 = 7
+    // applied = min(20, 7) = 7
+    // bidCap = 8 + 7 = 15
+    expect(result.bidCap).toBe(15);
+    expect(result.capSource).toContain("SP savings (to RP, max $15)");
+  });
+
+  it("5. RP hard cap $15 — large savings cannot push RP above cap", () => {
+    // Even with huge SP savings, RP never exceeds $15
+    const result = computeStrategyBidCap({
+      rawMaxBid: 20,
+      isPitcher: true,
+      isSP: false,
+      positions: ["RP"],
+      primaryPosition: "RP",
+      spCount: 5,
+      catcherSlotsRemaining: 1,
+      isEndgame: false,
+      inflationFactor: 1.0,
+      hitterSpent: 0,
+      pitcherSpent: 0,
+      draftedSpPrices: [1, 1, 1, 1, 1],
+      draftedSpTierCaps: [18, 12, 10, 5, 5],
+    });
+    expect(result.bidCap).toBe(15);
+  });
+
+  it("6a. ranked SP (rank=25, cap=$12) with rawMaxBid=$5 — tier cap is floor: bidCap=$12", () => {
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 5,
+      spCount: 0,
+      externalRank: 25,
+    }));
+    expect(result.bidCap).toBe(12);
+  });
+
+  it("6b. ranked SP (rank=25, cap=$12) with rawMaxBid=$20 — tier cap is ceiling: bidCap=$12", () => {
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 20,
+      spCount: 0,
+      externalRank: 25,
+    }));
+    expect(result.bidCap).toBe(12);
+  });
+
+  it("7a. filler SP (rank=75, cap=$3) with rawMaxBid=$2 — cap down only, no floor: bidCap=$2", () => {
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 2,
+      spCount: 0,
+      externalRank: 75,
+    }));
+    expect(result.bidCap).toBe(2);
+  });
+
+  it("7b. filler SP (rank=75, cap=$3) with rawMaxBid=$5 — ceiling applies: bidCap=$3", () => {
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 5,
+      spCount: 0,
+      externalRank: 75,
+    }));
+    expect(result.bidCap).toBe(3);
+  });
+
+  it("8. 7+ SPs drafted — all further SPs cap at $3 regardless of rank", () => {
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 20,
+      spCount: 7,
+      externalRank: 5, // SP1-tier but already full
+    }));
+    expect(result.bidCap).toBe(3);
+    expect(result.capSource).toContain("cap $3 (full)");
+  });
+
+  it("9. no pitcher SGP multiplier — rawMaxBid passes through before tier cap (no dampening factor)", () => {
+    // SP with rawMaxBid=$15, SP1-tier (rank=10, cap=$18): bidCap MUST equal $18 (floor)
+    // NOT $15 * 0.something from a pitcher multiplier
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 15,
+      spCount: 0,
+      externalRank: 10,
+    }));
+    // floor kicks in: bidCap = $18 (not dampened to something like $10)
+    expect(result.bidCap).toBe(18);
+    // And ceiling: rawMaxBid=$25 → still $18
+    const ceiling = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 25,
+      spCount: 0,
+      externalRank: 10,
+    }));
+    expect(ceiling.bidCap).toBe(18);
+  });
+
+  it("10. current-player tierCap uses rank not slot position — PL#28 gets $12, not $5 as slot-4", () => {
+    // 3 SP4-tier arms already drafted (slot-based getSpTierCap(3) would return $5)
+    // but evaluated player is PL#28 (SP2-tier, cap=$12)
+    const result = computeStrategyBidCap(makeSpInput({
+      rawMaxBid: 20,
+      spCount: 3,
+      externalRank: 28,
+      // No savings — all paid exactly their tier cap
+      draftedSpPrices: [5, 5, 5],
+      draftedSpTierCaps: [5, 5, 5],
+    }));
+    // tierCap must be $12 from rank=28, NOT $5 from slot-position spCount=3
+    expect(result.bidCap).toBe(12);
+    expect(result.capSource).toContain("SP2-tier $12");
   });
 });
