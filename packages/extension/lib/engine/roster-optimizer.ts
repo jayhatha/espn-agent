@@ -367,6 +367,9 @@ export function optimizeRoster(
         if (usedNames.has(entry.player.normalizedName)) continue;
         if (!canFillSlot(entry.player.positions, currentSlot)) continue;
 
+        // Bench composition: replacement must match hitter/pitcher type
+        if (currentSlot === "BN" && entry.player.isPitcher !== currentPlayer.isPitcher) continue;
+
         const extraCost = entry.player.dollars - currentPlayer.dollars;
         if (extraCost <= 0) continue; // Not an upgrade in cost
         if (extraCost > remainingBudget) continue; // Can't afford
@@ -438,6 +441,9 @@ export function optimizeRoster(
       for (const entry of indexed) {
         if (usedNames.has(entry.player.normalizedName)) continue;
         if (!canFillSlot(entry.player.positions, currentSlot)) continue;
+
+        // Bench composition: replacement must match hitter/pitcher type
+        if (currentSlot === "BN" && entry.player.isPitcher !== currentPlayer.isPitcher) continue;
 
         const extraCost = entry.player.dollars - currentPlayer.dollars;
         if (extraCost <= 0) continue;

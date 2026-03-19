@@ -549,28 +549,40 @@ function computeIdealRoster(
     }
   }
 
-  // Use ESPN ASV (market price) as the cost for ideal roster construction.
-  // This makes the ideal roster a realistic shopping list that sums to remaining
-  // budget at market prices. As we draft below market, the savings flow into
-  // upgrading remaining targets. Fall back to FG model dollars when no ASV available.
-  //
-  // espnAsvByName (normalized name → ASV) is built directly from the ESPN API
-  // response in the content script — no cross-ID mapping needed.
+  // Price ideal roster players using our blended valuation (40% SGP + 60% ASV),
+  // the same formula the bid optimizer uses. This means the ideal roster reflects
+  // what we'd actually pay, not raw market prices. Fall back to FG dollars when
+  // no ASV is available.
   const asvByName = input.espnAsvByName ?? {};
   const asvByNameCount = Object.keys(asvByName).length;
   const hasAsvData = asvByNameCount > 0;
 
   logger.log(`[IdealRoster] ASV data: espnAsvByName has ${asvByNameCount} entries, espnDomAuctionValues has ${Object.keys(input.espnDomAuctionValues ?? {}).length} entries`);
 
-  const playersForOptimizer = hasAsvData
-    ? allPlayers.map(p => {
-        const asv = asvByName[p.normalizedName];
-        if (asv != null && asv > 0) {
-          return { ...p, dollars: asv };
-        }
-        return p;
-      })
-    : allPlayers;
+  // Compute total positive SGP for proportional dollar conversion
+  const totalPositiveSGP = sgpValuesForOptimizer.reduce((s, v) => s + Math.max(0, v), 0);
+  // Total league budget across all teams (estimate from opponent budgets + ours)
+  const totalLeagueBudgetForIdeal = input.remainingBudget +
+    (input.allTeamBudgets ?? []).reduce((s, t) => s + t.remainingBudget, 0);
+  const SGP_WEIGHT = 0.4;
+
+  const playersForOptimizer = allPlayers.map((p, i) => {
+    const playerSGP = Math.max(0, sgpValuesForOptimizer[i] ?? 0);
+    const sgpDollars = totalPositiveSGP > 0
+      ? Math.round((playerSGP / totalPositiveSGP) * totalLeagueBudgetForIdeal)
+      : p.dollars;
+
+    const asv = asvByName[p.normalizedName];
+    let blendedPrice = p.dollars; // fallback to FG dollars
+
+    if (asv != null && asv > 0) {
+      blendedPrice = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
+    } else if (sgpDollars > 0) {
+      blendedPrice = sgpDollars; // no ASV, use SGP dollars directly
+    }
+
+    return blendedPrice !== p.dollars ? { ...p, dollars: blendedPrice } : p;
+  });
 
   const mappedCount = playersForOptimizer.filter((p, i) => p.dollars !== allPlayers[i].dollars).length;
   const unmappedSample = hasAsvData
