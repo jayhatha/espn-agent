@@ -207,6 +207,222 @@ interface TeamState {
   budget: number;
   roster: DraftedPlayer[];
   slotsRemaining: Record<string, number>;
+  benchHitters: number;
+  benchPitchers: number;
+  spPrices: number[];
+  hitterSpent: number;
+}
+
+// ============================================================
+// PitcherList Rankings
+// ============================================================
+
+interface PLEntry { rank: number; playerName: string; }
+
+function loadPitcherListRankings(): Map<string, number> {
+  const filepath = path.join(ROOT, "packages/extension/assets/pitcherlist-rankings.json");
+  if (!fs.existsSync(filepath)) return new Map();
+  const data = JSON.parse(fs.readFileSync(filepath, "utf-8"));
+  const map = new Map<string, number>();
+  for (const entry of (data.pitchers ?? []) as PLEntry[]) {
+    map.set(normalizeName(entry.playerName), entry.rank);
+  }
+  return map;
+}
+
+// ============================================================
+// Position Normalization
+// ============================================================
+
+function normalizePosition(pos: string): string {
+  const upper = pos.toUpperCase();
+  if (upper === "LF" || upper === "CF" || upper === "RF") return "OF";
+  return upper;
+}
+
+function isSP(player: PoolPlayer): boolean {
+  return player.isPitcher && player.positions.some(p => p.toUpperCase() === "SP");
+}
+
+function isRP(player: PoolPlayer): boolean {
+  return player.isPitcher && !isSP(player);
+}
+
+// ============================================================
+// Positional Weights (mirrors draft-constants.ts)
+// ============================================================
+
+const POSITIONAL_WEIGHTS: Record<string, number> = {
+  SS: 4, OF: 3, "3B": 3, "1B": 2, "2B": 2, DH: 2, C: 1,
+};
+
+function getPositionalWeight(positions: string[]): number {
+  let max = 0;
+  for (const pos of positions) {
+    const w = POSITIONAL_WEIGHTS[normalizePosition(pos)] ?? 0;
+    if (w > max) max = w;
+  }
+  return max;
+}
+
+// ============================================================
+// SP Tier Cap (mirrors draft-constants.ts)
+// ============================================================
+
+const SP_TIER_CAPS = [18, 12, 10, 5, 3];
+const HITTER_BUDGET_MAX = 220;
+const RP_MAX_BID = 15;
+
+function getSpTierCap(spCount: number): number {
+  return SP_TIER_CAPS[Math.min(spCount, SP_TIER_CAPS.length - 1)];
+}
+
+// ============================================================
+// Slot Destination (for positional need dampening)
+// ============================================================
+
+function determineSlotDestination(
+  positions: string[],
+  slots: Record<string, number>,
+  isPitcher: boolean,
+): "dedicated" | "flex" | "UTIL" | "BN" {
+  if (isPitcher) {
+    if ((slots["P"] ?? 0) > 0) return "dedicated";
+    return "BN";
+  }
+  const normalized = positions.map(normalizePosition);
+  for (const pos of normalized) {
+    if ((slots[pos] ?? 0) > 0) return "dedicated";
+  }
+  for (const pos of normalized) {
+    if ((pos === "2B" || pos === "SS") && (slots["MI"] ?? 0) > 0) return "flex";
+    if ((pos === "1B" || pos === "3B") && (slots["CI"] ?? 0) > 0) return "flex";
+  }
+  if ((slots["UTIL"] ?? 0) > 0) return "UTIL";
+  return "BN";
+}
+
+function hasDedicatedOrFlexSlot(positions: string[], slots: Record<string, number>): boolean {
+  for (const pos of positions) {
+    const norm = normalizePosition(pos);
+    if ((slots[norm] ?? 0) > 0) return true;
+    if ((norm === "2B" || norm === "SS") && (slots["MI"] ?? 0) > 0) return true;
+    if ((norm === "1B" || norm === "3B") && (slots["CI"] ?? 0) > 0) return true;
+  }
+  return false;
+}
+
+// ============================================================
+// Our Bid Computation (mirrors strategy-caps.ts)
+// ============================================================
+
+function computeOurBid(
+  player: PoolPlayer,
+  team: TeamState,
+  sgpDollars: number,
+  asv: number,
+  plRankMap: Map<string, number>,
+): number {
+  const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
+
+  // Base: SGP/ASV blend (matches live engine bid-optimizer.ts exactly)
+  let bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
+  const blendedValue = bid;
+
+  // --- 5. Catcher dampening ---
+  if (player.positions.some(p => p.toUpperCase() === "C") && (team.slotsRemaining["C"] ?? 0) === 0) {
+    bid = Math.max(1, Math.ceil(bid * 0.5));
+  }
+
+  // --- 4. Positional need dampening (hitters) ---
+  const ELITE_THRESHOLD = 30;
+  if (!player.isPitcher) {
+    const destination = determineSlotDestination(player.positions, team.slotsRemaining, false);
+    if (blendedValue < ELITE_THRESHOLD) {
+      if (destination === "UTIL") {
+        bid = Math.max(1, Math.ceil(bid * 0.7));
+      } else if (destination === "BN") {
+        bid = Math.max(1, Math.ceil(bid * 0.5));
+      }
+    }
+    // elite override: no reduction for dedicated/flex/UTIL/BN when value >= $30
+  }
+  // Pitchers: BN dampening
+  if (player.isPitcher) {
+    const destination = determineSlotDestination(player.positions, team.slotsRemaining, true);
+    if (destination === "BN" && blendedValue < ELITE_THRESHOLD) {
+      bid = Math.max(1, Math.ceil(bid * 0.5));
+    }
+  }
+
+  // --- 7. Positional weight bonus ---
+  const posWeight = getPositionalWeight(player.positions);
+  if (posWeight > 0 && !player.isPitcher) {
+    if (hasDedicatedOrFlexSlot(player.positions, team.slotsRemaining)) {
+      bid += posWeight;
+    }
+  }
+
+  // --- 3. Hitter budget cap ---
+  if (!player.isPitcher) {
+    if (team.hitterSpent + bid > HITTER_BUDGET_MAX) {
+      bid = Math.max(1, HITTER_BUDGET_MAX - team.hitterSpent);
+    }
+  }
+
+  // --- 1. SP tier caps based on PitcherList rank ---
+  if (isSP(player)) {
+    let tierCap: number;
+    const plRank = plRankMap.get(player.normalizedName);
+    const spCount = team.spPrices.length;
+
+    if (spCount >= 7) {
+      tierCap = 3;
+    } else if (plRank != null) {
+      if (plRank <= 20) tierCap = 18;
+      else if (plRank <= 30) tierCap = 12;
+      else if (plRank <= 40) tierCap = 10;
+      else if (plRank <= 60) tierCap = 5;
+      else tierCap = 3;
+    } else {
+      // Unranked SP
+      tierCap = 3;
+    }
+
+    // SP savings reallocation (only for top-60 ranked SPs)
+    if (team.spPrices.length > 0 && (plRank == null || plRank <= 60)) {
+      let idealSpSpend = 0;
+      for (let s = 0; s < team.spPrices.length; s++) {
+        idealSpSpend += getSpTierCap(s);
+      }
+      const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
+      const savings = Math.max(0, idealSpSpend - actualSpSpend);
+      if (savings > 0) tierCap += savings;
+    }
+
+    if (bid > tierCap) bid = tierCap;
+  }
+
+  // --- RP savings reallocation + hard cap ---
+  if (isRP(player)) {
+    // Apply SP savings to RPs when 5+ SPs drafted
+    if (team.spPrices.length >= 5) {
+      let idealSpSpend = 0;
+      for (let s = 0; s < team.spPrices.length; s++) {
+        idealSpSpend += getSpTierCap(s);
+      }
+      const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
+      const savings = Math.max(0, idealSpSpend - actualSpSpend);
+      if (savings > 0) {
+        const rpHeadroom = Math.max(0, RP_MAX_BID - bid);
+        bid += Math.min(savings, rpHeadroom);
+      }
+    }
+    // 2. RP hard cap: $15
+    if (bid > RP_MAX_BID) bid = RP_MAX_BID;
+  }
+
+  return Math.max(1, bid);
 }
 
 interface SimResult {
@@ -224,37 +440,51 @@ interface SimResult {
   overallRank: number;
 }
 
-function canFillSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean): boolean {
-  if (isPitcher) return (slots["P"] ?? 0) > 0 || (slots["BN"] ?? 0) > 0;
+function canFillSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, benchHitters?: number, benchPitchers?: number): boolean {
+  if (isPitcher) {
+    if ((slots["P"] ?? 0) > 0) return true;
+    if ((slots["BN"] ?? 0) > 0 && (benchPitchers ?? 0) < 3) return true;
+    return false;
+  }
   for (const pos of positions) {
-    const u = pos.toUpperCase();
+    const u = normalizePosition(pos);
     if ((slots[u] ?? 0) > 0) return true;
     if ((u === "2B" || u === "SS") && (slots["MI"] ?? 0) > 0) return true;
     if ((u === "1B" || u === "3B") && (slots["CI"] ?? 0) > 0) return true;
   }
-  return (slots["UTIL"] ?? 0) > 0 || (slots["BN"] ?? 0) > 0;
+  if ((slots["UTIL"] ?? 0) > 0) return true;
+  if ((slots["BN"] ?? 0) > 0 && (benchHitters ?? 0) < 2) return true;
+  return false;
 }
 
-function assignSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean): string | null {
+function assignSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, team?: TeamState): string | null {
   if (isPitcher) {
     if ((slots["P"] ?? 0) > 0) { slots["P"]--; return "P"; }
-    if ((slots["BN"] ?? 0) > 0) { slots["BN"]--; return "BN"; }
+    if ((slots["BN"] ?? 0) > 0 && (!team || team.benchPitchers < 3)) {
+      slots["BN"]--;
+      if (team) team.benchPitchers++;
+      return "BN";
+    }
     return null;
   }
   const order = ["C", "SS", "2B", "3B", "1B", "OF"];
   for (const slot of order) {
-    if ((slots[slot] ?? 0) > 0 && positions.some(p => p.toUpperCase() === slot)) {
+    if ((slots[slot] ?? 0) > 0 && positions.some(p => normalizePosition(p) === slot)) {
       slots[slot]--; return slot;
     }
   }
   // Flex
   for (const pos of positions) {
-    const u = pos.toUpperCase();
+    const u = normalizePosition(pos);
     if ((u === "2B" || u === "SS") && (slots["MI"] ?? 0) > 0) { slots["MI"]--; return "MI"; }
     if ((u === "1B" || u === "3B") && (slots["CI"] ?? 0) > 0) { slots["CI"]--; return "CI"; }
   }
   if ((slots["UTIL"] ?? 0) > 0) { slots["UTIL"]--; return "UTIL"; }
-  if ((slots["BN"] ?? 0) > 0) { slots["BN"]--; return "BN"; }
+  if ((slots["BN"] ?? 0) > 0 && (!team || team.benchHitters < 2)) {
+    slots["BN"]--;
+    if (team) team.benchHitters++;
+    return "BN";
+  }
   return null;
 }
 
@@ -296,11 +526,15 @@ function simulateAuction(
   players: PoolPlayer[],
   sgpValues: number[],
   asvMap: Map<string, number>,
+  plRankMap: Map<string, number>,
 ): SimResult {
   // Initialize teams
   const teams: TeamState[] = [];
   for (let t = 0; t < TOTAL_TEAMS; t++) {
-    teams.push({ budget: BUDGET, roster: [], slotsRemaining: { ...ROSTER_SLOTS } });
+    teams.push({
+      budget: BUDGET, roster: [], slotsRemaining: { ...ROSTER_SLOTS },
+      benchHitters: 0, benchPitchers: 0, spPrices: [], hitterSpent: 0,
+    });
   }
 
   // Assign opponent strategies (randomized each sim)
@@ -372,24 +606,16 @@ function simulateAuction(
     for (let t = 0; t < TOTAL_TEAMS; t++) {
       const team = teams[t];
       const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
-      if (remainingSlots === 0 || !canFillSlot(player.positions, team.slotsRemaining, player.isPitcher)) {
+      if (remainingSlots === 0 || !canFillSlot(player.positions, team.slotsRemaining, player.isPitcher, team.benchHitters, team.benchPitchers)) {
         teamMaxBids.push(0);
         continue;
       }
       const maxAffordable = Math.max(1, team.budget - (remainingSlots - 1));
 
       if (t === 0) {
-        // Our team: SGP/ASV blend with budget-spending pressure.
-        // As slots fill up, increase bids to ensure we spend the full budget.
-        // idealSpent = budget * (1 - slotsLeft/totalSlots)
-        // If we're under that pace, boost bids proportionally.
-        const idealSpent = BUDGET * (1 - remainingSlots / TOTAL_SLOTS);
-        const actualSpent = BUDGET - team.budget;
-        const underspend = Math.max(0, idealSpent - actualSpent);
-        // Distribute underspend across remaining slots
-        const perSlotBoost = remainingSlots > 0 ? underspend / remainingSlots : 0;
-        const blended = Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT) + perSlotBoost);
-        teamMaxBids.push(Math.min(Math.max(1, blended), maxAffordable));
+        // Our team: full strategy-cap bid
+        const ourBid = computeOurBid(player, team, sgpDollars, asv, plRankMap);
+        teamMaxBids.push(Math.min(ourBid, maxAffordable));
       } else {
         teamMaxBids.push(getOpponentMaxBid(strategies[t], asv, sgpDollars, maxAffordable));
       }
@@ -417,10 +643,20 @@ function simulateAuction(
 
     // Price = second-highest + 1 (minimum $1)
     const price = Math.max(1, secondHighest + 1);
-    const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher);
+    const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher, teams[winner]);
+    if (slot === null) {
+      // Can't actually roster this player — skip
+      available.delete(nomIdx);
+      nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
+      continue;
+    }
     const blendedVal = Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
     teams[winner].budget -= price;
-    teams[winner].roster.push({ playerIdx: nomIdx, price, slot: slot ?? "BN", blendedValue: blendedVal });
+    teams[winner].roster.push({ playerIdx: nomIdx, price, slot, blendedValue: blendedVal });
+    // Track hitterSpent for winning team
+    if (!player.isPitcher) teams[winner].hitterSpent += price;
+    // Track SP prices for winning team
+    if (isSP(player)) teams[winner].spPrices.push(price);
     available.delete(nomIdx);
 
     nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
@@ -508,8 +744,9 @@ console.log("Loading data...");
 const players = buildPlayerPool();
 const sgpValues = computeSGP(players);
 const asvMap = loadASV();
+const plRankMap = loadPitcherListRankings();
 const totalPositiveSGP = sgpValues.reduce((s, v) => s + Math.max(0, v), 0);
-console.log(`  ${players.length} players, ${asvMap.size} ASV entries, total SGP: ${totalPositiveSGP.toFixed(1)}`);
+console.log(`  ${players.length} players, ${asvMap.size} ASV entries, ${plRankMap.size} PL rankings, total SGP: ${totalPositiveSGP.toFixed(1)}`);
 console.log(`  Running ${NUM_SIMS} simulations...\n`);
 
 const results: SimResult[] = [];
@@ -517,7 +754,7 @@ const playerCounts = new Map<string, number>();
 const t0 = Date.now();
 
 for (let i = 0; i < NUM_SIMS; i++) {
-  const result = simulateAuction(players, sgpValues, asvMap);
+  const result = simulateAuction(players, sgpValues, asvMap, plRankMap);
   results.push(result);
   for (const p of result.myRoster) {
     playerCounts.set(p.name, (playerCounts.get(p.name) ?? 0) + 1);
