@@ -23,34 +23,41 @@ import { getPositionalWeight, getSpTierCap, HITTER_BUDGET_MAX } from "./draft-co
  * Priority: dedicated slot > flex slot (MI/CI) > UTIL > BN
  * Pitchers: P slot > BN (no UTIL for pitchers).
  */
+/** Normalize position string to match roster slot keys (LF/CF/RF → OF, DH → DH) */
+function normalizePosition(pos: string): string {
+  const upper = pos.toUpperCase();
+  if (upper === "LF" || upper === "CF" || upper === "RF") return "OF";
+  return upper;
+}
+
 export function determineSlotDestination(
   positions: string[],
   remainingSlots: Record<string, number>,
   isPitcher: boolean,
 ): "dedicated" | "flex" | "UTIL" | "BN" {
   if (isPitcher) {
-    // Pitchers only go to P or BN — no UTIL
     if ((remainingSlots["P"] ?? 0) > 0) return "dedicated";
     return "BN";
   }
 
+  // Normalize positions (LF/CF/RF → OF)
+  const normalized = positions.map(normalizePosition);
+
   // Check dedicated slots first
-  for (const pos of positions) {
-    const upper = pos.toUpperCase();
-    if ((remainingSlots[upper] ?? 0) > 0) return "dedicated";
+  for (const pos of normalized) {
+    if ((remainingSlots[pos] ?? 0) > 0) return "dedicated";
   }
 
   // Check flex slots: MI covers 2B/SS, CI covers 1B/3B
-  for (const pos of positions) {
-    const upper = pos.toUpperCase();
-    if ((upper === "2B" || upper === "SS") && (remainingSlots["MI"] ?? 0) > 0) return "flex";
-    if ((upper === "1B" || upper === "3B") && (remainingSlots["CI"] ?? 0) > 0) return "flex";
+  for (const pos of normalized) {
+    if ((pos === "2B" || pos === "SS") && (remainingSlots["MI"] ?? 0) > 0) return "flex";
+    if ((pos === "1B" || pos === "3B") && (remainingSlots["CI"] ?? 0) > 0) return "flex";
   }
 
-  // Check UTIL
+  // DH-eligible players can fill UTIL
+  // Any hitter can fill UTIL
   if ((remainingSlots["UTIL"] ?? 0) > 0) return "UTIL";
 
-  // No slots available
   return "BN";
 }
 
@@ -155,12 +162,12 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   const posWeight = getPositionalWeight(input.positions);
   if (posWeight > 0 && input.remainingSlots) {
     const hasDedicatedSlot = input.positions.some(pos => {
-      const upper = pos.toUpperCase();
+      const norm = normalizePosition(pos);
       // Check dedicated slot
-      if ((input.remainingSlots![upper] ?? 0) > 0) return true;
+      if ((input.remainingSlots![norm] ?? 0) > 0) return true;
       // Check flex slots (MI covers 2B/SS, CI covers 1B/3B)
-      if ((upper === "2B" || upper === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
-      if ((upper === "1B" || upper === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
+      if ((norm === "2B" || norm === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
+      if ((norm === "1B" || norm === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
       return false;
     });
     if (hasDedicatedSlot) {
