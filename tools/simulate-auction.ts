@@ -343,7 +343,13 @@ function computeOurBid(
   const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
 
   // Base: SGP/ASV blend (matches live engine bid-optimizer.ts exactly)
-  let bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
+  // Skip blend when SGP > ASV: trust our model when it's higher than market
+  let bid: number;
+  if (sgpDollars > asv && asv > 0) {
+    bid = Math.max(1, Math.round(sgpDollars));
+  } else {
+    bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
+  }
   const blendedValue = bid;
 
   // --- 5. Catcher guard: max 1 catcher ---
@@ -364,10 +370,18 @@ function computeOurBid(
   // --- 4. Positional need dampening (hitters) ---
   const ELITE_THRESHOLD = 30;
   if (!player.isPitcher) {
+    // Short-circuit: if no slot exists at all (not even BN), don't bid
+    if (!canFillSlot(player.positions, team.slotsRemaining, false, team.benchHitters, team.benchPitchers)) {
+      return 0;
+    }
     const destination = determineSlotDestination(player.positions, team.slotsRemaining, false);
     if (blendedValue < ELITE_THRESHOLD) {
       if (destination === "UTIL") {
-        bid = Math.max(1, Math.ceil(bid * 0.7));
+        // DH-eligible players: UTIL is their natural home, no dampening
+        const isDH = player.positions.some(p => p.toUpperCase() === "DH");
+        if (!isDH) {
+          bid = Math.max(1, Math.ceil(bid * 0.7));
+        }
       } else if (destination === "BN") {
         bid = Math.max(1, Math.ceil(bid * 0.5));
       }
@@ -475,6 +489,26 @@ function computeOurBid(
   // --- 7. Inflation adjustment (+2 when inflation > 1.10) ---
   if (inflationFactor > 1.10) {
     bid += 2;
+  }
+
+  // --- 8. Budget flush: spend excess when few slots remain ---
+  // Mirrors strategy-caps.ts budget flush logic, with tuned thresholds for the
+  // simulator context (teams don't always spend $200+ before entering flush mode).
+  // Fire when budget remaining < $120 (roughly halfway) AND <= 8 slots left.
+  const slotsLeft = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
+  const budgetRemaining = team.budget;
+  if (budgetRemaining < 200 && slotsLeft > 0 && slotsLeft <= 20) {
+    const minReserves = Math.max(0, slotsLeft - 1);
+    const excessBudget = budgetRemaining - minReserves - bid;
+    if (excessBudget > 0) {
+      if (slotsLeft <= 2) {
+        bid += excessBudget;
+      } else if (slotsLeft <= 5) {
+        bid += Math.ceil(excessBudget * 0.7);
+      } else {
+        bid += Math.ceil(excessBudget * 0.5);
+      }
+    }
   }
 
   return Math.max(1, bid);
@@ -736,7 +770,9 @@ function simulateAuction(
       nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
       continue;
     }
-    const blendedVal = Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
+    const blendedVal = sgpDollars > asv && asv > 0
+      ? Math.round(sgpDollars)
+      : Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
     teams[winner].budget -= price;
     teams[winner].roster.push({ playerIdx: nomIdx, price, slot, blendedValue: blendedVal });
     // Track hitterSpent for winning team
