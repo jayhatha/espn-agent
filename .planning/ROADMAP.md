@@ -230,3 +230,12 @@ Plans:
 Plans:
 - [ ] 59-01-PLAN.md — SGP skip blend + DH UTIL exemption + budget flush in engine + tests
 - [ ] 59-02-PLAN.md — Mirror changes in simulator + 2000-sim validation
+
+### Phase 60: Evaluate and fix starting pitcher logic in bid engine — verify SP tier caps (PL rank determines tier, cap is floor+ceiling for top 60), SP savings reallocation, target 7SP+5RP composition, RP $15 hard cap, no pitcher SGP multiplier, update simulator to match
+
+**Goal:** [To be planned]
+**Depends on:** Phase 59
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 60 to break down)
