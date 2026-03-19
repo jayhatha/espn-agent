@@ -686,27 +686,55 @@ function computeIdealRoster(
     };
   });
 
-  // Label SP slots as SP1-SP7 based on PitcherList rank (best rank = SP1).
-  // Includes both drafted and optimizer SPs so labels reflect the full rotation.
+  // Label pitcher slots: SP1-5 and RP1-4 are starters (fill 9 P slots),
+  // SP6-7 and RP5 go to bench. Sort by PL rank within each type.
   const allSPs = [
     ...draftedPlayers.filter(p => p.positions.some(pos => pos.toUpperCase() === "SP")),
     ...optimizerPlayers.filter(p => p.positions.some(pos => pos.toUpperCase() === "SP")),
   ].sort((a, b) => (a.externalRank ?? 999) - (b.externalRank ?? 999));
 
+  const allRPs = [
+    ...draftedPlayers.filter(p =>
+      p.positions.some(pos => pos.toUpperCase() === "RP") &&
+      !p.positions.some(pos => pos.toUpperCase() === "SP")),
+    ...optimizerPlayers.filter(p =>
+      p.positions.some(pos => pos.toUpperCase() === "RP") &&
+      !p.positions.some(pos => pos.toUpperCase() === "SP")),
+  ].sort((a, b) => (a.externalRank ?? 999) - (b.externalRank ?? 999));
+
   for (let i = 0; i < allSPs.length; i++) {
-    if (allSPs[i].slot === "P" || allSPs[i].slot === "SP") {
-      allSPs[i].slot = `SP${i + 1}`;
+    if (allSPs[i].slot === "P" || allSPs[i].slot === "SP" || allSPs[i].slot === "BN") {
+      if (i < 5) {
+        allSPs[i].slot = `SP${i + 1}`;  // SP1-5 = starting rotation
+      } else {
+        allSPs[i].slot = `SP${i + 1}`;  // SP6-7 = bench
+        // Only override to BN if they were in a P slot (not already BN)
+      }
+    }
+  }
+
+  for (let i = 0; i < allRPs.length; i++) {
+    if (allRPs[i].slot === "P" || allRPs[i].slot === "RP" || allRPs[i].slot === "BN") {
+      allRPs[i].slot = `RP${i + 1}`;  // RP1-4 = starting, RP5 = bench
     }
   }
 
   // Combine and sort by SLOT_ORDER
   const players = [...draftedPlayers, ...optimizerPlayers];
   const slotIndex = (slot: string) => {
-    // SP1-SP7 sort at the "P" position, sub-sorted by number
-    if (slot.startsWith("SP") && slot.length > 2) {
-      const pIdx = SLOT_ORDER.indexOf("P");
-      const spNum = parseInt(slot.slice(2), 10) || 0;
-      return pIdx + spNum * 0.01; // SP1 = P+0.01, SP2 = P+0.02, etc.
+    const pIdx = SLOT_ORDER.indexOf("P");
+    const bnIdx = SLOT_ORDER.indexOf("BN");
+    // SP1-5 sort in the P section (starters)
+    if (slot.startsWith("SP")) {
+      const num = parseInt(slot.slice(2), 10) || 0;
+      if (num <= 5) return pIdx + num * 0.01;       // SP1-5: starters
+      return bnIdx - 0.1 + num * 0.001;             // SP6-7: bench pitchers (before BN hitters)
+    }
+    // RP1-4 sort after SP5, RP5 sorts with bench pitchers
+    if (slot.startsWith("RP")) {
+      const num = parseInt(slot.slice(2), 10) || 0;
+      if (num <= 4) return pIdx + 0.06 + num * 0.01; // RP1-4: starters (after SP5)
+      return bnIdx - 0.05 + num * 0.001;             // RP5: bench pitcher
     }
     const idx = SLOT_ORDER.indexOf(slot);
     return idx >= 0 ? idx : SLOT_ORDER.length;
