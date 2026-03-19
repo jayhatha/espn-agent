@@ -225,6 +225,10 @@ interface TeamState {
   benchHitters: number;
   benchPitchers: number;
   spPrices: number[];
+  /** Rank-based tier cap for each drafted SP (parallel to spPrices) */
+  spTierCaps: number[];
+  /** Count of RPs drafted by this team */
+  rpCount: number;
   hitterSpent: number;
 }
 
@@ -330,6 +334,15 @@ function hasDedicatedOrFlexSlot(positions: string[], slots: Record<string, numbe
 // ============================================================
 // Our Bid Computation (mirrors strategy-caps.ts)
 // ============================================================
+
+function getRankBasedTierCap(rank: number | undefined): number {
+  if (rank == null) return 3;
+  if (rank <= 20) return 18;
+  if (rank <= 30) return 12;
+  if (rank <= 40) return 10;
+  if (rank <= 60) return 5;
+  return 3;
+}
 
 function computeOurBid(
   player: PoolPlayer,
@@ -438,24 +451,24 @@ function computeOurBid(
     }
 
     // SP savings reallocation (only for ranked SPs in top-60 tiers).
-    // Only count ranked SPs in spPrices for savings calc to avoid filler distortion.
+    // Uses per-SP rank-based tier caps (spTierCaps) so out-of-order drafting
+    // doesn't generate fake savings. Falls back to slot-position caps when not provided.
     if (plRank != null && plRank <= 60 && team.spPrices.length > 0) {
       let idealSpSpend = 0;
-      // Use number of RANKED SPs drafted (spPrices only tracks ranked SPs after this fix)
       for (let s = 0; s < team.spPrices.length; s++) {
-        idealSpSpend += getSpTierCap(s);
+        idealSpSpend += team.spTierCaps[s] ?? getSpTierCap(s);
       }
       const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
       const savings = Math.max(0, idealSpSpend - actualSpSpend);
       if (savings > 0) tierCap += savings;
     }
 
-    // For ranked SPs (top 60): bid exactly at tier cap — we've committed
-    // to spending that amount on quality arms. The SGP blend undervalues
-    // pitchers in an OPS league, so the tier cap IS our bid.
-    // For unranked/filler SPs: cap down only.
+    // For ranked SPs (top 60): tier cap is BOTH floor and ceiling — return
+    // immediately so endgame dampening and budget flush don't override it.
+    // The SGP blend undervalues pitchers in an OPS league, so the tier cap IS our bid.
+    // For unranked/filler SPs: cap down only, then continue to flush/endgame.
     if (plRank != null && plRank <= 60) {
-      bid = tierCap;
+      return Math.max(1, tierCap);
     } else {
       if (bid > tierCap) bid = tierCap;
     }
@@ -463,11 +476,14 @@ function computeOurBid(
 
   // --- RP savings reallocation + hard cap ---
   if (isRP(player)) {
+    // Cap at 5 RPs for composition targeting (7SP+5RP)
+    if (team.rpCount >= 5) return 0;
+
     // Apply SP savings to RPs when 5+ SPs drafted
     if (team.spPrices.length >= 5) {
       let idealSpSpend = 0;
       for (let s = 0; s < team.spPrices.length; s++) {
-        idealSpSpend += getSpTierCap(s);
+        idealSpSpend += team.spTierCaps[s] ?? getSpTierCap(s);
       }
       const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
       const savings = Math.max(0, idealSpSpend - actualSpSpend);
@@ -528,6 +544,7 @@ interface SimResult {
   rotoPoints: number;
   overallRank: number;
   rankedSpDrafted: number;  // count of top-60 PL SPs drafted
+  rpDrafted: number;        // count of RPs drafted
   benchSplit: { hitters: number; pitchers: number };
 }
 
@@ -624,7 +641,7 @@ function simulateAuction(
   for (let t = 0; t < TOTAL_TEAMS; t++) {
     teams.push({
       budget: BUDGET, roster: [], slotsRemaining: { ...ROSTER_SLOTS },
-      benchHitters: 0, benchPitchers: 0, spPrices: [], hitterSpent: 0,
+      benchHitters: 0, benchPitchers: 0, spPrices: [], spTierCaps: [], rpCount: 0, hitterSpent: 0,
     });
   }
 
@@ -783,7 +800,13 @@ function simulateAuction(
       const plRank = plRankMap.get(player.normalizedName);
       if (plRank != null && plRank <= 60) {
         teams[winner].spPrices.push(price);
+        // Track rank-based tier cap for each drafted SP (mirrors engine's draftedSpTierCaps)
+        teams[winner].spTierCaps.push(getRankBasedTierCap(plRank));
       }
+    }
+    // Track RP count for composition targeting (7SP+5RP cap)
+    if (isRP(player)) {
+      teams[winner].rpCount++;
     }
     available.delete(nomIdx);
 
@@ -846,12 +869,13 @@ function simulateAuction(
   const sortedRoto = [...rotoPoints].sort((a, b) => b - a);
   const overallRank = sortedRoto.indexOf(myRotoPoints) + 1;
 
-  // Count ranked SPs and bench split for our team
+  // Count ranked SPs, RPs, and bench split for our team
   const rankedSpDrafted = myTeam.roster.filter(d => {
     const p = players[d.playerIdx];
     const rank = plRankMap.get(p.normalizedName);
     return p.isPitcher && isSP(p) && rank != null && rank <= 60;
   }).length;
+  const rpDrafted = myTeam.rpCount;
 
   return {
     myDrafted: myTeam.roster,
@@ -867,6 +891,7 @@ function simulateAuction(
     rotoPoints: myRotoPoints,
     overallRank,
     rankedSpDrafted,
+    rpDrafted,
     benchSplit: { hitters: myTeam.benchHitters, pitchers: myTeam.benchPitchers },
   };
 }
@@ -1064,10 +1089,12 @@ console.log("  SP ACQUISITION ANALYSIS");
 console.log("=" .repeat(70));
 
 const meanRankedSPs = mean(results.map(r => r.rankedSpDrafted));
+const meanRPs = mean(results.map(r => r.rpDrafted));
 const meanBenchH = mean(results.map(r => r.benchSplit.hitters));
 const meanBenchP = mean(results.map(r => r.benchSplit.pitchers));
 console.log();
-console.log(`Mean ranked SPs (top-60 PL) per roster: ${meanRankedSPs.toFixed(1)}`);
+console.log(`Avg SP count (ranked top-60 PL): ${meanRankedSPs.toFixed(1)} (target: 4+ in top-60, ideally 7 total)`);
+console.log(`Avg RP count: ${meanRPs.toFixed(1)} (target: 5)`);
 console.log(`Mean bench hitters: ${meanBenchH.toFixed(1)} (target: 2)`);
 console.log(`Mean bench pitchers: ${meanBenchP.toFixed(1)} (target: 3)`);
 
