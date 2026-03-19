@@ -93,15 +93,25 @@ export function computeMaxBid(
   }
 
   // ------------------------------------------------------------------
-  // Step 3: Blend with ASV
+  // Step 3: Blend with ASV (or skip blend when SGP is higher)
   // ------------------------------------------------------------------
+  // When our model says a player is worth more than the market (sgpDollars >
+  // asvMarketPrice), trust the model — use SGP directly without ASV dilution.
+  // When ASV is higher than SGP, blend toward market to avoid overpaying on
+  // players whose projection we may be undervaluing.
   const SGP_WEIGHT = 0.4;
   let rawBlendedValue = sgpDollars;
 
   if (asvMarketPrice != null && asvMarketPrice > 0) {
-    rawBlendedValue = Math.max(1, Math.round(
-      sgpDollars * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT),
-    ));
+    if (sgpDollars > asvMarketPrice) {
+      // SGP exceeds market — trust the model, skip blend
+      rawBlendedValue = sgpDollars;
+    } else {
+      // ASV >= SGP — blend toward market consensus
+      rawBlendedValue = Math.max(1, Math.round(
+        sgpDollars * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT),
+      ));
+    }
   }
 
   // Clamp to budget constraints, floor at $1

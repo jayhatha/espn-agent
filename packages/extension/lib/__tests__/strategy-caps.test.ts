@@ -255,7 +255,7 @@ describe("computeStrategyBidCap — combined adjustments", () => {
     expect(result.capSource).toContain("inflation +2");
   });
 
-  it("applies catcher dampening then positional weight then hitter cap", () => {
+  it("applies catcher dampening then positional weight then hitter cap then budget flush", () => {
     const result = computeStrategyBidCap(
       makeInput({
         rawMaxBid: 40,
@@ -272,9 +272,12 @@ describe("computeStrategyBidCap — combined adjustments", () => {
     // Actually pos weight: C has dedicated=0, no flex for C, but UTIL>0 → no dedicated slot → pos +0
     // 20 + 0 (pos +0 slots full) = 20
     // Hitter cap: 210 + 20 = 230 > 220, headroom = 10 → cap to 10
-    expect(result.bidCap).toBe(10);
+    // Budget flush: totalSpent=210 > 200, slotsRemaining=1 ≤ 2, budgetRemaining=50,
+    //   excess = 50 - 0 - 10 = 40, boost = 40 → bidCap = 50
+    expect(result.bidCap).toBe(50);
     expect(result.capSource).toContain("C filled");
     expect(result.capSource).toContain("hitter cap");
+    expect(result.capSource).toContain("budget flush");
   });
 
   it("SP with endgame and inflation gets all three adjustments", () => {

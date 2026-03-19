@@ -16,6 +16,9 @@
 
 import { getPositionalWeight, getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
 
+/** Total auction draft budget */
+const TOTAL_BUDGET = 260;
+
 /**
  * Determine where a player would be slotted given their eligible positions
  * and remaining roster slots.
@@ -129,13 +132,29 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   }
 
   // Apply need multiplier — reduce bid when player would go to UTIL or BN
+  // Exception: DH-eligible players going to UTIL are not penalized — UTIL is
+  // their natural slot (DH can only play UTIL, not dedicated positions).
+  // BN dampening still applies to DH players — being bench-bound is genuinely bad.
   const ELITE_THRESHOLD = 30;
   if (input.remainingSlots && !input.isPitcher) {
     const destination = determineSlotDestination(input.positions, input.remainingSlots, false);
+
+    // Check BN overflow: if destination is BN and BN slots are full (or not tracked),
+    // return bid=0 — there is genuinely no roster slot for this hitter.
+    if (destination === "BN" && (input.remainingSlots["BN"] ?? -1) === 0) {
+      return { bidCap: 0, capSource: capSource + ` → NO SLOT (BN full)` };
+    }
+
     if (input.rawMaxBid < ELITE_THRESHOLD) {
       if (destination === "UTIL") {
-        bidCap = Math.max(1, Math.ceil(bidCap * 0.7));
-        capSource += ` → need ×0.7 (UTIL)`;
+        // DH-eligible players: UTIL is their natural home, no dampening
+        const isDH = input.positions.some(p => p.toUpperCase() === "DH");
+        if (isDH) {
+          capSource += ` -> need x1.0 (DH natural UTIL)`;
+        } else {
+          bidCap = Math.max(1, Math.ceil(bidCap * 0.7));
+          capSource += ` → need ×0.7 (UTIL)`;
+        }
       } else if (destination === "BN") {
         bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
         capSource += ` → need ×0.5 (BN)`;
@@ -302,6 +321,35 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   if (input.inflationFactor > 1.10) {
     bidCap += 2;
     capSource += ` → inflation +2`;
+  }
+
+  // Budget flush boost — spend all $260 when few slots remain.
+  // Only applies when the draft is substantially complete (spent > $200 total),
+  // meaning few slots remain and excess budget needs to be deployed.
+  // This ensures the full $260 is spent rather than leaving money on the table.
+  const totalSpent = input.hitterSpent + input.pitcherSpent;
+  if (input.remainingSlots != null && totalSpent > 200) {
+    const slotsRemaining = Object.values(input.remainingSlots).reduce((s, v) => s + v, 0);
+    if (slotsRemaining > 0 && slotsRemaining <= 5) {
+      const budgetRemaining = TOTAL_BUDGET - totalSpent;
+      // Must reserve $1 per slot after this pick
+      const minReserves = Math.max(0, slotsRemaining - 1);
+      const excessBudget = budgetRemaining - minReserves - bidCap;
+      if (excessBudget > 0) {
+        let boost: number;
+        if (slotsRemaining <= 2) {
+          // Last 1-2 picks: spend all excess
+          boost = excessBudget;
+        } else {
+          // 3-5 picks: spend ~half the excess on this pick
+          boost = Math.ceil(excessBudget * 0.5);
+        }
+        if (boost > 0) {
+          bidCap += boost;
+          capSource += ` → budget flush +${boost}`;
+        }
+      }
+    }
   }
 
   return { bidCap, capSource };
