@@ -220,11 +220,13 @@ Plans:
 Plans:
 - [ ] 58-01-PLAN.md — Need multiplier in strategy caps + BidVerdict display
 
-### Phase 59: Bid engine tuning — use SGP directly when higher than ASV (skip blend), exempt DH from UTIL-only bid cap, update simulator to match
+### Phase 59: Bid engine tuning — use SGP directly when higher than ASV (skip blend), exempt DH from UTIL-only bid cap, spend all $260, update simulator to match
 
-**Goal:** [To be planned]
+**Goal:** Three bid engine tuning changes: skip ASV blend when SGP is higher, exempt DH from UTIL-only bid cap, add budget flush to spend all $260
 **Depends on:** Phase 58
-**Plans:** 0 plans
+**Requirements:** BID-01, BID-02, BID-03, BID-04
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 59 to break down)
+- [ ] 59-01-PLAN.md — SGP skip blend + DH UTIL exemption + budget flush in engine + tests
+- [ ] 59-02-PLAN.md — Mirror changes in simulator + 2000-sim validation
