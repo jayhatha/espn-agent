@@ -148,7 +148,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
       });
 
-      const cappedMaxBid = Math.min(mergedOptimization.maxBid, capResult.bidCap);
+      // Use the strategy cap result directly — it starts from rawMaxBid and
+      // applies both increases (positional weight, inflation +2) and decreases
+      // (SP tier, hitter budget, endgame). Math.min was wrong here: it prevented
+      // positional bonuses from raising the bid above the raw blended value.
+      const cappedMaxBid = capResult.bidCap;
 
       mergedOptimization = {
         ...mergedOptimization,
