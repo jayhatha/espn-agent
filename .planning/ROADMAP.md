@@ -217,7 +217,7 @@ Plans:
 
 **Goal:** Add positional need multiplier to bid caps — reduce bids for UTIL-bound (0.7x) and BN-bound (0.5x) players, with elite override for top-value players
 **Depends on:** Phase 57
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 58-01-PLAN.md — Need multiplier in strategy caps + BidVerdict display

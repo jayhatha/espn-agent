@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 55 — Extension Draft Reliability
+**Current focus:** Phase 58 — Audit Max Bid and Ideal Roster Logic
 
 ## Current Position
 
-Phase: 55 of 55 (Extension Draft Reliability)
-Plan: 03 (3 of 3 plans complete)
+Phase: 58 of 58 (Audit Max Bid and Ideal Roster Logic)
+Plan: 01 (1 of 1 plans complete)
 Status: Complete
-Last activity: 2026-03-17 - Phase 55 all plans complete (55-01 SUMMARY.md added)
+Last activity: 2026-03-18 - Phase 58 plan 01 complete (positional need multiplier)
 
-Progress: [██████████] 100% (v5.0 — Phase 55 complete)
+Progress: [██████████] 100% (Phase 58 complete)
 
 ## Accumulated Context
 
@@ -43,6 +43,7 @@ Progress: [██████████] 100% (v5.0 — Phase 55 complete)
 - [Phase 55-01]: playerPool param kept in buildOpponentModel for API compatibility; unused for position resolution
 - [Phase 55-02]: No new decisions — inflation wiring followed plan exactly as specified
 - [Phase 55]: Increase monte-carlo replacement-level test from 100 to 300 sims with larger pool to make stochastic test reliable
+- [Phase 58-01]: Need multiplier after catcher dampening, before positional weight; elite threshold $30; pitchers only use P slots (no UTIL)
 
 ### Roadmap Evolution
 
@@ -51,6 +52,8 @@ Progress: [██████████] 100% (v5.0 — Phase 55 complete)
 - Phase 54 added: Auction engine test suite — unit, simulation, and scenario tests
 - Phase 55 added: Extension draft reliability — opponent model fix, inflation wiring, test stabilization
 - Phase 56 added: Audit draft logic for value strategy consistency and spec compliance (13 teams)
+- Phase 57 added: Auction simulation test suite — verify spec targets (roster value >= $320, profit >= $70, top-4 finishes >= 60%)
+- Phase 58 added: Audit max bid and ideal roster — introduce positional need as a bid factor
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-18
-Stopped at: Completed quick task 95 - wire shouldBid into auto-bid controller
+Stopped at: Completed 58-01-PLAN.md (positional need multiplier)
 Resume file: None
