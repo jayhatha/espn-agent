@@ -219,3 +219,12 @@ Plans:
 
 Plans:
 - [ ] 58-01-PLAN.md — Need multiplier in strategy caps + BidVerdict display
+
+### Phase 59: Bid engine tuning — use SGP directly when higher than ASV (skip blend), exempt DH from UTIL-only bid cap, update simulator to match
+
+**Goal:** [To be planned]
+**Depends on:** Phase 58
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 59 to break down)

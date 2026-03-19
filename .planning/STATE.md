@@ -55,6 +55,7 @@ Progress: [██████████] 100% (Phase 57 plan 01 complete)
 - Phase 56 added: Audit draft logic for value strategy consistency and spec compliance (13 teams)
 - Phase 57 added: Auction simulation test suite — verify spec targets (roster value >= $320, profit >= $70, top-4 finishes >= 60%)
 - Phase 58 added: Audit max bid and ideal roster — introduce positional need as a bid factor
+- Phase 59 added: Bid engine tuning — use SGP directly when higher than ASV (skip blend), exempt DH from UTIL-only bid cap, update simulator to match
 
 ### Pending Todos
 
