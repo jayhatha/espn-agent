@@ -390,8 +390,9 @@ function computeOurBid(
     }
   }
 
-  // --- 3. Hitter budget cap ---
-  if (!player.isPitcher) {
+  // --- 3. Hitter budget cap (skip in endgame — matches strategy-caps.ts) ---
+  const isEndgame = team.budget <= 20;
+  if (!player.isPitcher && !isEndgame) {
     if (team.hitterSpent + bid > HITTER_BUDGET_MAX) {
       bid = Math.max(1, HITTER_BUDGET_MAX - team.hitterSpent);
     }
@@ -467,7 +468,6 @@ function computeOurBid(
 
   // --- 6. Endgame dampening (matches strategy-caps.ts ordering) ---
   // Apply AFTER all other adjustments (SP tier caps, RP caps, hitter cap)
-  const isEndgame = team.budget <= 20;
   if (isEndgame) {
     bid = Math.max(1, Math.ceil(bid * 0.7));
   }
