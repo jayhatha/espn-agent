@@ -234,16 +234,11 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     }
 
     // Reallocate savings from SPs drafted below their tier cap.
-    // If you got an SP3-tier guy for $6 instead of $10, the $4 savings
-    // rolls up to the current SP (if it's a higher tier) or to RPs.
-    // Compute: ideal spending for drafted SPs vs actual spending.
-    if (input.draftedSpPrices && input.draftedSpPrices.length > 0) {
-      // Ideal: each drafted SP should have cost their rank-based tier cap.
-      // We don't know their ranks, so use the slot-based tier caps as ideal.
-      // The sum of tier caps for spCount SPs = sum of SP_TIER_CAPS[0..spCount-1]
+    // Only apply to SPs in the top 60 (SP1-SP4 tiers) — don't boost filler.
+    if (input.draftedSpPrices && input.draftedSpPrices.length > 0 && (rank == null || rank <= 60)) {
       let idealSpSpend = 0;
       for (let s = 0; s < input.draftedSpPrices.length; s++) {
-        idealSpSpend += getSpTierCap(s); // $18 + $12 + $10 + ...
+        idealSpSpend += getSpTierCap(s);
       }
       const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
       const savings = Math.max(0, idealSpSpend - actualSpSpend);
