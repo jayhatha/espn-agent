@@ -418,3 +418,101 @@ describe("computeMaxBid — SGP dollar valuation", () => {
     expect(result.valueSurplus).toBe(result.maxBid - result.expectedMarketPrice);
   });
 });
+
+// ============================================================
+// SGP skip-blend tests
+// ============================================================
+
+describe("computeMaxBid — SGP skip blend", () => {
+  /**
+   * Build a minimal pool where sgpDollars is predictable.
+   * Pool: 1 player with SGP that translates to a known dollar value.
+   * totalLeagueBudget = myBudget (no opponent budgets in minimal model).
+   */
+  function makeMinimalPool(playerDollars: number, opponentBudgets: number[] = []) {
+    const player: PoolPlayer = {
+      name: "Test Player",
+      normalizedName: "test player",
+      dollars: playerDollars,
+      isPitcher: false,
+      positions: ["OF"],
+      stats: {},
+    };
+    const pool = [player];
+    const sgpValues = [playerDollars]; // 1 SGP unit per dollar for simplicity
+    const model: OpponentModel = {
+      teamNeeds: new Map(),
+      teamBudgets: new Map(opponentBudgets.map((b, i) => [`team${i}`, b])),
+      competitionFactors: { OF: 0.5 },
+      leagueInflationFactor: 1.0,
+    };
+    return { player, pool, sgpValues, model };
+  }
+
+  it("when sgpDollars > asvMarketPrice, rawBlendedValue equals sgpDollars (no ASV dilution)", () => {
+    // With a single player in the pool: sgpDollars = budget = 200
+    // asvMarketPrice = 25 (lower than sgpDollars=200)
+    // Without skip: blend = 200*0.4 + 25*0.6 = 80+15 = 95
+    // With skip (sgp > asv): rawBlendedValue = 200
+    const { player, pool, sgpValues, model } = makeMinimalPool(40);
+    // Add opponent budgets so totalLeagueBudget is larger and sgpDollars is meaningful
+    const opponentModel: OpponentModel = {
+      teamNeeds: new Map(),
+      teamBudgets: new Map([["t1", 200], ["t2", 200], ["t3", 200]]),
+      competitionFactors: { OF: 0.5 },
+      leagueInflationFactor: 1.0,
+    };
+    // myBudget=200, opponents contribute 600 more = total 800
+    // sgpDollars = (40/40) * 800 = 800 → definitely > asvMarketPrice=25
+    const result = computeMaxBid(player, pool, sgpValues, 200, { OF: 1 }, opponentModel, 1.0, 25);
+    // SGP > ASV → rawBlendedValue should be sgpDollars, not the blend
+    expect(result.rawBlendedValue).toBeGreaterThan(25);
+    // Without skip, blend would be: sgpDollars*0.4 + 25*0.6 = less than sgpDollars
+    // With skip: rawBlendedValue = sgpDollars
+    expect(result.rawBlendedValue).toBe(result.sgpBreakeven);
+  });
+
+  it("when sgpDollars < asvMarketPrice, still uses blend formula", () => {
+    // Pool with many players so one player's SGP dollar value is small
+    const players: PoolPlayer[] = Array.from({ length: 20 }, (_, i) => ({
+      name: `Player ${i}`,
+      normalizedName: `player ${i}`,
+      dollars: 10,
+      isPitcher: false,
+      positions: ["OF"],
+      stats: {},
+    }));
+    const sgpValues = players.map(() => 1); // small equal SGP
+    const model: OpponentModel = {
+      teamNeeds: new Map(),
+      teamBudgets: new Map(), // no opponents, myBudget=50 total
+      competitionFactors: { OF: 0.5 },
+      leagueInflationFactor: 1.0,
+    };
+    // totalLeagueBudget = 50, totalPositiveSGP = 20
+    // sgpDollars for players[0] = (1/20) * 50 = 2.5 → rounds to 3
+    // asvMarketPrice = 30 → ASV > SGP → blend: 3*0.4 + 30*0.6 = 1.2+18 = 19.2 → 19
+    const result = computeMaxBid(players[0], players, sgpValues, 50, { OF: 5 }, model, 1.0, 30);
+    // rawBlendedValue should be the blend, less than asvMarketPrice (30)
+    expect(result.rawBlendedValue).toBeLessThan(30);
+    // And less than sgpDollars is not relevant (ASV is higher) — key: not equal to sgpBreakeven
+    expect(result.rawBlendedValue).not.toBe(result.sgpBreakeven);
+  });
+
+  it("when asvMarketPrice is undefined, rawBlendedValue equals sgpDollars (existing behavior)", () => {
+    const players: PoolPlayer[] = [
+      { name: "P1", normalizedName: "p1", dollars: 20, isPitcher: false, positions: ["OF"], stats: {} },
+      { name: "P2", normalizedName: "p2", dollars: 10, isPitcher: false, positions: ["1B"], stats: {} },
+    ];
+    const sgpValues = [4, 2];
+    const model: OpponentModel = {
+      teamNeeds: new Map(),
+      teamBudgets: new Map(),
+      competitionFactors: { OF: 0.5 },
+      leagueInflationFactor: 1.0,
+    };
+    // No asvMarketPrice → rawBlendedValue = sgpDollars
+    const result = computeMaxBid(players[0], players, sgpValues, 100, { OF: 1, "1B": 1 }, model);
+    expect(result.rawBlendedValue).toBe(result.sgpBreakeven);
+  });
+});
