@@ -1047,16 +1047,15 @@ export function computeDraftEngine(
   }
   const sgpValuesOpt = cachedSGPVectors.playerSGPs;
 
-  // Apply pitcher/hitter split weighting to create adjusted SGP values.
-  // The base sgpValuesOpt is preserved (cache-safe); adjustedSgpValuesOpt is
-  // used for all downstream optimizer and simulation calls.
-  const splitValue = input.pitcherHitterSplit ?? 65;
-  const hitterMultiplier = splitValue / 50;           // 65 → 1.3, 50 → 1.0, 20 → 0.4
-  const pitcherMultiplier = (100 - splitValue) / 50;  // 65 → 0.7, 50 → 1.0, 80 → 0.4
-  const adjustedSgpValuesOpt = sgpValuesOpt.map((sgp, i) => {
-    const multiplier = allPlayersOpt[i].isPitcher ? pitcherMultiplier : hitterMultiplier;
-    return sgp * multiplier;
-  });
+  // pitcherHitterSplit is kept for cache key invalidation but no longer used
+  // to multiply individual SGP values. The 75/25 budget split is enforced by:
+  //   - Hitter budget cap ($220) in strategy-caps.ts
+  //   - SP tier caps ($18/$12/$10/$5/$3) in strategy-caps.ts
+  //   - Budget tracking (hitterSpent/pitcherSpent) in budget-curve.ts
+  // Individual players are valued at their true SGP contribution regardless
+  // of position — buy the best value on the board.
+  const splitValue = input.pitcherHitterSplit ?? 75;
+  const adjustedSgpValuesOpt = sgpValuesOpt;
 
   // Build opponent model
   const opponentModelOpt = buildOpponentModel(
