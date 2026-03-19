@@ -185,46 +185,54 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     }
   }
 
-  // Apply SP tier cap with PitcherList rank quality gating.
-  // Tier caps are the ceiling, but the SP must be ranked well enough to
-  // deserve the full tier price. Target: 4 SPs in PL top 60.
-  //   SP1 ($18): PL top 20 gets full cap, top 40 gets $12, worse gets $8
-  //   SP2 ($12): PL top 30 gets full cap, top 60 gets $8, worse gets $5
-  //   SP3 ($10): PL top 40 gets full cap, top 60 gets $6, worse gets $3
-  //   SP4 ($5):  PL top 60 gets full cap, worse gets $3
-  //   SP5+ ($3): no rank gating (filler)
+  // Apply SP tier cap based on PitcherList rank (not draft order).
+  // The player's rank determines their tier — a PL #30 is an SP2-tier
+  // pitcher whether he's the first or fourth SP you draft. This lets you
+  // draft SPs out of order: save the $18 slot for a top-20 guy later.
+  //
+  // Rank → tier mapping:
+  //   PL top 20  → SP1 tier ($18)
+  //   PL 21-30   → SP2 tier ($12)
+  //   PL 31-40   → SP3 tier ($10)
+  //   PL 41-60   → SP4 tier ($5)
+  //   PL 61+     → SP5 tier ($3)
+  //   Unranked   → fall back to spCount-based tier (original behavior)
+  //
+  // Additionally: once you've drafted 7 SPs, all further SPs cap at $3.
   if (input.isSP) {
-    let tierCap = getSpTierCap(input.spCount);
+    let tierCap: number;
     const rank = input.externalRank;
 
-    if (rank != null && input.spCount < 4) {
-      // Rank-gated tier caps: reduce cap when pitcher is outside target rank range
-      const SP_RANK_GATES: Array<{ maxRankForFull: number; fallbackCap: number; minCap: number }> = [
-        { maxRankForFull: 20, fallbackCap: 12, minCap: 8 },  // SP1
-        { maxRankForFull: 30, fallbackCap: 8,  minCap: 5 },  // SP2
-        { maxRankForFull: 40, fallbackCap: 6,  minCap: 3 },  // SP3
-        { maxRankForFull: 60, fallbackCap: 3,  minCap: 3 },  // SP4
-      ];
-      const gate = SP_RANK_GATES[input.spCount];
-      if (rank <= gate.maxRankForFull) {
-        // Quality match — full tier cap
-        capSource += ` → SP${input.spCount + 1} PL#${rank} (full $${tierCap})`;
+    if (input.spCount >= 7) {
+      // Already have 7 SPs — no more needed, filler price only
+      tierCap = 3;
+      capSource += ` → SP${input.spCount + 1} cap $3 (full)`;
+    } else if (rank != null) {
+      // Rank-based tier: the player's quality determines the price
+      if (rank <= 20) {
+        tierCap = 18;
+        capSource += ` → PL#${rank} SP1-tier $18`;
+      } else if (rank <= 30) {
+        tierCap = 12;
+        capSource += ` → PL#${rank} SP2-tier $12`;
+      } else if (rank <= 40) {
+        tierCap = 10;
+        capSource += ` → PL#${rank} SP3-tier $10`;
       } else if (rank <= 60) {
-        // Decent but not ideal — reduced cap
-        tierCap = Math.min(tierCap, gate.fallbackCap);
-        capSource += ` → SP${input.spCount + 1} PL#${rank} (reduced $${tierCap})`;
+        tierCap = 5;
+        capSource += ` → PL#${rank} SP4-tier $5`;
       } else {
-        // Outside top 60 — minimum cap
-        tierCap = Math.min(tierCap, gate.minCap);
-        capSource += ` → SP${input.spCount + 1} PL#${rank} (min $${tierCap})`;
+        tierCap = 3;
+        capSource += ` → PL#${rank} SP5-tier $3`;
       }
+    } else {
+      // No PL rank available — fall back to spCount-based tier
+      tierCap = getSpTierCap(input.spCount);
+      capSource += ` → SP${input.spCount + 1} cap $${tierCap} (no rank)`;
     }
 
     if (bidCap > tierCap) {
       bidCap = tierCap;
-      if (!capSource.includes("SP" + (input.spCount + 1))) {
-        capSource += ` → SP${input.spCount + 1} cap $${tierCap}`;
-      }
     }
   }
 
