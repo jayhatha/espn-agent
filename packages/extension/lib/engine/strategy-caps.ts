@@ -255,7 +255,13 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       }
     }
 
-    if (bidCap > tierCap) {
+    // For ranked SPs (top 60): tier cap is both ceiling AND floor.
+    // The SGP blend undervalues pitchers in an OPS league, so we commit
+    // to spending the tier amount on quality arms.
+    // For unranked/filler SPs: cap down only.
+    if (rank != null && rank <= 60) {
+      bidCap = tierCap;
+    } else if (bidCap > tierCap) {
       bidCap = tierCap;
     }
   }
