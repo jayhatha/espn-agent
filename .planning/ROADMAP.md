@@ -203,15 +203,13 @@ Plans:
 
 ### Phase 57: Auction simulation test suite — run value strategy against simulated opponents with real FanGraphs player pool, verify spec targets: roster value >= $320, profit >= $70, top-4 category finishes >= 60%
 
-**Goal:** Build auction simulation test suite AND standalone CLI simulator using real FanGraphs player pool, verifying spec targets (roster value >= $320, profit >= $70, top-4 category finishes >= 60%)
+**Goal:** Fix auction simulator to match live engine bidding behavior -- expand player pool to include PL-ranked SPs, align computeOurBid with strategy-caps.ts, enforce bench composition
 **Depends on:** Phase 56
 **Requirements:** SIM-01, SIM-02
-**Plans:** 3 plans
+**Plans:** 1 plan
 
 Plans:
-- [ ] 57-01-PLAN.md — Shared auction simulation harness (data loading, auction loop, result aggregation)
-- [ ] 57-02-PLAN.md — Vitest spec target verification tests
-- [ ] 57-03-PLAN.md — Standalone CLI simulator with aggregated output
+- [ ] 57-01-PLAN.md -- Fix simulator: player pool, bid computation, bench enforcement, 1000-sim validation
 
 ### Phase 58: Audit max bid and ideal roster logic — introduce positional need as a bid factor, suppress bids on positions with filled dedicated and flex slots unless the player is elite
 
