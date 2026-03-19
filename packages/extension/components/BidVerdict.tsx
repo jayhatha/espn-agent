@@ -77,6 +77,21 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
             Budget tight
           </span>
         )}
+        {capSource?.includes("need ×0.7") && (
+          <span className="text-caption bg-grafana-warning/20 text-grafana-warning rounded px-2 py-0.5">
+            UTIL slot
+          </span>
+        )}
+        {capSource?.includes("need ×0.5") && (
+          <span className="text-caption bg-grafana-negative/20 text-grafana-negative rounded px-2 py-0.5">
+            Bench only
+          </span>
+        )}
+        {capSource?.includes("elite override") && (
+          <span className="text-caption bg-grafana-positive/20 text-grafana-positive rounded px-2 py-0.5">
+            Elite override
+          </span>
+        )}
       </div>
 
       {/* Debug panel — toggled by clicking verdict */}
