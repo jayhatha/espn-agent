@@ -111,6 +111,8 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       ? {
           ...baseSignals.optimization,
           maxBid: asyncBid.maxBid,
+          rawBlendedValue: asyncBid.rawBlendedValue,
+          sgpBreakeven: asyncBid.sgpBreakeven,
           expectedMarketPrice: asyncBid.expectedMarketPrice,
           valueSurplus: asyncBid.valueSurplus,
           shouldBid: asyncBid.shouldBid,

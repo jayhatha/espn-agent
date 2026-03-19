@@ -157,6 +157,10 @@ export interface RosterOptimizationSignal {
   expectedMarketPrice: number;
   valueSurplus: number;
   shouldBid: boolean;
+  /** Pre-cap blended value (40% SGP breakeven + 60% ASV) before strategy caps */
+  rawBlendedValue: number | null;
+  /** SGP breakeven from binary search (before ASV blend) */
+  sgpBreakeven: number | null;
   /** Strategy-adjusted bid cap (after pitcher dampening, SP tier caps, etc.) */
   strategyBidCap: number | null;
   /** Bid path classification */

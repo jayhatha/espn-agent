@@ -55,6 +55,10 @@ export interface BidOptimizerWorkerResponse {
   expectedMarketPrice: number;
   valueSurplus: number;
   shouldBid: boolean;
+  /** SGP breakeven from binary search (before ASV blend) */
+  sgpBreakeven: number;
+  /** Pre-cap blended value (40% SGP + 60% ASV) */
+  rawBlendedValue: number;
   simulationEV: number;
   simulationStdDev: number;
   computeTimeMs: number;
@@ -144,6 +148,8 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     expectedMarketPrice: maxBidResult.expectedMarketPrice,
     valueSurplus: maxBidResult.valueSurplus,
     shouldBid: monteCarloResult.shouldBid,
+    sgpBreakeven: maxBidResult.sgpBreakeven,
+    rawBlendedValue: maxBidResult.maxBid, // maxBid IS the blended value before strategy caps
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
     computeTimeMs,

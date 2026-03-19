@@ -156,6 +156,7 @@ export function computeMaxBid(
         })();
     return {
       maxBid: 1,
+      sgpBreakeven: 0,
       valueSurplus: 1 - marketPrice,
       baselineValue,
       withPlayerValue: baselineValue,
@@ -222,6 +223,7 @@ export function computeMaxBid(
 
   return {
     maxBid,
+    sgpBreakeven,
     valueSurplus: maxBid - expectedMarketPrice,
     baselineValue,
     withPlayerValue,

@@ -16,7 +16,7 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
   }
 
   const opt = engineSignals.optimization;
-  const { maxBid, shouldBid, expectedMarketPrice, valueSurplus, capSource, simulationEV, simulationStdDev } = opt;
+  const { maxBid, shouldBid, expectedMarketPrice, valueSurplus, capSource, simulationEV, simulationStdDev, rawBlendedValue, sgpBreakeven } = opt;
   const winProbability =
     engineSignals.simulation?.winProbability?.winProbability;
 
@@ -81,33 +81,45 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
 
       {/* Debug panel — toggled by clicking verdict */}
       {showDebug && (
-        <div className="mt-2 pt-2 border-t border-grafana-border text-caption text-grafana-muted space-y-1">
+        <div className="mt-2 pt-2 border-t border-grafana-border text-caption text-grafana-muted space-y-1.5">
+          {/* Value pipeline */}
+          <div className="space-y-0.5">
+            <div className="text-grafana-text font-medium">Value Pipeline</div>
+            <div className="font-mono text-[10px] leading-relaxed">
+              {sgpBreakeven != null && <div>SGP breakeven: ${sgpBreakeven}</div>}
+              <div>ESPN ASV (market): ${expectedMarketPrice}</div>
+              {rawBlendedValue != null && rawBlendedValue > 0 && (
+                <div>Blended value (40% SGP + 60% ASV): ${rawBlendedValue}</div>
+              )}
+              {rawBlendedValue != null && rawBlendedValue > maxBid && (
+                <div className="text-grafana-warning">
+                  Capped ${rawBlendedValue} → ${maxBid} ({rawBlendedValue - maxBid > 0 ? `-$${rawBlendedValue - maxBid}` : "no change"})
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Cap chain */}
           {capSource && (
-            <div className="font-mono text-[10px] leading-tight break-all">
-              {capSource}
+            <div className="space-y-0.5">
+              <div className="text-grafana-text font-medium">Cap Chain</div>
+              <div className="font-mono text-[10px] leading-tight break-all">
+                {capSource}
+              </div>
             </div>
           )}
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            <span>maxBid: ${maxBid}</span>
-            <span>market: ${expectedMarketPrice}</span>
-            <span>surplus: ${valueSurplus}</span>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            <span>shouldBid: {shouldBid ? "true" : "false"}</span>
-            {simulationEV > 0 && <span>simEV: {simulationEV.toFixed(1)}</span>}
-            {simulationStdDev > 0 && <span>simSD: {simulationStdDev.toFixed(1)}</span>}
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+          {/* State */}
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
             <span>budget: ${remainingBudget}</span>
             {engineSignals.inflation && (
-              <span>inflation: {engineSignals.inflation.inflationFactor.toFixed(2)}</span>
+              <span>infl: {engineSignals.inflation.inflationFactor.toFixed(2)}</span>
             )}
             {engineSignals.budgetCurve && (
               <>
-                <span>hitSpent: ${engineSignals.budgetCurve.hitterSpent}</span>
-                <span>pitSpent: ${engineSignals.budgetCurve.pitcherSpent}</span>
+                <span>hit$: ${engineSignals.budgetCurve.hitterSpent}</span>
+                <span>pit$: ${engineSignals.budgetCurve.pitcherSpent}</span>
               </>
             )}
+            <span>sim: {shouldBid ? "BID" : "PASS"}</span>
           </div>
         </div>
       )}
