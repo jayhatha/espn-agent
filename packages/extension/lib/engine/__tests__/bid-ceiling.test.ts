@@ -356,8 +356,8 @@ describe("computeMaxBid — ASV market price override", () => {
 // Baseline computation tests
 // ============================================================
 
-describe("computeMaxBid — baseline computation", () => {
-  it("baselineValue is computed from roster without nominated player", () => {
+describe("computeMaxBid — SGP dollar valuation", () => {
+  it("sgpBreakeven (SGP dollar value) is positive for a player with positive SGP", () => {
     const { players, sgpValues } = makePool();
     const nominated = players.find(p => p.name === "Strong 1B")!;
 
@@ -370,30 +370,20 @@ describe("computeMaxBid — baseline computation", () => {
       makeOpponentModel(),
     );
 
-    // Non-trivial pool should produce positive baseline
-    expect(result.baselineValue).toBeGreaterThan(0);
+    // Player with positive SGP should have positive SGP dollar value
+    expect(result.sgpBreakeven).toBeGreaterThan(0);
   });
 
-  it("withPlayerValue >= baselineValue at maxBid (binary search invariant)", () => {
-    // By definition: binary search stops at the highest price where
-    // roster(player at price) SGP >= baseline SGP.
-    // At maxBid, the constraint should be satisfied.
+  it("higher SGP player gets higher SGP dollar value", () => {
     const { players, sgpValues } = makePool();
-    const nominated = players.find(p => p.name === "Elite OF")!; // best player
+    const elite = players.find(p => p.name === "Elite OF")!;
+    const mid = players.find(p => p.name === "Strong 1B")!;
 
-    const result = computeMaxBid(
-      nominated,
-      players,
-      sgpValues,
-      200,
-      rosterSlots,
-      makeOpponentModel(),
-    );
+    const eliteResult = computeMaxBid(elite, players, sgpValues, 200, rosterSlots, makeOpponentModel());
+    const midResult = computeMaxBid(mid, players, sgpValues, 200, rosterSlots, makeOpponentModel());
 
-    if (result.maxBid > 1) {
-      // At maxBid, withPlayerValue should be >= baselineValue
-      expect(result.withPlayerValue).toBeGreaterThanOrEqual(result.baselineValue);
-    }
+    // Elite player should have higher SGP dollar value
+    expect(eliteResult.sgpBreakeven).toBeGreaterThan(midResult.sgpBreakeven);
   });
 
   it("expectedMarketPrice >= 1 (never below minimum bid)", () => {

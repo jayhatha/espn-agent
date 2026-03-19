@@ -88,15 +88,9 @@ describe("computeMaxBid — binary search convergence", () => {
     expect(result.expectedMarketPrice).toBeGreaterThanOrEqual(1);
   });
 
-  it("returns maxBid=$1 for a replacement-level player (no value added over alternatives)", () => {
-    // Create a scenario where the pool has MORE players than roster slots, all alternatives
-    // are cheap enough to fill within budget, so adding the replacement player at any
-    // price DISPLACES a better player.
-    // Roster: OF:1, SS:1 (2 slots). Budget: $30.
-    // Pool: Star (SGP=10, $15 OF), SSStar (SGP=8, $14 SS), Replacement (SGP=0.1, $1 OF).
-    // Baseline: Star + SSStar = 10+8=18 SGP, $15+$14=$29 spent.
-    // With replacement locked at $1: 1 OF slot taken by replacement, only SS slot left.
-    //   SSStar fills SS → 0.1 + 8 = 8.1 SGP < 18 baseline → NOT profitable at $1.
+  it("returns low maxBid for a replacement-level player (tiny SGP share)", () => {
+    // Replacement player has 0.1 SGP out of 18.1 total pool SGP.
+    // SGP dollar value = (0.1 / 18.1) × 30 ≈ $0.17 → rounds to $1 (floor).
     const nominatedPlayer: PoolPlayer = {
       name: "Replacement", normalizedName: "replacement", dollars: 1,
       isPitcher: false, positions: ["OF"], stats: {},
@@ -118,13 +112,12 @@ describe("computeMaxBid — binary search convergence", () => {
       nominatedPlayer,
       smallPool,
       smallSGP,
-      30, // enough budget for both Star + SSStar without replacement
+      30,
       twoSlotRoster,
       simpleOpponentModel,
     );
 
-    // Replacement player at $1: locks OF slot (replacement SGP=0.1) + SS filled by SSStar (8)
-    // = 8.1 SGP vs baseline 18 SGP. Not profitable → maxBid should be $1 (minimum).
+    // Replacement-level player with tiny SGP share → maxBid floors at $1
     expect(result.maxBid).toBe(1);
   });
 

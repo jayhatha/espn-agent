@@ -86,10 +86,10 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
           <div className="space-y-0.5">
             <div className="text-grafana-text font-medium">Value Pipeline</div>
             <div className="font-mono text-[10px] leading-relaxed">
-              {sgpBreakeven != null && <div>SGP breakeven: ${sgpBreakeven}</div>}
+              {sgpBreakeven != null && <div>SGP value: ${sgpBreakeven}</div>}
               <div>ESPN ASV (market): ${expectedMarketPrice}</div>
               {rawBlendedValue != null && rawBlendedValue > 0 && (
-                <div>Blended value (40% SGP + 60% ASV): ${rawBlendedValue}</div>
+                <div>Blended (40% SGP + 60% ASV): ${rawBlendedValue}</div>
               )}
               {rawBlendedValue != null && rawBlendedValue > maxBid && (
                 <div className="text-grafana-warning">
