@@ -79,6 +79,8 @@ export interface StrategyCapInput {
   pitcherSpent: number;
   /** Remaining roster slots by position (e.g. { OF: 2, SS: 0, UTIL: 1, P: 5 }) */
   remainingSlots?: Record<string, number>;
+  /** External ranking (e.g. PitcherList) — used for SP quality gating */
+  externalRank?: number;
 }
 
 export interface StrategyCapResult {
@@ -183,12 +185,46 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     }
   }
 
-  // Apply SP tier cap
+  // Apply SP tier cap with PitcherList rank quality gating.
+  // Tier caps are the ceiling, but the SP must be ranked well enough to
+  // deserve the full tier price. Target: 4 SPs in PL top 60.
+  //   SP1 ($18): PL top 20 gets full cap, top 40 gets $12, worse gets $8
+  //   SP2 ($12): PL top 30 gets full cap, top 60 gets $8, worse gets $5
+  //   SP3 ($10): PL top 40 gets full cap, top 60 gets $6, worse gets $3
+  //   SP4 ($5):  PL top 60 gets full cap, worse gets $3
+  //   SP5+ ($3): no rank gating (filler)
   if (input.isSP) {
-    const tierCap = getSpTierCap(input.spCount);
+    let tierCap = getSpTierCap(input.spCount);
+    const rank = input.externalRank;
+
+    if (rank != null && input.spCount < 4) {
+      // Rank-gated tier caps: reduce cap when pitcher is outside target rank range
+      const SP_RANK_GATES: Array<{ maxRankForFull: number; fallbackCap: number; minCap: number }> = [
+        { maxRankForFull: 20, fallbackCap: 12, minCap: 8 },  // SP1
+        { maxRankForFull: 30, fallbackCap: 8,  minCap: 5 },  // SP2
+        { maxRankForFull: 40, fallbackCap: 6,  minCap: 3 },  // SP3
+        { maxRankForFull: 60, fallbackCap: 3,  minCap: 3 },  // SP4
+      ];
+      const gate = SP_RANK_GATES[input.spCount];
+      if (rank <= gate.maxRankForFull) {
+        // Quality match — full tier cap
+        capSource += ` → SP${input.spCount + 1} PL#${rank} (full $${tierCap})`;
+      } else if (rank <= 60) {
+        // Decent but not ideal — reduced cap
+        tierCap = Math.min(tierCap, gate.fallbackCap);
+        capSource += ` → SP${input.spCount + 1} PL#${rank} (reduced $${tierCap})`;
+      } else {
+        // Outside top 60 — minimum cap
+        tierCap = Math.min(tierCap, gate.minCap);
+        capSource += ` → SP${input.spCount + 1} PL#${rank} (min $${tierCap})`;
+      }
+    }
+
     if (bidCap > tierCap) {
       bidCap = tierCap;
-      capSource += ` → SP${input.spCount + 1} cap $${tierCap}`;
+      if (!capSource.includes("SP" + (input.spCount + 1))) {
+        capSource += ` → SP${input.spCount + 1} cap $${tierCap}`;
+      }
     }
   }
 

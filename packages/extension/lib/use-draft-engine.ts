@@ -142,6 +142,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         primaryPosition: ranking?.primaryPosition ?? null,
         spCount,
         catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
+        externalRank: ranking?.externalRank,
         isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,
         inflationFactor: baseSignals.inflation?.inflationFactor ?? 1.0,
         hitterSpent: baseSignals.budgetCurve?.hitterSpent ?? 0,
