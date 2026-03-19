@@ -225,7 +225,7 @@ Plans:
 **Goal:** Three bid engine tuning changes: skip ASV blend when SGP is higher, exempt DH from UTIL-only bid cap, add budget flush to spend all $260
 **Depends on:** Phase 58
 **Requirements:** BID-01, BID-02, BID-03, BID-04
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 59-01-PLAN.md — SGP skip blend + DH UTIL exemption + budget flush in engine + tests
