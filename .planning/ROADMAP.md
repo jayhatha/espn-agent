@@ -198,7 +198,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 56-01-PLAN.md — Fix totalTeams default (12→13), consolidate HITTER_BUDGET_MAX, fix hardcoded budget in UI
+- [ ] 56-01-PLAN.md — Fix totalTeams default (12->13), consolidate HITTER_BUDGET_MAX, fix hardcoded budget in UI
 - [ ] 56-02-PLAN.md — Consolidate nomination scoring, verify BidVerdict async bid display
 
 ### Phase 57: Auction simulation test suite — run value strategy against simulated opponents with real FanGraphs player pool, verify spec targets: roster value >= $320, profit >= $70, top-4 category finishes >= 60%
@@ -233,9 +233,11 @@ Plans:
 
 ### Phase 60: Evaluate and fix starting pitcher logic in bid engine — verify SP tier caps (PL rank determines tier, cap is floor+ceiling for top 60), SP savings reallocation, target 7SP+5RP composition, RP $15 hard cap, no pitcher SGP multiplier, update simulator to match
 
-**Goal:** [To be planned]
+**Goal:** Fix SP savings reallocation bug (slot-position ideal vs per-SP rank-based tier caps), verify all SP/RP rules, add 7SP+5RP composition targeting, audit pitching-vs-hitting conflicts
 **Depends on:** Phase 59
-**Plans:** 0 plans
+**Requirements:** SP-TIER, SP-SAVINGS, SP-COMP, RP-CAP, PITCHER-SGP, HIT-PITCH-CONFLICT
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 60 to break down)
+- [ ] 60-01-PLAN.md — Fix SP savings to use per-SP rank-based tier caps + tests for all SP/RP rules
+- [ ] 60-02-PLAN.md — Mirror fixes in simulator + 7SP+5RP composition + pitching-vs-hitting conflict audit
