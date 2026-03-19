@@ -329,9 +329,19 @@ function computeOurBid(
   let bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
   const blendedValue = bid;
 
-  // --- 5. Catcher dampening ---
-  if (player.positions.some(p => p.toUpperCase() === "C") && (team.slotsRemaining["C"] ?? 0) === 0) {
-    bid = Math.max(1, Math.ceil(bid * 0.5));
+  // --- 5. Catcher guard: max 1 catcher ---
+  // If C slot is filled, only bid on catchers with multi-position eligibility
+  // (they'd fill a non-C slot). Pure catchers get $0 bid (skip).
+  const isCatcher = player.positions.some(p => p.toUpperCase() === "C");
+  if (isCatcher && (team.slotsRemaining["C"] ?? 0) === 0) {
+    const hasOtherPos = player.positions.some(p => {
+      const n = normalizePosition(p);
+      return n !== "C" && n !== "DH";
+    });
+    if (!hasOtherPos) {
+      return 0; // Pure catcher, C slot filled — don't bid
+    }
+    bid = Math.max(1, Math.ceil(bid * 0.5)); // Multi-pos catcher, dampen
   }
 
   // --- 4. Positional need dampening (hitters) ---
@@ -400,7 +410,15 @@ function computeOurBid(
       if (savings > 0) tierCap += savings;
     }
 
-    if (bid > tierCap) bid = tierCap;
+    // For ranked SPs (top 60): bid exactly at tier cap — we've committed
+    // to spending that amount on quality arms. The SGP blend undervalues
+    // pitchers in an OPS league, so the tier cap IS our bid.
+    // For unranked/filler SPs: cap down only.
+    if (plRank != null && plRank <= 60) {
+      bid = tierCap;
+    } else {
+      if (bid > tierCap) bid = tierCap;
+    }
   }
 
   // --- RP savings reallocation + hard cap ---
