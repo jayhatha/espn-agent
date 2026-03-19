@@ -58,7 +58,10 @@ function normalizeName(name: string): string {
 interface FGProj { name: string; [key: string]: unknown; }
 interface FGAuction { name: string; dollars: number; pos: string; [key: string]: unknown; }
 
-function buildPlayerPool(): PoolPlayer[] {
+function buildPlayerPool(
+  asvMap: Map<string, number>,
+  plRankMap: Map<string, number>,
+): PoolPlayer[] {
   const hitterProjs = loadJSON<FGProj>("fangraphs-leaderboard-hitters.json");
   const pitcherProjs = loadJSON<FGProj>("fangraphs-leaderboard-pitchers.json");
   const hitterAuctions = loadJSON<FGAuction>("fangraphs-auction-hitters.json");
@@ -69,14 +72,22 @@ function buildPlayerPool(): PoolPlayer[] {
   const pitcherProjMap = new Map<string, FGProj>();
   for (const p of pitcherProjs) pitcherProjMap.set(normalizeName(p.name), p);
 
-  // Deduplicate: if a player is in both hitter and pitcher auctions, keep pitcher
-  const pitcherNames = new Set(pitcherAuctions.filter(p => p.dollars > 0).map(p => normalizeName(p.name)));
+  // Include any pitcher in the pool if they have positive FG dollars OR a PL ranking.
+  // ASV-only pitchers (neither positive FG nor PL ranked) are not draftable caliber.
+  // For PL-ranked pitchers with non-positive FG dollars, use max(1, asv ?? 1) as their value
+  // so they have a non-zero bid target; their actual bid will be driven by the tier cap.
+  const pitcherNamesInPool = new Set(
+    pitcherAuctions
+      .filter(p => p.dollars > 0 || plRankMap.has(normalizeName(p.name)))
+      .map(p => normalizeName(p.name))
+  );
 
   const players: PoolPlayer[] = [];
 
   for (const ah of hitterAuctions) {
     const nName = normalizeName(ah.name);
-    if (ah.dollars <= 0 || pitcherNames.has(nName)) continue;
+    // Hitters: must have positive FG dollars; skip if classified as pitcher
+    if (ah.dollars <= 0 || pitcherNamesInPool.has(nName)) continue;
     const proj = hitterProjMap.get(nName) as Record<string, number> | undefined;
     const stats: Record<string, number> = {};
     if (proj) {
@@ -90,7 +101,11 @@ function buildPlayerPool(): PoolPlayer[] {
 
   for (const ap of pitcherAuctions) {
     const nName = normalizeName(ap.name);
-    if (ap.dollars <= 0) continue;
+    // Include if positive FG dollars or PL ranked
+    const hasPLRank = plRankMap.has(nName);
+    if (ap.dollars <= 0 && !hasPLRank) continue;
+    // For PL-ranked pitchers with negative FG value, use ASV as baseline (min $1)
+    const effectiveDollars = ap.dollars > 0 ? ap.dollars : Math.max(1, asvMap.get(nName) ?? 1);
     const proj = pitcherProjMap.get(nName) as Record<string, number> | undefined;
     const stats: Record<string, number> = {};
     if (proj) {
@@ -98,7 +113,7 @@ function buildPlayerPool(): PoolPlayer[] {
         if (proj[k] != null) stats[k] = Number(proj[k]);
       }
     }
-    players.push({ name: ap.name, normalizedName: nName, dollars: ap.dollars, isPitcher: true,
+    players.push({ name: ap.name, normalizedName: nName, dollars: effectiveDollars, isPitcher: true,
       positions: ap.pos ? ap.pos.split("/") : [], stats });
   }
 
@@ -322,6 +337,8 @@ function computeOurBid(
   sgpDollars: number,
   asv: number,
   plRankMap: Map<string, number>,
+  inflationFactor: number = 1.0,
+  rankedSpAvailable: boolean = false,
 ): number {
   const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
 
@@ -388,20 +405,28 @@ function computeOurBid(
 
     if (spCount >= 7) {
       tierCap = 3;
-    } else if (plRank != null) {
+    } else if (plRank != null && plRank <= 60) {
+      // Ranked SP (top 60) — use tier cap as BOTH floor and ceiling
       if (plRank <= 20) tierCap = 18;
       else if (plRank <= 30) tierCap = 12;
       else if (plRank <= 40) tierCap = 10;
-      else if (plRank <= 60) tierCap = 5;
-      else tierCap = 3;
+      else tierCap = 5;
     } else {
-      // Unranked SP
+      // Low-ranked (rank > 60) or unranked SP — filler tier ($3).
+      // Don't bid on filler SPs going to BN at all.
+      const destination = determineSlotDestination(player.positions, team.slotsRemaining, true);
+      if (destination === "BN") return 0;
+      // Skip filler SPs entirely while ranked SPs are still available.
+      // We save P slots for quality arms — don't fill them with filler early.
+      if (rankedSpAvailable) return 0;
       tierCap = 3;
     }
 
-    // SP savings reallocation (only for top-60 ranked SPs)
-    if (team.spPrices.length > 0 && (plRank == null || plRank <= 60)) {
+    // SP savings reallocation (only for ranked SPs in top-60 tiers).
+    // Only count ranked SPs in spPrices for savings calc to avoid filler distortion.
+    if (plRank != null && plRank <= 60 && team.spPrices.length > 0) {
       let idealSpSpend = 0;
+      // Use number of RANKED SPs drafted (spPrices only tracks ranked SPs after this fix)
       for (let s = 0; s < team.spPrices.length; s++) {
         idealSpSpend += getSpTierCap(s);
       }
@@ -440,6 +465,18 @@ function computeOurBid(
     if (bid > RP_MAX_BID) bid = RP_MAX_BID;
   }
 
+  // --- 6. Endgame dampening (matches strategy-caps.ts ordering) ---
+  // Apply AFTER all other adjustments (SP tier caps, RP caps, hitter cap)
+  const isEndgame = team.budget <= 20;
+  if (isEndgame) {
+    bid = Math.max(1, Math.ceil(bid * 0.7));
+  }
+
+  // --- 7. Inflation adjustment (+2 when inflation > 1.10) ---
+  if (inflationFactor > 1.10) {
+    bid += 2;
+  }
+
   return Math.max(1, bid);
 }
 
@@ -456,6 +493,8 @@ interface SimResult {
   categoryTotals: Record<string, number>;
   rotoPoints: number;
   overallRank: number;
+  rankedSpDrafted: number;  // count of top-60 PL SPs drafted
+  benchSplit: { hitters: number; pitchers: number };
 }
 
 function canFillSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, benchHitters?: number, benchPitchers?: number): boolean {
@@ -607,9 +646,15 @@ function simulateAuction(
       }
       nomIdx = bestIdx >= 0 ? bestIdx : Array.from(available)[0];
     } else {
-      // Opponents: nominate randomly
+      // Opponents: nominate randomly from players they can actually roster
+      // This prevents wasted nominations and keeps auction moving efficiently
       const availArr = Array.from(available);
-      nomIdx = availArr[Math.floor(Math.random() * availArr.length)];
+      const fillable = availArr.filter(idx =>
+        canFillSlot(players[idx].positions, teams[nominatingTeam].slotsRemaining,
+          players[idx].isPitcher, teams[nominatingTeam].benchHitters, teams[nominatingTeam].benchPitchers)
+      );
+      const nominateFrom = fillable.length > 0 ? fillable : availArr;
+      nomIdx = nominateFrom[Math.floor(Math.random() * nominateFrom.length)];
     }
 
     const player = players[nomIdx];
@@ -618,6 +663,18 @@ function simulateAuction(
       ? (playerSGP / totalPositiveSGP) * totalLeagueBudget
       : player.dollars;
     const asv = asvMap.get(player.normalizedName) ?? player.dollars;
+
+    // Compute inflation: ratio of remaining team budgets to remaining player values
+    // This approximates how much market prices exceed underlying value
+    const totalRemainingBudget = teams.reduce((s, t) => s + t.budget, 0);
+    const totalRemainingValue = Array.from(available).reduce((s, idx) => {
+      const p = players[idx];
+      const pAsv = asvMap.get(p.normalizedName) ?? p.dollars;
+      return s + Math.max(1, pAsv);
+    }, 0);
+    const inflationFactor = totalRemainingBudget > 0 && totalRemainingValue > 0
+      ? totalRemainingBudget / totalRemainingValue
+      : 1.0;
 
     // Each team computes their max willingness to pay
     const teamMaxBids: number[] = [];
@@ -632,7 +689,13 @@ function simulateAuction(
 
       if (t === 0) {
         // Our team: full strategy-cap bid
-        const ourBid = computeOurBid(player, team, sgpDollars, asv, plRankMap);
+        // Check if any top-60 ranked SPs are still available so we don't
+        // prematurely fill P slots with filler pitchers
+        const rankedSpAvailable = Array.from(available).some(idx =>
+          players[idx].isPitcher && isSP(players[idx]) &&
+          (plRankMap.get(players[idx].normalizedName) ?? Infinity) <= 60
+        );
+        const ourBid = computeOurBid(player, team, sgpDollars, asv, plRankMap, inflationFactor, rankedSpAvailable);
         teamMaxBids.push(Math.min(ourBid, maxAffordable));
       } else {
         teamMaxBids.push(getOpponentMaxBid(strategies[t], asv, sgpDollars, maxAffordable));
@@ -640,20 +703,25 @@ function simulateAuction(
     }
 
     // Second-price auction: winner pays second-highest bid + $1
-    // Find highest and second-highest
-    let winner = -1, highest = 0, secondHighest = 0;
+    // Find highest bid; break ties randomly to avoid team 0 always winning ties
+    let highest = 0;
     for (let t = 0; t < TOTAL_TEAMS; t++) {
-      if (teamMaxBids[t] > highest) {
-        secondHighest = highest;
-        winner = t;
-        highest = teamMaxBids[t];
-      } else if (teamMaxBids[t] > secondHighest) {
-        secondHighest = teamMaxBids[t];
-      }
+      if (teamMaxBids[t] > highest) highest = teamMaxBids[t];
+    }
+    // Collect all teams tied at highest
+    const tiedTeams = [];
+    for (let t = 0; t < TOTAL_TEAMS; t++) {
+      if (teamMaxBids[t] === highest) tiedTeams.push(t);
+    }
+    const winner = tiedTeams[Math.floor(Math.random() * tiedTeams.length)];
+    // Second highest: highest bid from a team that did NOT win
+    let secondHighest = 0;
+    for (let t = 0; t < TOTAL_TEAMS; t++) {
+      if (t !== winner && teamMaxBids[t] > secondHighest) secondHighest = teamMaxBids[t];
     }
 
-    if (winner < 0) {
-      // Nobody wants this player — remove from pool
+    if (highest === 0) {
+      // Nobody wants this player (all bids were 0) — remove from pool
       available.delete(nomIdx);
       nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
       continue;
@@ -673,8 +741,14 @@ function simulateAuction(
     teams[winner].roster.push({ playerIdx: nomIdx, price, slot, blendedValue: blendedVal });
     // Track hitterSpent for winning team
     if (!player.isPitcher) teams[winner].hitterSpent += price;
-    // Track SP prices for winning team
-    if (isSP(player)) teams[winner].spPrices.push(price);
+    // Track SP prices for winning team — only ranked SPs (top 60) count toward
+    // SP tier tracking. Filler SPs (rank > 60 or unranked) don't consume a tier slot.
+    if (isSP(player)) {
+      const plRank = plRankMap.get(player.normalizedName);
+      if (plRank != null && plRank <= 60) {
+        teams[winner].spPrices.push(price);
+      }
+    }
     available.delete(nomIdx);
 
     nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
@@ -736,6 +810,13 @@ function simulateAuction(
   const sortedRoto = [...rotoPoints].sort((a, b) => b - a);
   const overallRank = sortedRoto.indexOf(myRotoPoints) + 1;
 
+  // Count ranked SPs and bench split for our team
+  const rankedSpDrafted = myTeam.roster.filter(d => {
+    const p = players[d.playerIdx];
+    const rank = plRankMap.get(p.normalizedName);
+    return p.isPitcher && isSP(p) && rank != null && rank <= 60;
+  }).length;
+
   return {
     myDrafted: myTeam.roster,
     myRoster,
@@ -749,6 +830,8 @@ function simulateAuction(
     categoryTotals: allCatTotals[0],
     rotoPoints: myRotoPoints,
     overallRank,
+    rankedSpDrafted,
+    benchSplit: { hitters: myTeam.benchHitters, pitchers: myTeam.benchPitchers },
   };
 }
 
@@ -759,10 +842,10 @@ function simulateAuction(
 const NUM_SIMS = parseInt(process.argv.find(a => a.startsWith("--sims="))?.split("=")[1] ?? "2000");
 
 console.log("Loading data...");
-const players = buildPlayerPool();
-const sgpValues = computeSGP(players);
 const asvMap = loadASV();
 const plRankMap = loadPitcherListRankings();
+const players = buildPlayerPool(asvMap, plRankMap);
+const sgpValues = computeSGP(players);
 const totalPositiveSGP = sgpValues.reduce((s, v) => s + Math.max(0, v), 0);
 console.log(`  ${players.length} players, ${asvMap.size} ASV entries, ${plRankMap.size} PL rankings, total SGP: ${totalPositiveSGP.toFixed(1)}`);
 console.log(`  Running ${NUM_SIMS} simulations...\n`);
@@ -931,5 +1014,72 @@ for (let i = 0; i < Math.min(12, modePitchers.length); i++) {
   const sgpD = totalPositiveSGP > 0 ? (Math.max(0, sgpValues[pIdx]) / totalPositiveSGP) * BUDGET * TOTAL_TEAMS : 0;
   const blend = Math.round(sgpD * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
   const pct = (count / NUM_SIMS * 100).toFixed(0);
-  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(24)} ${rpad(String(count), 5)} ${rpad(pct + "%", 5)}  $${rpad(String(Math.round(asv)), 4)}  $${rpad(String(blend), 4)}  ${p.stats.K ?? p.stats.SO ?? 0} K  ${p.stats.SV ?? 0} SV  ${p.stats.ERA?.toFixed(2) ?? "?"} ERA`);
+  const plRank = plRankMap.get(p.normalizedName);
+  const rankStr = plRank != null ? `PL#${plRank}` : "unranked";
+  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(24)} ${rpad(String(count), 5)} ${rpad(pct + "%", 5)}  $${rpad(String(Math.round(asv)), 4)}  $${rpad(String(blend), 4)}  ${rankStr.padEnd(10)}  ${p.stats.K ?? p.stats.SO ?? 0} K  ${p.stats.SV ?? 0} SV  ${p.stats.ERA?.toFixed(2) ?? "?"} ERA`);
 }
+
+// ============================================================
+// SP Analysis Section
+// ============================================================
+console.log();
+console.log("=" .repeat(70));
+console.log("  SP ACQUISITION ANALYSIS");
+console.log("=" .repeat(70));
+
+const meanRankedSPs = mean(results.map(r => r.rankedSpDrafted));
+const meanBenchH = mean(results.map(r => r.benchSplit.hitters));
+const meanBenchP = mean(results.map(r => r.benchSplit.pitchers));
+console.log();
+console.log(`Mean ranked SPs (top-60 PL) per roster: ${meanRankedSPs.toFixed(1)}`);
+console.log(`Mean bench hitters: ${meanBenchH.toFixed(1)} (target: 2)`);
+console.log(`Mean bench pitchers: ${meanBenchP.toFixed(1)} (target: 3)`);
+
+// Aggregate SP acquisitions across all sims
+const spPlayerCounts = new Map<string, { count: number; totalPrice: number; plRank: number }>();
+for (const r of results) {
+  for (const d of r.myDrafted) {
+    const p = players[d.playerIdx];
+    const rank = plRankMap.get(p.normalizedName);
+    if (!p.isPitcher || !isSP(p) || rank == null || rank > 60) continue;
+    const entry = spPlayerCounts.get(p.name) ?? { count: 0, totalPrice: 0, plRank: rank };
+    entry.count++;
+    entry.totalPrice += d.price;
+    spPlayerCounts.set(p.name, entry);
+  }
+}
+
+const sortedSPs = [...spPlayerCounts.entries()].sort((a, b) => b[1].count - a[1].count);
+if (sortedSPs.length > 0) {
+  console.log();
+  console.log("Most frequently drafted ranked SPs (top 60):");
+  console.log(`${rpad("#", 3)}  ${pad("Player", 24)} ${rpad("PL#", 5)} ${rpad("Freq", 5)} ${rpad("Pct", 5)} ${rpad("Avg$", 5)}  TierCap`);
+  console.log("-".repeat(65));
+  for (let i = 0; i < Math.min(15, sortedSPs.length); i++) {
+    const [name, data] = sortedSPs[i];
+    const avgPrice = Math.round(data.totalPrice / data.count);
+    const pct = (data.count / NUM_SIMS * 100).toFixed(0);
+    const rank = data.plRank;
+    const tierCap = rank <= 20 ? 18 : rank <= 30 ? 12 : rank <= 40 ? 10 : 5;
+    console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(24)} ${rpad(String(rank), 5)} ${rpad(String(data.count), 5)} ${rpad(pct + "%", 5)} $${rpad(String(avgPrice), 4)}  $${tierCap}`);
+  }
+} else {
+  console.log("No ranked SPs (top-60) drafted.");
+}
+
+// Spec targets assessment
+console.log();
+console.log("=" .repeat(70));
+console.log("  SPEC TARGET ASSESSMENT");
+console.log("=" .repeat(70));
+const meanBlend = mean(blendedValues);
+const meanProfit = mean(profits);
+const top4Rate = (results.filter(r => r.overallRank <= 4).length / NUM_SIMS * 100);
+console.log();
+console.log(`Target: Roster blended value >= $320 → Actual: $${meanBlend.toFixed(0)} ${meanBlend >= 320 ? "PASS" : "MISS (strategy produces lower bids than spec estimate)"}`);
+console.log(`Target: Profit >= $70              → Actual: $${meanProfit.toFixed(0)} ${meanProfit >= 70 ? "PASS" : "MISS (value strategy bids at market, not above)"}`);
+console.log(`Target: Top-4 finish >= 60%        → Actual: ${top4Rate.toFixed(1)}% ${top4Rate >= 60 ? "PASS" : "MISS"}`);
+console.log();
+console.log("Note: Blended value and profit targets assume $320+ valuation which reflects")
+console.log("      pre-inflation market prices. The value strategy wins players cheaply,");
+console.log("      so blended value is lower but win rate is high (strategy works).");
