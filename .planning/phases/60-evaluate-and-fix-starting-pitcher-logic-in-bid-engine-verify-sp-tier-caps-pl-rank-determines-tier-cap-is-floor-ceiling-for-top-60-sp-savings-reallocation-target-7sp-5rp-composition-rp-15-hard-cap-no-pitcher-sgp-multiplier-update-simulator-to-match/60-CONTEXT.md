@@ -26,11 +26,22 @@
 
 6. **No pitcher SGP multiplier.** We removed the 0.5x pitcher SGP dampening. Individual pitchers are valued at their true SGP. The budget split (75/25 hitter/pitcher) is enforced structurally by the hitter budget cap ($220) and SP tier caps, not by devaluing every pitcher's SGP.
 
+### Additional Audit Scope
+
+7. **Audit where pitching goals conflict with hitting goals and recommend resolutions.** The hitter budget cap ($220), SP tier caps, positional weights, and budget flush all interact. Identify cases where these systems fight each other (e.g., budget flush pushing hitter bids up while SP tier caps need budget reserved for pitchers, or hitter cap preventing spend while pitchers are cheap). Recommend the most effective resolution for each conflict.
+
+### Known Bugs to Investigate
+
+8. **Budget split is 59/41 hitter/pitcher — should be ~76/24.** The simulator is massively overspending on pitchers. Target: ~$197 hitter / ~$63 pitcher (76/24 split). Diagnose why pitching spend is so high and fix.
+
+9. **Simulator overpays for Skenes and Skubal despite $18 cap.** The tier cap should hard-cap SP1-tier (PL rank 1-20) at $18, but the sim is paying more. This is likely the same root cause as the budget split issue — the SGP skip-blend (phase 59) may be overriding the tier cap for elite SPs when SGP > $18. The tier cap must be the FINAL word for ranked SPs, applied AFTER the SGP skip-blend.
+
 ## Claude's Discretion
 
 - How to verify each rule against the current codebase
 - Whether to split into audit + fix or do it in one pass
 - Test strategy
+- How to structure the pitching-vs-hitting conflict audit (code analysis, simulation, or both)
 
 ## Deferred Ideas
 
