@@ -16,6 +16,44 @@
 
 import { getPositionalWeight, getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
 
+/**
+ * Determine where a player would be slotted given their eligible positions
+ * and remaining roster slots.
+ *
+ * Priority: dedicated slot > flex slot (MI/CI) > UTIL > BN
+ * Pitchers: P slot > BN (no UTIL for pitchers).
+ */
+export function determineSlotDestination(
+  positions: string[],
+  remainingSlots: Record<string, number>,
+  isPitcher: boolean,
+): "dedicated" | "flex" | "UTIL" | "BN" {
+  if (isPitcher) {
+    // Pitchers only go to P or BN — no UTIL
+    if ((remainingSlots["P"] ?? 0) > 0) return "dedicated";
+    return "BN";
+  }
+
+  // Check dedicated slots first
+  for (const pos of positions) {
+    const upper = pos.toUpperCase();
+    if ((remainingSlots[upper] ?? 0) > 0) return "dedicated";
+  }
+
+  // Check flex slots: MI covers 2B/SS, CI covers 1B/3B
+  for (const pos of positions) {
+    const upper = pos.toUpperCase();
+    if ((upper === "2B" || upper === "SS") && (remainingSlots["MI"] ?? 0) > 0) return "flex";
+    if ((upper === "1B" || upper === "3B") && (remainingSlots["CI"] ?? 0) > 0) return "flex";
+  }
+
+  // Check UTIL
+  if ((remainingSlots["UTIL"] ?? 0) > 0) return "UTIL";
+
+  // No slots available
+  return "BN";
+}
+
 export interface StrategyCapInput {
   /** Raw maxBid from bid optimizer binary search */
   rawMaxBid: number;
@@ -77,6 +115,34 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   if (input.primaryPosition === "C" && input.catcherSlotsRemaining <= 0) {
     bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
     capSource += ` → C filled ×0.5`;
+  }
+
+  // Apply need multiplier — reduce bid when player would go to UTIL or BN
+  const ELITE_THRESHOLD = 30;
+  if (input.remainingSlots && !input.isPitcher) {
+    const destination = determineSlotDestination(input.positions, input.remainingSlots, false);
+    if (input.rawMaxBid < ELITE_THRESHOLD) {
+      if (destination === "UTIL") {
+        bidCap = Math.max(1, Math.ceil(bidCap * 0.7));
+        capSource += ` → need ×0.7 (UTIL)`;
+      } else if (destination === "BN") {
+        bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
+        capSource += ` → need ×0.5 (BN)`;
+      }
+      // dedicated and flex get no reduction (1.0x)
+    } else {
+      if (destination === "UTIL" || destination === "BN") {
+        capSource += ` → need ×1.0 (elite override)`;
+      }
+    }
+  }
+  // For pitchers: check P slots
+  if (input.remainingSlots && input.isPitcher) {
+    const destination = determineSlotDestination(input.positions, input.remainingSlots, true);
+    if (destination === "BN" && input.rawMaxBid < ELITE_THRESHOLD) {
+      bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
+      capSource += ` → need ×0.5 (BN)`;
+    }
   }
 
   // Apply positional weight bonus — only when the player fills a dedicated slot.

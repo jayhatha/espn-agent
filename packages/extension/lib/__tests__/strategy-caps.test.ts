@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeStrategyBidCap,
+  determineSlotDestination,
   type StrategyCapInput,
 } from "../engine/strategy-caps";
 
@@ -239,8 +240,10 @@ describe("computeStrategyBidCap — combined adjustments", () => {
         positions: ["SS"],
         isEndgame: true,
         inflationFactor: 1.20,
+        remainingSlots: { SS: 1, MI: 1, UTIL: 3 },
       }),
     );
+    // 30 >= elite threshold, need = 1.0 (dedicated slot anyway)
     // 30 + 4 (SS weight) = 34
     // Hitter cap skipped in endgame
     // Endgame: ceil(34 * 0.7) = ceil(23.8) = 24
@@ -259,11 +262,15 @@ describe("computeStrategyBidCap — combined adjustments", () => {
         primaryPosition: "C",
         catcherSlotsRemaining: 0,
         hitterSpent: 210,
+        remainingSlots: { C: 0, UTIL: 1 },
       }),
     );
+    // 40 >= elite threshold → need ×1.0 (elite override, UTIL)
     // 40 × 0.5 = 20 (C filled dampening)
-    // 20 + 1 (C weight) = 21
-    // Hitter cap: 210 + 21 = 231 > 220, headroom = 10 → cap to 10
+    // 20 + 1 (C weight — UTIL slot available) = no, C slot=0 and UTIL available means pos weight check
+    // Actually pos weight: C has dedicated=0, no flex for C, but UTIL>0 → no dedicated slot → pos +0
+    // 20 + 0 (pos +0 slots full) = 20
+    // Hitter cap: 210 + 20 = 230 > 220, headroom = 10 → cap to 10
     expect(result.bidCap).toBe(10);
     expect(result.capSource).toContain("C filled");
     expect(result.capSource).toContain("hitter cap");
@@ -279,8 +286,10 @@ describe("computeStrategyBidCap — combined adjustments", () => {
         spCount: 1, // SP2 cap = $12
         isEndgame: true,
         inflationFactor: 1.15,
+        remainingSlots: { P: 5 },
       }),
     );
+    // P slots available → no pitcher BN dampening
     // 25, no pos weight (SP=0)
     // SP2 cap: min(25, 12) = 12
     // Endgame: ceil(12 * 0.7) = ceil(8.4) = 9
@@ -289,5 +298,144 @@ describe("computeStrategyBidCap — combined adjustments", () => {
     expect(result.capSource).toContain("SP2 cap $12");
     expect(result.capSource).toContain("endgame");
     expect(result.capSource).toContain("inflation +2");
+  });
+});
+
+// ============================================================
+// Need Multiplier Tests
+// ============================================================
+
+describe("determineSlotDestination", () => {
+  it("returns dedicated when player has a matching dedicated slot", () => {
+    expect(determineSlotDestination(["SS"], { SS: 1, MI: 1, UTIL: 3 }, false)).toBe("dedicated");
+  });
+
+  it("returns flex when dedicated full but MI available for SS", () => {
+    expect(determineSlotDestination(["SS"], { SS: 0, MI: 1, UTIL: 3 }, false)).toBe("flex");
+  });
+
+  it("returns flex when dedicated full but CI available for 1B", () => {
+    expect(determineSlotDestination(["1B"], { "1B": 0, CI: 1, UTIL: 2 }, false)).toBe("flex");
+  });
+
+  it("returns UTIL when dedicated and flex full", () => {
+    expect(determineSlotDestination(["SS"], { SS: 0, MI: 0, UTIL: 1 }, false)).toBe("UTIL");
+  });
+
+  it("returns BN when no slots available", () => {
+    expect(determineSlotDestination(["OF"], { OF: 0, UTIL: 0 }, false)).toBe("BN");
+  });
+
+  it("returns dedicated for pitcher with P slots", () => {
+    expect(determineSlotDestination(["SP"], { P: 3 }, true)).toBe("dedicated");
+  });
+
+  it("returns BN for pitcher with no P slots", () => {
+    expect(determineSlotDestination(["SP"], { P: 0 }, true)).toBe("BN");
+  });
+});
+
+describe("computeStrategyBidCap — need multiplier", () => {
+  it("reduces bid ×0.7 when player would go to UTIL (all dedicated + flex full)", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 20,
+        positions: ["OF"],
+        remainingSlots: { OF: 0, UTIL: 1 },
+      }),
+    );
+    // 20 × 0.7 = 14, then pos +0 (OF full) = 14
+    expect(result.bidCap).toBe(14);
+    expect(result.capSource).toContain("need ×0.7 (UTIL)");
+  });
+
+  it("reduces bid ×0.5 when player would go to BN (no slots at all)", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 20,
+        positions: ["OF"],
+        remainingSlots: { OF: 0, UTIL: 0 },
+      }),
+    );
+    // 20 × 0.5 = 10, then pos +0 (OF full) = 10
+    expect(result.bidCap).toBe(10);
+    expect(result.capSource).toContain("need ×0.5 (BN)");
+  });
+
+  it("does not reduce bid for dedicated slot fill", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 20,
+        positions: ["OF"],
+        remainingSlots: { OF: 2, UTIL: 3 },
+      }),
+    );
+    // No need reduction — dedicated slot. 20 + 3 (OF weight) = 23
+    expect(result.bidCap).toBe(23);
+    expect(result.capSource).not.toContain("need");
+  });
+
+  it("does not reduce bid for flex slot fill (MI for SS)", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 20,
+        positions: ["SS"],
+        remainingSlots: { SS: 0, MI: 1, UTIL: 2 },
+      }),
+    );
+    // Flex slot — no need reduction. 20 + 4 (SS weight via MI flex) = 24
+    // But pos weight check: SS=0 dedicated, MI>0 flex → hasDedicatedSlot=true (flex counts in pos weight logic)
+    expect(result.bidCap).toBe(24);
+    expect(result.capSource).not.toContain("need ×0.7");
+    expect(result.capSource).not.toContain("need ×0.5");
+  });
+
+  it("elite override: rawMaxBid >= $30 skips UTIL reduction", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 35,
+        positions: ["OF"],
+        remainingSlots: { OF: 0, UTIL: 1 },
+      }),
+    );
+    // Elite ($35 >= $30) → no reduction, annotate elite override
+    // 35 + 0 (pos +0 OF slots full) = 35
+    expect(result.bidCap).toBe(35);
+    expect(result.capSource).toContain("elite override");
+    expect(result.capSource).not.toContain("need ×0.7");
+  });
+
+  it("pitcher BN dampening when P slots full", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 15,
+        isPitcher: true,
+        isSP: true,
+        positions: ["SP"],
+        spCount: 0,
+        remainingSlots: { P: 0 },
+      }),
+    );
+    // Pitcher, P=0 → BN. rawMaxBid 15 < 30 → ×0.5 = ceil(7.5) = 8
+    // Then SP1 cap $18 (no effect since 8 < 18)
+    expect(result.bidCap).toBe(8);
+    expect(result.capSource).toContain("need ×0.5 (BN)");
+  });
+
+  it("no pitcher reduction when P slots available", () => {
+    const result = computeStrategyBidCap(
+      makeInput({
+        rawMaxBid: 15,
+        isPitcher: true,
+        isSP: true,
+        positions: ["SP"],
+        spCount: 0,
+        remainingSlots: { P: 3 },
+      }),
+    );
+    // Pitcher, P>0 → dedicated. No need reduction.
+    // SP1 cap: min(15, 18) = 15
+    expect(result.bidCap).toBe(15);
+    expect(result.capSource).not.toContain("need");
   });
 });
