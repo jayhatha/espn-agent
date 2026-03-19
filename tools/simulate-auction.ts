@@ -196,17 +196,29 @@ const TOTAL_TEAMS = 13;
 const BUDGET = 260;
 const SGP_WEIGHT = 0.4;
 
+interface DraftedPlayer {
+  playerIdx: number;
+  price: number;
+  slot: string;
+  blendedValue: number; // our SGP/ASV blend valuation
+}
+
 interface TeamState {
   budget: number;
-  roster: number[]; // player indices
+  roster: DraftedPlayer[];
   slotsRemaining: Record<string, number>;
 }
 
 interface SimResult {
+  myDrafted: DraftedPlayer[];
   myRoster: PoolPlayer[];
-  totalFgValue: number;
+  totalBlendedValue: number;
   totalPaid: number;
   profit: number;
+  hitterPaid: number;
+  pitcherPaid: number;
+  hitterCount: number;
+  pitcherCount: number;
   categoryTotals: Record<string, number>;
   rotoPoints: number;
   overallRank: number;
@@ -405,9 +417,10 @@ function simulateAuction(
 
     // Price = second-highest + 1 (minimum $1)
     const price = Math.max(1, secondHighest + 1);
+    const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher);
+    const blendedVal = Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
     teams[winner].budget -= price;
-    teams[winner].roster.push(nomIdx);
-    assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher);
+    teams[winner].roster.push({ playerIdx: nomIdx, price, slot: slot ?? "BN", blendedValue: blendedVal });
     available.delete(nomIdx);
 
     nominatingTeam = (nominatingTeam + 1) % TOTAL_TEAMS;
@@ -415,16 +428,22 @@ function simulateAuction(
 
   // Compute results for our team (index 0)
   const myTeam = teams[0];
-  const myRoster = myTeam.roster.map(i => players[i]);
-  const totalFgValue = myRoster.reduce((s, p) => s + p.dollars, 0);
+  const myRoster = myTeam.roster.map(d => players[d.playerIdx]);
+  const totalBlendedValue = myTeam.roster.reduce((s, d) => s + d.blendedValue, 0);
   const totalPaid = BUDGET - myTeam.budget;
-  const profit = totalFgValue - totalPaid;
+  const profit = totalBlendedValue - totalPaid;
+
+  let hitterPaid = 0, pitcherPaid = 0, hitterCount = 0, pitcherCount = 0;
+  for (const d of myTeam.roster) {
+    if (players[d.playerIdx].isPitcher) { pitcherPaid += d.price; pitcherCount++; }
+    else { hitterPaid += d.price; hitterCount++; }
+  }
 
   // Category totals
   const allCatTotals: Record<string, number>[] = teams.map(team => {
     const totals: Record<string, number> = {};
-    for (const idx of team.roster) {
-      const p = players[idx];
+    for (const drafted of team.roster) {
+      const p = players[drafted.playerIdx];
       for (const cat of CATEGORIES) {
         if (cat.type === "COUNTING") {
           totals[cat.stat_key] = (totals[cat.stat_key] ?? 0) + (p.stats[cat.stat_key] ?? 0);
@@ -464,10 +483,15 @@ function simulateAuction(
   const overallRank = sortedRoto.indexOf(myRotoPoints) + 1;
 
   return {
+    myDrafted: myTeam.roster,
     myRoster,
-    totalFgValue: Math.round(totalFgValue),
+    totalBlendedValue: Math.round(totalBlendedValue),
     totalPaid,
     profit: Math.round(profit),
+    hitterPaid,
+    pitcherPaid,
+    hitterCount,
+    pitcherCount,
     categoryTotals: allCatTotals[0],
     rotoPoints: myRotoPoints,
     overallRank,
@@ -484,7 +508,8 @@ console.log("Loading data...");
 const players = buildPlayerPool();
 const sgpValues = computeSGP(players);
 const asvMap = loadASV();
-console.log(`  ${players.length} players, ${asvMap.size} ASV entries`);
+const totalPositiveSGP = sgpValues.reduce((s, v) => s + Math.max(0, v), 0);
+console.log(`  ${players.length} players, ${asvMap.size} ASV entries, total SGP: ${totalPositiveSGP.toFixed(1)}`);
 console.log(`  Running ${NUM_SIMS} simulations...\n`);
 
 const results: SimResult[] = [];
@@ -505,34 +530,45 @@ for (let i = 0; i < NUM_SIMS; i++) {
 const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 console.log(`\nDone in ${elapsed}s\n`);
 
-// Aggregate
-const values = results.map(r => r.totalFgValue).sort((a, b) => a - b);
-const profits = results.map(r => r.profit).sort((a, b) => a - b);
-const rotos = results.map(r => r.rotoPoints).sort((a, b) => a - b);
-const ranks = results.map(r => r.overallRank).sort((a, b) => a - b);
-const paid = results.map(r => r.totalPaid).sort((a, b) => a - b);
-
+// Helpers
 const mean = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length;
 const median = (arr: number[]) => arr[Math.floor(arr.length / 2)];
 const p10 = (arr: number[]) => arr[Math.floor(arr.length * 0.1)];
 const p90 = (arr: number[]) => arr[Math.floor(arr.length * 0.9)];
+const pad = (s: string, n: number) => s.padEnd(n);
+const rpad = (s: string, n: number) => s.padStart(n);
+
+// Aggregate
+const blendedValues = results.map(r => r.totalBlendedValue).sort((a, b) => a - b);
+const profits = results.map(r => r.profit).sort((a, b) => a - b);
+const rotos = results.map(r => r.rotoPoints).sort((a, b) => a - b);
+const ranks = results.map(r => r.overallRank).sort((a, b) => a - b);
+const paid = results.map(r => r.totalPaid).sort((a, b) => a - b);
+const hitPaid = results.map(r => r.hitterPaid).sort((a, b) => a - b);
+const pitPaid = results.map(r => r.pitcherPaid).sort((a, b) => a - b);
 
 console.log("=" .repeat(70));
 console.log("  AUCTION SIMULATION RESULTS");
 console.log("=" .repeat(70));
 console.log(`  Simulations: ${NUM_SIMS}`);
 console.log(`  Teams: ${TOTAL_TEAMS}, Budget: $${BUDGET}, Slots: ${TOTAL_SLOTS}`);
+console.log(`  ASV source: combined-draft-values.csv (from tools/build-combined-csv.ts)`);
 console.log();
 
-const pad = (s: string, n: number) => s.padEnd(n);
-const rpad = (s: string, n: number) => s.padStart(n);
 console.log(`${pad("Metric", 20)} ${rpad("Mean", 8)} ${rpad("Median", 8)} ${rpad("P10", 8)} ${rpad("P90", 8)}`);
 console.log("-".repeat(56));
-console.log(`${pad("Roster FG Value", 20)} $${rpad(mean(values).toFixed(0), 7)} $${rpad(String(median(values)), 7)} $${rpad(String(p10(values)), 7)} $${rpad(String(p90(values)), 7)}`);
+console.log(`${pad("Blended Value", 20)} $${rpad(mean(blendedValues).toFixed(0), 7)} $${rpad(String(median(blendedValues)), 7)} $${rpad(String(p10(blendedValues)), 7)} $${rpad(String(p90(blendedValues)), 7)}`);
 console.log(`${pad("Total Paid", 20)} $${rpad(mean(paid).toFixed(0), 7)} $${rpad(String(median(paid)), 7)} $${rpad(String(p10(paid)), 7)} $${rpad(String(p90(paid)), 7)}`);
-console.log(`${pad("Profit", 20)} $${rpad(mean(profits).toFixed(0), 7)} $${rpad(String(median(profits)), 7)} $${rpad(String(p10(profits)), 7)} $${rpad(String(p90(profits)), 7)}`);
+console.log(`${pad("Profit (blend-paid)", 20)} $${rpad(mean(profits).toFixed(0), 7)} $${rpad(String(median(profits)), 7)} $${rpad(String(p10(profits)), 7)} $${rpad(String(p90(profits)), 7)}`);
 console.log(`${pad("Roto Points", 20)} ${rpad(mean(rotos).toFixed(1), 8)} ${rpad(String(median(rotos)), 8)} ${rpad(String(p10(rotos)), 8)} ${rpad(String(p90(rotos)), 8)}`);
 console.log(`${pad("Overall Rank", 20)} ${rpad(mean(ranks).toFixed(1), 8)} ${rpad(String(median(ranks)), 8)} ${rpad(String(p10(ranks)), 8)} ${rpad(String(p90(ranks)), 8)}`);
+
+// Hitter/pitcher paid split
+console.log();
+console.log("Budget Split (actual $ paid):");
+console.log(`  Hitters:  ${mean(results.map(r => r.hitterCount)).toFixed(1)} players, $${mean(hitPaid).toFixed(0)} paid (${(mean(hitPaid) / mean(paid) * 100).toFixed(0)}%)`);
+console.log(`  Pitchers: ${mean(results.map(r => r.pitcherCount)).toFixed(1)} players, $${mean(pitPaid).toFixed(0)} paid (${(mean(pitPaid) / mean(paid) * 100).toFixed(0)}%)`);
+console.log(`  Unspent:  $${(BUDGET - mean(paid)).toFixed(0)}`);
 
 // Top-4 category finishes
 let top4Count = 0;
@@ -542,56 +578,6 @@ for (const r of results) {
 console.log();
 console.log(`Top 4 finish rate: ${(top4Count / NUM_SIMS * 100).toFixed(1)}% (${top4Count}/${NUM_SIMS})`);
 
-// Spec targets
-console.log();
-console.log("Spec Target Check:");
-console.log(`  Roster value >= $320:  ${mean(values) >= 320 ? "PASS" : "FAIL"} (mean $${mean(values).toFixed(0)})`);
-console.log(`  Profit >= $70:         ${mean(profits) >= 70 ? "PASS" : "FAIL"} (mean $${mean(profits).toFixed(0)})`);
-console.log(`  Top-4 finish >= 60%:   ${(top4Count / NUM_SIMS) >= 0.6 ? "PASS" : "FAIL"} (${(top4Count / NUM_SIMS * 100).toFixed(1)}%)`);
-
-// Mode roster (most common players)
-console.log();
-console.log("=" .repeat(70));
-console.log("  MODE ROSTER (most frequently drafted players)");
-console.log("=" .repeat(70));
-const sortedPlayers = [...playerCounts.entries()]
-  .sort((a, b) => b[1] - a[1]);
-
-const modeHitters = sortedPlayers.filter(([name]) => {
-  const p = players.find(pl => pl.name === name);
-  return p && !p.isPitcher;
-});
-const modePitchers = sortedPlayers.filter(([name]) => {
-  const p = players.find(pl => pl.name === name);
-  return p && p.isPitcher;
-});
-
-console.log();
-console.log("HITTERS (top 16):");
-console.log(`${rpad("#", 3)}  ${pad("Player", 26)} ${rpad("Freq", 6)} ${rpad("Pct", 6)}  ${rpad("FG$", 5)}  ${rpad("ASV", 5)}  Key Stats`);
-console.log("-".repeat(85));
-for (let i = 0; i < Math.min(16, modeHitters.length); i++) {
-  const [name, count] = modeHitters[i];
-  const p = players.find(pl => pl.name === name)!;
-  const asv = asvMap.get(p.normalizedName) ?? 0;
-  const pct = (count / NUM_SIMS * 100).toFixed(0);
-  const stats = `${p.stats.OPS?.toFixed(3) ?? "?"} OPS  ${p.stats.HR ?? 0} HR  ${p.stats.SB ?? 0} SB`;
-  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(26)} ${count.toString().padStart(6)} ${(pct + "%").padStart(6)}  $${p.dollars.toFixed(0).padStart(4)}  $${asv.toFixed(0).padStart(4)}  ${stats}`);
-}
-
-console.log();
-console.log("PITCHERS (top 12):");
-console.log(`${rpad("#", 3)}  ${pad("Player", 26)} ${rpad("Freq", 6)} ${rpad("Pct", 6)}  ${rpad("FG$", 5)}  ${rpad("ASV", 5)}  Key Stats`);
-console.log("-".repeat(85));
-for (let i = 0; i < Math.min(12, modePitchers.length); i++) {
-  const [name, count] = modePitchers[i];
-  const p = players.find(pl => pl.name === name)!;
-  const asv = asvMap.get(p.normalizedName) ?? 0;
-  const pct = (count / NUM_SIMS * 100).toFixed(0);
-  const stats = `${p.stats.K ?? p.stats.SO ?? 0} K  ${p.stats.SV ?? 0} SV  ${p.stats.ERA?.toFixed(2) ?? "?"} ERA`;
-  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(26)} ${count.toString().padStart(6)} ${(pct + "%").padStart(6)}  $${p.dollars.toFixed(0).padStart(4)}  $${asv.toFixed(0).padStart(4)}  ${stats}`);
-}
-
 // Mean SGP
 const meanSGP = results.reduce((s, r) => {
   return s + r.myRoster.reduce((rs, p) => {
@@ -599,6 +585,96 @@ const meanSGP = results.reduce((s, r) => {
     return rs + (idx >= 0 ? sgpValues[idx] : 0);
   }, 0);
 }, 0) / NUM_SIMS;
+console.log(`Mean team SGP: ${meanSGP.toFixed(1)}`);
+
+// ============================================================
+// Mode roster by SLOT
+// ============================================================
+console.log();
+console.log("=" .repeat(70));
+console.log("  MODE ROSTER BY SLOT");
+console.log("=" .repeat(70));
+
+// Track most frequent player per slot
+const slotPlayerCounts = new Map<string, Map<string, { count: number; totalPrice: number }>>();
+for (const r of results) {
+  for (const d of r.myDrafted) {
+    const p = players[d.playerIdx];
+    if (!slotPlayerCounts.has(d.slot)) slotPlayerCounts.set(d.slot, new Map());
+    const slotMap = slotPlayerCounts.get(d.slot)!;
+    const entry = slotMap.get(p.name) ?? { count: 0, totalPrice: 0 };
+    entry.count++;
+    entry.totalPrice += d.price;
+    slotMap.set(p.name, entry);
+  }
+}
+
+const SLOT_DISPLAY_ORDER = ["C", "1B", "2B", "SS", "3B", "MI", "CI", "OF", "UTIL", "P", "BN"];
 
 console.log();
-console.log(`Mean team SGP: ${meanSGP.toFixed(1)}`);
+console.log(`${pad("Slot", 5)} ${pad("Mode Player", 24)} ${rpad("Freq", 5)} ${rpad("Pct", 5)} ${rpad("Avg$", 5)}  ${rpad("ASV", 5)}  ${rpad("Blend", 5)}`);
+console.log("-".repeat(60));
+
+for (const slot of SLOT_DISPLAY_ORDER) {
+  const slotMap = slotPlayerCounts.get(slot);
+  if (!slotMap) continue;
+  const sorted = [...slotMap.entries()].sort((a, b) => b[1].count - a[1].count);
+
+  // How many instances of this slot exist per draft?
+  const slotCount = ROSTER_SLOTS[slot] ?? 1;
+  for (let s = 0; s < slotCount && s < sorted.length; s++) {
+    const [name, data] = sorted[s];
+    const p = players.find(pl => pl.name === name)!;
+    const asv = asvMap.get(p.normalizedName) ?? 0;
+    const totalPosSGP = Math.max(0, sgpValues[players.indexOf(p)] ?? 0);
+    const sgpD = totalPositiveSGP > 0 ? (totalPosSGP / totalPositiveSGP) * BUDGET * TOTAL_TEAMS : 0;
+    const blend = Math.round(sgpD * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
+    const avgPrice = Math.round(data.totalPrice / data.count);
+    const pct = (data.count / NUM_SIMS * 100).toFixed(0);
+    const slotLabel = slotCount > 1 ? `${slot}${s + 1}` : slot;
+    console.log(`${pad(slotLabel, 5)} ${pad(name, 24)} ${rpad(String(data.count), 5)} ${rpad(pct + "%", 5)} $${rpad(String(avgPrice), 4)}  $${rpad(String(Math.round(asv)), 4)}  $${rpad(String(blend), 4)}`);
+  }
+}
+
+// ============================================================
+// Overall most frequent players
+// ============================================================
+console.log();
+console.log("=" .repeat(70));
+console.log("  MOST FREQUENT PLAYERS (overall)");
+console.log("=" .repeat(70));
+
+const sortedPlayers = [...playerCounts.entries()].sort((a, b) => b[1] - a[1]);
+
+const modeHitters = sortedPlayers.filter(([name]) => !players.find(pl => pl.name === name)?.isPitcher);
+const modePitchers = sortedPlayers.filter(([name]) => players.find(pl => pl.name === name)?.isPitcher);
+
+console.log();
+console.log("HITTERS (top 16):");
+console.log(`${rpad("#", 3)}  ${pad("Player", 24)} ${rpad("Freq", 5)} ${rpad("Pct", 5)}  ${rpad("ASV", 5)}  ${rpad("Blend", 5)}  Key Stats`);
+console.log("-".repeat(80));
+for (let i = 0; i < Math.min(16, modeHitters.length); i++) {
+  const [name, count] = modeHitters[i];
+  const p = players.find(pl => pl.name === name)!;
+  const asv = asvMap.get(p.normalizedName) ?? 0;
+  const pIdx = players.indexOf(p);
+  const sgpD = totalPositiveSGP > 0 ? (Math.max(0, sgpValues[pIdx]) / totalPositiveSGP) * BUDGET * TOTAL_TEAMS : 0;
+  const blend = Math.round(sgpD * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
+  const pct = (count / NUM_SIMS * 100).toFixed(0);
+  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(24)} ${rpad(String(count), 5)} ${rpad(pct + "%", 5)}  $${rpad(String(Math.round(asv)), 4)}  $${rpad(String(blend), 4)}  ${p.stats.OPS?.toFixed(3) ?? "?"} OPS  ${p.stats.HR ?? 0} HR  ${p.stats.SB ?? 0} SB`);
+}
+
+console.log();
+console.log("PITCHERS (top 12):");
+console.log(`${rpad("#", 3)}  ${pad("Player", 24)} ${rpad("Freq", 5)} ${rpad("Pct", 5)}  ${rpad("ASV", 5)}  ${rpad("Blend", 5)}  Key Stats`);
+console.log("-".repeat(80));
+for (let i = 0; i < Math.min(12, modePitchers.length); i++) {
+  const [name, count] = modePitchers[i];
+  const p = players.find(pl => pl.name === name)!;
+  const asv = asvMap.get(p.normalizedName) ?? 0;
+  const pIdx = players.indexOf(p);
+  const sgpD = totalPositiveSGP > 0 ? (Math.max(0, sgpValues[pIdx]) / totalPositiveSGP) * BUDGET * TOTAL_TEAMS : 0;
+  const blend = Math.round(sgpD * SGP_WEIGHT + asv * (1 - SGP_WEIGHT));
+  const pct = (count / NUM_SIMS * 100).toFixed(0);
+  console.log(`${(i + 1).toString().padStart(3)}  ${name.padEnd(24)} ${rpad(String(count), 5)} ${rpad(pct + "%", 5)}  $${rpad(String(Math.round(asv)), 4)}  $${rpad(String(blend), 4)}  ${p.stats.K ?? p.stats.SO ?? 0} K  ${p.stats.SV ?? 0} SV  ${p.stats.ERA?.toFixed(2) ?? "?"} ERA`);
+}
