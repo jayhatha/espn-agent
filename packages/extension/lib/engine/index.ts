@@ -686,9 +686,28 @@ function computeIdealRoster(
     };
   });
 
+  // Label SP slots as SP1-SP7 based on PitcherList rank (best rank = SP1).
+  // Includes both drafted and optimizer SPs so labels reflect the full rotation.
+  const allSPs = [
+    ...draftedPlayers.filter(p => p.positions.some(pos => pos.toUpperCase() === "SP")),
+    ...optimizerPlayers.filter(p => p.positions.some(pos => pos.toUpperCase() === "SP")),
+  ].sort((a, b) => (a.externalRank ?? 999) - (b.externalRank ?? 999));
+
+  for (let i = 0; i < allSPs.length; i++) {
+    if (allSPs[i].slot === "P" || allSPs[i].slot === "SP") {
+      allSPs[i].slot = `SP${i + 1}`;
+    }
+  }
+
   // Combine and sort by SLOT_ORDER
   const players = [...draftedPlayers, ...optimizerPlayers];
   const slotIndex = (slot: string) => {
+    // SP1-SP7 sort at the "P" position, sub-sorted by number
+    if (slot.startsWith("SP") && slot.length > 2) {
+      const pIdx = SLOT_ORDER.indexOf("P");
+      const spNum = parseInt(slot.slice(2), 10) || 0;
+      return pIdx + spNum * 0.01; // SP1 = P+0.01, SP2 = P+0.02, etc.
+    }
     const idx = SLOT_ORDER.indexOf(slot);
     return idx >= 0 ? idx : SLOT_ORDER.length;
   };
