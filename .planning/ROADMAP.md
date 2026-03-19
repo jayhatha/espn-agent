@@ -206,7 +206,7 @@ Plans:
 **Goal:** Fix auction simulator to match live engine bidding behavior -- expand player pool to include PL-ranked SPs, align computeOurBid with strategy-caps.ts, enforce bench composition
 **Depends on:** Phase 56
 **Requirements:** SIM-01, SIM-02
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 57-01-PLAN.md -- Fix simulator: player pool, bid computation, bench enforcement, 1000-sim validation

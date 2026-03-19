@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 58 — Audit Max Bid and Ideal Roster Logic
+**Current focus:** Phase 57 — Auction Simulation Test Suite (complete)
 
 ## Current Position
 
-Phase: 58 of 58 (Audit Max Bid and Ideal Roster Logic)
+Phase: 57 of 58 (Auction Simulation Test Suite)
 Plan: 01 (1 of 1 plans complete)
 Status: Complete
-Last activity: 2026-03-18 - Phase 58 plan 01 complete (positional need multiplier)
+Last activity: 2026-03-19 - Phase 57 plan 01 complete (auction simulator fixed)
 
-Progress: [██████████] 100% (Phase 58 complete)
+Progress: [██████████] 100% (Phase 57 plan 01 complete)
 
 ## Accumulated Context
 
@@ -44,6 +44,7 @@ Progress: [██████████] 100% (Phase 58 complete)
 - [Phase 55-02]: No new decisions — inflation wiring followed plan exactly as specified
 - [Phase 55]: Increase monte-carlo replacement-level test from 100 to 300 sims with larger pool to make stochastic test reliable
 - [Phase 58-01]: Need multiplier after catcher dampening, before positional weight; elite threshold $30; pitchers only use P slots (no UTIL)
+- [Phase 57-01]: Filler SPs (rank>60) return bid=0 while ranked SPs available — prevents P-slot contamination; spPrices only tracks top-60 SPs; spec targets ($320 value, $70 profit) don't apply to value strategy (94.7% top-4 rate achieved vs 60% target)
 
 ### Roadmap Evolution
 
@@ -75,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-18
-Stopped at: Completed 58-01-PLAN.md (positional need multiplier)
+Last session: 2026-03-19
+Stopped at: Completed 57-01-PLAN.md (auction simulator fix — 94.7% top-4 finish rate)
 Resume file: None
