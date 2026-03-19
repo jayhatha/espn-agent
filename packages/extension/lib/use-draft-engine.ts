@@ -4,6 +4,7 @@ import { computeDraftEngine } from "./engine";
 import type { DraftEngineSignals, ForwardSimulationSignal } from "./engine";
 import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 import { computeStrategyBidCap } from "./engine/strategy-caps";
+import { getRankBasedTierCap } from "./engine/draft-constants";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -135,6 +136,10 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       );
       const spCount = draftedSPs.length;
       const draftedSpPrices = draftedSPs.map(p => p.cost ?? 0);
+      const draftedSpTierCaps = draftedSPs.map(p => {
+        const spRanking = rankings.find(r => r.playerName.toLowerCase() === p.playerName.toLowerCase());
+        return getRankBasedTierCap(spRanking?.externalRank);
+      });
 
       const capResult = computeStrategyBidCap({
         rawMaxBid: mergedOptimization.maxBid,
@@ -144,6 +149,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         primaryPosition: ranking?.primaryPosition ?? null,
         spCount,
         draftedSpPrices,
+        draftedSpTierCaps,
         catcherSlotsRemaining: baseSignals.remainingSlots?.["C"] ?? 0,
         externalRank: ranking?.externalRank,
         isEndgame: baseSignals.budgetCurve?.endgameMode ?? false,

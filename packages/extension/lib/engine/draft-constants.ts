@@ -79,6 +79,25 @@ export function getSpTierCap(spCount: number): number {
   return SP_TIER_CAPS[tierIndex].max;
 }
 
+/**
+ * Return the SP tier cap based on PitcherList rank (not draft order).
+ *
+ * rank 1-20:  $18 (SP1 tier)
+ * rank 21-30: $12 (SP2 tier)
+ * rank 31-40: $10 (SP3 tier)
+ * rank 41-60: $5  (SP4 tier)
+ * rank 61+:   $3  (SP5 filler tier)
+ * undefined:  $3  (no rank available — filler)
+ */
+export function getRankBasedTierCap(rank: number | undefined): number {
+  if (rank == null) return 3;
+  if (rank <= 20) return 18;
+  if (rank <= 30) return 12;
+  if (rank <= 40) return 10;
+  if (rank <= 60) return 5;
+  return 3;
+}
+
 // ============================================================
 // Games Started Cap
 // ============================================================

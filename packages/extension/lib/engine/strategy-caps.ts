@@ -14,7 +14,7 @@
  * Pure functions: no Zustand reads, no DOM access, no side effects.
  */
 
-import { getPositionalWeight, getSpTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
+import { getPositionalWeight, getSpTierCap, getRankBasedTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
 
 /** Total auction draft budget */
 const TOTAL_BUDGET = 260;
@@ -93,6 +93,8 @@ export interface StrategyCapInput {
   externalRank?: number;
   /** Prices paid for each drafted SP (for tier savings reallocation) */
   draftedSpPrices?: number[];
+  /** Rank-based tier caps for each drafted SP (parallel to draftedSpPrices) */
+  draftedSpTierCaps?: number[];
 }
 
 export interface StrategyCapResult {
@@ -107,23 +109,18 @@ export interface StrategyCapResult {
  *
  * Base: engine's SGP-based maxBid (highest profitable price).
  * Then applies structural adjustments:
- * 1. Pitcher dampening (×pitcherMultiplier)
- * 2. Catcher dampening (×0.5 when C slot filled)
+ * 1. Catcher dampening (×0.5 when C slot filled)
+ * 2. Need multiplier (×0.7 UTIL / ×0.5 BN when not elite)
  * 3. Positional weight bonus (+1 to +4)
- * 4. Hitter budget allocation cap ($200 max)
- * 5. SP tier cap ($18/$12/$10/$5/$3)
+ * 4. Hitter budget allocation cap ($220 max)
+ * 5. SP tier cap ($18/$12/$10/$5/$3 based on PL rank)
  * 6. Endgame dampening (×0.7)
  * 7. Inflation adjustment (+2 when > 1.10)
+ * 8. Budget flush (deploy excess budget in final slots)
  */
 export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResult {
   let bidCap = input.rawMaxBid;
   let capSource = `engine maxBid $${input.rawMaxBid}`;
-
-  // Pitcher spending is controlled by SP tier caps ($18/$12/$10/$5/$3) — no
-  // additional bid dampening needed. The SGP split (pitcherHitterSplit) already
-  // reduces pitcher SGP values in the optimizer, so the binary search maxBid
-  // naturally produces lower bids for pitchers. Applying a bid cap multiplier
-  // on top would double-dampen.
 
   // Apply catcher dampening (50% when C slot already filled)
   if (input.primaryPosition === "C" && input.catcherSlotsRemaining <= 0) {
@@ -236,21 +233,19 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       tierCap = 3;
       capSource += ` → SP${input.spCount + 1} cap $3 (full)`;
     } else if (rank != null) {
-      // Rank-based tier: the player's quality determines the price
+      // Rank-based tier: the player's quality determines the price.
+      // Uses getRankBasedTierCap so a PL #28 always gets $12 cap regardless
+      // of how many SPs have already been drafted (fixes slot-based bug).
+      tierCap = getRankBasedTierCap(rank);
       if (rank <= 20) {
-        tierCap = 18;
         capSource += ` → PL#${rank} SP1-tier $18`;
       } else if (rank <= 30) {
-        tierCap = 12;
         capSource += ` → PL#${rank} SP2-tier $12`;
       } else if (rank <= 40) {
-        tierCap = 10;
         capSource += ` → PL#${rank} SP3-tier $10`;
       } else if (rank <= 60) {
-        tierCap = 5;
         capSource += ` → PL#${rank} SP4-tier $5`;
       } else {
-        tierCap = 3;
         capSource += ` → PL#${rank} SP5-tier $3`;
       }
     } else {
@@ -259,12 +254,15 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       capSource += ` → SP${input.spCount + 1} cap $${tierCap} (no rank)`;
     }
 
-    // Reallocate savings from SPs drafted below their tier cap.
+    // Reallocate savings from SPs drafted below their rank-based tier cap.
+    // Uses per-SP rank-based tier caps (draftedSpTierCaps) so out-of-order
+    // drafting doesn't generate fake savings. Falls back to slot-position caps
+    // (getSpTierCap(s)) when tier caps are not provided.
     // Only apply to SPs in the top 60 (SP1-SP4 tiers) — don't boost filler.
     if (input.draftedSpPrices && input.draftedSpPrices.length > 0 && (rank == null || rank <= 60)) {
       let idealSpSpend = 0;
       for (let s = 0; s < input.draftedSpPrices.length; s++) {
-        idealSpSpend += getSpTierCap(s);
+        idealSpSpend += input.draftedSpTierCaps?.[s] ?? getSpTierCap(s);
       }
       const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
       const savings = Math.max(0, idealSpSpend - actualSpSpend);
@@ -292,7 +290,7 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   if (!input.isSP && input.isPitcher && input.draftedSpPrices && input.spCount >= 5) {
     let idealSpSpend = 0;
     for (let s = 0; s < input.draftedSpPrices.length; s++) {
-      idealSpSpend += getSpTierCap(s);
+      idealSpSpend += input.draftedSpTierCaps?.[s] ?? getSpTierCap(s);
     }
     const actualSpSpend = input.draftedSpPrices.reduce((s, v) => s + v, 0);
     const savings = Math.max(0, idealSpSpend - actualSpSpend);
