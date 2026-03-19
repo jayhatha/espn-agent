@@ -181,7 +181,7 @@ function simulateOneDraft(
   let totalSGP = result.totalSGPValue;
   if (myLockedPlayer) {
     // Find the locked player's SGP from the original sgpValues
-    const lockedIdx = availablePlayers.indexOf(myLockedPlayer);
+    const lockedIdx = availablePlayers.findIndex(p => p.normalizedName === myLockedPlayer.normalizedName);
     totalSGP += lockedIdx >= 0 ? (sgpValues[lockedIdx] ?? 0) : 0;
   }
 
@@ -241,8 +241,10 @@ export function runMonteCarlo(params: MonteCarloParams): MonteCarloResult {
   const allIndices = new Set(availablePlayers.map((_, i) => i));
 
   // Find nominated player's index (if provided)
+  // Use name matching — not reference equality — because the worker
+  // receives structured-cloned objects (new references).
   const nominatedIndex = nominatedPlayer
-    ? availablePlayers.indexOf(nominatedPlayer)
+    ? availablePlayers.findIndex(p => p.normalizedName === nominatedPlayer.normalizedName)
     : -1;
 
   const bidValues: number[] = [];
