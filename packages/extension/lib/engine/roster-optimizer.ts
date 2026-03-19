@@ -357,7 +357,7 @@ export function optimizeRoster(
 
       const currentPlayer = roster[rosterIdx];
       const currentSlot = slotAssignments[rosterIdx];
-      const currentSgpIdx = players.indexOf(currentPlayer);
+      const currentSgpIdx = players.findIndex(p => p.normalizedName === currentPlayer.normalizedName);
       const currentSgp = currentSgpIdx >= 0 ? (sgpValues[currentSgpIdx] ?? 0) : 0;
 
       // Find best upgrade: higher SGP, fits the slot, affordable
@@ -395,6 +395,75 @@ export function optimizeRoster(
         usedNames.add(bestUpgrade.player.normalizedName);
         roster[rosterIdx] = bestUpgrade.player;
         totalSGPValue += sgpGain;
+        budgetUsed += extraCost;
+        remainingBudget -= extraCost;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Phase 5: Budget exhaustion pass
+  // ------------------------------------------------------------------
+  // The SGP upgrade pass only swaps when the replacement has higher SGP.
+  // This can leave budget unspent when all upgrades are SGP-neutral or
+  // slightly worse. In an auction draft, unspent budget is wasted value.
+  // Swap cheapest roster players for the most expensive eligible alternative
+  // that fits the remaining budget, even if SGP is equal or slightly lower.
+  if (remainingBudget > 0) {
+    const usedNames = new Set(roster.map(p => p.normalizedName));
+
+    const exhaustOrder = roster
+      .map((_, i) => i)
+      .filter(i => !lockedPlayers?.some(lp => lp.player.normalizedName === roster[i].normalizedName))
+      .sort((a, b) => roster[a].dollars - roster[b].dollars);
+
+    for (const rosterIdx of exhaustOrder) {
+      if (remainingBudget <= 0) break;
+
+      const currentPlayer = roster[rosterIdx];
+      const currentSlot = slotAssignments[rosterIdx];
+      const currentSgpIdx = players.findIndex(p => p.normalizedName === currentPlayer.normalizedName);
+      const currentSgp = currentSgpIdx >= 0 ? (sgpValues[currentSgpIdx] ?? 0) : 0;
+
+      // Find the most expensive affordable upgrade that fits the slot
+      // Allow equal or slightly lower SGP (within 10% loss tolerance)
+      let bestSpend: { player: PoolPlayer; sgp: number; cost: number } | null = null;
+
+      for (const entry of indexed) {
+        if (usedNames.has(entry.player.normalizedName)) continue;
+        if (!canFillSlot(entry.player.positions, currentSlot)) continue;
+
+        const extraCost = entry.player.dollars - currentPlayer.dollars;
+        if (extraCost <= 0) continue;
+        if (extraCost > remainingBudget) continue;
+
+        // Allow up to 10% SGP loss to spend remaining budget
+        if (entry.sgp < currentSgp * 0.9) continue;
+
+        // SP tier cap check
+        if (currentSlot === "SP" || currentSlot === "P") {
+          const slotSpIndex = slotAssignments
+            .filter((s, i) => (s === "SP" || s === "P") && i < rosterIdx)
+            .length;
+          const tierCap = getSpTierCap(slotSpIndex);
+          if (entry.player.dollars > tierCap) continue;
+        }
+
+        // Prefer highest cost (spend the most budget), break ties by SGP
+        if (!bestSpend || entry.player.dollars > bestSpend.cost ||
+            (entry.player.dollars === bestSpend.cost && entry.sgp > bestSpend.sgp)) {
+          bestSpend = { player: entry.player, sgp: entry.sgp, cost: entry.player.dollars };
+        }
+      }
+
+      if (bestSpend) {
+        const extraCost = bestSpend.cost - currentPlayer.dollars;
+        const sgpDelta = bestSpend.sgp - currentSgp;
+
+        usedNames.delete(currentPlayer.normalizedName);
+        usedNames.add(bestSpend.player.normalizedName);
+        roster[rosterIdx] = bestSpend.player;
+        totalSGPValue += sgpDelta;
         budgetUsed += extraCost;
         remainingBudget -= extraCost;
       }
