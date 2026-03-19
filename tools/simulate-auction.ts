@@ -356,14 +356,17 @@ function computeOurBid(
   const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
 
   // Base: SGP/ASV blend (matches live engine bid-optimizer.ts exactly)
-  // Skip blend when SGP > ASV: trust our model when it's higher than market
+  // Skip blend when SGP > ASV on mid-tier players (ASV <= $33).
+  // For expensive players (ASV > $33), always blend — the market already
+  // knows their value so trusting raw SGP leads to massive overpays.
   let bid: number;
-  if (sgpDollars > asv && asv > 0) {
+  if (sgpDollars > asv && asv > 0 && asv <= 33) {
     bid = Math.max(1, Math.round(sgpDollars));
   } else {
     bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
   }
   const blendedValue = bid;
+
 
   // --- 5. Catcher guard: max 1 catcher ---
   // If C slot is filled, only bid on catchers with multi-position eligibility
@@ -508,22 +511,30 @@ function computeOurBid(
   }
 
   // --- 8. Budget flush: spend excess when few slots remain ---
-  // Mirrors strategy-caps.ts budget flush logic, with tuned thresholds for the
-  // simulator context (teams don't always spend $200+ before entering flush mode).
-  // Fire when budget remaining < $120 (roughly halfway) AND <= 8 slots left.
+  // Mirrors strategy-caps.ts budget flush logic. Flush deploys surplus budget
+  // by bidding above blended value. In a second-price auction, higher bids
+  // don't increase price paid — they just increase win probability.
+  // For expensive players (ASV > $33), cap at ASV to avoid chasing elite guys.
   const slotsLeft = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
   const budgetRemaining = team.budget;
   if (budgetRemaining < 200 && slotsLeft > 0 && slotsLeft <= 20) {
     const minReserves = Math.max(0, slotsLeft - 1);
     const excessBudget = budgetRemaining - minReserves - bid;
     if (excessBudget > 0) {
+      let flush: number;
       if (slotsLeft <= 2) {
-        bid += excessBudget;
+        flush = excessBudget;
       } else if (slotsLeft <= 5) {
-        bid += Math.ceil(excessBudget * 0.7);
+        flush = Math.ceil(excessBudget * 0.7);
       } else {
-        bid += Math.ceil(excessBudget * 0.5);
+        flush = Math.ceil(excessBudget * 0.5);
       }
+      // Cap flush at ASV for expensive players to prevent chasing
+      // elite guys above market price (the Judge problem)
+      if (asv > 33) {
+        flush = Math.min(flush, Math.max(0, Math.round(asv) - bid));
+      }
+      bid += flush;
     }
   }
 
@@ -753,8 +764,10 @@ function simulateAuction(
       }
     }
 
-    // Second-price auction: winner pays second-highest bid + $1
-    // Find highest bid; break ties randomly to avoid team 0 always winning ties
+    // Ascending auction (ESPN format): teams bid up incrementally, winner pays
+    // second-highest + $1 (equivalent to Vickrey/second-price). This matches
+    // ESPN's open ascending format where you stop bidding when the price
+    // exceeds your max willingness to pay.
     let highest = 0;
     for (let t = 0; t < TOTAL_TEAMS; t++) {
       if (teamMaxBids[t] > highest) highest = teamMaxBids[t];

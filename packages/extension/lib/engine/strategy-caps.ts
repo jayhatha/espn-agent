@@ -346,11 +346,15 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       if (excessBudget > 0) {
         let boost: number;
         if (slotsRemaining <= 2) {
-          // Last 1-2 picks: spend all excess
+          // Last 1-2 picks: spend everything — unspent dollars are wasted
           boost = excessBudget;
         } else {
-          // 3-5 picks: spend ~half the excess on this pick
-          boost = Math.ceil(excessBudget * 0.5);
+          // 3-5 picks: flush up to rawMaxBid so we don't overpay when
+          // we still have future picks to allocate budget to
+          boost = Math.min(
+            Math.ceil(excessBudget * 0.5),
+            Math.max(0, input.rawMaxBid - bidCap),
+          );
         }
         if (boost > 0) {
           bidCap += boost;

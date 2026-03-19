@@ -103,11 +103,13 @@ export function computeMaxBid(
   let rawBlendedValue = sgpDollars;
 
   if (asvMarketPrice != null && asvMarketPrice > 0) {
-    if (sgpDollars > asvMarketPrice) {
-      // SGP exceeds market — trust the model, skip blend
+    if (sgpDollars > asvMarketPrice && asvMarketPrice <= 33) {
+      // SGP exceeds market on mid-tier player — trust the model, skip blend.
+      // For expensive players (ASV > $33), always blend to avoid overpaying
+      // on elite guys where the market already knows their value.
       rawBlendedValue = sgpDollars;
     } else {
-      // ASV >= SGP — blend toward market consensus
+      // ASV >= SGP, or elite player — blend toward market consensus
       rawBlendedValue = Math.max(1, Math.round(
         sgpDollars * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT),
       ));
