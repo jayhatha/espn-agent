@@ -212,3 +212,12 @@ Plans:
 - [ ] 57-01-PLAN.md — Shared auction simulation harness (data loading, auction loop, result aggregation)
 - [ ] 57-02-PLAN.md — Vitest spec target verification tests
 - [ ] 57-03-PLAN.md — Standalone CLI simulator with aggregated output
+
+### Phase 58: Audit max bid and ideal roster logic — introduce positional need as a bid factor, suppress bids on positions with filled dedicated and flex slots unless the player is elite
+
+**Goal:** Add positional need multiplier to bid caps — reduce bids for UTIL-bound (0.7x) and BN-bound (0.5x) players, with elite override for top-value players
+**Depends on:** Phase 57
+**Plans:** 1 plan
+
+Plans:
+- [ ] 58-01-PLAN.md — Need multiplier in strategy caps + BidVerdict display
