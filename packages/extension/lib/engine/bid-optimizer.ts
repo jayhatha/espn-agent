@@ -184,11 +184,12 @@ export function computeMaxBid(
   let rawBlendedValue = sgpBreakeven;
   let maxBid = sgpBreakeven;
 
-  if (asvMarketPrice != null && asvMarketPrice > 0 && sgpBreakeven > 1) {
-    // Player has positive marginal value — blend with market price.
-    // 40% SGP breakeven + 60% ASV: respects value signal but stays competitive.
+  if (asvMarketPrice != null && asvMarketPrice > 0) {
+    // Blend SGP breakeven with market price. Even when SGP breakeven is 0
+    // (player doesn't improve team SGP at any price), the market still values
+    // them — bid a discounted ASV rather than $0.
     const SGP_WEIGHT = 0.4;
-    rawBlendedValue = Math.round(sgpBreakeven * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT));
+    rawBlendedValue = Math.max(1, Math.round(sgpBreakeven * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT)));
     maxBid = Math.min(rawBlendedValue, Math.max(1, budget - minReserves));
   }
 
