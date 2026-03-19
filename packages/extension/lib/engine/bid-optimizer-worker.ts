@@ -149,7 +149,7 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     valueSurplus: maxBidResult.valueSurplus,
     shouldBid: monteCarloResult.shouldBid,
     sgpBreakeven: maxBidResult.sgpBreakeven,
-    rawBlendedValue: maxBidResult.maxBid, // maxBid IS the blended value before strategy caps
+    rawBlendedValue: maxBidResult.rawBlendedValue,
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
     computeTimeMs,

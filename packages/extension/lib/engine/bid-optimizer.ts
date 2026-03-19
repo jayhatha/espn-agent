@@ -157,6 +157,7 @@ export function computeMaxBid(
     return {
       maxBid: 1,
       sgpBreakeven: 0,
+      rawBlendedValue: 0,
       valueSurplus: 1 - marketPrice,
       baselineValue,
       withPlayerValue: baselineValue,
@@ -180,14 +181,15 @@ export function computeMaxBid(
   // Blend with ASV so bids are competitive: use ASV as the market anchor,
   // weighted by how much SGP supports the price (SGP quality signal).
   const sgpBreakeven = lo;
+  let rawBlendedValue = sgpBreakeven;
   let maxBid = sgpBreakeven;
 
   if (asvMarketPrice != null && asvMarketPrice > 0 && sgpBreakeven > 1) {
     // Player has positive marginal value — blend with market price.
     // 40% SGP breakeven + 60% ASV: respects value signal but stays competitive.
     const SGP_WEIGHT = 0.4;
-    const blended = Math.round(sgpBreakeven * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT));
-    maxBid = Math.min(blended, Math.max(1, budget - minReserves));
+    rawBlendedValue = Math.round(sgpBreakeven * SGP_WEIGHT + asvMarketPrice * (1 - SGP_WEIGHT));
+    maxBid = Math.min(rawBlendedValue, Math.max(1, budget - minReserves));
   }
 
   // ------------------------------------------------------------------
@@ -224,6 +226,7 @@ export function computeMaxBid(
   return {
     maxBid,
     sgpBreakeven,
+    rawBlendedValue,
     valueSurplus: maxBid - expectedMarketPrice,
     baselineValue,
     withPlayerValue,

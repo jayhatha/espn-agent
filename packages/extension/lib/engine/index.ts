@@ -1211,9 +1211,12 @@ export function computeDraftEngine(
       const capturedBidKey = newBidWorkerCacheKey;
       runBidOptimizerInWorker({
         nominatedPlayer: bidNominatedPlayer,
-        // Use explicit ASV if found; otherwise fall back to the overlaid player's
-        // dollars (which IS the ASV when the pool was ASV-overlaid at line 1170).
-        nominatedAsv: nominatedAsv ?? (hasAsvBid ? bidNominatedPlayer.dollars : null),
+        // Use explicit ASV if found; fall back to overlaid pool price (ASV when
+        // pool was overlaid); final fallback to FG model dollars (better than null).
+        nominatedAsv: nominatedAsv
+          ?? (hasAsvBid ? bidNominatedPlayer.dollars : null)
+          ?? nominatedPlayer.dollars
+          ?? null,
         availablePlayers: bidPoolPlayers,
         sgpValues: adjustedSgpValuesOpt,
         budget: input.remainingBudget,

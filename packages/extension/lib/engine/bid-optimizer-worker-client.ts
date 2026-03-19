@@ -42,6 +42,8 @@ function nullBidResponse(requestId: number): BidOptimizerWorkerResponse {
     expectedMarketPrice: 0,
     valueSurplus: 0,
     shouldBid: false,
+    sgpBreakeven: 0,
+    rawBlendedValue: 0,
     simulationEV: 0,
     simulationStdDev: 0,
     computeTimeMs: 0,
