@@ -39,6 +39,8 @@ export interface StrategyCapInput {
   hitterSpent: number;
   /** Total spent on pitchers so far */
   pitcherSpent: number;
+  /** Remaining roster slots by position (e.g. { OF: 2, SS: 0, UTIL: 1, P: 5 }) */
+  remainingSlots?: Record<string, number>;
 }
 
 export interface StrategyCapResult {
@@ -77,9 +79,28 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
     capSource += ` → C filled ×0.5`;
   }
 
-  // Apply positional weight bonus
+  // Apply positional weight bonus — only when the player fills a dedicated slot.
+  // If all dedicated slots for the player's positions are filled, they'd go to
+  // UTIL/BN — no positional scarcity bonus (prevents piling up at one position).
   const posWeight = getPositionalWeight(input.positions);
-  if (posWeight > 0) {
+  if (posWeight > 0 && input.remainingSlots) {
+    const hasDedicatedSlot = input.positions.some(pos => {
+      const upper = pos.toUpperCase();
+      // Check dedicated slot
+      if ((input.remainingSlots![upper] ?? 0) > 0) return true;
+      // Check flex slots (MI covers 2B/SS, CI covers 1B/3B)
+      if ((upper === "2B" || upper === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
+      if ((upper === "1B" || upper === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
+      return false;
+    });
+    if (hasDedicatedSlot) {
+      bidCap += posWeight;
+      capSource += ` → pos +${posWeight}`;
+    } else {
+      capSource += ` → pos +0 (slots full)`;
+    }
+  } else if (posWeight > 0) {
+    // No slot data available — apply bonus (backward compat)
     bidCap += posWeight;
     capSource += ` → pos +${posWeight}`;
   }

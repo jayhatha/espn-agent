@@ -146,6 +146,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         inflationFactor: baseSignals.inflation?.inflationFactor ?? 1.0,
         hitterSpent: baseSignals.budgetCurve?.hitterSpent ?? 0,
         pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
+        remainingSlots: baseSignals.remainingSlots ?? undefined,
       });
 
       // Use the strategy cap result directly — it starts from rawMaxBid and
