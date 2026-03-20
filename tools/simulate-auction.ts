@@ -164,7 +164,7 @@ const CATEGORIES: Category[] = [
   { category_id: "HR", stat_key: "HR", type: "COUNTING", direction: "HIGHER_BETTER", name: "HR" },
   { category_id: "SB", stat_key: "SB", type: "COUNTING", direction: "HIGHER_BETTER", name: "SB" },
   { category_id: "OPS", stat_key: "OPS", type: "RATE", direction: "HIGHER_BETTER", name: "OPS" },
-  { category_id: "K", stat_key: "K", type: "COUNTING", direction: "HIGHER_BETTER", name: "K" },
+  { category_id: "K", stat_key: "SO", type: "COUNTING", direction: "HIGHER_BETTER", name: "K" },
   { category_id: "W", stat_key: "W", type: "COUNTING", direction: "HIGHER_BETTER", name: "W" },
   { category_id: "SV", stat_key: "SV", type: "COUNTING", direction: "HIGHER_BETTER", name: "SV" },
   { category_id: "ERA", stat_key: "ERA", type: "RATE", direction: "LOWER_BETTER", name: "ERA", formula_id: "era" },
@@ -412,11 +412,6 @@ function computeOurBid(
   } else {
     bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
   }
-  // Hitter ASV floor: always willing to pay market price so we compete
-  // for the $10-15 tier that carries fantasy rosters.
-  if (!player.isPitcher && asv > 0) {
-    bid = Math.max(bid, Math.round(asv));
-  }
   // Hard cap per hitter — don't chase any single player above $30
   if (!player.isPitcher) {
     bid = Math.min(bid, HITTER_PER_PLAYER_CAP);
@@ -562,6 +557,7 @@ interface SimResult {
   hitterCount: number;
   pitcherCount: number;
   categoryTotals: Record<string, number>;
+  categoryRanks: Record<string, number>;
   rotoPoints: number;
   overallRank: number;
   rankedSpDrafted: number;  // count of top-60 PL SPs drafted
@@ -965,6 +961,17 @@ function simulateAuction(
     }
   }
 
+  // Per-category ranks for our team (1 = best)
+  const myCategoryRanks: Record<string, number> = {};
+  for (const cat of CATEGORIES) {
+    const vals = allCatTotals.map(t => t[cat.stat_key] ?? 0);
+    const sorted = vals.map((v, i) => ({ v, i }))
+      .sort((a, b) => cat.direction === "LOWER_BETTER" ? a.v - b.v : b.v - a.v);
+    for (let rank = 0; rank < sorted.length; rank++) {
+      if (sorted[rank].i === 0) { myCategoryRanks[cat.stat_key] = rank + 1; break; }
+    }
+  }
+
   const myRotoPoints = rotoPoints[0];
   const sortedRoto = [...rotoPoints].sort((a, b) => b - a);
   const overallRank = sortedRoto.indexOf(myRotoPoints) + 1;
@@ -991,6 +998,7 @@ function simulateAuction(
     hitterCount,
     pitcherCount,
     categoryTotals: allCatTotals[0],
+    categoryRanks: myCategoryRanks,
     rotoPoints: myRotoPoints,
     overallRank,
     rankedSpDrafted,
@@ -1255,7 +1263,28 @@ if (sortedSPs.length > 0) {
 }
 
 // Spec targets assessment
+// Category rank analysis — where do we win and lose?
 console.log();
+console.log("=" .repeat(70));
+console.log("  CATEGORY RANK ANALYSIS");
+console.log("=" .repeat(70));
+console.log();
+// Display names → stat_keys (K displays as "K" but uses "SO" internally)
+const catDisplay: [string, string][] = [["R","R"],["HR","HR"],["RBI","RBI"],["SB","SB"],["OPS","OPS"],["K","SO"],["W","W"],["SV","SV"],["ERA","ERA"],["WHIP","WHIP"]];
+console.log(`${pad("Category", 10)} ${rpad("Avg Rank", 10)} ${rpad("Top 3%", 8)} ${rpad("Bot 3%", 8)} ${rpad("Avg Total", 12)}`);
+console.log("-".repeat(52));
+for (const [label, key] of catDisplay) {
+  const ranks = results.map(r => r.categoryRanks[key] ?? 7);
+  const totals = results.map(r => r.categoryTotals[key] ?? 0);
+  const avgRank = mean(ranks);
+  const top3Pct = (ranks.filter(r => r <= 3).length / ranks.length * 100);
+  const bot3Pct = (ranks.filter(r => r >= 11).length / ranks.length * 100);
+  const avgTotal = mean(totals);
+  const totalStr = (key === "OPS" || key === "ERA" || key === "WHIP") ? avgTotal.toFixed(3) : Math.round(avgTotal).toString();
+  console.log(`${pad(label, 10)} ${rpad(avgRank.toFixed(1), 10)} ${rpad(top3Pct.toFixed(0) + "%", 8)} ${rpad(bot3Pct.toFixed(0) + "%", 8)} ${rpad(totalStr, 12)}`);
+}
+console.log();
+
 console.log("=" .repeat(70));
 console.log("  SPEC TARGET ASSESSMENT");
 console.log("=" .repeat(70));
