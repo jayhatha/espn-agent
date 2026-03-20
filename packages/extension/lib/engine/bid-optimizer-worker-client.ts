@@ -47,6 +47,10 @@ function nullBidResponse(requestId: number): BidOptimizerWorkerResponse {
     simulationEV: 0,
     simulationStdDev: 0,
     computeTimeMs: 0,
+    priorityScore: 0,
+    evBuffer: 0,
+    categoryBonus: 0,
+    playerTags: [],
   };
 }
 

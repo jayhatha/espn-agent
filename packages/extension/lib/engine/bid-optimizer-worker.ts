@@ -3,9 +3,9 @@
  *
  * Web Worker entry point for bid optimization (Quick Task 58).
  *
- * Runs computeMaxBid (binary search) and runMonteCarlo off the main thread.
- * Previously these ran synchronously inside computeRosterOptimization() on every
- * nomination change, blocking the UI for 10-15 optimizeRoster calls plus 200
+ * Runs EV-based priority scoring (Phase 62) and runMonteCarlo off the main thread.
+ * Previously ran computeMaxBid (binary search) synchronously inside computeRosterOptimization()
+ * on every nomination change, blocking the UI for 10-15 optimizeRoster calls plus 200
  * Monte Carlo simulations.
  *
  * Message protocol:
@@ -18,9 +18,9 @@
  *   - No Zustand reads, no DOM access, no side effects
  */
 
-import type { PoolPlayer, OpponentModel } from "./types";
+import type { PoolPlayer, OpponentModel, CategoryState } from "./types";
 import type { SerializedOpponentModel } from "./simulation-worker";
-import { computeMaxBid } from "./bid-optimizer";
+import { computePriorityScore, computeEVMaxBid, tagPlayer } from "./priority-scorer";
 import { runMonteCarlo } from "./monte-carlo";
 
 // ============================================================
@@ -46,6 +46,10 @@ export interface BidOptimizerWorkerRequest {
   myCurrentRosterSGP: number;
   opponentBudgets: number[];
   numSimulations: number; // 200
+  /** FanGraphs auction dollar value for the nominated player */
+  fgDollars: number;
+  /** Category state computed by computeCategoryState in computeDraftEngine */
+  categoryState: CategoryState;
 }
 
 /** Response payload posted back from the worker */
@@ -55,13 +59,21 @@ export interface BidOptimizerWorkerResponse {
   expectedMarketPrice: number;
   valueSurplus: number;
   shouldBid: boolean;
-  /** SGP breakeven from binary search (before ASV blend) */
+  /** Priority score stored here for UI display (repurposed from SGP breakeven) */
   sgpBreakeven: number;
-  /** Pre-cap blended value (40% SGP + 60% ASV) */
+  /** EV-based max bid (pre-strategy-cap) */
   rawBlendedValue: number;
   simulationEV: number;
   simulationStdDev: number;
   computeTimeMs: number;
+  /** EV-based priority score (EV × weights product) */
+  priorityScore: number;
+  /** $ added to inflated FG$ for EV+ players */
+  evBuffer: number;
+  /** $ added for scarce-category contributors */
+  categoryBonus: number;
+  /** Player classification tags */
+  playerTags: string[];
 }
 
 // ============================================================
@@ -108,22 +120,31 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     myCurrentRosterSGP,
     opponentBudgets,
     numSimulations,
+    fgDollars,
+    categoryState,
   } = req;
 
   // Reconstruct OpponentModel Maps from plain objects
   const opponentModel = deserializeOpponentModel(serializedOpponentModel);
+  void opponentModel; // used by Monte Carlo via runMonteCarlo params below
 
-  // Step 1: Compute max bid via binary search
-  const maxBidResult = computeMaxBid(
+  // Step 1: Compute EV-based priority score and max bid
+  const isEndgame = budget <= 20;
+  const priorityResult = computePriorityScore(
     nominatedPlayer,
-    availablePlayers,
-    sgpValues,
-    budget,
-    rosterSlots,
-    opponentModel,
-    inflationFactor,
+    fgDollars,
     nominatedAsv ?? undefined,
+    categoryState,
   );
+  const evMaxBid = computeEVMaxBid(
+    fgDollars,
+    priorityResult.evBuffer,
+    priorityResult.categoryBonus,
+    inflationFactor,
+    budget,
+    isEndgame,
+  );
+  const playerTags = tagPlayer(nominatedPlayer);
 
   // Step 2: Run Monte Carlo simulation
   const monteCarloResult = runMonteCarlo({
@@ -135,7 +156,7 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     opponentBudgets,
     rosterSlots,
     nominatedPlayer,
-    nominatedBid: maxBidResult.maxBid,
+    nominatedBid: evMaxBid,
     numSimulations,
   });
 
@@ -144,15 +165,19 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
   // Post response back to main thread
   const response: BidOptimizerWorkerResponse = {
     requestId,
-    maxBid: maxBidResult.maxBid,
-    expectedMarketPrice: maxBidResult.expectedMarketPrice,
-    valueSurplus: maxBidResult.valueSurplus,
+    maxBid: evMaxBid,
+    expectedMarketPrice: nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars,
+    valueSurplus: evMaxBid - (nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars),
     shouldBid: monteCarloResult.shouldBid,
-    sgpBreakeven: maxBidResult.sgpBreakeven,
-    rawBlendedValue: maxBidResult.rawBlendedValue,
+    sgpBreakeven: priorityResult.priorityScore, // repurposed field: store priority score here for UI display
+    rawBlendedValue: evMaxBid, // EV-based max bid (pre-strategy-cap)
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
     computeTimeMs,
+    priorityScore: priorityResult.priorityScore,
+    evBuffer: priorityResult.evBuffer,
+    categoryBonus: priorityResult.categoryBonus,
+    playerTags,
   };
 
   (self as unknown as Worker).postMessage(response);
