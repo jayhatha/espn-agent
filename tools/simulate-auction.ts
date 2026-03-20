@@ -123,19 +123,34 @@ function buildPlayerPool(
   return players;
 }
 
-// Load ESPN ASV
+// Load ESPN ASV — takes max(ASV from draft trends, ESPN pre-draft salary)
 function loadASV(): Map<string, number> {
-  const csvPath = path.join(ROOT, "combined-draft-values.csv");
-  if (!fs.existsSync(csvPath)) return new Map();
-  const content = fs.readFileSync(csvPath, "utf-8");
   const map = new Map<string, number>();
-  for (const line of content.split("\n")) {
-    if (line.startsWith("#") || line.startsWith("Name,")) continue;
-    const match = line.match(/^"([^"]+)",([^,]+),([0-9.]+)/);
-    if (match) {
-      map.set(normalizeName(match[1]), parseFloat(match[3]));
+
+  // 1. Load ASV from combined CSV (draft trend averages)
+  const csvPath = path.join(ROOT, "combined-draft-values.csv");
+  if (fs.existsSync(csvPath)) {
+    const content = fs.readFileSync(csvPath, "utf-8");
+    for (const line of content.split("\n")) {
+      if (line.startsWith("#") || line.startsWith("Name,")) continue;
+      const match = line.match(/^"([^"]+)",([^,]+),([0-9.]+)/);
+      if (match) {
+        map.set(normalizeName(match[1]), parseFloat(match[3]));
+      }
     }
   }
+
+  // 2. Load ESPN pre-draft values and take max(ASV, pre-draft)
+  const predraftPath = path.join(ROOT, "tools/espn-predraft-values.json");
+  if (fs.existsSync(predraftPath)) {
+    const predraft = JSON.parse(fs.readFileSync(predraftPath, "utf-8")) as { name: string; salary: number }[];
+    for (const entry of predraft) {
+      const nName = normalizeName(entry.name);
+      const existing = map.get(nName) ?? 0;
+      map.set(nName, Math.max(existing, entry.salary));
+    }
+  }
+
   return map;
 }
 
@@ -294,7 +309,7 @@ function getPositionalWeight(positions: string[]): number {
 // ============================================================
 
 const SP_TIER_CAPS = [18, 12, 10, 5, 3];
-const HITTER_BUDGET_MAX = 220;
+const HITTER_BUDGET_MAX = 200;
 const RP_MAX_BID = 15;
 
 function getSpTierCap(spCount: number): number {
@@ -461,11 +476,11 @@ function computeOurBid(
     }
   }
 
-  // --- 3. Hitter budget cap ($220) ---
-  // Always enforced (even for bench hitters) — prevents budget overspend.
-  // Skip only in endgame when budget is nearly exhausted anyway.
+  // --- 3. Hitter budget cap ($200) ---
+  // Always enforced, no exceptions. Remaining $60 is reserved for pitching.
+  // This ensures ~77% hitter / ~23% pitcher split.
   const isEndgame = team.budget <= 20;
-  if (!player.isPitcher && !isEndgame) {
+  if (!player.isPitcher) {
     if (team.hitterSpent + bid > HITTER_BUDGET_MAX) {
       bid = Math.max(1, HITTER_BUDGET_MAX - team.hitterSpent);
     }
@@ -523,6 +538,11 @@ function computeOurBid(
       // elite guys above market price (the Judge problem)
       if (asv > 33) {
         flush = Math.min(flush, Math.max(0, Math.round(asv) - bid));
+      }
+      // For hitters, flush must not exceed hitter budget cap
+      if (!player.isPitcher) {
+        const hitterHeadroom = Math.max(0, HITTER_BUDGET_MAX - team.hitterSpent - bid);
+        flush = Math.min(flush, hitterHeadroom);
       }
       bid += flush;
     }

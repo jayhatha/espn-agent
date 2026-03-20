@@ -50,7 +50,9 @@
 <h1>Roster Builder</h1>
 <p class="subtitle">Fill positions, adjust prices, see category projections. Click a player in the pool to add them.</p>
 <button class="load-btn" onclick="document.getElementById('csvInput').click()">Load combined-draft-values.csv</button>
+<button class="load-btn" onclick="document.getElementById('predraftInput').click()" style="margin-left:8px">Load pre-draft values JSON</button>
 <input type="file" id="csvInput" accept=".csv" onchange="loadCSV(event)">
+<input type="file" id="predraftInput" accept=".json" style="display:none" onchange="loadPredraftJSON(event)">
 
 <div class="layout">
   <div class="roster-panel">
@@ -123,6 +125,7 @@ const HITTING_CATS = ['HR', 'R', 'RBI', 'SB', 'OPS'];
 const PITCHING_CATS = ['K', 'W', 'SV', 'ERA', 'WHIP'];
 
 let players = [];
+let predraftValues = {}; // name -> salary from ESPN pre-draft
 let roster = {}; // slotId -> { player, price }
 let nextSlotForClick = null;
 
@@ -133,9 +136,35 @@ function loadCSV(event) {
   reader.onload = (e) => {
     const text = e.target.result;
     players = parseCSV(text);
+    // Apply pre-draft values: use max(ASV, pre-draft)
+    applyPredraftValues();
     renderAll();
   };
   reader.readAsText(file);
+}
+
+function loadPredraftJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = JSON.parse(e.target.result);
+    predraftValues = {};
+    for (const entry of data) {
+      predraftValues[entry.name.toLowerCase()] = entry.salary;
+    }
+    applyPredraftValues();
+    renderAll();
+  };
+  reader.readAsText(file);
+}
+
+function applyPredraftValues() {
+  for (const p of players) {
+    const predraft = predraftValues[p.name.toLowerCase()] ?? 0;
+    p.asv = Math.max(p.asv, predraft);
+  }
+  players.sort((a, b) => b.asv - a.asv);
 }
 
 function parseCSV(text) {
@@ -342,10 +371,23 @@ function renderPool() {
   }).join('');
 }
 
-// Try auto-loading CSV from same directory
-fetch('combined-draft-values.csv').then(r => r.ok ? r.text() : null).then(text => {
-  if (text) { players = parseCSV(text); renderAll(); }
-}).catch(() => {});
+// Try auto-loading both files from same directory
+Promise.all([
+  fetch('combined-draft-values.csv').then(r => r.ok ? r.text() : null).catch(() => null),
+  fetch('espn-predraft-values.json').then(r => r.ok ? r.json() : null).catch(() => null),
+]).then(([csvText, predraftData]) => {
+  if (predraftData) {
+    predraftValues = {};
+    for (const entry of predraftData) {
+      predraftValues[entry.name.toLowerCase()] = entry.salary;
+    }
+  }
+  if (csvText) {
+    players = parseCSV(csvText);
+    applyPredraftValues();
+  }
+  renderAll();
+});
 
 renderAll();
 </script>
