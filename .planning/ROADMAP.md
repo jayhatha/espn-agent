@@ -253,3 +253,12 @@ Plans:
 Plans:
 - [ ] 61-01-PLAN.md — TDD: Dynamic SGP recomputation in simulator (5-pick interval) + verify live engine already filters to undrafted players
 - [ ] 61-02-PLAN.md — Fix RP cap (conditional on spCount), SP/RP mode roster display, bench hitter reliability, 10k sim validation
+
+### Phase 62: Priority-scored auction engine — EV-based priority score with category scarcity weights, team need tracking, surplus pool allocation, replacement cliff detection, player tags, and dynamic max bid capped at FG x 1.25. Simulator first, then live engine.
+
+**Goal:** [To be planned]
+**Depends on:** Phase 61
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 62 to break down)
