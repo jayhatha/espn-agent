@@ -682,7 +682,7 @@ function getOpponentMaxBid(
 
 function simulateAuction(
   players: PoolPlayer[],
-  sgpValues: number[],
+  staticSGPValues: number[],
   asvMap: Map<string, number>,
   plRankMap: Map<string, number>,
 ): SimResult {
@@ -716,8 +716,7 @@ function simulateAuction(
 
   const available = new Set(players.map((_, i) => i));
   // Static SGP: computed once from the full pool before the loop — serves as the initial anchor.
-  // Used outside the while loop (pre-loop initialization, post-loop stats).
-  const staticSGPValues = sgpValues; // rename for clarity; same reference
+  // Parameter is named staticSGPValues to make the static/dynamic distinction clear.
   const staticTotalPositiveSGP = staticSGPValues.reduce((s, v) => s + Math.max(0, v), 0);
   const totalLeagueBudget = BUDGET * TOTAL_TEAMS;
 
