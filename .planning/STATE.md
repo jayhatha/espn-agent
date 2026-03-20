@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 62 of 62 (Priority-Scored Auction Engine)
-Plan: 01 (1 of 3 plans complete)
+Plan: 02 (2 of 3 plans complete)
 Status: In Progress
-Last activity: 2026-03-20 - Phase 62 plan 01 complete (EV-based priority scoring: computePriorityScore, computeEVMaxBid, tagPlayer, getCategoryWeight + 56 tests)
+Last activity: 2026-03-20 - Phase 62 plan 02 complete (dynamic category state: scarcity weights, pace tracking, surplus pool, cliff detection, 27 tests)
 
-Progress: [█░░] 33% (Phase 62: 1/3 plans complete)
+Progress: [██░] 67% (Phase 62: 2/3 plans complete)
 
 ## Accumulated Context
 
@@ -111,6 +111,8 @@ Progress: [█░░] 33% (Phase 62: 1/3 plans complete)
 0 FG value threshold (580 players): structural fix for 13-team bench/UTIL slot shortage (158 positive-value hitters vs 208 slots needed)
 - [Phase 61]: Conditional RP cap guarded by pitcherSlotsLeft <= 3 to prevent early-draft RP flood; SP/RP slot labels distinguish pitcher type in mode roster display
 - [Phase 62]: priority_score = max(0, EV) x category_weight x scarcity_weight x team_need_weight; EV = FG$ - ESPN_ASV; missing ASV → EV = 0
+- [Phase 62-02]: LOWER_BETTER scarcity uses initialMedian/remainingMedian (inverted) so worsening ERA increases scarcity weight above 1.0
+- [Phase 62-02]: Cliff detection sorts contributors by stat value (not FG$) to find true top specialists per category before computing FG$ dropoff
 0 remaining, 30% bid dampening, value_per_dollar filtering, budget bands as tracking (not constraints)
 - [Phase 48]: Overpricing-based nomination scoring: 60% overpricing, 20% opponent need, 20% my non-need
 - [Phase 49]: Positional weights added after dampening; SP tier caps clamp bid ceiling by drafted SP count; GS cap is advisory only
@@ -225,5 +227,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 61-02-PLAN.md (simulator roster composition fixes: SP/RP display, conditional RP cap, bench hitter pool expansion, 10k sim validation).
+Stopped at: Completed 62-02-PLAN.md (dynamic category state: scarcity weights, pace tracking with LOWER_BETTER inversion, surplus pool, cliff detection, 27 tests).
 Resume file: None
