@@ -247,7 +247,7 @@ Plans:
 
 **Goal:** Recompute SGP per-pick as the player pool shrinks, anchored from static baseline. Fix simulator to draft quality hitters (ASV >= $3) and RPs, fill all 28 roster slots. Validate with 10k sims.
 **Depends on:** Phase 60
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 **Requirements:** DYN-SGP, SIM-ROSTER, SIM-RP, SIM-BENCH
 
 Plans:

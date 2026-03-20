@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 60 — Evaluate and Fix SP Logic in Bid Engine
+**Current focus:** Phase 61 — Dynamic SGP Recalculation During Draft
 
 ## Current Position
 
-Phase: 60 of 60 (Evaluate and Fix SP Logic)
-Plan: 02 (2 of 2 plans complete)
+Phase: 61 of 61 (Dynamic SGP Recalculation)
+Plan: 01 (1 of 1 plans complete)
 Status: Complete
-Last activity: 2026-03-19 - Phase 60 plan 02 complete (simulator SP savings fix + conflict audit)
+Last activity: 2026-03-20 - Phase 61 plan 01 complete (dynamic SGP recomputation in simulator + live engine verification)
 
-Progress: [██████████] 100% (Phase 60: 2/2 plans complete)
+Progress: [██████████] 100% (Phase 61: 1/1 plans complete)
 
 ## Accumulated Context
 
@@ -271,6 +271,8 @@ Progress: [██████████] 100% (Phase 60: 2/2 plans complete)
 - [Phase 60-02]: Endgame dampening can reduce ranked SP bids below tier floor in engine (strategy-caps.ts) — follow-up item, low priority
 - [Phase 60-03]: Endgame re-enforce guard skips when spCount >= 7 — full-roster $3 cap takes precedence over tier floor
 - [Phase 60-03]: Re-enforce placed after endgame block but before inflation adjustment — preserves ordering invariant
+- [Phase 61-01]: RECOMPUTE_EVERY=5 picks yields ~95 recomputes per sim (478-player pool); dynamic SGP stored as sparse array (zeros for drafted) to preserve index alignment
+- [Phase 61-01]: Live engine already dynamic — allPlayersOpt = undraftedPlayers.slice(0,200), SGP cache key includes allPicks.length; no code change needed
 
 ### Roadmap Evolution
 
@@ -305,6 +307,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19
-Stopped at: Completed 60-03-PLAN.md (endgame SP tier floor fix + REQUIREMENTS.md phase-60 IDs).
+Last session: 2026-03-20
+Stopped at: Completed 61-01-PLAN.md (dynamic SGP recomputation in simulator + live engine verification).
 Resume file: None
