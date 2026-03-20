@@ -50,6 +50,7 @@ function makeCategoryState(
     cliffPlayers: [],
     initialPoolStats: {},
     categoryDirections: {},
+    forceAcquisitionCategories: [],
     ...overrides,
   };
 }
