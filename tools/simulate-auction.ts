@@ -86,12 +86,11 @@ function buildPlayerPool(
 
   for (const ah of hitterAuctions) {
     const nName = normalizeName(ah.name);
-    // Hitters: include players down to -$10 FG value as replacement-level UTIL/bench picks.
-    // In a 13-team deep league, 208 hitter slots need filling — only 158 have positive value,
-    // so we must include lower-tier players. Replacement level is roughly -$10 in 12-team
-    // FG context (still draftable in a deeper 13-team format).
-    // Exclude pitchers misclassified in the hitter file.
-    if (ah.dollars < -10 || pitcherNamesInPool.has(nName)) continue;
+    // Hitters: include top ~195 hitters (FG dollars >= -4). This covers the
+    // top 130 (real starters) plus ~65 bench/UTIL-depth players for a 13-team
+    // league (208 hitter slots). Excludes deep replacement junk that distorts
+    // SGP calculations and creates unrealistic draft dynamics.
+    if (ah.dollars < -4 || pitcherNamesInPool.has(nName)) continue;
     const proj = hitterProjMap.get(nName) as Record<string, number> | undefined;
     const stats: Record<string, number> = {};
     if (proj) {
@@ -386,11 +385,12 @@ function computeOurBid(
     return 0;
   }
 
-  // Base: SGP/ASV blend, floored at ASV for hitters.
-  // The blend determines which players we PREFER (highest SGP per dollar),
-  // but the floor ensures we actually compete for mid-tier talent ($10-15)
-  // instead of ceding them to opponents and filling up on replacement guys.
-  // Pitchers use SP tier caps instead — no ASV floor needed.
+  // Base: SGP/ASV blend, floored at ASV for hitters, hard-capped at $30.
+  // Dynamic SGP inflates values as the pool shrinks — the $30 cap prevents
+  // us from chasing elite guys at $35-40+. We want 1-2 stars at $20-30
+  // and the rest at $10-15. The blend + floor handles the $10-15 tier;
+  // the cap prevents runaway spending on any single player.
+  const HITTER_PER_PLAYER_CAP = 30;
   let bid: number;
   if (sgpDollars > asv && asv > 0 && asv <= 33) {
     bid = Math.max(1, Math.round(sgpDollars));
@@ -401,6 +401,10 @@ function computeOurBid(
   // for the $10-15 tier that carries fantasy rosters.
   if (!player.isPitcher && asv > 0) {
     bid = Math.max(bid, Math.round(asv));
+  }
+  // Hard cap per hitter — don't chase any single player above $30
+  if (!player.isPitcher) {
+    bid = Math.min(bid, HITTER_PER_PLAYER_CAP);
   }
   const blendedValue = bid;
 
@@ -457,12 +461,11 @@ function computeOurBid(
     }
   }
 
-  // --- 3. Hitter budget cap (skip in endgame or when filling bench hitter slots) ---
-  // Also exempt when only bench/UTIL hitter slots remain — these are cheap filler
-  // picks and we must fill them; the cap shouldn't prevent roster completion.
+  // --- 3. Hitter budget cap ($220) ---
+  // Always enforced (even for bench hitters) — prevents budget overspend.
+  // Skip only in endgame when budget is nearly exhausted anyway.
   const isEndgame = team.budget <= 20;
-  const isFillingBenchHitter = hitterSlotsLeft <= 5;
-  if (!player.isPitcher && !isEndgame && !isFillingBenchHitter) {
+  if (!player.isPitcher && !isEndgame) {
     if (team.hitterSpent + bid > HITTER_BUDGET_MAX) {
       bid = Math.max(1, HITTER_BUDGET_MAX - team.hitterSpent);
     }
@@ -913,8 +916,10 @@ function simulateAuction(
       continue;
     }
 
-    // Price = second-highest + 1 (minimum $1)
-    const price = Math.max(1, secondHighest + 1);
+    // Price = second-highest + 1 (minimum $1), capped at winner's budget
+    const winnerSlotsLeft = Object.values(teams[winner].slotsRemaining).reduce((s, v) => s + v, 0);
+    const winnerMaxPrice = Math.max(1, teams[winner].budget - Math.max(0, winnerSlotsLeft - 1));
+    const price = Math.min(Math.max(1, secondHighest + 1), winnerMaxPrice);
     const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher, teams[winner], isSP(player));
     if (slot === null) {
       // Can't actually roster this player — skip
