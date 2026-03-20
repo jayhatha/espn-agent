@@ -715,15 +715,24 @@ function simulateAuction(
   }
 
   const available = new Set(players.map((_, i) => i));
-  const totalPositiveSGP = sgpValues.reduce((s, v) => s + Math.max(0, v), 0);
+  // Static SGP: computed once from the full pool before the loop — serves as the initial anchor.
+  // Used outside the while loop (pre-loop initialization, post-loop stats).
+  const staticSGPValues = sgpValues; // rename for clarity; same reference
+  const staticTotalPositiveSGP = staticSGPValues.reduce((s, v) => s + Math.max(0, v), 0);
   const totalLeagueBudget = BUDGET * TOTAL_TEAMS;
-  let sgpRecomputeCount = 0; // tracks how many times dynamic SGP was recomputed
 
-  // Pre-compute overpricing scores for our nomination strategy
+  // Dynamic SGP: starts identical to static, recomputes from remaining pool every 5 picks.
+  let dynamicSGPValues = [...staticSGPValues];
+  let dynamicTotalPositiveSGP = staticTotalPositiveSGP;
+  let lastRecomputeAvailSize = available.size;
+  let sgpRecomputeCount = 0; // tracks how many times dynamic SGP was recomputed
+  const RECOMPUTE_EVERY = 5;
+
+  // Pre-compute overpricing scores for our nomination strategy (will refresh with each SGP recompute)
   const overpricingScores = players.map((p, i) => {
     const asv = asvMap.get(p.normalizedName) ?? p.dollars;
-    const sgpD = totalPositiveSGP > 0
-      ? (Math.max(0, sgpValues[i]) / totalPositiveSGP) * totalLeagueBudget : p.dollars;
+    const sgpD = dynamicTotalPositiveSGP > 0
+      ? (Math.max(0, dynamicSGPValues[i]) / dynamicTotalPositiveSGP) * totalLeagueBudget : p.dollars;
     return asv - sgpD; // higher = more overpriced
   });
 
@@ -734,6 +743,32 @@ function simulateAuction(
       Object.values(t.slotsRemaining).reduce((s, v) => s + v, 0) > 0
     );
     if (!anyTeamHasSlots) break;
+
+    // Dynamic SGP recomputation: every 5 picks, recompute SGP from the remaining available pool.
+    // This corrects stale replacement levels as the player pool shrinks during the draft.
+    if (lastRecomputeAvailSize - available.size >= RECOMPUTE_EVERY) {
+      const availArr = Array.from(available);
+      const availPlayers = availArr.map(i => players[i]);
+      const freshSGP = computeSGP(availPlayers);
+      // Reset to zeros — only available players get updated values; drafted players stay 0.
+      dynamicSGPValues = new Array(players.length).fill(0);
+      for (let j = 0; j < availArr.length; j++) {
+        dynamicSGPValues[availArr[j]] = freshSGP[j];
+      }
+      dynamicTotalPositiveSGP = freshSGP.reduce((s, v) => s + Math.max(0, v), 0);
+      lastRecomputeAvailSize = available.size;
+      sgpRecomputeCount++;
+
+      // Rebuild overpricing scores from fresh dynamic SGP + fresh available pool
+      for (const idx of available) {
+        const p = players[idx];
+        const asv = asvMap.get(p.normalizedName) ?? p.dollars;
+        const sgpD = dynamicTotalPositiveSGP > 0
+          ? (Math.max(0, dynamicSGPValues[idx]) / dynamicTotalPositiveSGP) * totalLeagueBudget
+          : p.dollars;
+        overpricingScores[idx] = asv - sgpD;
+      }
+    }
 
     const slotsLeft = Object.values(teams[nominatingTeam].slotsRemaining).reduce((s, v) => s + v, 0);
     if (slotsLeft === 0) {
@@ -772,9 +807,9 @@ function simulateAuction(
     }
 
     const player = players[nomIdx];
-    const playerSGP = Math.max(0, sgpValues[nomIdx]);
-    const sgpDollars = totalPositiveSGP > 0
-      ? (playerSGP / totalPositiveSGP) * totalLeagueBudget
+    const playerSGP = Math.max(0, dynamicSGPValues[nomIdx]);
+    const sgpDollars = dynamicTotalPositiveSGP > 0
+      ? (playerSGP / dynamicTotalPositiveSGP) * totalLeagueBudget
       : player.dollars;
     const asv = asvMap.get(player.normalizedName) ?? player.dollars;
 
@@ -1023,6 +1058,7 @@ console.log("=" .repeat(70));
 console.log(`  Simulations: ${NUM_SIMS}`);
 console.log(`  Teams: ${TOTAL_TEAMS}, Budget: $${BUDGET}, Slots: ${TOTAL_SLOTS}`);
 console.log(`  ASV source: combined-draft-values.csv (from tools/build-combined-csv.ts)`);
+console.log(`  Dynamic SGP recomputes: ~${mean(results.map(r => r.sgpRecomputeCount)).toFixed(0)} per sim`);
 console.log();
 
 console.log(`${pad("Metric", 20)} ${rpad("Mean", 8)} ${rpad("Median", 8)} ${rpad("P10", 8)} ${rpad("P90", 8)}`);
