@@ -86,8 +86,12 @@ function buildPlayerPool(
 
   for (const ah of hitterAuctions) {
     const nName = normalizeName(ah.name);
-    // Hitters: must have positive FG dollars; skip if classified as pitcher
-    if (ah.dollars <= 0 || pitcherNamesInPool.has(nName)) continue;
+    // Hitters: include players down to -$10 FG value as replacement-level UTIL/bench picks.
+    // In a 13-team deep league, 208 hitter slots need filling — only 158 have positive value,
+    // so we must include lower-tier players. Replacement level is roughly -$10 in 12-team
+    // FG context (still draftable in a deeper 13-team format).
+    // Exclude pitchers misclassified in the hitter file.
+    if (ah.dollars < -10 || pitcherNamesInPool.has(nName)) continue;
     const proj = hitterProjMap.get(nName) as Record<string, number> | undefined;
     const stats: Record<string, number> = {};
     if (proj) {
@@ -227,6 +231,8 @@ interface TeamState {
   spPrices: number[];
   /** Rank-based tier cap for each drafted SP (parallel to spPrices) */
   spTierCaps: number[];
+  /** Count of SPs drafted by this team */
+  spCount: number;
   /** Count of RPs drafted by this team */
   rpCount: number;
   hitterSpent: number;
@@ -368,7 +374,15 @@ function computeOurBid(
     (team.slotsRemaining["UTIL"] ?? 0);
   const needBenchHitters = team.benchHitters < 2 && (team.slotsRemaining["BN"] ?? 0) > 0;
   const hitterSlotsRemaining = hitterSlotsLeft + (needBenchHitters ? 1 : 0);
-  if (!player.isPitcher && asv < 3 && pricedHittersAvailable && hitterSlotsRemaining > 3) {
+  // Override cheap hitter skip when only bench/UTIL slots remain.
+  // When main hitter slots are all filled but bench/UTIL slots still need filling,
+  // we MUST take any available hitter regardless of ASV.
+  const onlyBenchHitterSlotsLeft = hitterSlotsLeft === 0 && needBenchHitters;
+  // Also override when only UTIL+BN hitter slots remain (hitterSlotsLeft <= 5).
+  // Cheap hitters will be consumed by opponents before all priced ones run out,
+  // so we need to compete for them once we're down to UTIL/bench-only territory.
+  const onlyUtilBenchSlotsLeft = hitterSlotsLeft <= 5;
+  if (!player.isPitcher && asv < 3 && pricedHittersAvailable && !onlyBenchHitterSlotsLeft && !onlyUtilBenchSlotsLeft && hitterSlotsRemaining > 3) {
     return 0;
   }
 
@@ -443,9 +457,12 @@ function computeOurBid(
     }
   }
 
-  // --- 3. Hitter budget cap (skip in endgame — matches strategy-caps.ts) ---
+  // --- 3. Hitter budget cap (skip in endgame or when filling bench hitter slots) ---
+  // Also exempt when only bench/UTIL hitter slots remain — these are cheap filler
+  // picks and we must fill them; the cap shouldn't prevent roster completion.
   const isEndgame = team.budget <= 20;
-  if (!player.isPitcher && !isEndgame) {
+  const isFillingBenchHitter = hitterSlotsLeft <= 5;
+  if (!player.isPitcher && !isEndgame && !isFillingBenchHitter) {
     if (team.hitterSpent + bid > HITTER_BUDGET_MAX) {
       bid = Math.max(1, HITTER_BUDGET_MAX - team.hitterSpent);
     }
@@ -502,8 +519,16 @@ function computeOurBid(
 
   // --- RP savings reallocation + hard cap ---
   if (isRP(player)) {
-    // Cap at 5 RPs for composition targeting (7SP+5RP)
-    if (team.rpCount >= 5) return 0;
+    // Cap at 5 RPs for composition targeting (7SP+5RP).
+    // Conditional: if SP count is below 7 AND few pitcher slots remain (late draft),
+    // allow more RPs to fill remaining pitcher slots up to 12 total.
+    // Guard: only loosen cap late in the draft (< 10 pitcher slots remain collectively
+    // on our team) to prevent the early-draft feedback loop where RPs flood all P slots.
+    const pitcherSlotsLeft = (team.slotsRemaining["P"] ?? 0) + (team.slotsRemaining["BN"] ?? 0);
+    const maxRPs = (team.spCount < 7 && pitcherSlotsLeft <= 3)
+      ? Math.max(5, 12 - team.spCount)
+      : 5;
+    if (team.rpCount >= maxRPs) return 0;
 
     // Apply SP savings to RPs when 5+ SPs drafted
     if (team.spPrices.length >= 5) {
@@ -579,6 +604,8 @@ interface SimResult {
   overallRank: number;
   rankedSpDrafted: number;  // count of top-60 PL SPs drafted
   rpDrafted: number;        // count of RPs drafted
+  spDrafted: number;        // count of all SPs drafted (any rank)
+  filledSlots: number;      // count of roster slots filled (out of 28)
   benchSplit: { hitters: number; pitchers: number };
   sgpRecomputeCount: number; // number of times dynamic SGP was recomputed during this sim
 }
@@ -600,13 +627,17 @@ function canFillSlot(positions: string[], slots: Record<string, number>, isPitch
   return false;
 }
 
-function assignSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, team?: TeamState): string | null {
+function assignSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, team?: TeamState, isStartingPitcher?: boolean): string | null {
   if (isPitcher) {
-    if ((slots["P"] ?? 0) > 0) { slots["P"]--; return "P"; }
+    if ((slots["P"] ?? 0) > 0) {
+      slots["P"]--;
+      // Distinguish SP vs RP in the slot label so mode roster shows them separately
+      return isStartingPitcher ? "SP" : "RP";
+    }
     if ((slots["BN"] ?? 0) > 0 && (!team || team.benchPitchers < 3)) {
       slots["BN"]--;
       if (team) team.benchPitchers++;
-      return "BN";
+      return isStartingPitcher ? "SP-BN" : "RP-BN";
     }
     return null;
   }
@@ -691,7 +722,7 @@ function simulateAuction(
   for (let t = 0; t < TOTAL_TEAMS; t++) {
     teams.push({
       budget: BUDGET, roster: [], slotsRemaining: { ...ROSTER_SLOTS },
-      benchHitters: 0, benchPitchers: 0, spPrices: [], spTierCaps: [], rpCount: 0, hitterSpent: 0,
+      benchHitters: 0, benchPitchers: 0, spPrices: [], spTierCaps: [], spCount: 0, rpCount: 0, hitterSpent: 0,
     });
   }
 
@@ -884,7 +915,7 @@ function simulateAuction(
 
     // Price = second-highest + 1 (minimum $1)
     const price = Math.max(1, secondHighest + 1);
-    const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher, teams[winner]);
+    const slot = assignSlot(player.positions, teams[winner].slotsRemaining, player.isPitcher, teams[winner], isSP(player));
     if (slot === null) {
       // Can't actually roster this player — skip
       available.delete(nomIdx);
@@ -901,6 +932,7 @@ function simulateAuction(
     // Track SP prices for winning team — only ranked SPs (top 60) count toward
     // SP tier tracking. Filler SPs (rank > 60 or unranked) don't consume a tier slot.
     if (isSP(player)) {
+      teams[winner].spCount++; // count all SPs for conditional RP cap
       const plRank = plRankMap.get(player.normalizedName);
       if (plRank != null && plRank <= 60) {
         teams[winner].spPrices.push(price);
@@ -980,6 +1012,9 @@ function simulateAuction(
     return p.isPitcher && isSP(p) && rank != null && rank <= 60;
   }).length;
   const rpDrafted = myTeam.rpCount;
+  const spDrafted = myTeam.spCount;
+  // filledSlots = 28 - sum of remaining unfilled slots
+  const filledSlots = TOTAL_SLOTS - Object.values(myTeam.slotsRemaining).reduce((s, v) => s + v, 0);
 
   return {
     myDrafted: myTeam.roster,
@@ -996,6 +1031,8 @@ function simulateAuction(
     overallRank,
     rankedSpDrafted,
     rpDrafted,
+    spDrafted,
+    filledSlots,
     benchSplit: { hitters: myTeam.benchHitters, pitchers: myTeam.benchPitchers },
     sgpRecomputeCount,
   };
@@ -1050,6 +1087,21 @@ const ranks = results.map(r => r.overallRank).sort((a, b) => a - b);
 const paid = results.map(r => r.totalPaid).sort((a, b) => a - b);
 const hitPaid = results.map(r => r.hitterPaid).sort((a, b) => a - b);
 const pitPaid = results.map(r => r.pitcherPaid).sort((a, b) => a - b);
+
+// ============================================================
+// Roster Composition Diagnostics (printed first for easy scanning)
+// ============================================================
+const meanSPs = mean(results.map(r => r.spDrafted));
+const meanRPs_comp = mean(results.map(r => r.rpDrafted));
+const meanBenchHitters_comp = mean(results.map(r => r.benchSplit.hitters));
+const meanBenchPitchers_comp = mean(results.map(r => r.benchSplit.pitchers));
+const meanFilledSlots = mean(results.map(r => r.filledSlots));
+
+console.log(`\nRoster Composition (mean across ${NUM_SIMS} sims):`);
+console.log(`  SPs: ${meanSPs.toFixed(1)} | RPs: ${meanRPs_comp.toFixed(1)}`);
+console.log(`  Bench hitters: ${meanBenchHitters_comp.toFixed(1)}/2 | Bench pitchers: ${meanBenchPitchers_comp.toFixed(1)}/3`);
+console.log(`  Filled slots: ${meanFilledSlots.toFixed(1)}/28`);
+console.log();
 
 console.log("=" .repeat(70));
 console.log("  AUCTION SIMULATION RESULTS");
@@ -1114,7 +1166,7 @@ for (const r of results) {
   }
 }
 
-const SLOT_DISPLAY_ORDER = ["C", "1B", "2B", "SS", "3B", "MI", "CI", "OF", "UTIL", "P", "BN"];
+const SLOT_DISPLAY_ORDER = ["C", "1B", "2B", "SS", "3B", "MI", "CI", "OF", "UTIL", "SP", "RP", "SP-BN", "RP-BN", "BN"];
 
 console.log();
 console.log(`${pad("Slot", 5)} ${pad("Mode Player", 24)} ${rpad("Freq", 5)} ${rpad("Pct", 5)} ${rpad("Avg$", 5)}  ${rpad("ASV", 5)}  ${rpad("Blend", 5)}`);
@@ -1126,7 +1178,9 @@ for (const slot of SLOT_DISPLAY_ORDER) {
   const sorted = [...slotMap.entries()].sort((a, b) => b[1].count - a[1].count);
 
   // How many instances of this slot exist per draft?
-  const slotCount = ROSTER_SLOTS[slot] ?? 1;
+  // SP/RP/SP-BN/RP-BN are virtual splits of "P" and "BN" slots — use dynamic counts.
+  const SLOT_COUNT_OVERRIDES: Record<string, number> = { SP: 7, RP: 5, "SP-BN": 3, "RP-BN": 3 };
+  const slotCount = SLOT_COUNT_OVERRIDES[slot] ?? ROSTER_SLOTS[slot] ?? 1;
   for (let s = 0; s < slotCount && s < sorted.length; s++) {
     const [name, data] = sorted[s];
     const p = players.find(pl => pl.name === name)!;
