@@ -3448,5 +3448,415 @@
       "handedness": "RHP",
       "team": "FA"
     }
+  ],
+  "relievers": [
+    {
+      "rank": 1,
+      "playerName": "Mason Miller",
+      "tier": 1,
+      "tierName": "Elite",
+      "handedness": "RHP",
+      "team": "SD"
+    },
+    {
+      "rank": 2,
+      "playerName": "Edwin Diaz",
+      "tier": 1,
+      "tierName": "Elite",
+      "handedness": "RHP",
+      "team": "LAD"
+    },
+    {
+      "rank": 3,
+      "playerName": "Cade Smith",
+      "tier": 1,
+      "tierName": "Elite",
+      "handedness": "RHP",
+      "team": "CLE"
+    },
+    {
+      "rank": 4,
+      "playerName": "Jhoan Duran",
+      "tier": 1,
+      "tierName": "Elite",
+      "handedness": "RHP",
+      "team": "PHI"
+    },
+    {
+      "rank": 5,
+      "playerName": "Devin Williams",
+      "tier": 1,
+      "tierName": "Elite",
+      "handedness": "RHP",
+      "team": "NYM"
+    },
+    {
+      "rank": 6,
+      "playerName": "Andres Munoz",
+      "tier": 2,
+      "tierName": "Top",
+      "handedness": "RHP",
+      "team": "SEA"
+    },
+    {
+      "rank": 7,
+      "playerName": "David Bednar",
+      "tier": 2,
+      "tierName": "Top",
+      "handedness": "RHP",
+      "team": "NYY"
+    },
+    {
+      "rank": 8,
+      "playerName": "Aroldis Chapman",
+      "tier": 2,
+      "tierName": "Top",
+      "handedness": "LHP",
+      "team": "BOS"
+    },
+    {
+      "rank": 9,
+      "playerName": "Ryan Helsley",
+      "tier": 2,
+      "tierName": "Top",
+      "handedness": "RHP",
+      "team": "BAL"
+    },
+    {
+      "rank": 10,
+      "playerName": "Jeff Hoffman",
+      "tier": 2,
+      "tierName": "Top",
+      "handedness": "RHP",
+      "team": "TOR"
+    },
+    {
+      "rank": 11,
+      "playerName": "Pete Fairbanks",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "MIA"
+    },
+    {
+      "rank": 12,
+      "playerName": "Emilio Pagan",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "CIN"
+    },
+    {
+      "rank": 13,
+      "playerName": "Daniel Palencia",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "CHC"
+    },
+    {
+      "rank": 14,
+      "playerName": "Raisel Iglesias",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "ATL"
+    },
+    {
+      "rank": 15,
+      "playerName": "Ryan Walker",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "SF"
+    },
+    {
+      "rank": 16,
+      "playerName": "Kenley Jansen",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "DET"
+    },
+    {
+      "rank": 17,
+      "playerName": "Josh Hader",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "LHP",
+      "team": "HOU"
+    },
+    {
+      "rank": 18,
+      "playerName": "Trevor Megill",
+      "tier": 3,
+      "tierName": "Solid",
+      "handedness": "RHP",
+      "team": "MIL"
+    },
+    {
+      "rank": 19,
+      "playerName": "Dennis Santana",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 20,
+      "playerName": "Carlos Estevez",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "KC"
+    },
+    {
+      "rank": 21,
+      "playerName": "Seranthony Dominguez",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "CHW"
+    },
+    {
+      "rank": 22,
+      "playerName": "Bryan Abreu",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "HOU"
+    },
+    {
+      "rank": 23,
+      "playerName": "Griffin Jax",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "TB"
+    },
+    {
+      "rank": 24,
+      "playerName": "Abner Uribe",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "MIL"
+    },
+    {
+      "rank": 25,
+      "playerName": "Robert Suarez",
+      "tier": 4,
+      "tierName": "Mid",
+      "handedness": "RHP",
+      "team": "ATL"
+    },
+    {
+      "rank": 26,
+      "playerName": "Robert Garcia",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 27,
+      "playerName": "Garrett Cleavinger",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 28,
+      "playerName": "Garrett Whitlock",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 29,
+      "playerName": "Grant Taylor",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 30,
+      "playerName": "Jeremiah Estrada",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": "SD"
+    },
+    {
+      "rank": 31,
+      "playerName": "Kirby Yates",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 32,
+      "playerName": "Clayton Beeter",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 33,
+      "playerName": "JoJo Romero",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 34,
+      "playerName": "Tanner Scott",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 35,
+      "playerName": "Riley O'Brien",
+      "tier": 5,
+      "tierName": "Bench",
+      "handedness": "RHP",
+      "team": "STL"
+    },
+    {
+      "rank": 36,
+      "playerName": "Paul Sewald",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 37,
+      "playerName": "Hogan Harris",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 38,
+      "playerName": "Chris Martin",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 39,
+      "playerName": "Lucas Erceg",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 40,
+      "playerName": "Bryan Baker",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 41,
+      "playerName": "Kyle Finnegan",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 42,
+      "playerName": "Matt Svanson",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 43,
+      "playerName": "Luke Weaver",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": "NYM"
+    },
+    {
+      "rank": 44,
+      "playerName": "Will Vest",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": "DET"
+    },
+    {
+      "rank": 45,
+      "playerName": "Matt Strahm",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 46,
+      "playerName": "Justin Sterner",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 47,
+      "playerName": "Mark Leiter Jr.",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 48,
+      "playerName": "Tyler Wells",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 49,
+      "playerName": "Zach Agnos",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "LHP",
+      "team": ""
+    },
+    {
+      "rank": 50,
+      "playerName": "Cole Henry",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "RHP",
+      "team": ""
+    },
+    {
+      "rank": 51,
+      "playerName": "Adrian Morejon",
+      "tier": 6,
+      "tierName": "Deep",
+      "handedness": "LHP",
+      "team": "SD"
+    }
   ]
 }
