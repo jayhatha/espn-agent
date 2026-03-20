@@ -245,9 +245,11 @@ Plans:
 
 ### Phase 61: Dynamic SGP recalculation during draft — recompute player values as pool shrinks, anchor from static SGP baseline, update replacement levels and inflation live, fix simulator to draft real hitters and RPs
 
-**Goal:** [To be planned]
+**Goal:** Recompute SGP per-pick as the player pool shrinks, anchored from static baseline. Fix simulator to draft quality hitters (ASV >= $3) and RPs, fill all 28 roster slots. Validate with 10k sims.
 **Depends on:** Phase 60
-**Plans:** 0 plans
+**Plans:** 2 plans
+**Requirements:** DYN-SGP, SIM-ROSTER, SIM-RP, SIM-BENCH
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 61 to break down)
+- [ ] 61-01-PLAN.md — TDD: Dynamic SGP recomputation in simulator (5-pick interval) + verify live engine already filters to undrafted players
+- [ ] 61-02-PLAN.md — Fix RP cap (conditional on spCount), SP/RP mode roster display, bench hitter reliability, 10k sim validation
