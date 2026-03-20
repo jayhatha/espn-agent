@@ -297,6 +297,40 @@ export interface MonteCarloResult {
 }
 
 // ============================================================
+// Phase 62: Priority-Scored Auction Engine types
+// ============================================================
+
+/**
+ * Dynamic category state computed once per pick in computeDraftEngine.
+ * Passed to the bid worker to drive EV-based priority scoring.
+ */
+export interface CategoryState {
+  /** statKey → current scarcity weight (clamped 1.0–2.0) */
+  scarcityWeights: Record<string, number>;
+  /** statKey → pace ratio (current_total / target_total; inverted for LOWER_BETTER) */
+  paceRatios: Record<string, number>;
+  /** Accumulated $ saved vs FG value from bargain wins */
+  surplusPool: number;
+  /** Normalized player names with large value dropoff (cliff bonus candidates) */
+  cliffPlayers: string[];  // serialized as string[] (not Set) for worker transfer
+  /** Initial pool stat totals (denominator for scarcity ratio) */
+  initialPoolStats: Record<string, number>;
+  /** Category directions */
+  categoryDirections: Record<string, "HIGHER_BETTER" | "LOWER_BETTER">;
+  /** Categories where pace is below 80% threshold mid-draft — triggers force acquisition logic */
+  forceAcquisitionCategories: string[];
+}
+
+/** Result from computePriorityScore */
+export interface PriorityScoreResult {
+  priorityScore: number;   // EV × combined weight product
+  evBuffer: number;        // $ added to inflated FG$ for EV+ players
+  categoryBonus: number;   // $ added for scarce-category contributors
+  playerTags: string[];    // ["is_SB_anchor", "is_closer", etc.]
+  maxBid: number;          // inflated FG$ + evBuffer + categoryBonus, capped at FG$×1.25, floored at 1
+}
+
+// ============================================================
 // Phase 28: Forward-Looking Draft Simulation types
 // ============================================================
 
