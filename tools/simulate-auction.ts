@@ -471,82 +471,21 @@ function computeOurBid(
     }
   }
 
-  // --- 1. SP tier caps based on PitcherList rank ---
+  // --- 1. SP hard cap: $18 max ---
+  // Dynamic SGP determines what we want to bid. Cap just prevents overspending.
+  // No tier floors, no savings reallocation — let the market (dynamic SGP) decide.
+  const SP_MAX_BID = 18;
   if (isSP(player)) {
-    let tierCap: number;
-    const plRank = plRankMap.get(player.normalizedName);
-    const spCount = team.spPrices.length;
-
-    if (spCount >= 7) {
-      tierCap = 3;
-    } else if (plRank != null && plRank <= 60) {
-      // Ranked SP (top 60) — use tier cap as BOTH floor and ceiling
-      if (plRank <= 20) tierCap = 18;
-      else if (plRank <= 30) tierCap = 12;
-      else if (plRank <= 40) tierCap = 10;
-      else tierCap = 5;
-    } else {
-      // Low-ranked (rank > 60) or unranked SP — filler tier ($3).
-      // Don't bid on filler SPs going to BN at all.
-      const destination = determineSlotDestination(player.positions, team.slotsRemaining, true);
-      if (destination === "BN") return 0;
-      // Skip filler SPs entirely while ranked SPs are still available.
-      // We save P slots for quality arms — don't fill them with filler early.
-      if (rankedSpAvailable) return 0;
-      tierCap = 3;
-    }
-
-    // SP savings reallocation (only for ranked SPs in top-60 tiers).
-    // Uses per-SP rank-based tier caps (spTierCaps) so out-of-order drafting
-    // doesn't generate fake savings. Falls back to slot-position caps when not provided.
-    if (plRank != null && plRank <= 60 && team.spPrices.length > 0) {
-      let idealSpSpend = 0;
-      for (let s = 0; s < team.spPrices.length; s++) {
-        idealSpSpend += team.spTierCaps[s] ?? getSpTierCap(s);
-      }
-      const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
-      const savings = Math.max(0, idealSpSpend - actualSpSpend);
-      if (savings > 0) tierCap += savings;
-    }
-
-    // For ranked SPs (top 60): tier cap is BOTH floor and ceiling — return
-    // immediately so endgame dampening and budget flush don't override it.
-    // The SGP blend undervalues pitchers in an OPS league, so the tier cap IS our bid.
-    // For unranked/filler SPs: cap down only, then continue to flush/endgame.
-    if (plRank != null && plRank <= 60) {
-      return Math.max(1, tierCap);
-    } else {
-      if (bid > tierCap) bid = tierCap;
-    }
+    if (bid > SP_MAX_BID) bid = SP_MAX_BID;
   }
 
-  // --- RP savings reallocation + hard cap ---
+  // --- 2. RP hard cap: $15 max + composition guard ---
   if (isRP(player)) {
-    // Cap at 5 RPs for composition targeting (7SP+5RP).
-    // Conditional: if SP count is below 7 AND few pitcher slots remain (late draft),
-    // allow more RPs to fill remaining pitcher slots up to 12 total.
-    // Guard: only loosen cap late in the draft (< 10 pitcher slots remain collectively
-    // on our team) to prevent the early-draft feedback loop where RPs flood all P slots.
     const pitcherSlotsLeft = (team.slotsRemaining["P"] ?? 0) + (team.slotsRemaining["BN"] ?? 0);
     const maxRPs = (team.spCount < 7 && pitcherSlotsLeft <= 3)
       ? Math.max(5, 12 - team.spCount)
       : 5;
     if (team.rpCount >= maxRPs) return 0;
-
-    // Apply SP savings to RPs when 5+ SPs drafted
-    if (team.spPrices.length >= 5) {
-      let idealSpSpend = 0;
-      for (let s = 0; s < team.spPrices.length; s++) {
-        idealSpSpend += team.spTierCaps[s] ?? getSpTierCap(s);
-      }
-      const actualSpSpend = team.spPrices.reduce((s, v) => s + v, 0);
-      const savings = Math.max(0, idealSpSpend - actualSpSpend);
-      if (savings > 0) {
-        const rpHeadroom = Math.max(0, RP_MAX_BID - bid);
-        bid += Math.min(savings, rpHeadroom);
-      }
-    }
-    // 2. RP hard cap: $15
     if (bid > RP_MAX_BID) bid = RP_MAX_BID;
   }
 

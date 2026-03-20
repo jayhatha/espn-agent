@@ -197,15 +197,31 @@ function renderRoster() {
   }
 }
 
+function isEligible(player, slot) {
+  // BN/UTIL/any slots accept anyone of the right type
+  if (slot.type === 'any') return true;
+  if (slot.type === 'pitcher') return player.type === 'pitcher';
+  if (slot.type === 'hitter' && player.type !== 'hitter') return false;
+
+  // For specific position slots, check player eligibility
+  const slotPos = slot.label;
+  if (slotPos === 'UTIL') return player.type === 'hitter';
+  if (slotPos === 'P') return player.type === 'pitcher';
+
+  const playerPositions = player.pos.split('/').map(p => p.trim().toUpperCase());
+
+  if (slotPos === 'OF') return playerPositions.some(p => ['OF', 'LF', 'CF', 'RF'].includes(p));
+  if (slotPos === 'MI') return playerPositions.some(p => ['2B', 'SS'].includes(p));
+  if (slotPos === 'CI') return playerPositions.some(p => ['1B', '3B'].includes(p));
+
+  return playerPositions.includes(slotPos.toUpperCase());
+}
+
 function getOptionsForSlot(slot, selectedName) {
-  const eligible = players.filter(p => {
-    if (slot.type === 'pitcher' && p.type !== 'pitcher') return false;
-    if (slot.type === 'hitter' && p.type !== 'hitter') return false;
-    // Don't show players already rostered in other slots
-    const rostered = Object.entries(roster).filter(([sid, r]) => r && sid !== slot.id).map(([, r]) => r.player.name);
-    if (rostered.includes(p.name)) return false;
-    return true;
-  });
+  const rostered = new Set(
+    Object.entries(roster).filter(([sid, r]) => r && sid !== slot.id).map(([, r]) => r.player.name)
+  );
+  const eligible = players.filter(p => !rostered.has(p.name) && isEligible(p, slot));
   return eligible.map(p =>
     `<option value="${p.name}" ${p.name === selectedName ? 'selected' : ''}>${p.name} ($${p.asv}) ${p.pos}</option>`
   ).join('');
