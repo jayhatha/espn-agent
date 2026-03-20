@@ -9,6 +9,7 @@ import { normalizeName } from "./normalizer";
 import { computeProjectedStandings } from "./projected-standings";
 import { buildSGPVectors } from "./sgp";
 import { optimizeRoster } from "./roster-optimizer";
+import { computeCategoryState } from "./category-state";
 // category-floor imports removed — SGP naturally handles category coverage
 import { buildOpponentModel, estimateMarketPrice, computePositionCompetition } from "./opponent-model";
 import { computeExternalRankBoost } from "./rank-boost";
@@ -1187,6 +1188,36 @@ export function computeDraftEngine(
     }
   }
 
+  // 5d. Compute category state for EV-based priority scoring (Phase 62)
+  // Must come after teamDraftedTotals is computed. Uses myTeamId totals for pace tracking.
+  const myTotals = (teamDraftedTotals && input.myTeamId)
+    ? (teamDraftedTotals.get(input.myTeamId) ?? {})
+    : {};
+
+  const categoryDirections: Record<string, "HIGHER_BETTER" | "LOWER_BETTER"> = {};
+  for (const cat of input.leagueCategories) {
+    categoryDirections[cat.stat_key] = (cat.direction ?? "HIGHER_BETTER") as "HIGHER_BETTER" | "LOWER_BETTER";
+  }
+
+  const categoryState = computeCategoryState({
+    leagueId: input.leagueId,
+    undraftedPlayers,
+    allUndraftedPlusDrafted: undraftedPlayers,
+    myDraftedPlayers: input.myRoster.map(p => ({
+      normalizedName: normalizeName(p.playerName),
+      fgDollars: (() => {
+        const poolMatch = allPlayersOpt.find(pl => pl.normalizedName === normalizeName(p.playerName));
+        return poolMatch?.dollars ?? p.cost ?? 0;
+      })(),
+      paidDollars: p.cost ?? 0,
+    })),
+    myTotals,
+    categoryTargets: input.categoryTargets ?? {},
+    categoryDirections,
+    totalPicksMade: input.allPicks.length,
+    totalPicksInDraft: input.totalTeams * (input.rosterSize ?? 28),
+  });
+
   // 6a. Async bid optimizer dispatch (Quick Task 58 — moved to Web Worker)
   // Fire bid computation to worker when nominated player changes.
   // Results arrive asynchronously via onBidComplete callback.
@@ -1292,6 +1323,8 @@ export function computeDraftEngine(
         myCurrentRosterSGP,
         opponentBudgets,
         numSimulations: 200,
+        fgDollars: bidNominatedPlayer.dollars,
+        categoryState,
       }).then(result => {
         cachedBidWorkerResult = result;
         bidWorkerCacheKey = capturedBidKey;
