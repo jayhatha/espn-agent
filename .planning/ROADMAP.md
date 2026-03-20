@@ -258,7 +258,7 @@ Plans:
 
 **Goal:** Replace SGP blend with EV-based priority scoring engine (EV × category × scarcity × need), add category pace tracking with force-acquisition triggers, surplus pool, replacement cliff detection, player tags, dynamic max bid capped at FG$ × 1.25. Engine only with thorough tests.
 **Depends on:** Phase 61
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 62-01-PLAN.md — EV-based priority scorer: computePriorityScore, computeEVMaxBid, tagPlayer + TDD tests

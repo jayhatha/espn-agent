@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 62 of 62 (Priority-Scored Auction Engine)
-Plan: 02 (2 of 3 plans complete)
-Status: In Progress
-Last activity: 2026-03-20 - Phase 62 plan 02 complete (dynamic category state: scarcity weights, pace tracking, surplus pool, cliff detection, 27 tests)
+Plan: 03 (3 of 3 plans complete)
+Status: Complete
+Last activity: 2026-03-20 - Phase 62 plan 03 complete (EV-based priority scoring wired into bid pipeline, 12 integration tests, 224 total engine tests pass)
 
-Progress: [██░] 67% (Phase 62: 2/3 plans complete)
+Progress: [███] 100% (Phase 62: 3/3 plans complete)
 
 ## Accumulated Context
 
@@ -65,6 +65,8 @@ Progress: [██░] 67% (Phase 62: 2/3 plans complete)
 - [Phase 62-02]: LOWER_BETTER scarcity uses initialMedian/remainingMedian (inverted) so worsening ERA increases scarcity weight above 1.0
 - [Phase 62-02]: Cliff detection sorts contributors by stat value (not FG$) to find true top specialists per category before computing FG$ dropoff
 - [Phase 62]: max bid = inflated FG$ + evBuffer + categoryBonus, hard capped at FG$ x 1.25 (raw FG$, not inflated); endgame 0.7x dampening
+- [Phase 62-03]: computeMaxBid removed from bid-optimizer-worker.ts but preserved in bid-optimizer.ts for backward compat; DraftedPlayer uses .cost (not .auctionPrice) for auction price
+- [Phase 62-03]: nullBidResponse in worker-client carries new EV fields (priorityScore/evBuffer/categoryBonus/playerTags) for type conformance
 
 ### Roadmap Evolution
 
@@ -101,5 +103,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 62-02-PLAN.md (dynamic category state: scarcity weights, pace tracking with LOWER_BETTER inversion, surplus pool, cliff detection, 27 tests).
+Stopped at: Completed 62-03-PLAN.md (EV-based priority scoring wired into bid pipeline: computeCategoryState in computeDraftEngine, bid-optimizer-worker uses computePriorityScore+computeEVMaxBid, 12 integration tests, 224 total engine tests pass).
 Resume file: None
