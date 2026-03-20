@@ -283,6 +283,7 @@ Progress: [██████████] 100% (Phase 60: 2/2 plans complete)
 - Phase 58 added: Audit max bid and ideal roster — introduce positional need as a bid factor
 - Phase 59 added: Bid engine tuning — use SGP directly when higher than ASV (skip blend), exempt DH from UTIL-only bid cap, spend all $260
 - Phase 60 added: Evaluate and fix SP logic — tier caps, savings reallocation, 7SP+5RP composition, RP hard cap, no pitcher SGP multiplier
+- Phase 61 added: Dynamic SGP recalculation during draft — recompute values as pool shrinks, anchor from static baseline, update replacement levels + inflation live, fix simulator hitter/RP drafting
 
 ### Pending Todos
 

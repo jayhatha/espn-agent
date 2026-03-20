@@ -242,3 +242,12 @@ Plans:
 - [x] 60-01-PLAN.md — Fix SP savings to use per-SP rank-based tier caps + tests for all SP/RP rules
 - [x] 60-02-PLAN.md — Mirror fixes in simulator + 7SP+5RP composition + pitching-vs-hitting conflict audit
 - [ ] 60-03-PLAN.md — Gap closure: fix endgame dampening violating ranked SP tier floor + register requirement IDs
+
+### Phase 61: Dynamic SGP recalculation during draft — recompute player values as pool shrinks, anchor from static SGP baseline, update replacement levels and inflation live, fix simulator to draft real hitters and RPs
+
+**Goal:** [To be planned]
+**Depends on:** Phase 60
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 61 to break down)
