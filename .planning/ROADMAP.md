@@ -256,9 +256,11 @@ Plans:
 
 ### Phase 62: Priority-scored auction engine — EV-based priority score with category scarcity weights, team need tracking, surplus pool allocation, replacement cliff detection, player tags, and dynamic max bid capped at FG x 1.25. Simulator first, then live engine.
 
-**Goal:** [To be planned]
+**Goal:** Replace SGP blend with EV-based priority scoring engine (EV × category × scarcity × need), add category pace tracking with force-acquisition triggers, surplus pool, replacement cliff detection, player tags, dynamic max bid capped at FG$ × 1.25. Engine only with thorough tests.
 **Depends on:** Phase 61
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 62 to break down)
+- [ ] 62-01-PLAN.md — EV-based priority scorer: computePriorityScore, computeEVMaxBid, tagPlayer + TDD tests
+- [ ] 62-02-PLAN.md — Dynamic category state: scarcity weights, pace tracking, surplus pool, cliff detection + TDD tests
+- [ ] 62-03-PLAN.md — Wire priority scorer into bid pipeline (worker + index.ts) + integration tests
