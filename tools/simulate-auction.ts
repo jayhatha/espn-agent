@@ -580,6 +580,7 @@ interface SimResult {
   rankedSpDrafted: number;  // count of top-60 PL SPs drafted
   rpDrafted: number;        // count of RPs drafted
   benchSplit: { hitters: number; pitchers: number };
+  sgpRecomputeCount: number; // number of times dynamic SGP was recomputed during this sim
 }
 
 function canFillSlot(positions: string[], slots: Record<string, number>, isPitcher: boolean, benchHitters?: number, benchPitchers?: number): boolean {
@@ -716,6 +717,7 @@ function simulateAuction(
   const available = new Set(players.map((_, i) => i));
   const totalPositiveSGP = sgpValues.reduce((s, v) => s + Math.max(0, v), 0);
   const totalLeagueBudget = BUDGET * TOTAL_TEAMS;
+  let sgpRecomputeCount = 0; // tracks how many times dynamic SGP was recomputed
 
   // Pre-compute overpricing scores for our nomination strategy
   const overpricingScores = players.map((p, i) => {
@@ -961,6 +963,7 @@ function simulateAuction(
     rankedSpDrafted,
     rpDrafted,
     benchSplit: { hitters: myTeam.benchHitters, pitchers: myTeam.benchPitchers },
+    sgpRecomputeCount,
   };
 }
 
