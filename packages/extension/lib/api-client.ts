@@ -209,7 +209,7 @@ function buildBundledRankings(): {
   for (const p of pitcherlistRankings.pitchers as PitcherListRanking[]) {
     plLookup.set(normalizeName(p.playerName), p);
   }
-  for (const p of pitcherlistRankings.hitters as PitcherListRanking[]) {
+  for (const p of (pitcherlistRankings.hitters ?? []) as PitcherListRanking[]) {
     plLookup.set(normalizeName(p.playerName), p);
   }
 
@@ -366,7 +366,7 @@ export async function getDraftBoardData(): Promise<{
 
       // Build PitcherList lookup maps — cached at module level and only rebuilt when rankings data changes.
       // ESPN draft sessions always use the same bundled rankings, so maps are built at most once.
-      const rankingsHash = `${pitcherlistRankings.pitchers.length}-${pitcherlistRankings.hitters.length}-${pitcherlistRankings.relievers.length}`;
+      const rankingsHash = `${pitcherlistRankings.pitchers.length}-${(pitcherlistRankings.hitters ?? []).length}-${(pitcherlistRankings.relievers ?? []).length}`;
 
       if (rankingsHash !== cachedRankingsHash) {
         // Rebuild maps when rankings data changes (e.g., new bundle deployed mid-session)
@@ -375,7 +375,7 @@ export async function getDraftBoardData(): Promise<{
           cachedPitcherMap.set(normalizeName(ext.playerName), ext);
         }
         cachedHitterMap = new Map<string, PitcherListRanking>();
-        for (const ext of pitcherlistRankings.hitters as PitcherListRanking[]) {
+        for (const ext of (pitcherlistRankings.hitters ?? []) as PitcherListRanking[]) {
           cachedHitterMap.set(normalizeName(ext.playerName), ext);
         }
         cachedRelieverMap = new Map<string, PitcherListRanking>();
