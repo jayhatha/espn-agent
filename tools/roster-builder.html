@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roster Builder</title>
+<style>
+  :root { --bg: #1a1b23; --panel: #22242e; --border: #2d3041; --text: #c8cdd8; --muted: #8890a4; --accent: #5b9cf6; --green: #4ade80; --red: #f87171; --gold: #fbbf24; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+  h1 { font-size: 18px; margin-bottom: 4px; color: #fff; }
+  .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; max-width: 1200px; }
+  .roster-panel, .summary-panel, .pool-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .pool-panel { grid-column: 1 / -1; margin-top: 8px; }
+  h2 { font-size: 14px; color: var(--accent); margin-bottom: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-size: 11px; padding: 4px 6px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: rgba(91, 156, 246, 0.05); }
+  .slot-label { color: var(--muted); font-size: 11px; width: 40px; }
+  .player-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; width: 100%; font-size: 12px; }
+  .player-select:focus { border-color: var(--accent); outline: none; }
+  .price-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; width: 55px; font-size: 12px; text-align: right; }
+  .price-input:focus { border-color: var(--accent); outline: none; }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .stat-label { color: var(--muted); }
+  .stat-value { font-weight: 600; }
+  .stat-value.good { color: var(--green); }
+  .stat-value.warn { color: var(--gold); }
+  .stat-value.bad { color: var(--red); }
+  .budget-bar { height: 6px; background: var(--border); border-radius: 3px; margin: 8px 0; overflow: hidden; }
+  .budget-fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .pool-search { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; width: 300px; font-size: 12px; margin-bottom: 8px; }
+  .pool-search:focus { border-color: var(--accent); outline: none; }
+  .pool-table { max-height: 300px; overflow-y: auto; }
+  .pool-table td { cursor: pointer; }
+  .pool-table tr:hover { background: rgba(91, 156, 246, 0.1); }
+  .clear-btn { background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  .clear-btn:hover { border-color: var(--red); color: var(--red); }
+  .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  #csvInput { display: none; }
+  .load-btn { background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 6px 12px; font-size: 12px; cursor: pointer; margin-bottom: 12px; }
+  .load-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<h1>Roster Builder</h1>
+<p class="subtitle">Fill positions, adjust prices, see category projections. Click a player in the pool to add them.</p>
+<button class="load-btn" onclick="document.getElementById('csvInput').click()">Load combined-draft-values.csv</button>
+<input type="file" id="csvInput" accept=".csv" onchange="loadCSV(event)">
+
+<div class="layout">
+  <div class="roster-panel">
+    <h2>Roster</h2>
+    <table>
+      <thead><tr><th>Slot</th><th>Player</th><th>Price</th><th></th></tr></thead>
+      <tbody id="rosterBody"></tbody>
+    </table>
+  </div>
+  <div class="summary-panel">
+    <h2>Summary</h2>
+    <div class="stat-row"><span class="stat-label">Budget</span><span id="budgetStat" class="stat-value">$260</span></div>
+    <div class="stat-row"><span class="stat-label">Spent</span><span id="spentStat" class="stat-value">$0</span></div>
+    <div class="stat-row"><span class="stat-label">Remaining</span><span id="remainStat" class="stat-value good">$260</span></div>
+    <div class="budget-bar"><div id="budgetFill" class="budget-fill" style="width:0%;background:var(--green)"></div></div>
+    <div class="stat-row"><span class="stat-label">Hitter $</span><span id="hitSpent" class="stat-value">$0</span></div>
+    <div class="stat-row"><span class="stat-label">Pitcher $</span><span id="pitSpent" class="stat-value">$0</span></div>
+    <div class="stat-row"><span class="stat-label">Players</span><span id="playerCount" class="stat-value">0/28</span></div>
+    <hr class="section-divider">
+    <h2>Category Projections</h2>
+    <div class="cat-grid" id="catGrid"></div>
+  </div>
+</div>
+
+<div class="pool-panel">
+  <h2>Player Pool</h2>
+  <input class="pool-search" id="poolSearch" placeholder="Search players..." oninput="renderPool()">
+  <div class="pool-table">
+    <table>
+      <thead><tr><th>Name</th><th>Pos</th><th>ASV</th><th>HR</th><th>R</th><th>RBI</th><th>SB</th><th>OPS</th><th>K</th><th>W</th><th>SV</th><th>ERA</th><th>WHIP</th></tr></thead>
+      <tbody id="poolBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const BUDGET = 260;
+const SLOTS = [
+  { id: 'C', label: 'C', type: 'hitter' },
+  { id: '1B', label: '1B', type: 'hitter' },
+  { id: '2B', label: '2B', type: 'hitter' },
+  { id: 'SS', label: 'SS', type: 'hitter' },
+  { id: '3B', label: '3B', type: 'hitter' },
+  { id: 'MI', label: 'MI', type: 'hitter' },
+  { id: 'CI', label: 'CI', type: 'hitter' },
+  { id: 'OF1', label: 'OF', type: 'hitter' },
+  { id: 'OF2', label: 'OF', type: 'hitter' },
+  { id: 'OF3', label: 'OF', type: 'hitter' },
+  { id: 'OF4', label: 'OF', type: 'hitter' },
+  { id: 'UTIL1', label: 'UTIL', type: 'hitter' },
+  { id: 'UTIL2', label: 'UTIL', type: 'hitter' },
+  { id: 'UTIL3', label: 'UTIL', type: 'hitter' },
+  { id: 'P1', label: 'P', type: 'pitcher' },
+  { id: 'P2', label: 'P', type: 'pitcher' },
+  { id: 'P3', label: 'P', type: 'pitcher' },
+  { id: 'P4', label: 'P', type: 'pitcher' },
+  { id: 'P5', label: 'P', type: 'pitcher' },
+  { id: 'P6', label: 'P', type: 'pitcher' },
+  { id: 'P7', label: 'P', type: 'pitcher' },
+  { id: 'P8', label: 'P', type: 'pitcher' },
+  { id: 'P9', label: 'P', type: 'pitcher' },
+  { id: 'BN1', label: 'BN', type: 'any' },
+  { id: 'BN2', label: 'BN', type: 'any' },
+  { id: 'BN3', label: 'BN', type: 'any' },
+  { id: 'BN4', label: 'BN', type: 'any' },
+  { id: 'BN5', label: 'BN', type: 'any' },
+];
+
+const HITTING_CATS = ['HR', 'R', 'RBI', 'SB', 'OPS'];
+const PITCHING_CATS = ['K', 'W', 'SV', 'ERA', 'WHIP'];
+
+let players = [];
+let roster = {}; // slotId -> { player, price }
+let nextSlotForClick = null;
+
+function loadCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    players = parseCSV(text);
+    renderAll();
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const result = [];
+  let section = null;
+  let headers = null;
+
+  for (const line of lines) {
+    if (line.startsWith('## HITTERS')) { section = 'hitter'; headers = null; continue; }
+    if (line.startsWith('## PITCHERS')) { section = 'pitcher'; headers = null; continue; }
+    if (!section) continue;
+    if (line.startsWith('Name,')) { headers = line.split(','); continue; }
+    if (!headers || !line.trim()) continue;
+
+    const match = line.match(/^"([^"]+)",(.+)/);
+    if (!match) continue;
+    const name = match[1];
+    const rest = match[2].split(',');
+    const pos = rest[0];
+    const asv = parseFloat(rest[1]) || 0;
+
+    const stats = {};
+    for (let i = 2; i < headers.length && i < rest.length + 2; i++) {
+      const key = headers[i];
+      const val = parseFloat(rest[i - 1]);
+      if (!isNaN(val)) stats[key] = val;
+    }
+
+    result.push({ name, pos, asv: Math.round(asv), type: section, stats });
+  }
+  return result.sort((a, b) => b.asv - a.asv);
+}
+
+function renderAll() {
+  renderRoster();
+  renderPool();
+  updateSummary();
+}
+
+function renderRoster() {
+  const body = document.getElementById('rosterBody');
+  body.innerHTML = '';
+  for (const slot of SLOTS) {
+    const r = roster[slot.id];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="slot-label">${slot.label}</td>
+      <td>
+        <select class="player-select" onchange="setPlayer('${slot.id}', this.value)" onfocus="nextSlotForClick='${slot.id}'">
+          <option value="">-- empty --</option>
+          ${getOptionsForSlot(slot, r?.player?.name)}
+        </select>
+      </td>
+      <td><input class="price-input" type="number" min="0" max="260" value="${r?.price ?? ''}" placeholder="$" onchange="setPrice('${slot.id}', this.value)"></td>
+      <td>${r ? '<button class="clear-btn" onclick="clearSlot(\'' + slot.id + '\')">x</button>' : ''}</td>
+    `;
+    body.appendChild(tr);
+  }
+}
+
+function getOptionsForSlot(slot, selectedName) {
+  const eligible = players.filter(p => {
+    if (slot.type === 'pitcher' && p.type !== 'pitcher') return false;
+    if (slot.type === 'hitter' && p.type !== 'hitter') return false;
+    // Don't show players already rostered in other slots
+    const rostered = Object.entries(roster).filter(([sid, r]) => r && sid !== slot.id).map(([, r]) => r.player.name);
+    if (rostered.includes(p.name)) return false;
+    return true;
+  });
+  return eligible.map(p =>
+    `<option value="${p.name}" ${p.name === selectedName ? 'selected' : ''}>${p.name} ($${p.asv}) ${p.pos}</option>`
+  ).join('');
+}
+
+function setPlayer(slotId, name) {
+  if (!name) { clearSlot(slotId); return; }
+  const p = players.find(pl => pl.name === name);
+  if (!p) return;
+  const existing = roster[slotId];
+  roster[slotId] = { player: p, price: existing?.price ?? p.asv };
+  renderAll();
+}
+
+function setPrice(slotId, val) {
+  if (!roster[slotId]) return;
+  roster[slotId].price = parseInt(val) || 0;
+  updateSummary();
+}
+
+function clearSlot(slotId) {
+  delete roster[slotId];
+  renderAll();
+}
+
+function addPlayerFromPool(name) {
+  const p = players.find(pl => pl.name === name);
+  if (!p) return;
+  // Find first empty matching slot
+  const slotType = p.type === 'pitcher' ? 'pitcher' : 'hitter';
+  let target = SLOTS.find(s => !roster[s.id] && (s.type === slotType || s.type === 'any'));
+  if (!target) target = SLOTS.find(s => !roster[s.id] && s.type === 'any');
+  if (!target) return;
+  roster[target.id] = { player: p, price: p.asv };
+  renderAll();
+}
+
+function updateSummary() {
+  const entries = Object.values(roster).filter(Boolean);
+  const spent = entries.reduce((s, r) => s + (r.price || 0), 0);
+  const remain = BUDGET - spent;
+  const hitSpent = entries.filter(r => r.player.type === 'hitter').reduce((s, r) => s + (r.price || 0), 0);
+  const pitSpent = entries.filter(r => r.player.type === 'pitcher').reduce((s, r) => s + (r.price || 0), 0);
+
+  document.getElementById('spentStat').textContent = `$${spent}`;
+  const remainEl = document.getElementById('remainStat');
+  remainEl.textContent = `$${remain}`;
+  remainEl.className = 'stat-value ' + (remain < 0 ? 'bad' : remain < 20 ? 'warn' : 'good');
+  document.getElementById('hitSpent').textContent = `$${hitSpent}`;
+  document.getElementById('pitSpent').textContent = `$${pitSpent}`;
+  document.getElementById('playerCount').textContent = `${entries.length}/28`;
+
+  const pct = Math.min(100, (spent / BUDGET) * 100);
+  const fill = document.getElementById('budgetFill');
+  fill.style.width = pct + '%';
+  fill.style.background = remain < 0 ? 'var(--red)' : remain < 20 ? 'var(--gold)' : 'var(--green)';
+
+  // Category projections
+  const catGrid = document.getElementById('catGrid');
+  catGrid.innerHTML = '';
+  const allCats = [...HITTING_CATS, ...PITCHING_CATS];
+  for (const cat of allCats) {
+    const total = entries.reduce((s, r) => {
+      const val = r.player.stats[cat];
+      if (val == null) return s;
+      if (cat === 'OPS' || cat === 'ERA' || cat === 'WHIP') {
+        // Weighted average for rate stats
+        return s; // handled below
+      }
+      return s + val;
+    }, 0);
+
+    let display;
+    if (cat === 'OPS') {
+      const hitters = entries.filter(r => r.player.type === 'hitter' && r.player.stats.OPS != null);
+      const ab = hitters.reduce((s, r) => s + (r.player.stats.AB || 0), 0);
+      const weighted = hitters.reduce((s, r) => s + (r.player.stats.OPS || 0) * (r.player.stats.AB || 0), 0);
+      display = ab > 0 ? (weighted / ab).toFixed(3) : '---';
+    } else if (cat === 'ERA') {
+      const pitchers = entries.filter(r => r.player.type === 'pitcher' && r.player.stats.ERA != null);
+      const ip = pitchers.reduce((s, r) => s + (r.player.stats.IP || 0), 0);
+      const weighted = pitchers.reduce((s, r) => s + (r.player.stats.ERA || 0) * (r.player.stats.IP || 0), 0);
+      display = ip > 0 ? (weighted / ip).toFixed(2) : '---';
+    } else if (cat === 'WHIP') {
+      const pitchers = entries.filter(r => r.player.type === 'pitcher' && r.player.stats.WHIP != null);
+      const ip = pitchers.reduce((s, r) => s + (r.player.stats.IP || 0), 0);
+      const weighted = pitchers.reduce((s, r) => s + (r.player.stats.WHIP || 0) * (r.player.stats.IP || 0), 0);
+      display = ip > 0 ? (weighted / ip).toFixed(2) : '---';
+    } else {
+      display = Math.round(total);
+    }
+
+    const div = document.createElement('div');
+    div.className = 'stat-row';
+    div.innerHTML = `<span class="stat-label">${cat}</span><span class="stat-value">${display}</span>`;
+    catGrid.appendChild(div);
+  }
+}
+
+function renderPool() {
+  const body = document.getElementById('poolBody');
+  const search = document.getElementById('poolSearch').value.toLowerCase();
+  const rostered = new Set(Object.values(roster).filter(Boolean).map(r => r.player.name));
+
+  const filtered = players.filter(p => !rostered.has(p.name) && (
+    p.name.toLowerCase().includes(search) || p.pos.toLowerCase().includes(search)
+  )).slice(0, 100);
+
+  body.innerHTML = filtered.map(p => {
+    const s = p.stats;
+    return `<tr onclick="addPlayerFromPool('${p.name.replace(/'/g, "\\'")}')">
+      <td>${p.name}</td><td>${p.pos}</td><td>$${p.asv}</td>
+      <td>${s.HR ?? ''}</td><td>${s.R ?? ''}</td><td>${s.RBI ?? ''}</td><td>${s.SB ?? ''}</td>
+      <td>${s.OPS?.toFixed(3) ?? ''}</td>
+      <td>${s.K ?? s.SO ?? ''}</td><td>${s.W ?? ''}</td><td>${s.SV ?? ''}</td>
+      <td>${s.ERA?.toFixed(2) ?? ''}</td><td>${s.WHIP?.toFixed(2) ?? ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Try auto-loading CSV from same directory
+fetch('combined-draft-values.csv').then(r => r.ok ? r.text() : null).then(text => {
+  if (text) { players = parseCSV(text); renderAll(); }
+}).catch(() => {});
+
+renderAll();
+</script>
+</body>
+</html>
