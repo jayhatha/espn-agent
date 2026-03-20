@@ -1081,7 +1081,10 @@ export function computeDraftEngine(
     );
   }
 
-  // SGP cache: rebuild only when pick count or league changes
+  // SGP cache: rebuild only when pick count or league changes.
+  // Dynamic SGP: allPlayersOpt is filtered to undraftedPlayers above (line ~1028),
+  // so SGP denominators naturally reflect the shrinking remaining pool.
+  // Cache invalidates on each pick via allPicks.length in the cache key.
   const newSgpCacheKey = `${input.leagueId ?? 'unknown'}_${input.allPicks.length}`;
   if (newSgpCacheKey !== sgpCacheKey || cachedSGPVectors === null) {
     cachedSGPVectors = buildSGPVectors(
