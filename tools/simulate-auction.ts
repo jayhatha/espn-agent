@@ -352,18 +352,41 @@ function computeOurBid(
   plRankMap: Map<string, number>,
   inflationFactor: number = 1.0,
   rankedSpAvailable: boolean = false,
+  pricedHittersAvailable: boolean = false,
 ): number {
   const remainingSlots = Object.values(team.slotsRemaining).reduce((s, v) => s + v, 0);
 
-  // Base: SGP/ASV blend (matches live engine bid-optimizer.ts exactly)
-  // Skip blend when SGP > ASV on mid-tier players (ASV <= $33).
-  // For expensive players (ASV > $33), always blend — the market already
-  // knows their value so trusting raw SGP leads to massive overpays.
+  // Skip low-ASV hitters (< $3) while real hitters are still available.
+  // ~136 hitters have ASV >= $3 — more than enough for our 16 hitter slots.
+  // We want to draft from the real player pool, not fill up on replacement
+  // guys that nobody else wants. Fall back to cheap guys only when needed.
+  // Exception: when we're down to bench/UTIL slots only, take what's available.
+  const hitterSlotsLeft = (team.slotsRemaining["C"] ?? 0) + (team.slotsRemaining["1B"] ?? 0) +
+    (team.slotsRemaining["2B"] ?? 0) + (team.slotsRemaining["SS"] ?? 0) +
+    (team.slotsRemaining["3B"] ?? 0) + (team.slotsRemaining["MI"] ?? 0) +
+    (team.slotsRemaining["CI"] ?? 0) + (team.slotsRemaining["OF"] ?? 0) +
+    (team.slotsRemaining["UTIL"] ?? 0);
+  const needBenchHitters = team.benchHitters < 2 && (team.slotsRemaining["BN"] ?? 0) > 0;
+  const hitterSlotsRemaining = hitterSlotsLeft + (needBenchHitters ? 1 : 0);
+  if (!player.isPitcher && asv < 3 && pricedHittersAvailable && hitterSlotsRemaining > 3) {
+    return 0;
+  }
+
+  // Base: SGP/ASV blend, floored at ASV for hitters.
+  // The blend determines which players we PREFER (highest SGP per dollar),
+  // but the floor ensures we actually compete for mid-tier talent ($10-15)
+  // instead of ceding them to opponents and filling up on replacement guys.
+  // Pitchers use SP tier caps instead — no ASV floor needed.
   let bid: number;
   if (sgpDollars > asv && asv > 0 && asv <= 33) {
     bid = Math.max(1, Math.round(sgpDollars));
   } else {
     bid = Math.max(1, Math.round(sgpDollars * SGP_WEIGHT + asv * (1 - SGP_WEIGHT)));
+  }
+  // Hitter ASV floor: always willing to pay market price so we compete
+  // for the $10-15 tier that carries fantasy rosters.
+  if (!player.isPitcher && asv > 0) {
+    bid = Math.max(bid, Math.round(asv));
   }
   const blendedValue = bid;
 
@@ -608,7 +631,10 @@ function assignSlot(positions: string[], slots: Record<string, number>, isPitche
 }
 
 // Opponent strategy types
-type OpponentStrategy = "market" | "stars" | "bargain" | "balanced";
+// Market-like teams dominate (8/12). Fewer permanent underbidders.
+// All strategies centered at or slightly above ASV to create realistic
+// competition that pushes prices toward market value.
+type OpponentStrategy = "market" | "market_aggressive" | "stars" | "balanced";
 
 function getOpponentMaxBid(
   strategy: OpponentStrategy,
@@ -618,24 +644,36 @@ function getOpponentMaxBid(
 ): number {
   let maxBid: number;
   switch (strategy) {
-    case "stars":
-      // Stars-and-scrubs: overpay for elite ($30+), underpay for everyone else
-      maxBid = asv >= 30 ? Math.round(asv * (1.1 + Math.random() * 0.2)) : Math.round(asv * 0.7);
+    case "market_aggressive":
+      // Slightly overpays vs market — bids 1.05-1.15× ASV with noise.
+      // These are the opponents who "always bid one more" in real leagues.
+      {
+        const u1 = Math.random(), u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        maxBid = Math.round(asv * (1.10 + z * 0.10));
+      }
       break;
-    case "bargain":
-      // Bargain hunter: never pays more than 90% of ASV
-      maxBid = Math.round(asv * (0.7 + Math.random() * 0.2));
+    case "stars":
+      // Stars-and-scrubs: overpay 20-40% for elite ($25+), pays ASV on rest.
+      // No more 0.7× underbid — even stars managers pay market on cheap guys.
+      maxBid = asv >= 25
+        ? Math.round(asv * (1.2 + Math.random() * 0.2))
+        : Math.round(asv * (0.9 + Math.random() * 0.2));
       break;
     case "balanced":
-      // Balanced: uses a blend similar to ours but less SGP-weighted
-      maxBid = Math.round(sgpDollars * 0.2 + asv * 0.8);
+      // Blend of SGP model and ASV — slightly analytical opponent.
+      // Centered at ASV, occasionally pays above for SGP-rich players.
+      maxBid = Math.round(sgpDollars * 0.3 + asv * 0.7 + (Math.random() * 4 - 1));
       break;
     case "market":
     default:
-      // Market follower: bids ASV with Gaussian noise (std ~15%)
-      const u1 = Math.random(), u2 = Math.random();
-      const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      maxBid = Math.round(asv * (1 + z * 0.15));
+      // Market follower: bids ASV with tight Gaussian noise (std ~10%).
+      // Centered at 1.0× ASV — the backbone of a competitive league.
+      {
+        const u1 = Math.random(), u2 = Math.random();
+        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+        maxBid = Math.round(asv * (1.0 + z * 0.10));
+      }
       break;
   }
   return Math.min(Math.max(1, maxBid), maxAffordable);
@@ -657,9 +695,15 @@ function simulateAuction(
   }
 
   // Assign opponent strategies (randomized each sim)
+  // 5 market + 3 market_aggressive = 8 market-like (dominant).
+  // 2 stars + 2 balanced = 4 differentiated. No permanent underbidders.
   const strategies: OpponentStrategy[] = ["market"]; // team 0 = us (unused)
-  const strategyPool: OpponentStrategy[] = ["market", "market", "market", "market",
-    "stars", "stars", "balanced", "balanced", "balanced", "bargain", "bargain", "bargain"];
+  const strategyPool: OpponentStrategy[] = [
+    "market", "market", "market", "market", "market",
+    "market_aggressive", "market_aggressive", "market_aggressive",
+    "stars", "stars",
+    "balanced", "balanced",
+  ];
   // Shuffle
   for (let i = strategyPool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -708,15 +752,21 @@ function simulateAuction(
       }
       nomIdx = bestIdx >= 0 ? bestIdx : Array.from(available)[0];
     } else {
-      // Opponents: nominate randomly from players they can actually roster
-      // This prevents wasted nominations and keeps auction moving efficiently
+      // Opponents: nominate from the ~10 best available players they can roster.
+      // Real managers nominate guys they want or think will fetch high prices —
+      // they don't randomly throw out replacement-level nobodies.
       const availArr = Array.from(available);
       const fillable = availArr.filter(idx =>
         canFillSlot(players[idx].positions, teams[nominatingTeam].slotsRemaining,
           players[idx].isPitcher, teams[nominatingTeam].benchHitters, teams[nominatingTeam].benchPitchers)
       );
       const nominateFrom = fillable.length > 0 ? fillable : availArr;
-      nomIdx = nominateFrom[Math.floor(Math.random() * nominateFrom.length)];
+      // Sort by ASV descending, pick randomly from top ~10
+      const sorted = [...nominateFrom].sort((a, b) =>
+        (asvMap.get(players[b].normalizedName) ?? 0) - (asvMap.get(players[a].normalizedName) ?? 0)
+      );
+      const topN = sorted.slice(0, Math.min(10, sorted.length));
+      nomIdx = topN[Math.floor(Math.random() * topN.length)];
     }
 
     const player = players[nomIdx];
@@ -757,7 +807,12 @@ function simulateAuction(
           players[idx].isPitcher && isSP(players[idx]) &&
           (plRankMap.get(players[idx].normalizedName) ?? Infinity) <= 60
         );
-        const ourBid = computeOurBid(player, team, sgpDollars, asv, plRankMap, inflationFactor, rankedSpAvailable);
+        // Check if any hitters with meaningful ASV (>= $3) are still available
+        // so we don't fill up on replacement guys prematurely
+        const pricedHittersAvailable = Array.from(available).some(idx =>
+          !players[idx].isPitcher && (asvMap.get(players[idx].normalizedName) ?? 0) >= 3
+        );
+        const ourBid = computeOurBid(player, team, sgpDollars, asv, plRankMap, inflationFactor, rankedSpAvailable, pricedHittersAvailable);
         teamMaxBids.push(Math.min(ourBid, maxAffordable));
       } else {
         teamMaxBids.push(getOpponentMaxBid(strategies[t], asv, sgpDollars, maxAffordable));
