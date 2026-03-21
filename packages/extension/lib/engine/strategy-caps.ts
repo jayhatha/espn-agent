@@ -132,7 +132,8 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   // Exception: DH-eligible players going to UTIL are not penalized — UTIL is
   // their natural slot (DH can only play UTIL, not dedicated positions).
   // BN dampening still applies to DH players — being bench-bound is genuinely bad.
-  const ELITE_THRESHOLD = 30;
+  // No elite override — the EV-based priority score already accounts for
+  // player value. UTIL/BN dampening applies to everyone regardless of price.
   if (input.remainingSlots && !input.isPitcher) {
     const destination = determineSlotDestination(input.positions, input.remainingSlots, false);
 
@@ -142,7 +143,7 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
       return { bidCap: 0, capSource: capSource + ` → NO SLOT (BN full)` };
     }
 
-    if (input.rawMaxBid < ELITE_THRESHOLD) {
+    {
       if (destination === "UTIL") {
         // DH-eligible players: UTIL is their natural home, no dampening
         const isDH = input.positions.some(p => p.toUpperCase() === "DH");
@@ -157,46 +158,19 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
         capSource += ` → need ×0.5 (BN)`;
       }
       // dedicated and flex get no reduction (1.0x)
-    } else {
-      if (destination === "UTIL" || destination === "BN") {
-        capSource += ` → need ×1.0 (elite override)`;
-      }
     }
   }
   // For pitchers: check P slots
   if (input.remainingSlots && input.isPitcher) {
     const destination = determineSlotDestination(input.positions, input.remainingSlots, true);
-    if (destination === "BN" && input.rawMaxBid < ELITE_THRESHOLD) {
+    if (destination === "BN") {
       bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
       capSource += ` → need ×0.5 (BN)`;
     }
   }
 
-  // Apply positional weight bonus — only when the player fills a dedicated slot.
-  // If all dedicated slots for the player's positions are filled, they'd go to
-  // UTIL/BN — no positional scarcity bonus (prevents piling up at one position).
-  const posWeight = getPositionalWeight(input.positions);
-  if (posWeight > 0 && input.remainingSlots) {
-    const hasDedicatedSlot = input.positions.some(pos => {
-      const norm = normalizePosition(pos);
-      // Check dedicated slot
-      if ((input.remainingSlots![norm] ?? 0) > 0) return true;
-      // Check flex slots (MI covers 2B/SS, CI covers 1B/3B)
-      if ((norm === "2B" || norm === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
-      if ((norm === "1B" || norm === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
-      return false;
-    });
-    if (hasDedicatedSlot) {
-      bidCap += posWeight;
-      capSource += ` → pos +${posWeight}`;
-    } else {
-      capSource += ` → pos +0 (slots full)`;
-    }
-  } else if (posWeight > 0) {
-    // No slot data available — apply bonus (backward compat)
-    bidCap += posWeight;
-    capSource += ` → pos +${posWeight}`;
-  }
+  // Positional weights removed — EV-based priority score already accounts
+  // for positional scarcity via FanGraphs replacement-level adjustments.
 
   // Apply hitter budget allocation cap ($200 max for hitters)
   if (!input.isPitcher && !input.isEndgame) {
