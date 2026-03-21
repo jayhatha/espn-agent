@@ -135,13 +135,16 @@ export function computeEVMaxBid(
   budget: number,
   isEndgame: boolean,
 ): number {
-  const base = fgDollars * inflationFactor;
+  // Inflation only pushes bids UP, never below FG$. In a real draft,
+  // other managers bid based on their own values — a $20 FG player still
+  // goes for $15-20. Bidding $12 because of deflation means we never win.
+  const inflatedBase = fgDollars * Math.max(1.0, inflationFactor);
 
   // Endgame: 30% dampening on discretionary buffers
   const effectiveEvBuffer = isEndgame ? Math.round(evBuffer * 0.7) : evBuffer;
   const effectiveCategoryBonus = isEndgame ? Math.round(categoryBonus * 0.7) : categoryBonus;
 
-  const raw = base + effectiveEvBuffer + effectiveCategoryBonus;
+  const raw = inflatedBase + effectiveEvBuffer + effectiveCategoryBonus;
 
   // Hard cap on RAW fgDollars (not inflated)
   const cap = fgDollars * 1.25;
