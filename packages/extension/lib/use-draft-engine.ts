@@ -167,6 +167,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         hitterSpent: baseSignals.budgetCurve?.hitterSpent ?? 0,
         pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
         remainingSlots: baseSignals.remainingSlots ?? undefined,
+        playerName: currentPlayerName ?? undefined,
       });
 
       // Use the strategy cap result directly — it starts from rawMaxBid and

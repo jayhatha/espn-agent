@@ -1,0 +1,34 @@
+{
+  "C": {
+    "targets": ["Cal Raleigh", "Shea Langeliers", "Salvador Perez", "William Contreras", "Ben Rice", "Hunter Goodman", "Adley Rutschman", "Drake Baldwin"],
+    "reaches": []
+  },
+  "1B": {
+    "targets": ["Vladimir Guerrero Jr.", "Freddie Freeman", "Matt Olson", "Bryce Harper", "Munetaka Murakami", "Yandy Diaz", "Alec Burleson", "Michael Busch"],
+    "reaches": ["Pete Alonso", "Nick Kurtz", "Rafael Devers"]
+  },
+  "2B": {
+    "targets": ["Jose Altuve", "Ceddanne Rafaela", "Gleyber Torres", "Marcus Semien", "Ozzie Albies", "Brandon Lowe", "Jorge Polanco", "Bryson Stott"],
+    "reaches": ["Ketel Marte"]
+  },
+  "SS": {
+    "targets": ["Zach Neto", "Mookie Betts", "Corey Seager", "CJ Abrams", "Willy Adames", "Ezequiel Tovar", "Bo Bichette", "Jeremy Pena", "Masyn Winn"],
+    "reaches": []
+  },
+  "3B": {
+    "targets": ["Eugenio Suarez", "Austin Riley", "Alex Bregman", "Maikel Garcia", "Matt Chapman", "Kazuma Okamoto", "Isaac Paredes", "Royce Lewis"],
+    "reaches": ["Junior Caminero"]
+  },
+  "OF": {
+    "targets": ["Brent Rooker", "George Springer", "Wyatt Langford", "Cody Bellinger", "Riley Greene", "Oneil Cruz", "Byron Buxton", "Randy Arozarena", "Brandon Nimmo", "Pete Crow-Armstrong", "Taylor Ward", "Ian Happ", "Michael Harris II"],
+    "reaches": ["Kyle Schwarber", "James Wood", "Roman Anthony", "Yordan Alvarez"]
+  },
+  "SP": {
+    "targets": ["Zack Wheeler", "Shane McClanahan", "Sonny Gray", "Nathan Eovaldi", "Brandon Woodruff", "Tyler Glasnow", "Blake Snell", "Drew Rasmussen", "Michael King", "MacKenzie Gore", "Emmet Sheehan", "Aaron Nola", "Chase Burns"],
+    "reaches": ["Chris Sale", "Bryan Woo", "Max Fried", "Jacob deGrom", "Logan Gilbert", "Logan Webb", "Cole Ragans", "Joe Ryan", "Framber Valdez", "Dylan Cease", "George Kirby"]
+  },
+  "RP": {
+    "targets": ["Devin Williams", "Josh Hader", "Griffin Jax", "Ryan Walker", "Jeff Hoffman", "David Bednar", "Aroldis Chapman", "Daniel Palencia", "Abner Uribe", "Ryan Helsley", "Pete Fairbanks", "Raisel Iglesias"],
+    "reaches": ["Mason Miller", "Edwin Diaz", "Cade Smith", "Jhoan Duran", "Andres Munoz"]
+  }
+}

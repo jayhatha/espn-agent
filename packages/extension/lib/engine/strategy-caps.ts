@@ -15,6 +15,16 @@
  */
 
 import { getPositionalWeight, getSpTierCap, getRankBasedTierCap, HITTER_BUDGET_MAX } from "./draft-constants";
+import draftBoard from "../../assets/draft-board.json";
+import { normalizeName } from "./normalizer";
+
+// Build draft board lookup at module load time
+const draftBoardTargets = new Set<string>();
+const draftBoardReaches = new Set<string>();
+for (const pos of Object.values(draftBoard)) {
+  for (const name of (pos as any).targets ?? []) draftBoardTargets.add(normalizeName(name));
+  for (const name of (pos as any).reaches ?? []) draftBoardReaches.add(normalizeName(name));
+}
 
 /** Total auction draft budget */
 const TOTAL_BUDGET = 260;
@@ -95,6 +105,8 @@ export interface StrategyCapInput {
   draftedSpPrices?: number[];
   /** Rank-based tier caps for each drafted SP (parallel to draftedSpPrices) */
   draftedSpTierCaps?: number[];
+  /** Player name (for draft board lookup) */
+  playerName?: string;
 }
 
 export interface StrategyCapResult {
@@ -122,30 +134,17 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   let bidCap = input.rawMaxBid;
   let capSource = `engine maxBid $${input.rawMaxBid}`;
 
-  // Position priority boost: bid more aggressively on infield and pitchers
-  // when their dedicated slots are still open. Infield positions are scarce
-  // (1 slot each) — missing on SS or 3B means replacement-level all season.
-  // Pitching is 5/10 categories — maximize pitcher acquisitions.
-  if (input.remainingSlots && !input.isPitcher) {
-    const pos = input.positions.map(p => p.toUpperCase());
-    const hasOpenDedicatedSlot = pos.some(p => {
-      const n = normalizePosition(p);
-      if ((input.remainingSlots![n] ?? 0) > 0) return true;
-      if ((n === "2B" || n === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
-      if ((n === "1B" || n === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
-      return false;
-    });
-    // Infield positions with open dedicated slots get a 20% boost
-    const isInfield = pos.some(p => ["C","1B","2B","SS","3B"].includes(p));
-    if (isInfield && hasOpenDedicatedSlot) {
-      bidCap = Math.ceil(bidCap * 1.2);
-      capSource += ` → infield priority ×1.2`;
+  // Draft board boost: bid more aggressively on curated target/reach players.
+  // These are the specific players we identified as top picks at each position.
+  if (input.playerName) {
+    const normalizedName = normalizeName(input.playerName);
+    if (draftBoardTargets.has(normalizedName)) {
+      bidCap = Math.ceil(bidCap * 1.25);
+      capSource += ` → TARGET ×1.25`;
+    } else if (draftBoardReaches.has(normalizedName)) {
+      bidCap = Math.ceil(bidCap * 1.15);
+      capSource += ` → REACH ×1.15`;
     }
-  }
-  // Pitchers with open P slots get a 15% boost
-  if (input.isPitcher && input.remainingSlots && (input.remainingSlots["P"] ?? 0) > 0) {
-    bidCap = Math.ceil(bidCap * 1.15);
-    capSource += ` → pitcher priority ×1.15`;
   }
 
   // Apply catcher dampening (50% when C slot already filled)
