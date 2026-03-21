@@ -80,21 +80,24 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
       <div className="space-y-px">
         {POS_GROUPS.map(({ label, keys, limit, flex }) => {
           const posKey = keys[0];
-          // For flex positions (MI/CI), merge players from both eligible positions
+          // For flex positions (MI/CI), merge players from both eligible positions and deduplicate
           const draftedHere = keys.length > 1
-            ? keys.flatMap(k => draftedByPos.get(k) ?? [])
-            : draftedByPos.get(posKey) ?? [];
+            ? keys.flatMap(k => draftedByPos.get(k) ?? []).filter(p => p?.name)
+            : (draftedByPos.get(posKey) ?? []).filter(p => p?.name);
           const availHere = keys.length > 1
-            ? [...new Map(keys.flatMap(k => (availByPos.get(k) ?? []).map(p => [p.name, p] as [string, typeof p])).entries()).values()]
-              .sort((a, b) => b.fgDollars - a.fgDollars)
-            : availByPos.get(posKey) ?? [];
+            ? [...new Map(
+                keys.flatMap(k => (availByPos.get(k) ?? []))
+                  .filter(p => p?.name)
+                  .map(p => [p.name, p] as [string, typeof p])
+              ).values()].sort((a, b) => b.fgDollars - a.fgDollars)
+            : (availByPos.get(posKey) ?? []).filter(p => p?.name);
           const needKey = flex ? label : posKey;
           const isFilled = !needed.has(needKey);
           const filledCount = draftedHere.length;
 
-          // Deduplicate
+          // Deduplicate (skip undefined names)
           const uniqueDrafted = draftedHere.filter(p => {
-            if (draftedNamesSeen.has(p.name)) return false;
+            if (!p?.name || draftedNamesSeen.has(p.name)) return false;
             draftedNamesSeen.add(p.name);
             return true;
           });
