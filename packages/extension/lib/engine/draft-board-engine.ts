@@ -358,7 +358,28 @@ export function computeDraftBoardState(
       // Slot priority: dedicated → flex (MI/CI) → UTIL → BN
       const slotDestination = findBestOpenSlot(boardPlayer, remainingRosterSlots);
 
-      if (nominatedPositionNeeded && (slotDestination === "dedicated" || slotDestination === "flex")) {
+      // Check if we should spread first: if ANY hitter position group has zero
+      // board players drafted and this player's position already has one,
+      // deprioritize to fill gaps first. Spread before depth.
+      const hitterPositionGroups = ["C", "1B", "2B", "SS", "3B", "OF"];
+      const emptyHitterPositions = hitterPositionGroups.filter(pos => {
+        const count = draftedPlayers.filter(p => isEligible(p, pos)).length;
+        return count === 0 && positionsNeeded.includes(pos);
+      });
+      const thisPlayerPositionCount = boardPlayer.positions.reduce((max, pos) => {
+        const count = draftedPlayers.filter(p => p.positions.includes(pos)).length;
+        return Math.max(max, count);
+      }, 0);
+      const shouldSpreadFirst = emptyHitterPositions.length > 0
+        && thisPlayerPositionCount >= 1
+        && !boardPlayer.positions.some(p => p === "SP" || p === "RP") // pitchers exempt
+        && !boardPlayer.positions.some(p => emptyHitterPositions.includes(p)); // unless filling an empty pos
+
+      if (shouldSpreadFirst) {
+        // We already have someone at this position but other positions are empty
+        recommendedMaxBid = Math.round(boardPlayer.fgDollars * 0.5);
+        bidReason = `${boardPlayer.positions.join("/")} has ${thisPlayerPositionCount} — fill ${emptyHitterPositions.join(",")} first`;
+      } else if (nominatedPositionNeeded && (slotDestination === "dedicated" || slotDestination === "flex")) {
         // Going to a real position slot — bid aggressively
         if (boardPlayer.tier === "target") {
           recommendedMaxBid = Math.round(boardPlayer.fgDollars * 1.25);
