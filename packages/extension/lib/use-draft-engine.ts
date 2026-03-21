@@ -119,6 +119,10 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
           shouldBid: asyncBid.shouldBid,
           simulationEV: asyncBid.simulationEV,
           simulationStdDev: asyncBid.simulationStdDev,
+          priorityScore: asyncBid.priorityScore,
+          evBuffer: asyncBid.evBuffer,
+          categoryBonus: asyncBid.categoryBonus,
+          playerTags: asyncBid.playerTags,
         }
       : baseSignals.optimization;
 

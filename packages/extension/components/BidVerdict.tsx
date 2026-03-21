@@ -16,7 +16,7 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
   }
 
   const opt = engineSignals.optimization;
-  const { maxBid, shouldBid, expectedMarketPrice, valueSurplus, capSource, simulationEV, simulationStdDev, rawBlendedValue, sgpBreakeven } = opt;
+  const { maxBid, shouldBid, expectedMarketPrice, valueSurplus, capSource, simulationEV, simulationStdDev, rawBlendedValue, sgpBreakeven, priorityScore, evBuffer, categoryBonus, playerTags } = opt as any;
   const winProbability =
     engineSignals.simulation?.winProbability?.winProbability;
 
@@ -33,6 +33,19 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
       : "border-grafana-positive"
     : "border-grafana-negative";
 
+  // Pass reason — explain WHY the engine is passing
+  const passReason = !shouldBid ? (() => {
+    if (maxBid <= 0) return "No value (max bid $0)";
+    if (capSource?.includes("hitter cap")) return `Hitter budget exhausted (cap: ${capSource.match(/\$\d+/)?.[0] ?? ""})`;
+    if (capSource?.includes("C filled")) return "Catcher slot already filled";
+    if (capSource?.includes("need ×0.5")) return "Would go to bench — not worth it";
+    if (capSource?.includes("need ×0.7") && maxBid < 3) return "UTIL slot only — bid too low";
+    if (valueSurplus < -5) return `Overpriced by $${Math.abs(valueSurplus)} vs market`;
+    if (maxBid < (expectedMarketPrice ?? 0)) return `Max bid $${maxBid} < market $${expectedMarketPrice}`;
+    if (priorityScore != null && priorityScore <= 0) return "Negative EV — market overvalues this player";
+    return `Max bid $${maxBid} — below current price`;
+  })() : null;
+
   // Verdict text
   const verdictText = shouldBid
     ? `BID up to $${maxBid}`
@@ -42,17 +55,22 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
     <div className={`mx-3 my-1.5 border-2 ${borderClass} rounded-card p-3 bg-grafana-panel`}>
       {/* Verdict — click to toggle debug */}
       <div
-        className={`text-h4 font-bold cursor-pointer ${
+        className="cursor-pointer"
+        onClick={() => setShowDebug(prev => !prev)}
+        title="Click for bid reasoning"
+      >
+        <div className={`text-h4 font-bold ${
           shouldBid
             ? isRisky
               ? "text-grafana-warning"
               : "text-grafana-positive"
             : "text-grafana-negative"
-        }`}
-        onClick={() => setShowDebug(prev => !prev)}
-        title="Click for bid reasoning"
-      >
-        {verdictText}
+        }`}>
+          {verdictText}
+        </div>
+        {passReason && (
+          <div className="text-caption text-grafana-muted mt-0.5">{passReason}</div>
+        )}
       </div>
 
       {/* Stat pills */}
@@ -97,19 +115,23 @@ export default function BidVerdict({ engineSignals }: BidVerdictProps) {
       {/* Debug panel — toggled by clicking verdict */}
       {showDebug && (
         <div className="mt-2 pt-2 border-t border-grafana-border text-caption text-grafana-muted space-y-1.5">
-          {/* Value pipeline */}
+          {/* Priority Score Pipeline */}
           <div className="space-y-0.5">
-            <div className="text-grafana-text font-medium">Value Pipeline</div>
+            <div className="text-grafana-text font-medium">EV Pipeline</div>
             <div className="font-mono text-[10px] leading-relaxed">
-              {sgpBreakeven != null && <div>SGP value: ${sgpBreakeven}</div>}
+              {sgpBreakeven != null && <div>FG$ (model): ${sgpBreakeven}</div>}
               <div>ESPN ASV (market): ${expectedMarketPrice}</div>
-              {rawBlendedValue != null && rawBlendedValue > 0 && (
-                <div>Blended (40% SGP + 60% ASV): ${rawBlendedValue}</div>
-              )}
-              {rawBlendedValue != null && rawBlendedValue > maxBid && (
-                <div className="text-grafana-warning">
-                  Capped ${rawBlendedValue} → ${maxBid} ({rawBlendedValue - maxBid > 0 ? `-$${rawBlendedValue - maxBid}` : "no change"})
+              {sgpBreakeven != null && expectedMarketPrice != null && (
+                <div className={sgpBreakeven - expectedMarketPrice >= 0 ? "text-grafana-positive" : "text-grafana-negative"}>
+                  EV: {sgpBreakeven - expectedMarketPrice >= 0 ? "+" : ""}${sgpBreakeven - expectedMarketPrice} ({sgpBreakeven > expectedMarketPrice ? "underpriced" : "overpriced"})
                 </div>
+              )}
+              {priorityScore != null && <div>Priority score: {priorityScore.toFixed(1)}</div>}
+              {evBuffer != null && evBuffer > 0 && <div>EV buffer: +${evBuffer}</div>}
+              {categoryBonus != null && categoryBonus > 0 && <div>Category bonus: +${categoryBonus}</div>}
+              <div>Max bid: ${maxBid}</div>
+              {playerTags?.length > 0 && (
+                <div className="text-grafana-accent">Tags: {playerTags.join(", ")}</div>
               )}
             </div>
           </div>
