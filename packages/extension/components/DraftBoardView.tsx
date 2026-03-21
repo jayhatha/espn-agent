@@ -175,7 +175,8 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
   );
 }
 
-function lastName(fullName: string): string {
+function lastName(fullName: string | undefined | null): string {
+  if (!fullName) return "?";
   const parts = fullName.split(" ");
   return parts.length > 1 ? parts.slice(1).join(" ") : fullName;
 }
