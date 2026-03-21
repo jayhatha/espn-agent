@@ -135,15 +135,26 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   let capSource = `engine maxBid $${input.rawMaxBid}`;
 
   // Draft board boost: bid more aggressively on curated target/reach players.
-  // These are the specific players we identified as top picks at each position.
+  // Targets always get boosted. Reaches only when we have surplus budget
+  // (avg $/remaining slot > $8 means we're ahead of pace).
   if (input.playerName) {
     const normalizedName = normalizeName(input.playerName);
     if (draftBoardTargets.has(normalizedName)) {
       bidCap = Math.ceil(bidCap * 1.25);
       capSource += ` → TARGET ×1.25`;
     } else if (draftBoardReaches.has(normalizedName)) {
-      bidCap = Math.ceil(bidCap * 1.15);
-      capSource += ` → REACH ×1.15`;
+      const totalSpent = input.hitterSpent + input.pitcherSpent;
+      const budgetLeft = TOTAL_BUDGET - totalSpent;
+      const slotsLeft = input.remainingSlots
+        ? Object.values(input.remainingSlots).reduce((s, v) => s + v, 0)
+        : 28;
+      const avgPerSlot = slotsLeft > 0 ? budgetLeft / slotsLeft : 0;
+      if (avgPerSlot > 8) {
+        bidCap = Math.ceil(bidCap * 1.15);
+        capSource += ` → REACH ×1.15 (surplus $${Math.round(avgPerSlot)}/slot)`;
+      } else {
+        capSource += ` → REACH skipped (no surplus, $${Math.round(avgPerSlot)}/slot)`;
+      }
     }
   }
 
