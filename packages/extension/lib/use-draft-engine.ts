@@ -222,12 +222,14 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         avgPerSlot,
       );
 
+      // $3/slot reserve calculation
+      const RESERVE_PER_SLOT = 3;
+      const slotsAfterThis = Math.max(0, slotsLeft - 1);
+      const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
+      const maxAffordable = Math.max(1, remainingBudget - reserveNeeded);
+
       if (boardState.nominatedPlayerOnBoard && boardState.recommendedMaxBid > 0) {
-        // Board player: use board's recommended bid, apply $3/slot reserve
-        const RESERVE_PER_SLOT = 3;
-        const slotsAfterThis = Math.max(0, slotsLeft - 1);
-        const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
-        const maxAffordable = Math.max(1, remainingBudget - reserveNeeded);
+        // ON BOARD: use board's recommended bid
         const finalBoardBid = Math.min(boardState.recommendedMaxBid, maxAffordable);
 
         mergedOptimization = {
@@ -238,11 +240,48 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
           capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason} (max $${finalBoardBid})`,
         };
       } else if (boardState.nominatedPlayerOnBoard && !boardState.nominatedPositionNeeded) {
-        // Board player but position filled — reduce bid
+        // ON BOARD but position filled — reduce bid
         mergedOptimization = {
           ...mergedOptimization,
           capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason}`,
         };
+      } else {
+        // NOT ON BOARD — only bid if:
+        // 1) Board is exhausted (no more board players at unfilled positions), OR
+        // 2) Elite hitter falling 15%+ below FG$ (opportunistic steal)
+        const boardExhausted = boardState.positionsNeeded.length === 0
+          || boardState.availablePlayers.filter(p =>
+            p.positions.some(pos => boardState.positionsNeeded.includes(pos))
+          ).length === 0;
+
+        const fgDollars = mergedOptimization.sgpBreakeven ?? 0; // FG$ stored here
+        const marketPrice = mergedOptimization.expectedMarketPrice ?? 0;
+        const isEliteDiscount = fgDollars >= 20 && marketPrice > 0
+          && marketPrice <= fgDollars * 0.85; // 15%+ below FG$
+
+        if (boardExhausted) {
+          // Board exhausted — fall back to standard EV bidding
+          mergedOptimization = {
+            ...mergedOptimization,
+            capSource: (mergedOptimization.capSource ?? '') + ` → board exhausted, EV fallback`,
+          };
+        } else if (isEliteDiscount) {
+          // Elite hitter at 15%+ discount — opportunistic bid
+          const discountBid = Math.min(Math.round(fgDollars), maxAffordable);
+          mergedOptimization = {
+            ...mergedOptimization,
+            maxBid: discountBid,
+            shouldBid: discountBid > 0,
+            capSource: (mergedOptimization.capSource ?? '') + ` → STEAL: $${fgDollars} player at $${marketPrice} (-${Math.round((1 - marketPrice/fgDollars) * 100)}%)`,
+          };
+        } else {
+          // Not on board, board has targets left — PASS
+          mergedOptimization = {
+            ...mergedOptimization,
+            shouldBid: false,
+            capSource: (mergedOptimization.capSource ?? '') + ` → PASS (not on board, ${boardState.availablePlayers.length} board players remain)`,
+          };
+        }
       }
 
       // Attach board state to signals for UI display
