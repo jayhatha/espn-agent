@@ -9,6 +9,7 @@ import { getEspnAsvLookup } from "./espn-asv-data";
 import { buildBoardPlayers, computeDraftBoardState } from "./engine/draft-board-engine";
 import type { DraftBoardState } from "./engine/draft-board-engine";
 import { normalizeName } from "./engine/normalizer";
+import { fgAuctionHittersData, fgAuctionPitchersData } from "./fangraphs-data";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -199,14 +200,19 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
     // Draft board override: if nominated player is on the board and position
     // is needed, use the board's recommended max bid instead of EV-based bid.
     if (mergedOptimization && currentPlayerName) {
-      // Build FG$ and ASV lookups from rankings
+      // Build FG$ lookup directly from bundled auction JSONs (not rankings,
+      // which may have dollars overwritten by ASV overlay)
       const fgLookup = new Map<string, number>();
+      for (const h of fgAuctionHittersData) {
+        fgLookup.set(normalizeName(h.name), h.dollars ?? 0);
+      }
+      for (const p of fgAuctionPitchersData) {
+        fgLookup.set(normalizeName(p.name), p.dollars ?? 0);
+      }
+      // ASV from bundled pre-draft values
       const asvLookup = new Map<string, number>(
         Object.entries(getEspnAsvLookup()).map(([k, v]) => [k, v]),
       );
-      for (const r of rankings) {
-        fgLookup.set(normalizeName(r.playerName), r.dollars ?? 0);
-      }
 
       const boardPlayers = buildBoardPlayers(fgLookup, asvLookup);
       const totalSpent = (baseSignals.budgetCurve?.hitterSpent ?? 0) + (baseSignals.budgetCurve?.pitcherSpent ?? 0);
