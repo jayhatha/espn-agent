@@ -173,11 +173,11 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     maxBid: evMaxBid,
     expectedMarketPrice: nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars,
     valueSurplus: evMaxBid - (nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars),
-    // EV-based BID/PASS: bid on positive-EV players (FG$ > ASV) or
-    // when ASV is unknown (treat as fairly priced). Negative-EV players
-    // (ASV > FG$) get PASS — we don't chase overpriced stars like Judge.
-    // Draft board REACH players are handled by strategy-caps after this.
-    shouldBid: evMaxBid > 0 && (nominatedAsv == null || fgDollars >= (nominatedAsv ?? 0)),
+    // BID whenever maxBid is positive — let the player bid up to their
+    // FG$-based max regardless of EV. The maxBid cap (FG$ × 1.25) already
+    // prevents overpaying. Negative-EV just means we won't win most of
+    // the time (market bids higher), but if they fall to our price, great.
+    shouldBid: evMaxBid > 0,
     sgpBreakeven: fgDollars, // FG$ value for UI display
     rawBlendedValue: evMaxBid, // EV-based max bid (pre-strategy-cap)
     simulationEV: monteCarloResult.expectedTeamValue,
