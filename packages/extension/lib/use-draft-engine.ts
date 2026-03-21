@@ -5,6 +5,7 @@ import type { DraftEngineSignals, ForwardSimulationSignal } from "./engine";
 import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 import { computeStrategyBidCap } from "./engine/strategy-caps";
 import { getRankBasedTierCap } from "./engine/draft-constants";
+import { getEspnAsvLookup } from "./espn-asv-data";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -71,7 +72,9 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         currentAuctionPlayerId: currentPlayerId,
         currentAuctionPlayerName: currentPlayerName,
         espnDomAuctionValues,
-        espnAsvByName,
+        // Merge bundled ESPN ASV (pre-draft values) with DOM-scraped ASV.
+        // Bundled data provides baseline; DOM scraping overrides with live values.
+        espnAsvByName: { ...getEspnAsvLookup(), ...espnAsvByName },
         pitcherHitterSplit,
         categoryTargets,
         optimizeForTargets,
