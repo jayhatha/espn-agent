@@ -122,6 +122,32 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   let bidCap = input.rawMaxBid;
   let capSource = `engine maxBid $${input.rawMaxBid}`;
 
+  // Position priority boost: bid more aggressively on infield and pitchers
+  // when their dedicated slots are still open. Infield positions are scarce
+  // (1 slot each) — missing on SS or 3B means replacement-level all season.
+  // Pitching is 5/10 categories — maximize pitcher acquisitions.
+  if (input.remainingSlots && !input.isPitcher) {
+    const pos = input.positions.map(p => p.toUpperCase());
+    const hasOpenDedicatedSlot = pos.some(p => {
+      const n = normalizePosition(p);
+      if ((input.remainingSlots![n] ?? 0) > 0) return true;
+      if ((n === "2B" || n === "SS") && (input.remainingSlots!["MI"] ?? 0) > 0) return true;
+      if ((n === "1B" || n === "3B") && (input.remainingSlots!["CI"] ?? 0) > 0) return true;
+      return false;
+    });
+    // Infield positions with open dedicated slots get a 20% boost
+    const isInfield = pos.some(p => ["C","1B","2B","SS","3B"].includes(p));
+    if (isInfield && hasOpenDedicatedSlot) {
+      bidCap = Math.ceil(bidCap * 1.2);
+      capSource += ` → infield priority ×1.2`;
+    }
+  }
+  // Pitchers with open P slots get a 15% boost
+  if (input.isPitcher && input.remainingSlots && (input.remainingSlots["P"] ?? 0) > 0) {
+    bidCap = Math.ceil(bidCap * 1.15);
+    capSource += ` → pitcher priority ×1.15`;
+  }
+
   // Apply catcher dampening (50% when C slot already filled)
   if (input.primaryPosition === "C" && input.catcherSlotsRemaining <= 0) {
     bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
