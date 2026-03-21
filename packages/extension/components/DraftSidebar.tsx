@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useMemo } from "react";
 import { useDraftStore } from "../lib/draft-state";
 import { useDraftEngineSignals } from "../lib/use-draft-engine";
 import { autoBidController } from "../lib/auto-bid-controller";
-import AuctionRecommendations from "./AuctionRecommendations";
+import DraftBoardView from "./DraftBoardView";
 import BidVerdict from "./BidVerdict";
 import CategoryHeatmap from "./CategoryHeatmap";
 import DraftRecommendations from "./DraftRecommendations";
@@ -481,9 +481,9 @@ export default function DraftSidebar() {
               <EngineInsights engineSignals={engineSignals} />
             </ErrorBoundary>
 
-            {/* Auction Recommendations */}
-            <ErrorBoundary sectionName="Auction Recommendations">
-              <AuctionRecommendations />
+            {/* Draft Board */}
+            <ErrorBoundary sectionName="Draft Board">
+              <DraftBoardView engineSignals={engineSignals} />
             </ErrorBoundary>
           </>
         ) : (
