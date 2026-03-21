@@ -132,8 +132,9 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         (r) => r.playerName.toLowerCase() === currentPlayerName.toLowerCase(),
       );
 
-      const isSP = ranking?.primaryPosition === "SP";
-      const isRP = ranking?.primaryPosition === "RP";
+      const positionsUpper = (ranking?.positions ?? []).map((p: string) => p.toUpperCase());
+      const isSP = ranking?.primaryPosition === "SP" || positionsUpper.includes("SP");
+      const isRP = ranking?.primaryPosition === "RP" || (!isSP && positionsUpper.includes("RP"));
 
       const draftedSPs = myRoster.filter(
         (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
