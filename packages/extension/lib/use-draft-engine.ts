@@ -262,9 +262,13 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
           ).length === 0;
 
         const fgDollars = mergedOptimization.sgpBreakeven ?? 0; // FG$ stored here
-        const marketPrice = mergedOptimization.expectedMarketPrice ?? 0;
-        const isEliteDiscount = fgDollars >= 20 && marketPrice > 0
-          && marketPrice <= fgDollars * 0.85; // 15%+ below FG$
+        const currentBid = currentAuctionPlayer?.currentBid ?? 0;
+        // Steal: current auction price is 15%+ below our FG$ valuation
+        // AND it's a meaningful player (FG$ >= $15) AND there's a roster slot
+        const hasSlot = slotsLeft > 0;
+        const isSteal = fgDollars >= 15 && currentBid > 0 && hasSlot
+          && currentBid <= fgDollars * 0.85;
+        const discount = fgDollars > 0 ? Math.round((1 - currentBid / fgDollars) * 100) : 0;
 
         if (boardExhausted) {
           // Board exhausted — fall back to standard EV bidding
@@ -272,14 +276,14 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
             ...mergedOptimization,
             capSource: (mergedOptimization.capSource ?? '') + ` → board exhausted, EV fallback`,
           };
-        } else if (isEliteDiscount) {
-          // Elite hitter at 15%+ discount — opportunistic bid
-          const discountBid = Math.min(Math.round(fgDollars), maxAffordable);
+        } else if (isSteal) {
+          // Current auction price is well below our valuation — opportunistic bid
+          const stealBid = Math.min(Math.round(fgDollars), maxAffordable);
           mergedOptimization = {
             ...mergedOptimization,
-            maxBid: discountBid,
-            shouldBid: discountBid > 0,
-            capSource: (mergedOptimization.capSource ?? '') + ` → STEAL: $${fgDollars} player at $${marketPrice} (-${Math.round((1 - marketPrice/fgDollars) * 100)}%)`,
+            maxBid: stealBid,
+            shouldBid: stealBid > 0,
+            capSource: (mergedOptimization.capSource ?? '') + ` → STEAL: FG$${fgDollars} going for $${currentBid} (-${discount}%)`,
           };
         } else {
           // Not on board, board has targets left — PASS
