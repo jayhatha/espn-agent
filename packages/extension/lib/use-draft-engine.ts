@@ -6,6 +6,9 @@ import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 import { computeStrategyBidCap } from "./engine/strategy-caps";
 import { getRankBasedTierCap } from "./engine/draft-constants";
 import { getEspnAsvLookup } from "./espn-asv-data";
+import { buildBoardPlayers, computeDraftBoardState } from "./engine/draft-board-engine";
+import type { DraftBoardState } from "./engine/draft-board-engine";
+import { normalizeName } from "./engine/normalizer";
 
 export function useDraftEngineSignals(): DraftEngineSignals | null {
   const {
@@ -191,6 +194,59 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         bidPath: null,
         capSource: capResult.capSource,
       };
+    }
+
+    // Draft board override: if nominated player is on the board and position
+    // is needed, use the board's recommended max bid instead of EV-based bid.
+    if (mergedOptimization && currentPlayerName) {
+      // Build FG$ and ASV lookups from rankings
+      const fgLookup = new Map<string, number>();
+      const asvLookup = new Map<string, number>(
+        Object.entries(getEspnAsvLookup()).map(([k, v]) => [k, v]),
+      );
+      for (const r of rankings) {
+        fgLookup.set(normalizeName(r.playerName), r.dollars ?? 0);
+      }
+
+      const boardPlayers = buildBoardPlayers(fgLookup, asvLookup);
+      const totalSpent = (baseSignals.budgetCurve?.hitterSpent ?? 0) + (baseSignals.budgetCurve?.pitcherSpent ?? 0);
+      const slotsLeft = baseSignals.remainingSlots
+        ? Object.values(baseSignals.remainingSlots).reduce((s, v) => s + v, 0) : 28;
+      const avgPerSlot = slotsLeft > 0 ? (260 - totalSpent) / slotsLeft : 0;
+
+      const boardState = computeDraftBoardState(
+        boardPlayers,
+        myRoster.map(p => ({ playerName: p.playerName, cost: p.cost })),
+        remainingBudget,
+        currentPlayerName,
+        avgPerSlot,
+      );
+
+      if (boardState.nominatedPlayerOnBoard && boardState.recommendedMaxBid > 0) {
+        // Board player: use board's recommended bid, apply $3/slot reserve
+        const RESERVE_PER_SLOT = 3;
+        const slotsAfterThis = Math.max(0, slotsLeft - 1);
+        const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
+        const maxAffordable = Math.max(1, remainingBudget - reserveNeeded);
+        const finalBoardBid = Math.min(boardState.recommendedMaxBid, maxAffordable);
+
+        mergedOptimization = {
+          ...mergedOptimization,
+          maxBid: finalBoardBid,
+          shouldBid: finalBoardBid > 0,
+          valueSurplus: finalBoardBid - mergedOptimization.expectedMarketPrice,
+          capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason} (max $${finalBoardBid})`,
+        };
+      } else if (boardState.nominatedPlayerOnBoard && !boardState.nominatedPositionNeeded) {
+        // Board player but position filled — reduce bid
+        mergedOptimization = {
+          ...mergedOptimization,
+          capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason}`,
+        };
+      }
+
+      // Attach board state to signals for UI display
+      (mergedOptimization as any).draftBoardState = boardState;
     }
 
     return {
