@@ -5,165 +5,163 @@ interface DraftBoardViewProps {
   engineSignals: DraftEngineSignals | null;
 }
 
-interface BoardSlotDisplay {
-  position: string;
-  positionGroup: string;
-  filled: boolean;
-  playerName: string | null;
-  playerTier: "target" | "reach" | null;
-  cost: number | null;
-}
+const POS_GROUPS = [
+  { label: "C", keys: ["C"], limit: 1 },
+  { label: "1B", keys: ["1B"], limit: 1 },
+  { label: "2B", keys: ["2B"], limit: 1 },
+  { label: "SS", keys: ["SS"], limit: 1 },
+  { label: "3B", keys: ["3B"], limit: 1 },
+  { label: "OF", keys: ["OF"], limit: 3 },
+  { label: "SP", keys: ["SP"], limit: 99 },
+  { label: "RP", keys: ["RP"], limit: 99 },
+];
 
 export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
   const boardState = (engineSignals?.optimization as any)?.draftBoardState;
   if (!boardState) return null;
 
-  const { slots, availablePlayers, positionsNeeded, totalBudgetRemaining } = boardState;
+  const { availablePlayers, draftedPlayers, positionsNeeded, totalBudgetRemaining } = boardState;
+  const available = availablePlayers ?? [];
+  const drafted = draftedPlayers ?? [];
+  const needed = new Set<string>(positionsNeeded ?? []);
 
-  // Group available players by position for the "still needed" view
-  const availableByPosition = new Map<string, Array<{ name: string; tier: string; fgDollars: number }>>();
-  for (const p of availablePlayers ?? []) {
+  // Group drafted board players by their board position
+  const draftedByPos = new Map<string, Array<{ name: string; tier: string; cost: number }>>();
+  for (const p of drafted) {
     for (const pos of p.positions) {
-      if (!availableByPosition.has(pos)) availableByPosition.set(pos, []);
-      availableByPosition.get(pos)!.push({ name: p.name, tier: p.tier, fgDollars: Math.round(p.fgDollars) });
+      if (!draftedByPos.has(pos)) draftedByPos.set(pos, []);
+      const rosterEntry = (boardState.slots ?? []).find(
+        (s: any) => s.draftedName === p.name && s.filled
+      );
+      draftedByPos.get(pos)!.push({
+        name: p.name,
+        tier: p.tier,
+        cost: rosterEntry?.draftedCost ?? 0,
+      });
     }
   }
 
-  // Build display slots — combine filled (from boardState) with roster structure
-  const posOrder = ["C", "1B", "2B", "SS", "3B", "MI", "CI", "OF", "UTIL", "P", "BN"];
-  const groupedSlots = new Map<string, BoardSlotDisplay[]>();
-
-  for (const slot of (slots ?? [])) {
-    const group = slot.positionGroup;
-    if (!groupedSlots.has(group)) groupedSlots.set(group, []);
-    groupedSlots.get(group)!.push({
-      position: slot.position,
-      positionGroup: group,
-      filled: slot.filled,
-      playerName: slot.draftedName ?? null,
-      playerTier: slot.player?.tier ?? null,
-      cost: slot.draftedCost ?? null,
-    });
+  // Group available board players by position
+  const availByPos = new Map<string, Array<{ name: string; tier: string; fgDollars: number }>>();
+  for (const p of available) {
+    for (const pos of p.positions) {
+      if (!availByPos.has(pos)) availByPos.set(pos, []);
+      availByPos.get(pos)!.push({ name: p.name, tier: p.tier, fgDollars: Math.round(p.fgDollars) });
+    }
   }
+  // Sort each position group by FG$ desc
+  for (const [, list] of availByPos) list.sort((a, b) => b.fgDollars - a.fgDollars);
+
+  // Deduplicate drafted names across positions
+  const draftedNamesSeen = new Set<string>();
 
   return (
-    <div className="mx-3 my-1.5">
+    <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-body-xs font-semibold text-grafana-text uppercase tracking-wider">
+        <div className="text-body-xs text-grafana-muted uppercase tracking-wide">
           Draft Board
-        </span>
-        <span className="text-caption text-grafana-muted">
-          ${totalBudgetRemaining} left · {(availablePlayers ?? []).length} targets available
-        </span>
+        </div>
+        <div className="text-label text-grafana-muted">
+          <span className="text-grafana-text font-semibold">${totalBudgetRemaining}</span> left
+          <span className="mx-1">·</span>
+          <span className="text-grafana-text font-semibold">{available.length}</span> targets
+        </div>
       </div>
 
-      {/* Positions needing targets */}
-      {(positionsNeeded ?? []).length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {(positionsNeeded as string[]).map((pos: string) => (
-            <span key={pos} className="text-label bg-grafana-warning/20 text-grafana-warning rounded px-1.5 py-0.5">
-              Need {pos}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Position rows */}
+      <div className="space-y-px">
+        {POS_GROUPS.map(({ label, keys, limit }) => {
+          const posKey = keys[0];
+          const draftedHere = draftedByPos.get(posKey) ?? [];
+          const availHere = availByPos.get(posKey) ?? [];
+          const isFilled = !needed.has(posKey);
+          const filledCount = draftedHere.length;
 
-      {/* Filled roster from board */}
-      <div className="space-y-0.5">
-        {posOrder.map(group => {
-          const groupSlots = groupedSlots.get(group);
-          if (!groupSlots || groupSlots.length === 0) return null;
+          // Deduplicate
+          const uniqueDrafted = draftedHere.filter(p => {
+            if (draftedNamesSeen.has(p.name)) return false;
+            draftedNamesSeen.add(p.name);
+            return true;
+          });
 
-          // Only show filled slots and first empty slot per group
-          const filledInGroup = groupSlots.filter(s => s.filled);
-          const emptyCount = groupSlots.filter(s => !s.filled).length;
-
-          if (filledInGroup.length === 0 && !["P", "BN", "UTIL"].includes(group)) {
-            // Show "empty" placeholder for unfilled position groups
-            const available = availableByPosition.get(group);
-            return (
-              <div key={group} className="flex items-center gap-1.5 py-0.5 opacity-60">
-                <span className="text-label text-grafana-muted w-7 text-right font-mono">{group}</span>
-                <span className="text-caption text-grafana-muted italic">
-                  {available && available.length > 0
-                    ? `${available.slice(0, 3).map(p => p.name.split(' ').pop()).join(', ')}...`
-                    : 'no targets'}
-                </span>
-              </div>
-            );
-          }
-
-          return filledInGroup.map((slot, idx) => (
-            <div key={slot.position + idx} className="flex items-center gap-1.5 py-0.5">
-              <span className="text-label text-grafana-muted w-7 text-right font-mono">
-                {filledInGroup.length > 1 && idx > 0 ? '' : group}
-              </span>
-              <span className={`text-caption font-medium ${
-                slot.playerTier === 'target' ? 'text-grafana-positive' :
-                slot.playerTier === 'reach' ? 'text-grafana-accent' :
-                'text-grafana-text'
+          return (
+            <div key={label} className="flex items-start py-1 border-b border-grafana-border/50 last:border-0">
+              {/* Position label */}
+              <div className={`w-6 flex-shrink-0 text-right mr-2 font-mono text-label font-bold mt-px ${
+                isFilled && filledCount >= Math.min(limit, 1)
+                  ? "text-grafana-positive"
+                  : needed.has(posKey)
+                  ? "text-grafana-warning"
+                  : "text-grafana-muted"
               }`}>
-                {slot.playerName}
-              </span>
-              {slot.cost != null && (
-                <span className="text-label text-grafana-muted">${slot.cost}</span>
-              )}
-              {slot.playerTier && (
-                <span className={`text-[9px] px-1 rounded ${
-                  slot.playerTier === 'target'
-                    ? 'bg-grafana-positive/20 text-grafana-positive'
-                    : 'bg-grafana-accent/20 text-grafana-accent'
-                }`}>
-                  {slot.playerTier === 'target' ? 'T' : 'R'}
-                </span>
-              )}
-            </div>
-          ));
-        })}
-      </div>
-
-      {/* Available targets by position */}
-      <div className="mt-3 pt-2 border-t border-grafana-border">
-        <div className="text-body-xs font-semibold text-grafana-text uppercase tracking-wider mb-1.5">
-          Available Targets
-        </div>
-        <div className="space-y-1">
-          {posOrder.filter(g => !["UTIL", "BN"].includes(g)).map(group => {
-            const available = availableByPosition.get(group === "P" ? "SP" : group);
-            const availableRP = group === "P" ? availableByPosition.get("RP") : undefined;
-            const combined = [...(available ?? []), ...(availableRP ?? [])];
-            if (combined.length === 0) return null;
-
-            // Sort by FG$ descending, show top 4
-            combined.sort((a, b) => b.fgDollars - a.fgDollars);
-            const isNeeded = (positionsNeeded as string[])?.includes(group === "P" ? "SP" : group)
-              || (group === "P" && (positionsNeeded as string[])?.includes("RP"));
-
-            return (
-              <div key={group} className="flex items-start gap-1.5">
-                <span className={`text-label w-5 text-right font-mono mt-0.5 ${
-                  isNeeded ? 'text-grafana-warning' : 'text-grafana-muted'
-                }`}>
-                  {group === "P" ? "P" : group}
-                </span>
-                <div className="flex flex-wrap gap-x-2 gap-y-0">
-                  {combined.slice(0, 5).map((p, i) => (
-                    <span key={i} className={`text-caption ${
-                      p.tier === 'target' ? 'text-grafana-text' : 'text-grafana-muted'
-                    }`}>
-                      {p.name.split(' ').pop()} <span className="text-grafana-muted">${p.fgDollars}</span>
-                    </span>
-                  ))}
-                  {combined.length > 5 && (
-                    <span className="text-caption text-grafana-muted">+{combined.length - 5}</span>
-                  )}
-                </div>
+                {label}
               </div>
-            );
-          })}
-        </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                {/* Drafted players at this position */}
+                {uniqueDrafted.map((p, i) => (
+                  <div key={i} className="flex items-center gap-1.5 leading-tight">
+                    <span className="text-caption text-grafana-positive font-medium">
+                      {lastName(p.name)}
+                    </span>
+                    <span className="text-[9px] text-grafana-muted">${p.cost}</span>
+                    <span className={`text-[8px] px-1 rounded-sm font-bold ${
+                      p.tier === "target"
+                        ? "bg-[#37872d]/30 text-[#37872d]"
+                        : "bg-[#5b9cf6]/30 text-[#5b9cf6]"
+                    }`}>
+                      {p.tier === "target" ? "T" : "R"}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Available targets */}
+                {availHere.length > 0 && (
+                  <div className="flex flex-wrap gap-x-1 gap-y-0 leading-tight">
+                    {availHere.slice(0, label === "SP" || label === "RP" ? 6 : 4).map((p, i) => (
+                      <span key={i} className={`text-[10px] ${
+                        p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
+                      }`}>
+                        {lastName(p.name)}
+                        <span className="text-grafana-muted/60 ml-px">{p.fgDollars}</span>
+                        {i < Math.min(availHere.length, (label === "SP" || label === "RP" ? 6 : 4)) - 1 && (
+                          <span className="text-grafana-border mx-0.5">·</span>
+                        )}
+                      </span>
+                    ))}
+                    {availHere.length > (label === "SP" || label === "RP" ? 6 : 4) && (
+                      <span className="text-[10px] text-grafana-muted/50">
+                        +{availHere.length - (label === "SP" || label === "RP" ? 6 : 4)}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {uniqueDrafted.length === 0 && availHere.length === 0 && (
+                  <span className="text-[10px] text-grafana-muted/40 italic">no targets</span>
+                )}
+              </div>
+
+              {/* Status indicator */}
+              <div className="flex-shrink-0 ml-1 mt-px">
+                {filledCount >= Math.min(limit, 1) && filledCount > 0 ? (
+                  <span className="text-[9px] text-grafana-positive">✓</span>
+                ) : needed.has(posKey) ? (
+                  <span className="text-[9px] text-grafana-warning">○</span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+function lastName(fullName: string): string {
+  const parts = fullName.split(" ");
+  return parts.length > 1 ? parts.slice(1).join(" ") : fullName;
 }
