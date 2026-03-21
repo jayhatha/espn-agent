@@ -18,13 +18,35 @@ import { getPositionalWeight, getSpTierCap, getRankBasedTierCap, HITTER_BUDGET_M
 import draftBoard from "../../assets/draft-board.json";
 import { normalizeName } from "./normalizer";
 
-// Build draft board lookup at module load time
+// Build draft board lookups at module load time
 const draftBoardTargets = new Set<string>();
 const draftBoardReaches = new Set<string>();
-for (const pos of Object.values(draftBoard)) {
-  for (const name of (pos as any).targets ?? []) draftBoardTargets.add(normalizeName(name));
-  for (const name of (pos as any).reaches ?? []) draftBoardReaches.add(normalizeName(name));
+// Map each player to their draft board positions (for saturation check)
+const draftBoardPlayerPositions = new Map<string, string[]>();
+const draftBoardPositionPlayers = new Map<string, Set<string>>();
+for (const [pos, list] of Object.entries(draftBoard)) {
+  const allNames = [...((list as any).targets ?? []), ...((list as any).reaches ?? [])];
+  if (!draftBoardPositionPlayers.has(pos)) draftBoardPositionPlayers.set(pos, new Set());
+  for (const name of (list as any).targets ?? []) {
+    const n = normalizeName(name);
+    draftBoardTargets.add(n);
+    draftBoardPositionPlayers.get(pos)!.add(n);
+    if (!draftBoardPlayerPositions.has(n)) draftBoardPlayerPositions.set(n, []);
+    draftBoardPlayerPositions.get(n)!.push(pos);
+  }
+  for (const name of (list as any).reaches ?? []) {
+    const n = normalizeName(name);
+    draftBoardReaches.add(n);
+    draftBoardPositionPlayers.get(pos)!.add(n);
+    if (!draftBoardPlayerPositions.has(n)) draftBoardPlayerPositions.set(n, []);
+    draftBoardPlayerPositions.get(n)!.push(pos);
+  }
 }
+
+// Position saturation limits: how many targets/reaches we want per position
+const POSITION_TARGET_LIMITS: Record<string, number> = {
+  C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, OF: 3, SP: 99, RP: 99,
+};
 
 /** Total auction draft budget */
 const TOTAL_BUDGET = 260;
@@ -107,6 +129,8 @@ export interface StrategyCapInput {
   draftedSpTierCaps?: number[];
   /** Player name (for draft board lookup) */
   playerName?: string;
+  /** Normalized names of players already on my roster */
+  myRosterNames?: string[];
 }
 
 export interface StrategyCapResult {
@@ -135,11 +159,30 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   let capSource = `engine maxBid $${input.rawMaxBid}`;
 
   // Draft board boost: bid more aggressively on curated target/reach players.
-  // Targets always get boosted. Reaches only when we have surplus budget
-  // (avg $/remaining slot > $8 means we're ahead of pace).
+  // Targets always get boosted. Reaches only when we have surplus budget.
+  // Stop boosting at a position once we've drafted enough targets there
+  // (1 per IF slot, 3 for OF, unlimited for SP/RP).
   if (input.playerName) {
     const normalizedName = normalizeName(input.playerName);
-    if (draftBoardTargets.has(normalizedName)) {
+    const isOnBoard = draftBoardTargets.has(normalizedName) || draftBoardReaches.has(normalizedName);
+
+    // Check position saturation: have we already drafted enough targets at this position?
+    let positionSaturated = false;
+    if (isOnBoard && input.myRosterNames) {
+      const myRosterSet = new Set(input.myRosterNames.map(n => normalizeName(n)));
+      const playerPositions = draftBoardPlayerPositions.get(normalizedName) ?? [];
+      positionSaturated = playerPositions.every(pos => {
+        const limit = POSITION_TARGET_LIMITS[pos] ?? 1;
+        const posPlayers = draftBoardPositionPlayers.get(pos);
+        if (!posPlayers) return false;
+        const draftedAtPos = [...posPlayers].filter(n => myRosterSet.has(n)).length;
+        return draftedAtPos >= limit;
+      });
+    }
+
+    if (positionSaturated) {
+      capSource += ` → board skip (position filled)`;
+    } else if (draftBoardTargets.has(normalizedName)) {
       bidCap = Math.ceil(bidCap * 1.25);
       capSource += ` → TARGET ×1.25`;
     } else if (draftBoardReaches.has(normalizedName)) {

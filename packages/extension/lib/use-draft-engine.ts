@@ -168,6 +168,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
         remainingSlots: baseSignals.remainingSlots ?? undefined,
         playerName: currentPlayerName ?? undefined,
+        myRosterNames: myRoster.map(p => p.playerName),
       });
 
       // Use the strategy cap result directly — it starts from rawMaxBid and
