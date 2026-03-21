@@ -211,20 +211,21 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   // Positional weights removed — EV-based priority score already accounts
   // for positional scarcity via FanGraphs replacement-level adjustments.
 
-  // Budget pacing: scale bids when budget-per-remaining-slot gets tight.
-  // Without this, we spend freely early and run out late.
+  // Budget reserve: always keep $3 per remaining slot (after this pick).
+  // This prevents blowing the budget on top picks and having $0 for the rest.
+  // Max bid = budget - ($3 × remaining slots after this pick).
   if (input.remainingSlots) {
     const totalSlotsLeft = Object.values(input.remainingSlots).reduce((s, v) => s + v, 0);
-    if (totalSlotsLeft > 0) {
+    if (totalSlotsLeft > 1) {
       const totalSpent = input.hitterSpent + input.pitcherSpent;
       const budgetLeft = TOTAL_BUDGET - totalSpent;
-      const avgPerSlot = budgetLeft / totalSlotsLeft;
-      // If average budget per slot drops below $5, start dampening aggressively
-      // to preserve $1/slot for remaining picks
-      if (avgPerSlot < 5 && bidCap > avgPerSlot) {
-        const pacingFactor = Math.max(0.3, avgPerSlot / 5);
-        bidCap = Math.max(1, Math.ceil(bidCap * pacingFactor));
-        capSource += ` → pacing ×${pacingFactor.toFixed(2)} ($${budgetLeft}/${totalSlotsLeft} slots)`;
+      const RESERVE_PER_SLOT = 3;
+      const slotsAfterThis = totalSlotsLeft - 1;
+      const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
+      const maxAffordable = Math.max(1, budgetLeft - reserveNeeded);
+      if (bidCap > maxAffordable) {
+        capSource += ` → reserve cap $${maxAffordable} ($3×${slotsAfterThis} slots reserved)`;
+        bidCap = maxAffordable;
       }
     }
   }
