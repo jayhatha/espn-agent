@@ -128,6 +128,11 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
   const opponentModel = deserializeOpponentModel(serializedOpponentModel);
   void opponentModel; // used by Monte Carlo via runMonteCarlo params below
 
+  // Debug: log FG$ for the nominated player
+  if (fgDollars === 0 || fgDollars == null) {
+    console.warn(`[BidWorker] fgDollars=0 for ${nominatedPlayer.name ?? nominatedPlayer.normalizedName}. ASV=${nominatedAsv}`);
+  }
+
   // Step 1: Compute EV-based priority score and max bid
   const isEndgame = budget <= 20;
   const priorityResult = computePriorityScore(
@@ -169,7 +174,7 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     expectedMarketPrice: nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars,
     valueSurplus: evMaxBid - (nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars),
     shouldBid: monteCarloResult.shouldBid,
-    sgpBreakeven: priorityResult.priorityScore, // repurposed field: store priority score here for UI display
+    sgpBreakeven: fgDollars, // FG$ value for UI display
     rawBlendedValue: evMaxBid, // EV-based max bid (pre-strategy-cap)
     simulationEV: monteCarloResult.expectedTeamValue,
     simulationStdDev: monteCarloResult.valueStdDev,
