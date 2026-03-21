@@ -132,9 +132,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         (r) => r.playerName.toLowerCase() === currentPlayerName.toLowerCase(),
       );
 
-      const positionsUpper = (ranking?.positions ?? []).map((p: string) => p.toUpperCase());
+      // Use ranking positions, falling back to DOM-detected positions from the auction player
+      const playerPositions = ranking?.positions ?? currentAuctionPlayer?.positions ?? [];
+      const positionsUpper = playerPositions.map((p: string) => p.toUpperCase());
       const isSP = ranking?.primaryPosition === "SP" || positionsUpper.includes("SP");
-      const isRP = ranking?.primaryPosition === "RP" || (!isSP && positionsUpper.includes("RP"));
+      const isRP = ranking?.primaryPosition === "RP" || (!isSP && (positionsUpper.includes("RP") || positionsUpper.includes("P")));
 
       const draftedSPs = myRoster.filter(
         (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
@@ -150,8 +152,8 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         rawMaxBid: mergedOptimization.maxBid,
         isPitcher: isSP || isRP,
         isSP,
-        positions: ranking?.positions ?? [],
-        primaryPosition: ranking?.primaryPosition ?? null,
+        positions: playerPositions,
+        primaryPosition: ranking?.primaryPosition ?? (isSP ? "SP" : isRP ? "RP" : null),
         spCount,
         draftedSpPrices,
         draftedSpTierCaps,
