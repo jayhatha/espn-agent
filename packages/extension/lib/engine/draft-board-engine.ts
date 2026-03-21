@@ -44,6 +44,7 @@ export interface DraftBoardState {
   nominatedPositionNeeded: boolean; // do we still need this position?
   recommendedMaxBid: number;
   bidReason: string;
+  cumulativeSurplus: number;       // total savings from drafting below FG$
 }
 
 // ============================================================
@@ -183,10 +184,11 @@ function findBestOpenSlot(
 
 export function computeDraftBoardState(
   allBoardPlayers: BoardPlayer[],
-  myRoster: Array<{ playerName: string; cost?: number }>,
+  myRoster: Array<{ playerName: string; cost?: number; positions?: string[] }>,
   budget: number,
   nominatedPlayerName?: string,
-  surplusPerSlot?: number, // avg $/slot for reach eligibility
+  surplusPerSlot?: number,
+  fgDollarsLookup?: Map<string, number>, // FG$ lookup for surplus calculation
 ): DraftBoardState {
   const TOTAL_BUDGET = 260;
 
@@ -318,9 +320,21 @@ export function computeDraftBoardState(
     }
   }
 
-  // Compute total budget used
+  // Compute total budget used and cumulative surplus from all drafted players.
+  // Surplus = sum of (FG$ - cost) for players drafted below FG value.
+  // This tracks how much "free money" we've banked from bargain picks.
   const totalBudgetUsed = myRoster.reduce((s, p) => s + (p.cost ?? 0), 0);
   const totalBudgetRemaining = TOTAL_BUDGET - totalBudgetUsed;
+
+  let cumulativeSurplus = 0;
+  for (const rp of myRoster) {
+    const n = normalizeName(rp.playerName);
+    const fgVal = fgDollarsLookup?.get(n) ?? 0;
+    const cost = rp.cost ?? 0;
+    if (fgVal > cost) {
+      cumulativeSurplus += Math.round(fgVal - cost);
+    }
+  }
 
   // Evaluate nominated player
   let nominatedPlayerOnBoard = false;
@@ -350,13 +364,27 @@ export function computeDraftBoardState(
           recommendedMaxBid = Math.round(boardPlayer.fgDollars * 1.25);
           bidReason = `TARGET at ${boardPlayer.positions.join("/")} — bid aggressively`;
         } else {
-          const hasSurplus = (surplusPerSlot ?? 0) > 8;
-          if (hasSurplus) {
+          // REACH: need cumulative surplus to cover the premium, OR no targets left
+          const reachPremium = Math.max(0, boardPlayer.espnAsv - boardPlayer.fgDollars);
+          const noTargetsAtPos = boardPlayer.positions.every(pos => {
+            const targetsAtPos = allBoardPlayers.filter(
+              p => p.tier === "target" && p.positions.includes(pos) && !draftedNames.has(p.normalizedName)
+            );
+            return targetsAtPos.length === 0;
+          });
+
+          if (noTargetsAtPos) {
+            // Forced reach — no targets left at this position, must pay market
             recommendedMaxBid = Math.max(Math.round(boardPlayer.fgDollars), boardPlayer.espnAsv);
-            bidReason = `REACH at ${boardPlayer.positions.join("/")} — surplus available`;
+            bidReason = `REACH at ${boardPlayer.positions.join("/")} — no targets left, forced (max $${recommendedMaxBid})`;
+          } else if (cumulativeSurplus >= reachPremium) {
+            // Surplus covers the premium — reach is funded
+            recommendedMaxBid = Math.round(boardPlayer.fgDollars) + Math.min(cumulativeSurplus, reachPremium);
+            bidReason = `REACH at ${boardPlayer.positions.join("/")} — surplus $${cumulativeSurplus} covers $${reachPremium} premium`;
           } else {
+            // Not enough surplus — bid FG$ only, don't overpay
             recommendedMaxBid = Math.round(boardPlayer.fgDollars);
-            bidReason = `REACH at ${boardPlayer.positions.join("/")} — no surplus, bid FG$ only`;
+            bidReason = `REACH at ${boardPlayer.positions.join("/")} — need $${reachPremium} surplus, have $${cumulativeSurplus}`;
           }
         }
       } else if (slotDestination === "UTIL") {
@@ -395,5 +423,6 @@ export function computeDraftBoardState(
     nominatedPositionNeeded,
     recommendedMaxBid,
     bidReason,
+    cumulativeSurplus,
   };
 }

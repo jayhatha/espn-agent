@@ -222,10 +222,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
 
       const boardState = computeDraftBoardState(
         boardPlayers,
-        myRoster.map(p => ({ playerName: p.playerName, cost: p.cost })),
+        myRoster.map(p => ({ playerName: p.playerName, cost: p.cost, positions: p.positions })),
         remainingBudget,
         currentPlayerName,
         avgPerSlot,
+        fgLookup,
       );
 
       // $3/slot reserve calculation

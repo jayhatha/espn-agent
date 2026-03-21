@@ -22,7 +22,7 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
   const boardState = (engineSignals?.optimization as any)?.draftBoardState;
   if (!boardState) return null;
 
-  const { availablePlayers, draftedPlayers, positionsNeeded, totalBudgetRemaining } = boardState;
+  const { availablePlayers, draftedPlayers, positionsNeeded, totalBudgetRemaining, cumulativeSurplus } = boardState;
   const available = availablePlayers ?? [];
   const drafted = draftedPlayers ?? [];
   const needed = new Set<string>(positionsNeeded ?? []);
@@ -66,8 +66,13 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
         </div>
         <div className="text-label text-grafana-muted">
           <span className="text-grafana-text font-semibold">${totalBudgetRemaining}</span> left
-          <span className="mx-1">·</span>
-          <span className="text-grafana-text font-semibold">{available.length}</span> targets
+          {(cumulativeSurplus ?? 0) > 0 && (
+            <>
+              <span className="mx-1">·</span>
+              <span className="text-grafana-positive font-semibold">+${cumulativeSurplus}</span>
+              <span className="text-grafana-muted"> banked</span>
+            </>
+          )}
         </div>
       </div>
 
