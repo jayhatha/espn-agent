@@ -144,6 +144,40 @@ export function buildBoardPlayers(
 }
 
 // ============================================================
+// Slot destination logic
+// ============================================================
+
+function findBestOpenSlot(
+  player: BoardPlayer,
+  remainingSlots: Record<string, number>,
+): "dedicated" | "flex" | "UTIL" | "BN" | null {
+  const isPitcher = player.positions.some(p => p === "SP" || p === "RP");
+
+  if (isPitcher) {
+    if (remainingSlots["P"] > 0) return "dedicated";
+    if (remainingSlots["BN"] > 0) return "BN";
+    return null;
+  }
+
+  // Check dedicated position slot
+  for (const pos of player.positions) {
+    if (remainingSlots[pos] != null && remainingSlots[pos] > 0) return "dedicated";
+  }
+
+  // Check flex slots (MI for 2B/SS, CI for 1B/3B)
+  if (player.positions.some(p => p === "2B" || p === "SS") && remainingSlots["MI"] > 0) return "flex";
+  if (player.positions.some(p => p === "1B" || p === "3B") && remainingSlots["CI"] > 0) return "flex";
+
+  // UTIL (hitters only)
+  if (remainingSlots["UTIL"] > 0) return "UTIL";
+
+  // Bench
+  if (remainingSlots["BN"] > 0) return "BN";
+
+  return null;
+}
+
+// ============================================================
 // Compute draft board state
 // ============================================================
 
@@ -236,6 +270,54 @@ export function computeDraftBoardState(
     }
   }
 
+  // Track remaining roster slots (count all roster picks, not just board players)
+  const remainingRosterSlots: Record<string, number> = {
+    C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, MI: 1, CI: 1,
+    OF: 4, UTIL: 3, P: 9, BN: 5,
+  };
+  // Subtract slots used by ALL drafted players (not just board players)
+  for (const rp of myRoster) {
+    // Try to assign to best slot based on positions
+    const positions = (rp as any).positions ?? [];
+    const posUpper = positions.map((p: string) => p.toUpperCase());
+    const isPitcher = posUpper.some((p: string) => ["SP", "RP", "P"].includes(p));
+
+    if (isPitcher) {
+      if (remainingRosterSlots["P"] > 0) remainingRosterSlots["P"]--;
+      else if (remainingRosterSlots["BN"] > 0) remainingRosterSlots["BN"]--;
+    } else {
+      // Try dedicated slot first
+      let assigned = false;
+      for (const pos of posUpper) {
+        const norm = pos === "LF" || pos === "CF" || pos === "RF" ? "OF" : pos;
+        if (remainingRosterSlots[norm] != null && remainingRosterSlots[norm] > 0) {
+          remainingRosterSlots[norm]--;
+          assigned = true;
+          break;
+        }
+      }
+      // Try flex
+      if (!assigned) {
+        if (posUpper.some((p: string) => p === "2B" || p === "SS") && remainingRosterSlots["MI"] > 0) {
+          remainingRosterSlots["MI"]--;
+          assigned = true;
+        } else if (posUpper.some((p: string) => p === "1B" || p === "3B") && remainingRosterSlots["CI"] > 0) {
+          remainingRosterSlots["CI"]--;
+          assigned = true;
+        }
+      }
+      // Try UTIL
+      if (!assigned && remainingRosterSlots["UTIL"] > 0) {
+        remainingRosterSlots["UTIL"]--;
+        assigned = true;
+      }
+      // BN
+      if (!assigned && remainingRosterSlots["BN"] > 0) {
+        remainingRosterSlots["BN"]--;
+      }
+    }
+  }
+
   // Compute total budget used
   const totalBudgetUsed = myRoster.reduce((s, p) => s + (p.cost ?? 0), 0);
   const totalBudgetRemaining = TOTAL_BUDGET - totalBudgetUsed;
@@ -258,13 +340,16 @@ export function computeDraftBoardState(
       // Check if any of this player's positions (including flex) are still needed
       nominatedPositionNeeded = positionsNeeded.some(pos => isEligible(boardPlayer, pos));
 
-      if (nominatedPositionNeeded) {
+      // Check where this player would actually slot in the roster
+      // Slot priority: dedicated → flex (MI/CI) → UTIL → BN
+      const slotDestination = findBestOpenSlot(boardPlayer, remainingRosterSlots);
+
+      if (nominatedPositionNeeded && (slotDestination === "dedicated" || slotDestination === "flex")) {
+        // Going to a real position slot — bid aggressively
         if (boardPlayer.tier === "target") {
-          // Target at a needed position: bid up to FG$ × 1.25
           recommendedMaxBid = Math.round(boardPlayer.fgDollars * 1.25);
           bidReason = `TARGET at ${boardPlayer.positions.join("/")} — bid aggressively`;
         } else {
-          // Reach at a needed position: bid up to ASV if surplus exists
           const hasSurplus = (surplusPerSlot ?? 0) > 8;
           if (hasSurplus) {
             recommendedMaxBid = Math.max(Math.round(boardPlayer.fgDollars), boardPlayer.espnAsv);
@@ -274,10 +359,23 @@ export function computeDraftBoardState(
             bidReason = `REACH at ${boardPlayer.positions.join("/")} — no surplus, bid FG$ only`;
           }
         }
+      } else if (slotDestination === "UTIL") {
+        // Would go to UTIL — only bid if it's a strong hitter (OF/DH types)
+        const isOFtype = boardPlayer.positions.includes("OF") || boardPlayer.positions.includes("DH");
+        if (isOFtype) {
+          recommendedMaxBid = Math.round(boardPlayer.fgDollars);
+          bidReason = `UTIL (OF/DH) — bid at FG$`;
+        } else {
+          recommendedMaxBid = Math.round(boardPlayer.fgDollars * 0.5);
+          bidReason = `UTIL (${boardPlayer.positions.join("/")}) — position full, only if cheap`;
+        }
+      } else if (slotDestination === "BN") {
+        recommendedMaxBid = Math.round(boardPlayer.fgDollars * 0.3);
+        bidReason = `BN only — deep discount`;
       } else {
-        // Position already filled — bid conservatively (only if cheap)
-        recommendedMaxBid = Math.round(boardPlayer.fgDollars * 0.5);
-        bidReason = `${boardPlayer.positions.join("/")} filled — only if cheap`;
+        // No slot available
+        recommendedMaxBid = 0;
+        bidReason = `No roster slot available`;
       }
     } else {
       // Not on board — standard EV bid (handled by existing engine)
