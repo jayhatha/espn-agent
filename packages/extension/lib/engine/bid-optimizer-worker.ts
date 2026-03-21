@@ -173,7 +173,8 @@ self.onmessage = (event: MessageEvent<BidOptimizerWorkerRequest>) => {
     maxBid: evMaxBid,
     expectedMarketPrice: nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars,
     valueSurplus: evMaxBid - (nominatedAsv != null ? Math.max(1, Math.round(nominatedAsv)) : fgDollars),
-    shouldBid: monteCarloResult.shouldBid,
+    // EV-based BID/PASS: bid if maxBid > 0 and we have positive value or force-acquisition
+    shouldBid: evMaxBid > 0,
     sgpBreakeven: fgDollars, // FG$ value for UI display
     rawBlendedValue: evMaxBid, // EV-based max bid (pre-strategy-cap)
     simulationEV: monteCarloResult.expectedTeamValue,
