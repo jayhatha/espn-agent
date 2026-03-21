@@ -177,9 +177,15 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       // positional bonuses from raising the bid above the raw blended value.
       const cappedMaxBid = capResult.bidCap;
 
+      // Override shouldBid: if strategy-caps applied a draft board boost
+      // (TARGET or REACH), force shouldBid=true even for negative-EV players.
+      const hasBoardBoost = capResult.capSource.includes("TARGET") || capResult.capSource.includes("REACH ×");
+      const finalShouldBid = cappedMaxBid > 0 && (mergedOptimization.shouldBid || hasBoardBoost);
+
       mergedOptimization = {
         ...mergedOptimization,
         maxBid: cappedMaxBid,
+        shouldBid: finalShouldBid,
         valueSurplus: cappedMaxBid - mergedOptimization.expectedMarketPrice,
         strategyBidCap: capResult.bidCap,
         bidPath: null,
