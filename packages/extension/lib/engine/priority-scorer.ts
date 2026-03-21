@@ -135,9 +135,7 @@ export function computeEVMaxBid(
   budget: number,
   isEndgame: boolean,
 ): number {
-  // Inflation only pushes bids UP, never below FG$. In a real draft,
-  // other managers bid based on their own values — a $20 FG player still
-  // goes for $15-20. Bidding $12 because of deflation means we never win.
+  // Inflation only pushes bids UP, never below FG$.
   const inflatedBase = fgDollars * Math.max(1.0, inflationFactor);
 
   // Endgame: 30% dampening on discretionary buffers
