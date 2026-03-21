@@ -5,13 +5,15 @@ interface DraftBoardViewProps {
   engineSignals: DraftEngineSignals | null;
 }
 
-const POS_GROUPS = [
+const POS_GROUPS: Array<{ label: string; keys: string[]; limit: number; flex?: boolean }> = [
   { label: "C", keys: ["C"], limit: 1 },
   { label: "1B", keys: ["1B"], limit: 1 },
   { label: "2B", keys: ["2B"], limit: 1 },
   { label: "SS", keys: ["SS"], limit: 1 },
   { label: "3B", keys: ["3B"], limit: 1 },
-  { label: "OF", keys: ["OF"], limit: 3 },
+  { label: "MI", keys: ["2B", "SS"], limit: 1, flex: true },
+  { label: "CI", keys: ["1B", "3B"], limit: 1, flex: true },
+  { label: "OF", keys: ["OF"], limit: 4 },
   { label: "SP", keys: ["SP"], limit: 99 },
   { label: "RP", keys: ["RP"], limit: 99 },
 ];
@@ -71,11 +73,18 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
 
       {/* Position rows */}
       <div className="space-y-px">
-        {POS_GROUPS.map(({ label, keys, limit }) => {
+        {POS_GROUPS.map(({ label, keys, limit, flex }) => {
           const posKey = keys[0];
-          const draftedHere = draftedByPos.get(posKey) ?? [];
-          const availHere = availByPos.get(posKey) ?? [];
-          const isFilled = !needed.has(posKey);
+          // For flex positions (MI/CI), merge players from both eligible positions
+          const draftedHere = keys.length > 1
+            ? keys.flatMap(k => draftedByPos.get(k) ?? [])
+            : draftedByPos.get(posKey) ?? [];
+          const availHere = keys.length > 1
+            ? [...new Map(keys.flatMap(k => (availByPos.get(k) ?? []).map(p => [p.name, p] as [string, typeof p])).entries()).values()]
+              .sort((a, b) => b.fgDollars - a.fgDollars)
+            : availByPos.get(posKey) ?? [];
+          const needKey = flex ? label : posKey;
+          const isFilled = !needed.has(needKey);
           const filledCount = draftedHere.length;
 
           // Deduplicate
@@ -91,7 +100,7 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
               <div className={`w-6 flex-shrink-0 text-right mr-2 font-mono text-label font-bold mt-px ${
                 isFilled && filledCount >= Math.min(limit, 1)
                   ? "text-grafana-positive"
-                  : needed.has(posKey)
+                  : needed.has(needKey)
                   ? "text-grafana-warning"
                   : "text-grafana-muted"
               }`}>
@@ -149,7 +158,7 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
               <div className="flex-shrink-0 ml-1 mt-px">
                 {filledCount >= Math.min(limit, 1) && filledCount > 0 ? (
                   <span className="text-[9px] text-grafana-positive">✓</span>
-                ) : needed.has(posKey) ? (
+                ) : needed.has(needKey) ? (
                   <span className="text-[9px] text-grafana-warning">○</span>
                 ) : null}
               </div>

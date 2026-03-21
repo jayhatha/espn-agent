@@ -45,7 +45,7 @@ for (const [pos, list] of Object.entries(draftBoard)) {
 
 // Position saturation limits: how many targets/reaches we want per position
 const POSITION_TARGET_LIMITS: Record<string, number> = {
-  C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, OF: 3, SP: 99, RP: 99,
+  C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, OF: 4, SP: 99, RP: 99,
 };
 
 /** Total auction draft budget */

@@ -212,12 +212,25 @@ export function computeDraftBoardState(
     // We don't know their position precisely, so just count them as filling a slot
   }
 
-  // Determine which position groups still need a board player
+  // Determine which position groups still need a board player.
+  // 1B/3B also fill CI. 2B/SS also fill MI. Need 4 OF (not 3).
   const positionsNeeded: string[] = [];
-  const positionLimits: Record<string, number> = { C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, OF: 3, SP: 99, RP: 99 };
+  const positionLimits: Record<string, number> = {
+    C: 1, "1B": 1, "2B": 1, SS: 1, "3B": 1, OF: 4,
+    MI: 1, CI: 1, SP: 99, RP: 99,
+  };
+
+  // Count how many board players we've drafted that are eligible at each position
+  function isEligible(player: BoardPlayer, pos: string): boolean {
+    if (player.positions.includes(pos)) return true;
+    // Flex eligibility: 1B/3B → CI, 2B/SS → MI
+    if (pos === "CI" && (player.positions.includes("1B") || player.positions.includes("3B"))) return true;
+    if (pos === "MI" && (player.positions.includes("2B") || player.positions.includes("SS"))) return true;
+    return false;
+  }
 
   for (const [pos, limit] of Object.entries(positionLimits)) {
-    const filledCount = draftedPlayers.filter(p => p.positions.includes(pos)).length;
+    const filledCount = draftedPlayers.filter(p => isEligible(p, pos)).length;
     if (filledCount < limit) {
       positionsNeeded.push(pos);
     }
@@ -242,8 +255,8 @@ export function computeDraftBoardState(
       nominatedPlayerOnBoard = true;
       nominatedPlayerTier = boardPlayer.tier;
 
-      // Check if any of this player's positions are still needed
-      nominatedPositionNeeded = boardPlayer.positions.some(pos => positionsNeeded.includes(pos));
+      // Check if any of this player's positions (including flex) are still needed
+      nominatedPositionNeeded = positionsNeeded.some(pos => isEligible(boardPlayer, pos));
 
       if (nominatedPositionNeeded) {
         if (boardPlayer.tier === "target") {
