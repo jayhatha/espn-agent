@@ -1323,9 +1323,9 @@ export function computeDraftEngine(
         myCurrentRosterSGP,
         opponentBudgets,
         numSimulations: 200,
-        // Use original FG$ from the non-ASV-overlaid pool — bidNominatedPlayer.dollars
-        // may have been overwritten with ESPN ASV by the overlay step above.
-        fgDollars: (allPlayersOpt.find(p => p.normalizedName === bidNominatedPlayer.normalizedName)?.dollars) ?? bidNominatedPlayer.dollars,
+        // Use original FG$ from the full undrafted pool (not ASV-overlaid, not top-200 limited).
+        // bidNominatedPlayer.dollars may have been overwritten with ESPN ASV by the overlay step.
+        fgDollars: (undraftedPlayers.find(p => p.normalizedName === bidNominatedPlayer.normalizedName)?.dollars) ?? bidNominatedPlayer.dollars,
         categoryState,
       }).then(result => {
         cachedBidWorkerResult = result;
