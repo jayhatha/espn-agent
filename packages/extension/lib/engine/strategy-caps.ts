@@ -150,8 +150,11 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
         if (isDH) {
           capSource += ` -> need x1.0 (DH natural UTIL)`;
         } else {
-          bidCap = Math.max(1, Math.ceil(bidCap * 0.7));
-          capSource += ` → need ×0.7 (UTIL)`;
+          // Check remaining UTIL slots — fewer slots = steeper dampening
+          const utilLeft = input.remainingSlots["UTIL"] ?? 0;
+          const utilFactor = utilLeft <= 1 ? 0.4 : 0.7;
+          bidCap = Math.max(1, Math.ceil(bidCap * utilFactor));
+          capSource += ` → need ×${utilFactor} (UTIL, ${utilLeft} left)`;
         }
       } else if (destination === "BN") {
         bidCap = Math.max(1, Math.ceil(bidCap * 0.5));
@@ -171,6 +174,24 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
 
   // Positional weights removed — EV-based priority score already accounts
   // for positional scarcity via FanGraphs replacement-level adjustments.
+
+  // Budget pacing: scale bids when budget-per-remaining-slot gets tight.
+  // Without this, we spend freely early and run out late.
+  if (input.remainingSlots) {
+    const totalSlotsLeft = Object.values(input.remainingSlots).reduce((s, v) => s + v, 0);
+    if (totalSlotsLeft > 0) {
+      const totalSpent = input.hitterSpent + input.pitcherSpent;
+      const budgetLeft = TOTAL_BUDGET - totalSpent;
+      const avgPerSlot = budgetLeft / totalSlotsLeft;
+      // If average budget per slot drops below $5, start dampening aggressively
+      // to preserve $1/slot for remaining picks
+      if (avgPerSlot < 5 && bidCap > avgPerSlot) {
+        const pacingFactor = Math.max(0.3, avgPerSlot / 5);
+        bidCap = Math.max(1, Math.ceil(bidCap * pacingFactor));
+        capSource += ` → pacing ×${pacingFactor.toFixed(2)} ($${budgetLeft}/${totalSlotsLeft} slots)`;
+      }
+    }
+  }
 
   // Apply hitter budget allocation cap ($200 max for hitters)
   if (!input.isPitcher && !input.isEndgame) {
