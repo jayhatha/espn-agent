@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 ## Current Position
 
 Phase: 64 of 64 (Dynamic Budget Allocation)
-Plan: 02 (1 of 2 plans complete)
-Status: In Progress
-Last activity: 2026-03-22 - Phase 64 plan 01 complete (computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState via TDD)
+Plan: 02 (2 of 2 plans complete)
+Status: Complete
+Last activity: 2026-03-22 - Phase 64 plan 02 complete (surplusMultiplier wired to board bids, $1/slot reserve, unconditional full budget flush last 5 picks)
 
-Progress: [██░] 50% (Phase 64: 1/2 plans complete)
+Progress: [███] 100% (Phase 64: 2/2 plans complete)
 
 ## Accumulated Context
 
@@ -75,6 +75,9 @@ Progress: [██░] 50% (Phase 64: 1/2 plans complete)
 - [Phase 64-01]: surplusRatio clamped to 0 when budget < idealRemainingSpend (no negative surplus); surplusMultiplier capped at 1.5 via min(0.5, ratio)
 - [Phase 64-01]: specificityOrder drives position claim priority for computeIdealRemainingSpend: C, SS, 2B, 1B, 3B, MI, CI, OF, SP, RP
 - [Phase 64-01]: isEligible extracted verbatim to module scope from computeDraftBoardState closure
+- [Phase 64-02]: Budget flush guard (totalSpent>200) removed — fires unconditionally on slotsRemaining<=5; 50% dampening for slots 3-5 removed (full excess deployed)
+- [Phase 64-02]: RESERVE_PER_SLOT changed from 3 to 1 in strategy-caps.ts and use-draft-engine.ts — reduces over-reserving from ~$42 to ~$14
+- [Phase 64-02]: Wait-for-top-guys uses availablePlayers (undrafted only) to check for better same-position targets before suppressing surplus boost
 
 ### Roadmap Evolution
 
@@ -113,5 +116,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Completed 64-01-PLAN.md (computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState — TDD, 11 tests, 2 commits).
+Stopped at: Completed 64-02-PLAN.md (surplusMultiplier wired to board bids, $1/slot reserve, unconditional full budget flush last 5 picks — 3 tasks, 3 commits).
 Resume file: None
