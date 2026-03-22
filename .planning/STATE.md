@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 64 of 64 (Dynamic Budget Allocation)
 Plan: 02 (2 of 2 plans complete)
 Status: Complete
-Last activity: 2026-03-22 - Phase 64 plan 02 complete (surplusMultiplier wired to board bids, $1/slot reserve, unconditional full budget flush last 5 picks)
+Last activity: 2026-03-22 - Completed quick task 96: Fix auto-nominate search timing delays
 
 Progress: [███] 100% (Phase 64: 2/2 plans complete)
 
