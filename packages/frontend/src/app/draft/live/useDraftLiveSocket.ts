@@ -63,11 +63,40 @@ export interface Alert {
   category?: string;
 }
 
+// ---- Draft Board Types ----
+
+export interface BoardPlayer {
+  name: string;
+  positions: string[];
+  fgDollars: number;
+  tier: "target" | "reserve";
+  priorityScore?: number | null;
+}
+
+export interface DraftBoardStateSignal {
+  availablePlayers: BoardPlayer[];
+  draftedPlayers: Array<{ name: string; tier: string; positions: string[] }>;
+  positionsNeeded: string[];
+  totalBudgetRemaining: number;
+  cumulativeSurplus: number;
+  slots: Array<{ draftedName: string | null; filled: boolean; draftedCost: number | null }>;
+}
+
 export interface OptimizationSignal {
   maxBid: number;
   shouldBid: boolean;
   valueSurplus: number;
   expectedMarketPrice: number;
+  simulationEV?: number | null;
+  // EV debug fields (relayed from extension via Plan 01)
+  capSource?: string | null;
+  sgpBreakeven?: number | null;
+  priorityScore?: number | null;
+  evBuffer?: number | null;
+  categoryBonus?: number | null;
+  playerTags?: string[] | null;
+  // Draft board (relayed from extension via Plan 01)
+  draftBoardState?: DraftBoardStateSignal | null;
 }
 
 export interface SimulationDecisionEntry {
@@ -154,6 +183,8 @@ export type ControlActionMap = {
   SKIP_PLAYER: { playerId: number; playerName: string };
   TOGGLE_SIDEBAR: undefined;
   REORDER_QUEUE: number[];
+  MANUAL_BID: undefined;
+  MANUAL_NOMINATE: { playerName: string; playerId?: number };
 };
 
 export type ControlActionName = keyof ControlActionMap;
