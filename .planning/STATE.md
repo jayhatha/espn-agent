@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 63 — Mobile Draft Companion
+**Current focus:** Phase 64 — Dynamic Budget Allocation
 
 ## Current Position
 
-Phase: 63 of 63 (Mobile Draft Companion)
-Plan: 03 (3 of 3 plans complete)
-Status: Complete
-Last activity: 2026-03-22 - Phase 63 plan 03 complete (MobileBidVerdict, MobileDraftBoardView, NominatePickerModal + LiveTab rebuild — single-page grafana dark mobile draft companion)
+Phase: 64 of 64 (Dynamic Budget Allocation)
+Plan: 02 (1 of 2 plans complete)
+Status: In Progress
+Last activity: 2026-03-22 - Phase 64 plan 01 complete (computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState via TDD)
 
-Progress: [███] 100% (Phase 63: 3/3 plans complete)
+Progress: [██░] 50% (Phase 64: 1/2 plans complete)
 
 ## Accumulated Context
 
@@ -72,6 +72,9 @@ Progress: [███] 100% (Phase 63: 3/3 plans complete)
 - [Phase 63]: placeSingleBid reads DOM at execution time so stale WS prices cannot cause incorrect bids
 - [Phase 63]: MobileBidVerdict is props-only (no Zustand); LiveTabProps kept unchanged for page.tsx compat; 3 available players shown per position on mobile
 - [Phase 63-03]: Mobile page simplified to single-page LiveTab only — Strategy/Queue tabs removed post human-verify; page background set to #181b1f grafana dark
+- [Phase 64-01]: surplusRatio clamped to 0 when budget < idealRemainingSpend (no negative surplus); surplusMultiplier capped at 1.5 via min(0.5, ratio)
+- [Phase 64-01]: specificityOrder drives position claim priority for computeIdealRemainingSpend: C, SS, 2B, 1B, 3B, MI, CI, OF, SP, RP
+- [Phase 64-01]: isEligible extracted verbatim to module scope from computeDraftBoardState closure
 
 ### Roadmap Evolution
 
@@ -110,5 +113,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Completed 63-03-PLAN.md (MobileBidVerdict/MobileDraftBoardView/NominatePickerModal + LiveTab rebuild, single-page grafana dark mobile draft companion — Phase 63 complete).
+Stopped at: Completed 64-01-PLAN.md (computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState — TDD, 11 tests, 2 commits).
 Resume file: None

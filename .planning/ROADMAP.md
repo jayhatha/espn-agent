@@ -288,7 +288,7 @@ Plans:
 
 **Goal:** Compute ideal remaining team spend after each pick, distribute surplus to board targets (up to FG$ × 1.5), reduce reserve from $3 to $1/slot, spend everything in last 5 picks. Engine only with tests.
 **Depends on:** Phase 63
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 64-01-PLAN.md — TDD: computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState
