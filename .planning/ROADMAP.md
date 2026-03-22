@@ -269,7 +269,7 @@ Plans:
 
 **Goal:** Update mobile draft companion to match new draft board layout with cheatsheet-style table, add manual bid and nominate controls via WebSocket, relay draftBoardState and EV fields to mobile
 **Depends on:** Phase 62
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 63-01-PLAN.md — Extension relay: serialize draftBoardState + EV fields, add MANUAL_BID/MANUAL_NOMINATE control handlers
