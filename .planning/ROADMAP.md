@@ -264,3 +264,12 @@ Plans:
 - [ ] 62-01-PLAN.md — EV-based priority scorer: computePriorityScore, computeEVMaxBid, tagPlayer + TDD tests
 - [ ] 62-02-PLAN.md — Dynamic category state: scarcity weights, pace tracking, surplus pool, cliff detection + TDD tests
 - [ ] 62-03-PLAN.md — Wire priority scorer into bid pipeline (worker + index.ts) + integration tests
+
+### Phase 63: Mobile draft companion — update mobile interface to match new draft board layout, add manual bid and nominate controls
+
+**Goal:** [To be planned]
+**Depends on:** Phase 62
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 63 to break down)
