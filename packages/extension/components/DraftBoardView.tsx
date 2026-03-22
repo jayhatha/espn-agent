@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { DraftEngineSignals } from "../lib/engine";
 
 interface DraftBoardViewProps {
@@ -57,12 +57,18 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
   // Deduplicate drafted names across positions
   const draftedNamesSeen = new Set<string>();
 
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <div className="text-body-xs text-grafana-muted uppercase tracking-wide">
-          Draft Board
+        <div
+          className="text-body-xs text-grafana-muted uppercase tracking-wide cursor-pointer select-none"
+          onClick={() => setExpanded(prev => !prev)}
+          title={expanded ? "Collapse" : "Expand all targets"}
+        >
+          Draft Board <span className="text-[9px]">{expanded ? "▼" : "▶"}</span>
         </div>
         <div className="text-label text-grafana-muted">
           <span className="text-grafana-text font-semibold">${totalBudgetRemaining}</span> left
@@ -134,24 +140,51 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
                   </div>
                 ))}
 
-                {/* Available targets */}
+                {/* Available targets — show all when expanded, truncated when collapsed */}
                 {availHere.length > 0 && (
-                  <div className="flex flex-wrap gap-x-1 gap-y-0 leading-tight">
-                    {availHere.slice(0, label === "SP" || label === "RP" ? 6 : 4).map((p, i) => (
+                  <div className={expanded ? "space-y-px" : "flex flex-wrap gap-x-1 gap-y-0 leading-tight"}>
+                    {expanded ? (
+                      // Expanded: one player per line with full name and tier badge
+                      availHere.map((p, i) => (
+                        <div key={i} className="flex items-center gap-1.5 leading-tight">
+                          <span className={`text-[10px] ${
+                            p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
+                          }`}>
+                            {p.name}
+                          </span>
+                          <span className="text-[9px] text-grafana-muted/60">${p.fgDollars}</span>
+                          <span className={`text-[8px] px-1 rounded-sm font-bold ${
+                            p.tier === "target"
+                              ? "bg-[#37872d]/20 text-[#37872d]"
+                              : "bg-[#5b9cf6]/20 text-[#5b9cf6]"
+                          }`}>
+                            {p.tier === "target" ? "T" : "R"}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      // Collapsed: inline dot-separated last names
+                      <>
+                    {availHere.slice(0, label === "SP" || label === "RP" ? 6 : 4).map((p, i) => {
+                      const maxShow = label === "SP" || label === "RP" ? 6 : 4;
+                      return (
                       <span key={i} className={`text-[10px] ${
                         p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
                       }`}>
                         {lastName(p.name)}
                         <span className="text-grafana-muted/60 ml-px">{p.fgDollars}</span>
-                        {i < Math.min(availHere.length, (label === "SP" || label === "RP" ? 6 : 4)) - 1 && (
+                        {i < Math.min(availHere.length, maxShow) - 1 && (
                           <span className="text-grafana-border mx-0.5">·</span>
                         )}
                       </span>
-                    ))}
+                      );
+                    })}
                     {availHere.length > (label === "SP" || label === "RP" ? 6 : 4) && (
                       <span className="text-[10px] text-grafana-muted/50">
                         +{availHere.length - (label === "SP" || label === "RP" ? 6 : 4)}
                       </span>
+                    )}
+                      </>
                     )}
                   </div>
                 )}
