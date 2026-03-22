@@ -112,9 +112,10 @@ None yet.
 | 93 | Fix ideal roster optimizer for value drafting | 2026-03-16 | 1768f8a | [93-fix-ideal-roster-optimizer-for-value-dra](./quick/93-fix-ideal-roster-optimizer-for-value-dra/) |
 | 94 | Simplify nomination — overpriced-first | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/) |
 | 95 | Wire shouldBid from Monte Carlo into auto-bid | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/) |
+| 96 | Fix auto-nominate bug — add delay after search | 2026-03-22 | b3b5787 | [96-fix-auto-nominate-bug-add-delay-after-se](./quick/96-fix-auto-nominate-bug-add-delay-after-se/) |
 
 ## Session Continuity
 
 Last session: 2026-03-22
-Stopped at: Completed 64-02-PLAN.md (surplusMultiplier wired to board bids, $1/slot reserve, unconditional full budget flush last 5 picks — 3 tasks, 3 commits).
+Stopped at: Completed quick task 96 (fix auto-nominate search timing: SEARCH_INITIAL_DELAY_MS=500, SEARCH_MATCH_SETTLE_MS=150, SEARCH_DROPDOWN_TIMEOUT_MS=3000).
 Resume file: None
