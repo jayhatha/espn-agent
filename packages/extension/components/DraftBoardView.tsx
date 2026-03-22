@@ -26,8 +26,9 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
   const available = availablePlayers ?? [];
   const drafted = draftedPlayers ?? [];
   const needed = new Set<string>(positionsNeeded ?? []);
+  const [expanded, setExpanded] = useState(false);
 
-  // Group drafted board players by their board position
+  // Group drafted board players by position
   const draftedByPos = new Map<string, Array<{ name: string; tier: string; cost: number }>>();
   for (const p of drafted) {
     for (const pos of p.positions) {
@@ -36,9 +37,7 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
         (s: any) => s.draftedName === p.name && s.filled
       );
       draftedByPos.get(pos)!.push({
-        name: p.name,
-        tier: p.tier,
-        cost: rosterEntry?.draftedCost ?? 0,
+        name: p.name, tier: p.tier, cost: rosterEntry?.draftedCost ?? 0,
       });
     }
   }
@@ -51,168 +50,148 @@ export default function DraftBoardView({ engineSignals }: DraftBoardViewProps) {
       availByPos.get(pos)!.push({ name: p.name, tier: p.tier, fgDollars: Math.round(p.fgDollars) });
     }
   }
-  // Sort each position group by FG$ desc
   for (const [, list] of availByPos) list.sort((a, b) => b.fgDollars - a.fgDollars);
 
-  // Deduplicate drafted names across positions
   const draftedNamesSeen = new Set<string>();
-
-  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="px-3 py-2 bg-grafana-panel border-b border-grafana-border">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div
-          className="text-body-xs text-grafana-muted uppercase tracking-wide cursor-pointer select-none"
-          onClick={() => setExpanded(prev => !prev)}
-          title={expanded ? "Collapse" : "Expand all targets"}
-        >
-          Draft Board <span className="text-[9px]">{expanded ? "▼" : "▶"}</span>
+      {/* Header bar */}
+      <div
+        className="flex items-center justify-between mb-1.5 cursor-pointer select-none"
+        onClick={() => setExpanded(prev => !prev)}
+      >
+        <div className="text-body-xs text-grafana-muted uppercase tracking-wide">
+          Draft Board <span className="text-[9px] ml-0.5">{expanded ? "▼" : "▶"}</span>
         </div>
         <div className="text-label text-grafana-muted">
-          <span className="text-grafana-text font-semibold">${totalBudgetRemaining}</span> left
+          <span className="text-grafana-text font-semibold">${totalBudgetRemaining}</span>
           {(cumulativeSurplus ?? 0) > 0 && (
-            <>
-              <span className="mx-1">·</span>
-              <span className="text-grafana-positive font-semibold">+${cumulativeSurplus}</span>
-              <span className="text-grafana-muted"> banked</span>
-            </>
+            <span className="text-grafana-positive font-semibold ml-1.5">+${cumulativeSurplus}</span>
           )}
         </div>
       </div>
 
-      {/* Position rows */}
-      <div className="space-y-px">
-        {POS_GROUPS.map(({ label, keys, limit, flex }) => {
-          const posKey = keys[0];
-          // For flex positions (MI/CI), merge players from both eligible positions and deduplicate
-          const draftedHere = keys.length > 1
-            ? keys.flatMap(k => draftedByPos.get(k) ?? []).filter(p => p?.name)
-            : (draftedByPos.get(posKey) ?? []).filter(p => p?.name);
-          const availHere = keys.length > 1
-            ? [...new Map(
-                keys.flatMap(k => (availByPos.get(k) ?? []))
-                  .filter(p => p?.name)
-                  .map(p => [p.name, p] as [string, typeof p])
-              ).values()].sort((a, b) => b.fgDollars - a.fgDollars)
-            : (availByPos.get(posKey) ?? []).filter(p => p?.name);
-          const needKey = flex ? label : posKey;
-          const isFilled = !needed.has(needKey);
-          const filledCount = draftedHere.length;
+      {/* Table */}
+      <table className="w-full text-[10px] leading-tight" style={{ borderCollapse: "collapse" }}>
+        <thead>
+          <tr className="text-[9px] text-grafana-muted uppercase">
+            <th className="text-left w-6 pb-0.5 font-normal">Pos</th>
+            <th className="text-left pb-0.5 font-normal">Player</th>
+            <th className="text-right w-8 pb-0.5 font-normal">FG$</th>
+            <th className="text-center w-5 pb-0.5 font-normal"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {POS_GROUPS.map(({ label, keys, limit, flex }) => {
+            const posKey = keys[0];
+            const draftedHere = keys.length > 1
+              ? keys.flatMap(k => draftedByPos.get(k) ?? []).filter(p => p?.name)
+              : (draftedByPos.get(posKey) ?? []).filter(p => p?.name);
+            const availHere = keys.length > 1
+              ? [...new Map(
+                  keys.flatMap(k => (availByPos.get(k) ?? []))
+                    .filter(p => p?.name)
+                    .map(p => [p.name, p] as [string, typeof p])
+                ).values()].sort((a, b) => b.fgDollars - a.fgDollars)
+              : (availByPos.get(posKey) ?? []).filter(p => p?.name);
+            const needKey = flex ? label : posKey;
+            const posNeeded = needed.has(needKey);
+            const filledCount = draftedHere.length;
+            const isFilled = !posNeeded && filledCount > 0;
 
-          // Deduplicate (skip undefined names)
-          const uniqueDrafted = draftedHere.filter(p => {
-            if (!p?.name || draftedNamesSeen.has(p.name)) return false;
-            draftedNamesSeen.add(p.name);
-            return true;
-          });
+            const uniqueDrafted = draftedHere.filter(p => {
+              if (!p?.name || draftedNamesSeen.has(p.name)) return false;
+              draftedNamesSeen.add(p.name);
+              return true;
+            });
 
-          return (
-            <div key={label} className="flex items-start py-1 border-b border-grafana-border/50 last:border-0">
-              {/* Position label */}
-              <div className={`w-6 flex-shrink-0 text-right mr-2 font-mono text-label font-bold mt-px ${
-                isFilled && filledCount >= Math.min(limit, 1)
-                  ? "text-grafana-positive"
-                  : needed.has(needKey)
-                  ? "text-grafana-warning"
-                  : "text-grafana-muted"
-              }`}>
-                {label}
-              </div>
+            const maxCollapsed = label === "SP" || label === "RP" ? 4 : 3;
+            const shownAvail = expanded ? availHere : availHere.slice(0, maxCollapsed);
+            const hiddenCount = expanded ? 0 : Math.max(0, availHere.length - maxCollapsed);
 
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                {/* Drafted players at this position */}
+            const hasContent = uniqueDrafted.length > 0 || availHere.length > 0;
+            if (!hasContent && !posNeeded) return null;
+
+            return (
+              <React.Fragment key={label}>
+                {/* Position header row */}
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="pt-1.5 pb-0.5"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={`font-mono font-bold text-[11px] ${
+                        isFilled ? "text-grafana-positive" : posNeeded ? "text-grafana-warning" : "text-grafana-muted"
+                      }`}>
+                        {label}
+                      </span>
+                      {isFilled && <span className="text-[9px] text-grafana-positive">✓</span>}
+                      {posNeeded && <span className="text-[9px] text-grafana-warning">○</span>}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Drafted players */}
                 {uniqueDrafted.map((p, i) => (
-                  <div key={i} className="flex items-center gap-1.5 leading-tight">
-                    <span className="text-caption text-grafana-positive font-medium">
-                      {lastName(p.name)}
-                    </span>
-                    <span className="text-[9px] text-grafana-muted">${p.cost}</span>
-                    <span className={`text-[8px] px-1 rounded-sm font-bold ${
-                      p.tier === "target"
-                        ? "bg-[#37872d]/30 text-[#37872d]"
-                        : "bg-[#5b9cf6]/30 text-[#5b9cf6]"
-                    }`}>
-                      {p.tier === "target" ? "T" : "R"}
-                    </span>
-                  </div>
+                  <tr key={`d-${label}-${i}`} className="text-grafana-positive">
+                    <td></td>
+                    <td className="py-px font-medium">{p.name}</td>
+                    <td className="text-right py-px text-grafana-muted">${p.cost}</td>
+                    <td className="text-center py-px">
+                      <span className={`text-[8px] px-1 rounded-sm font-bold ${
+                        p.tier === "target"
+                          ? "bg-[#37872d]/30 text-[#37872d]"
+                          : "bg-[#5b9cf6]/30 text-[#5b9cf6]"
+                      }`}>
+                        {p.tier === "target" ? "T" : "R"}
+                      </span>
+                    </td>
+                  </tr>
                 ))}
 
-                {/* Available targets — show all when expanded, truncated when collapsed */}
-                {availHere.length > 0 && (
-                  <div className={expanded ? "space-y-px" : "flex flex-wrap gap-x-1 gap-y-0 leading-tight"}>
-                    {expanded ? (
-                      // Expanded: one player per line with full name and tier badge
-                      availHere.map((p, i) => (
-                        <div key={i} className="flex items-center gap-1.5 leading-tight">
-                          <span className={`text-[10px] ${
-                            p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
-                          }`}>
-                            {p.name}
-                          </span>
-                          <span className="text-[9px] text-grafana-muted/60">${p.fgDollars}</span>
-                          <span className={`text-[8px] px-1 rounded-sm font-bold ${
-                            p.tier === "target"
-                              ? "bg-[#37872d]/20 text-[#37872d]"
-                              : "bg-[#5b9cf6]/20 text-[#5b9cf6]"
-                          }`}>
-                            {p.tier === "target" ? "T" : "R"}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      // Collapsed: inline dot-separated last names
-                      <>
-                    {availHere.slice(0, label === "SP" || label === "RP" ? 6 : 4).map((p, i) => {
-                      const maxShow = label === "SP" || label === "RP" ? 6 : 4;
-                      return (
-                      <span key={i} className={`text-[10px] ${
-                        p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
+                {/* Available players */}
+                {shownAvail.map((p, i) => (
+                  <tr key={`a-${label}-${i}`} className={p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"}>
+                    <td></td>
+                    <td className="py-px">{p.name}</td>
+                    <td className="text-right py-px">${p.fgDollars}</td>
+                    <td className="text-center py-px">
+                      <span className={`text-[8px] px-1 rounded-sm font-bold ${
+                        p.tier === "target"
+                          ? "bg-[#37872d]/15 text-[#37872d]"
+                          : "bg-[#5b9cf6]/15 text-[#5b9cf6]"
                       }`}>
-                        {lastName(p.name)}
-                        <span className="text-grafana-muted/60 ml-px">{p.fgDollars}</span>
-                        {i < Math.min(availHere.length, maxShow) - 1 && (
-                          <span className="text-grafana-border mx-0.5">·</span>
-                        )}
+                        {p.tier === "target" ? "T" : "R"}
                       </span>
-                      );
-                    })}
-                    {availHere.length > (label === "SP" || label === "RP" ? 6 : 4) && (
-                      <span className="text-[10px] text-grafana-muted/50">
-                        +{availHere.length - (label === "SP" || label === "RP" ? 6 : 4)}
-                      </span>
-                    )}
-                      </>
-                    )}
-                  </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Overflow count */}
+                {hiddenCount > 0 && (
+                  <tr>
+                    <td></td>
+                    <td colSpan={3} className="py-px text-grafana-muted/40 italic">
+                      +{hiddenCount} more
+                    </td>
+                  </tr>
                 )}
 
-                {/* Empty state */}
+                {/* Empty position */}
                 {uniqueDrafted.length === 0 && availHere.length === 0 && (
-                  <span className="text-[10px] text-grafana-muted/40 italic">no targets</span>
+                  <tr>
+                    <td></td>
+                    <td colSpan={3} className="py-px text-grafana-muted/30 italic">no targets</td>
+                  </tr>
                 )}
-              </div>
-
-              {/* Status indicator */}
-              <div className="flex-shrink-0 ml-1 mt-px">
-                {filledCount >= Math.min(limit, 1) && filledCount > 0 ? (
-                  <span className="text-[9px] text-grafana-positive">✓</span>
-                ) : needed.has(needKey) ? (
-                  <span className="text-[9px] text-grafana-warning">○</span>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
-}
-
-function lastName(fullName: string | undefined | null): string {
-  if (!fullName) return "?";
-  const parts = fullName.split(" ");
-  return parts.length > 1 ? parts.slice(1).join(" ") : fullName;
 }
