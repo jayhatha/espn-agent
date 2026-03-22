@@ -87,6 +87,7 @@ Progress: [███] 100% (Phase 63: 3/3 plans complete)
 - Phase 61 added: Dynamic SGP recalculation during draft — recompute values as pool shrinks, anchor from static baseline, update replacement levels + inflation live, fix simulator hitter/RP drafting
 - Phase 62 added: Priority-scored auction engine — EV-based priority score with category scarcity, team need tracking, surplus pool, replacement cliffs, player tags, dynamic max bid capped at FG×1.25
 - Phase 63 added: Mobile draft companion — match new draft board layout, add manual bid and nominate controls
+- Phase 64 added: Dynamic budget allocation — recalculate ideal team to spend all $260, bid up when surplus exists, wait for top guys
 
 ### Pending Todos
 

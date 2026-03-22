@@ -283,3 +283,12 @@ Plans:
 - [x] 63-01-PLAN.md — Extension relay: serialize draftBoardState + EV fields, add MANUAL_BID/MANUAL_NOMINATE control handlers
 - [x] 63-02-PLAN.md — Frontend types + grafana theme: extend ControlActionMap, OptimizationSignal, add DraftBoardStateSignal, add grafana colors to tailwind.config
 - [x] 63-03-PLAN.md — Mobile UI rebuild: MobileBidVerdict, MobileDraftBoardView, NominatePickerModal, rewrite LiveTab with new layout
+
+### Phase 64: Dynamic budget allocation — recalculate ideal team to spend all $260, bid up on board targets when surplus exists, wait for top guys if affordable, don't leave value on the table
+
+**Goal:** [To be planned]
+**Depends on:** Phase 63
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 64 to break down)
