@@ -153,6 +153,14 @@ Phases 47, 48, 49, 51 can execute in parallel. Phase 50 depends on 47.
 | 53. UI Polish | 3/3 | Complete    | 2026-03-16 | - |
 | 54. Auction Engine Test Suite | v5.0 | 3/3 | Complete | 2026-03-17 |
 | 55. Extension Draft Reliability | 3/3 | Complete   | 2026-03-17 | - |
+| 56. Audit Draft Logic | 2/2 | Complete | 2026-03-18 | - |
+| 57. Auction Simulation Test Suite | 1/1 | Complete | 2026-03-19 | - |
+| 58. Max Bid & Positional Need | 1/1 | Complete | 2026-03-20 | - |
+| 59. Bid Engine Tuning | 2/2 | Complete | 2026-03-20 | - |
+| 60. SP Logic Fix | 3/3 | Complete | 2026-03-21 | - |
+| 61. Dynamic SGP Recalculation | 2/2 | Complete | 2026-03-21 | - |
+| 62. Priority-Scored Auction Engine | 3/3 | Complete | 2026-03-22 | - |
+| 63. Mobile Draft Companion | 3/3 | Complete   | 2026-03-22 | - |
 
 ### Phase 54: Auction engine test suite: unit tests for bid ceiling, inflation, SGP, roster constraints; simulation tests for strategy validation; scenario tests for edge cases
 
@@ -272,6 +280,6 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 63-01-PLAN.md — Extension relay: serialize draftBoardState + EV fields, add MANUAL_BID/MANUAL_NOMINATE control handlers
-- [ ] 63-02-PLAN.md — Frontend types + grafana theme: extend ControlActionMap, OptimizationSignal, add DraftBoardStateSignal, add grafana colors to tailwind.config
-- [ ] 63-03-PLAN.md — Mobile UI rebuild: MobileBidVerdict, MobileDraftBoardView, NominatePickerModal, rewrite LiveTab with new layout
+- [x] 63-01-PLAN.md — Extension relay: serialize draftBoardState + EV fields, add MANUAL_BID/MANUAL_NOMINATE control handlers
+- [x] 63-02-PLAN.md — Frontend types + grafana theme: extend ControlActionMap, OptimizationSignal, add DraftBoardStateSignal, add grafana colors to tailwind.config
+- [x] 63-03-PLAN.md — Mobile UI rebuild: MobileBidVerdict, MobileDraftBoardView, NominatePickerModal, rewrite LiveTab with new layout

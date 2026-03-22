@@ -34,30 +34,33 @@ key-files:
     - packages/frontend/src/app/draft/live/components/NominatePickerModal.tsx
   modified:
     - packages/frontend/src/app/draft/live/tabs/LiveTab.tsx
+    - packages/frontend/src/app/draft/live/page.tsx (old Strategy/Queue tabs removed)
 
 key-decisions:
   - "MobileBidVerdict is props-only — no Zustand; all data comes from LiveTab via engineSignals.optimization"
   - "MobileDraftBoardView shows 3 available players per position group (vs 4 in extension) for mobile density"
   - "LiveTabProps interface kept unchanged — positionFilter, splitValue, onPositionFilterChange, onSplitValueChange still accepted but unused (for page.tsx compat)"
+  - "Mobile page simplified to single-page LiveTab only — old Strategy/Queue tabs removed post human-verify"
+  - "Page background set to grafana dark theme (#181b1f) matching extension aesthetic"
 
 requirements-completed: [MOB-06, MOB-07, MOB-08]
 
 # Metrics
-duration: 7min
+duration: 12min
 completed: 2026-03-22
 ---
 
 # Phase 63 Plan 03: Mobile Draft Companion UI Rebuild Summary
 
-**LiveTab rebuilt as single-scroll page: MobileBidVerdict at top, MobileDraftBoardView in middle, sticky control bar (Auto/BID/Nominate) at bottom — grafana dark theme throughout**
+**LiveTab rebuilt as single-scroll page: MobileBidVerdict at top, MobileDraftBoardView in middle, sticky control bar (Auto/BID/Nominate) at bottom — grafana dark theme throughout. Old Strategy/Queue tabs removed post human-verify.**
 
 ## Performance
 
-- **Duration:** ~7 min
+- **Duration:** ~12 min
 - **Started:** 2026-03-22T02:15:29Z
-- **Completed:** 2026-03-22T02:17:16Z
-- **Tasks:** 2 complete (Task 3 is human-verify checkpoint)
-- **Files modified:** 4 (3 created, 1 rewritten)
+- **Completed:** 2026-03-22
+- **Tasks:** 3 complete (Task 3 human-verify approved with follow-up fixes)
+- **Files modified:** 5 (3 created, 2 modified)
 
 ## Accomplishments
 
@@ -65,6 +68,7 @@ completed: 2026-03-22
 - Created `MobileDraftBoardView` — collapsible position-grouped table. Header shows budget remaining + banked surplus. Drafted players rendered in grafana-positive green with T/R tier badges. Up to 3 available targets shown per position group. Uses text-xs (12px) minimum, not 10px like the extension.
 - Created `NominatePickerModal` — fixed full-screen overlay (bg-[#181b1f]/90) with inner scrollable panel (max-height 80vh). Players sorted by priorityScore descending, fgDollars as tiebreaker. Each row is min-h-[44px]. Backdrop tap closes modal.
 - Rewrote `LiveTab.tsx` — replaced old card-based layout (win probability, budget pressure bar, roster list, alerts, position filter, split slider) with the three new components. Sticky bottom bar has Auto-bid toggle (grafana green when on), BID +$1 button (disabled when shouldBid=false), and Nominate button. LiveTabProps interface unchanged for page.tsx compatibility.
+- Post human-verify: Removed old Strategy/Queue tabs from `page.tsx` — mobile page is now single-page LiveTab only. Set page background to #181b1f grafana dark theme.
 
 ## Task Commits
 
@@ -72,6 +76,7 @@ Each task was committed atomically:
 
 1. **Task 1: Create MobileBidVerdict, MobileDraftBoardView, NominatePickerModal** - `fd29e78` (feat)
 2. **Task 2: Rewrite LiveTab.tsx with new layout** - `7d4dcca` (feat)
+3. **Task 3: Remove old tabs, set grafana page background** - `64378a3` (fix, post human-verify)
 
 ## Files Created/Modified
 
@@ -79,28 +84,33 @@ Each task was committed atomically:
 - `packages/frontend/src/app/draft/live/components/MobileDraftBoardView.tsx` — NEW: mobile draft board table
 - `packages/frontend/src/app/draft/live/components/NominatePickerModal.tsx` — NEW: nomination overlay
 - `packages/frontend/src/app/draft/live/tabs/LiveTab.tsx` — REWRITTEN: new layout wiring all three components
+- `packages/frontend/src/app/draft/live/page.tsx` — MODIFIED: Strategy/Queue tabs removed, grafana bg applied
 
 ## Decisions Made
 
 - `MobileBidVerdict` accepts `currentPlayer` / `optimization` / `remainingBudget` as props — no Zustand dependency — all data flows from LiveTab via engineSignals
 - `MobileDraftBoardView` limits available players to 3 per position group (vs extension's 4) for better mobile density
 - `LiveTabProps` interface kept intact with `positionFilter`, `splitValue`, `onPositionFilterChange`, `onSplitValueChange` params still accepted (but unused in new layout) so page.tsx doesn't need updating
+- Mobile page simplified to single LiveTab only — old Strategy/Queue tabs removed after user identified them as unnecessary during verification
+- Page background updated to #181b1f to match grafana dark theme applied in LiveTab and extension
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Post-checkpoint fixes (user-directed)
 
-## Issues Encountered
+**1. [User-directed] Remove old Strategy/Queue tabs from mobile page**
+- **Found during:** Task 3 human-verify checkpoint
+- **Issue:** User identified old Strategy/Queue tabs as unnecessary — mobile should be LiveTab only
+- **Fix:** Removed old tab components/routes from `page.tsx`, made LiveTab the sole view
+- **Files modified:** `packages/frontend/src/app/draft/live/page.tsx`
+- **Commit:** 64378a3
 
-None.
-
-## User Setup Required
-
-Task 3 (human-verify) requires:
-1. Start dev server: `cd /Users/jay-work/Code/espn-agent && pnpm --filter frontend dev`
-2. Navigate to the mobile draft page
-3. Connect to extension WebSocket with draft data active
-4. Verify visual layout, touch targets, colors, and control actions
+**2. [User-directed] Set page background to grafana dark theme**
+- **Found during:** Task 3 human-verify checkpoint
+- **Issue:** Page background was default light/neutral, inconsistent with grafana dark aesthetic
+- **Fix:** Updated page background to `#181b1f` (grafana-bg token) in `page.tsx`
+- **Files modified:** `packages/frontend/src/app/draft/live/page.tsx`
+- **Commit:** 64378a3
 
 ## Self-Check: PASSED
 
@@ -110,6 +120,7 @@ Task 3 (human-verify) requires:
 - FOUND: packages/frontend/src/app/draft/live/tabs/LiveTab.tsx
 - FOUND commit: fd29e78 (Task 1)
 - FOUND commit: 7d4dcca (Task 2)
+- FOUND commit: 64378a3 (Task 3 post-verify fixes)
 
 ---
 *Phase: 63-mobile-draft-companion*
