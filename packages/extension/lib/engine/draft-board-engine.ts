@@ -45,6 +45,9 @@ export interface DraftBoardState {
   recommendedMaxBid: number;
   bidReason: string;
   cumulativeSurplus: number;       // total savings from drafting below FG$
+  idealRemainingSpend: number;     // sum of best FG$ at each unfilled position slot
+  surplusRatio: number;            // max(0, (budget - idealSpend) / idealSpend)
+  surplusMultiplier: number;       // 1 + min(0.5, surplusRatio)
 }
 
 // ============================================================
@@ -179,6 +182,64 @@ function findBestOpenSlot(
 }
 
 // ============================================================
+// Position eligibility (module scope so computeIdealRemainingSpend can use it)
+// ============================================================
+
+function isEligible(player: BoardPlayer, pos: string): boolean {
+  if (player.positions.includes(pos)) return true;
+  // Flex eligibility: 1B/3B → CI, 2B/SS → MI
+  if (pos === "CI" && (player.positions.includes("1B") || player.positions.includes("3B"))) return true;
+  if (pos === "MI" && (player.positions.includes("2B") || player.positions.includes("SS"))) return true;
+  return false;
+}
+
+// ============================================================
+// Ideal remaining spend
+// ============================================================
+
+/**
+ * Computes how much budget is "needed" for the rest of the draft by summing
+ * the best available FG$ at each unfilled position slot.
+ *
+ * Positions are processed in specificity order (C, SS, 2B first) so that the
+ * rarest positions claim the best multi-eligible players before flex positions.
+ * A Set prevents any player from being counted twice.
+ */
+export function computeIdealRemainingSpend(
+  positionsNeeded: string[],
+  positionLimits: Record<string, number>,
+  draftedPlayers: BoardPlayer[],
+  availablePlayers: BoardPlayer[],
+): number {
+  const used = new Set<string>();
+  let total = 0;
+
+  // Rarest positions first so they claim the best multi-eligible players
+  const specificityOrder = ["C", "SS", "2B", "1B", "3B", "MI", "CI", "OF", "SP", "RP"];
+
+  // Build list of (position, slotsNeeded) pairs
+  const posSlots: Array<{ pos: string; slotsNeeded: number }> = [];
+  for (const pos of specificityOrder) {
+    if (!positionsNeeded.includes(pos)) continue;
+    const limit = positionLimits[pos] ?? 1;
+    const filledCount = draftedPlayers.filter(p => isEligible(p, pos)).length;
+    const needed = Math.max(0, limit - filledCount);
+    if (needed > 0) posSlots.push({ pos, slotsNeeded: needed });
+  }
+
+  for (const { pos, slotsNeeded } of posSlots) {
+    const eligible = availablePlayers
+      .filter(p => !used.has(p.normalizedName) && isEligible(p, pos))
+      .sort((a, b) => b.fgDollars - a.fgDollars);
+    for (let i = 0; i < Math.min(slotsNeeded, eligible.length); i++) {
+      used.add(eligible[i].normalizedName);
+      total += eligible[i].fgDollars;
+    }
+  }
+  return total;
+}
+
+// ============================================================
 // Compute draft board state
 // ============================================================
 
@@ -256,14 +317,7 @@ export function computeDraftBoardState(
     MI: 1, CI: 1, SP: 99, RP: 99,
   };
 
-  // Count how many board players we've drafted that are eligible at each position
-  function isEligible(player: BoardPlayer, pos: string): boolean {
-    if (player.positions.includes(pos)) return true;
-    // Flex eligibility: 1B/3B → CI, 2B/SS → MI
-    if (pos === "CI" && (player.positions.includes("1B") || player.positions.includes("3B"))) return true;
-    if (pos === "MI" && (player.positions.includes("2B") || player.positions.includes("SS"))) return true;
-    return false;
-  }
+  // isEligible is defined at module scope — see above.
 
   for (const [pos, limit] of Object.entries(positionLimits)) {
     const filledCount = draftedPlayers.filter(p => isEligible(p, pos)).length;
@@ -271,6 +325,18 @@ export function computeDraftBoardState(
       positionsNeeded.push(pos);
     }
   }
+
+  // Compute ideal remaining spend and surplus fields
+  const idealRemainingSpend = computeIdealRemainingSpend(
+    positionsNeeded,
+    positionLimits,
+    draftedPlayers,
+    availablePlayers,
+  );
+  const surplusRatio = idealRemainingSpend > 0
+    ? Math.max(0, (budget - idealRemainingSpend) / idealRemainingSpend)
+    : 0;
+  const surplusMultiplier = 1 + Math.min(0.5, surplusRatio);
 
   // Track remaining roster slots (count all roster picks, not just board players)
   const remainingRosterSlots: Record<string, number> = {
@@ -445,5 +511,8 @@ export function computeDraftBoardState(
     recommendedMaxBid,
     bidReason,
     cumulativeSurplus,
+    idealRemainingSpend,
+    surplusRatio,
+    surplusMultiplier,
   };
 }
