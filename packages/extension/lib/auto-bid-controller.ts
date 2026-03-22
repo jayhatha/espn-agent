@@ -1285,6 +1285,65 @@ export class AutoBidController {
 
     button.click();
   }
+
+  /**
+   * Manual bid — clicks the ESPN +$1 bid button once, ignoring auto-mode guard.
+   * The bid button re-reads the DOM at execution time so stale WS prices don't matter.
+   */
+  placeSingleBid(): void {
+    const state = useDraftStore.getState();
+    if (!state.currentAuctionPlayer) {
+      logger.log("[AutoBidController] placeSingleBid: no current auction player");
+      return;
+    }
+    const button = document.querySelector<HTMLButtonElement>(
+      "form.bidding-form__default button.bid-player__button",
+    );
+    if (!button) {
+      logger.warn("[AutoBidController] placeSingleBid: bid button not found in DOM");
+      return;
+    }
+    if (button.disabled) {
+      logger.warn("[AutoBidController] placeSingleBid: bid button is disabled");
+      return;
+    }
+    logger.log("[AutoBidController] placeSingleBid: clicking bid button");
+    button.click();
+  }
+
+  /**
+   * Manual nominate — nominates a specific player by name, bypassing auto-mode guard.
+   * Reuses the same search → button-click flow as evaluateAndNominate().
+   */
+  nominateSpecificPlayer(playerName: string): void {
+    const state = useDraftStore.getState();
+
+    // Guard: active auction — can't nominate while one is in progress
+    if (state.currentAuctionPlayer != null) {
+      logger.log(`[AutoBidController] nominateSpecificPlayer: auction active, skipping ${playerName}`);
+      return;
+    }
+
+    const normalizedName = normalizeName(playerName);
+    const matchedRanking = state.rankings?.find(
+      (r) => normalizeName(r.playerName) === normalizedName,
+    );
+
+    if (matchedRanking) {
+      const playerId = matchedRanking.playerId;
+      const directButton = findActionButton(playerId);
+      if (directButton && !directButton.disabled) {
+        logger.log(`[AutoBidController] nominateSpecificPlayer: clicking button for ${playerName} (ID: ${playerId})`);
+        this.clickPlayerButton(directButton, playerName, playerId, "manual-nominate");
+        return;
+      }
+    }
+
+    // Fall back to search-and-nominate
+    logger.log(`[AutoBidController] nominateSpecificPlayer: searching for "${playerName}"`);
+    const playerId = matchedRanking?.playerId ?? 0;
+    this.searchAndNominate(playerName, playerId, "manual-nominate");
+  }
 }
 
 /** Singleton instance shared across the extension */

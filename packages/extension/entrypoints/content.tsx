@@ -105,6 +105,14 @@ export default defineContentScript({
         case "REORDER_QUEUE":
           autoBidController.reorderQueue(message.payload as number[]);
           break;
+        case "MANUAL_BID":
+          autoBidController.placeSingleBid();
+          break;
+        case "MANUAL_NOMINATE": {
+          const { playerName } = message.payload as { playerName: string };
+          autoBidController.nominateSpecificPlayer(playerName);
+          break;
+        }
       }
 
       sendResponse({ ok: true });
