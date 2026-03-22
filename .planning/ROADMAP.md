@@ -286,9 +286,10 @@ Plans:
 
 ### Phase 64: Dynamic budget allocation — recalculate ideal team to spend all $260, bid up on board targets when surplus exists, wait for top guys if affordable, don't leave value on the table
 
-**Goal:** [To be planned]
+**Goal:** Compute ideal remaining team spend after each pick, distribute surplus to board targets (up to FG$ × 1.5), reduce reserve from $3 to $1/slot, spend everything in last 5 picks. Engine only with tests.
 **Depends on:** Phase 63
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 64 to break down)
+- [ ] 64-01-PLAN.md — TDD: computeIdealRemainingSpend + surplusRatio/surplusMultiplier on DraftBoardState
+- [ ] 64-02-PLAN.md — Wire surplus into board bids, $3→$1 reserve, fix endgame flush, update tests
