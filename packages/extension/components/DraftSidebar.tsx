@@ -88,6 +88,42 @@ export default function DraftSidebar() {
                 valueSurplus: engineSignals.optimization.valueSurplus,
                 shouldBid: engineSignals.optimization.shouldBid,
                 simulationEV: engineSignals.optimization.simulationEV,
+                // EV debug fields for BidVerdict display
+                capSource: (engineSignals.optimization as any).capSource ?? null,
+                sgpBreakeven: (engineSignals.optimization as any).sgpBreakeven ?? null,
+                priorityScore: (engineSignals.optimization as any).priorityScore ?? null,
+                evBuffer: (engineSignals.optimization as any).evBuffer ?? null,
+                categoryBonus: (engineSignals.optimization as any).categoryBonus ?? null,
+                playerTags: (engineSignals.optimization as any).playerTags ?? null,
+                // Draft board state — trim availablePlayers to top 150 to limit payload size
+                draftBoardState: (() => {
+                  const bs = (engineSignals.optimization as any).draftBoardState;
+                  if (!bs) return null;
+                  return {
+                    availablePlayers: (bs.availablePlayers ?? [])
+                      .slice(0, 150)
+                      .map((p: any) => ({
+                        name: p.name,
+                        positions: p.positions,
+                        fgDollars: p.fgDollars,
+                        tier: p.tier,
+                        priorityScore: p.priorityScore ?? null,
+                      })),
+                    draftedPlayers: (bs.draftedPlayers ?? []).map((p: any) => ({
+                      name: p.name,
+                      tier: p.tier,
+                      positions: p.positions ?? [],
+                    })),
+                    positionsNeeded: bs.positionsNeeded ?? [],
+                    totalBudgetRemaining: bs.totalBudgetRemaining ?? 0,
+                    cumulativeSurplus: bs.cumulativeSurplus ?? 0,
+                    slots: (bs.slots ?? []).map((s: any) => ({
+                      draftedName: s.draftedName,
+                      filled: s.filled,
+                      draftedCost: s.draftedCost ?? null,
+                    })),
+                  };
+                })(),
               }
             : null,
           simulation: engineSignals.simulation
