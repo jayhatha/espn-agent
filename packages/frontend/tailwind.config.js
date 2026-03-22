@@ -66,6 +66,17 @@ module.exports = {
           light: '#eff6ff',
           border: '#bfdbfe',
         },
+        // Grafana dark theme palette (for mobile draft companion)
+        grafana: {
+          bg: "#181b1f",
+          panel: "#22252b",
+          border: "#2d3139",
+          text: "#d9dde6",
+          muted: "#99a5bc",
+          positive: "#37872d",
+          negative: "#c4162a",
+          warning: "#e0b400",
+        },
       },
       spacing: {
         'section': '6rem',
