@@ -229,8 +229,8 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         fgLookup,
       );
 
-      // $3/slot reserve calculation
-      const RESERVE_PER_SLOT = 3;
+      // $1/slot reserve calculation
+      const RESERVE_PER_SLOT = 1;
       const slotsAfterThis = Math.max(0, slotsLeft - 1);
       const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
       const maxAffordable = Math.max(1, remainingBudget - reserveNeeded);

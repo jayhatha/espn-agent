@@ -254,20 +254,20 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   // Positional weights removed — EV-based priority score already accounts
   // for positional scarcity via FanGraphs replacement-level adjustments.
 
-  // Budget reserve: always keep $3 per remaining slot (after this pick).
+  // Budget reserve: always keep $1 per remaining slot (after this pick).
   // This prevents blowing the budget on top picks and having $0 for the rest.
-  // Max bid = budget - ($3 × remaining slots after this pick).
+  // Max bid = budget - ($1 × remaining slots after this pick).
   if (input.remainingSlots) {
     const totalSlotsLeft = Object.values(input.remainingSlots).reduce((s, v) => s + v, 0);
     if (totalSlotsLeft > 1) {
       const totalSpent = input.hitterSpent + input.pitcherSpent;
       const budgetLeft = TOTAL_BUDGET - totalSpent;
-      const RESERVE_PER_SLOT = 3;
+      const RESERVE_PER_SLOT = 1;
       const slotsAfterThis = totalSlotsLeft - 1;
       const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
       const maxAffordable = Math.max(1, budgetLeft - reserveNeeded);
       if (bidCap > maxAffordable) {
-        capSource += ` → reserve cap $${maxAffordable} ($3×${slotsAfterThis} slots reserved)`;
+        capSource += ` → reserve cap $${maxAffordable} ($1×${slotsAfterThis} slots reserved)`;
         bidCap = maxAffordable;
       }
     }
@@ -407,34 +407,20 @@ export function computeStrategyBidCap(input: StrategyCapInput): StrategyCapResul
   }
 
   // Budget flush boost — spend all $260 when few slots remain.
-  // Only applies when the draft is substantially complete (spent > $200 total),
-  // meaning few slots remain and excess budget needs to be deployed.
-  // This ensures the full $260 is spent rather than leaving money on the table.
+  // Fires unconditionally when slotsRemaining <= 5 (no totalSpent guard).
+  // Last 5 picks: flush all excess budget — reserve $1 per remaining slot, spend everything else.
   const totalSpent = input.hitterSpent + input.pitcherSpent;
-  if (input.remainingSlots != null && totalSpent > 200) {
+  if (input.remainingSlots != null) {
     const slotsRemaining = Object.values(input.remainingSlots).reduce((s, v) => s + v, 0);
     if (slotsRemaining > 0 && slotsRemaining <= 5) {
       const budgetRemaining = TOTAL_BUDGET - totalSpent;
-      // Must reserve $1 per slot after this pick
+      // Reserve $1 per slot after this pick; flush everything else
       const minReserves = Math.max(0, slotsRemaining - 1);
       const excessBudget = budgetRemaining - minReserves - bidCap;
       if (excessBudget > 0) {
-        let boost: number;
-        if (slotsRemaining <= 2) {
-          // Last 1-2 picks: spend everything — unspent dollars are wasted
-          boost = excessBudget;
-        } else {
-          // 3-5 picks: flush up to rawMaxBid so we don't overpay when
-          // we still have future picks to allocate budget to
-          boost = Math.min(
-            Math.ceil(excessBudget * 0.5),
-            Math.max(0, input.rawMaxBid - bidCap),
-          );
-        }
-        if (boost > 0) {
-          bidCap += boost;
-          capSource += ` → budget flush +${boost}`;
-        }
+        // Last 5 picks: spend all excess — no 50% dampening
+        bidCap += excessBudget;
+        capSource += ` → budget flush +${excessBudget}`;
       }
     }
   }
