@@ -4,10 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useDraftLiveSocket } from "./useDraftLiveSocket";
 import { useWakeLock } from "./useWakeLock";
 import { ConnectionBanner } from "./components/ConnectionBanner";
-import { TabBar } from "./components/TabBar";
 import { LiveTab } from "./tabs/LiveTab";
-import QueueTab from "./tabs/QueueTab";
-import { StrategyTab } from "./tabs/StrategyTab";
 
 // ---- Sub-components ----
 
@@ -41,7 +38,7 @@ export default function DraftLivePage() {
   const [urlExpanded, setUrlExpanded] = useState(false);
   const [positionFilter, setPositionFilter] = useState<string>("All");
   const [splitValue, setSplitValue] = useState<number>(50);
-  const [activeTab, setActiveTab] = useState<string>("live");
+  // Removed tab system — single-page LiveTab only
 
   // Initialize on mount (client only - window.location)
   useEffect(() => {
@@ -81,9 +78,9 @@ export default function DraftLivePage() {
   const hasData = state !== null;
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col">
+    <div className="min-h-screen bg-[#181b1f] text-[#d9dde6] flex flex-col">
       {/* ---- Sticky Header ---- */}
-      <header className="sticky top-0 z-50 bg-neutral-950 border-b border-neutral-800 px-4 py-3">
+      <header className="sticky top-0 z-50 bg-[#181b1f] border-b border-[#2d3139] px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <span className="text-base font-bold tracking-tight">Draft Companion</span>
           <div className="flex items-center gap-3">
@@ -122,42 +119,21 @@ export default function DraftLivePage() {
       {/* ---- Extension Connection Banner ---- */}
       <ConnectionBanner extensionConnected={extensionConnected} wsConnected={connected} />
 
-      {/* ---- Tab Content ---- */}
-      <main className="flex-1 overflow-y-auto pb-12">
-        {activeTab === "live" && (
-          <LiveTab
-            state={state}
-            engineSignals={engineSignals}
-            hasData={hasData}
-            wsConnected={connected}
-            wsUrl={wsUrl}
-            positionFilter={positionFilter}
-            splitValue={splitValue}
-            onPositionFilterChange={setPositionFilter}
-            onSplitValueChange={setSplitValue}
-            sendControl={sendControl}
-          />
-        )}
-
-        {activeTab === "strategy" && (
-          <StrategyTab
-            engineSignals={engineSignals as Parameters<typeof StrategyTab>[0]["engineSignals"]}
-            simulation={(engineSignals?.simulation ?? null) as Parameters<typeof StrategyTab>[0]["simulation"]}
-          />
-        )}
-
-        {activeTab === "queue" && (
-          <QueueTab
-            state={state}
-            engineSignals={engineSignals}
-            sendControl={sendControl}
-            extensionConnected={extensionConnected}
-          />
-        )}
+      {/* ---- Content ---- */}
+      <main className="flex-1 overflow-y-auto">
+        <LiveTab
+          state={state}
+          engineSignals={engineSignals}
+          hasData={hasData}
+          wsConnected={connected}
+          wsUrl={wsUrl}
+          positionFilter={positionFilter}
+          splitValue={splitValue}
+          onPositionFilterChange={setPositionFilter}
+          onSplitValueChange={setSplitValue}
+          sendControl={sendControl}
+        />
       </main>
-
-      {/* ---- Bottom Tab Bar ---- */}
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
