@@ -110,7 +110,11 @@ export class AutoBidController {
   /** Max nomination attempts before backing off until state changes */
   private static readonly MAX_NOMINATION_ATTEMPTS = 3;
   /** How long to wait for ESPN's search dropdown to appear after typing (ms) */
-  private static readonly SEARCH_DROPDOWN_TIMEOUT_MS = 2000;
+  private static readonly SEARCH_DROPDOWN_TIMEOUT_MS = 3000;
+  /** Initial delay after typing before polling for the dropdown begins (ms) */
+  private static readonly SEARCH_INITIAL_DELAY_MS = 500;
+  /** Settle delay after dropdown match buttons appear, before clicking (ms) */
+  private static readonly SEARCH_MATCH_SETTLE_MS = 150;
   /** How long to wait for ESPN's queue button to appear after clicking dropdown match (ms) */
   private static readonly SEARCH_QUEUE_BUTTON_TIMEOUT_MS = 3000;
   /** Polling interval for dropdown and queue button checks (ms) */
@@ -948,6 +952,12 @@ export class AutoBidController {
           )
         : [];
 
+      if (elapsed === 0) {
+        logger.log(
+          `[AutoNominate] First poll: dropdown=${!!matchesContainer}, matchButtons=${matchButtons.length}`,
+        );
+      }
+
       if (matchButtons.length > 0) {
         // Prefer match by ESPN player ID attribute
         let matchButton: HTMLButtonElement | null = null;
@@ -970,24 +980,27 @@ export class AutoBidController {
         }
 
         if (matchButton) {
-          logger.log(
-            `[AutoNominate] Clicking search match for ${candidateName} (ID: ${playerId})`,
-          );
-          matchButton.click();
-          this.nominationAttempts++;
-          this.lastNominationTime = Date.now();
-          this.lastAttemptResult = `Clicked search dropdown match for ${candidateName}`;
-
-          // After ESPN processes the dropdown selection, click the "Nominate Player" confirm button.
-          // Two separate clicks: search match click selects the player, then "Nominate Player" finalizes.
+          // Small settle delay to ensure DOM is fully interactive before clicking
           setTimeout(() => {
-            this.pollForNominateButton(candidateName, 0);
-          }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS);
+            logger.log(
+              `[AutoNominate] Clicking search match for ${candidateName} (ID: ${playerId})`,
+            );
+            matchButton!.click();
+            this.nominationAttempts++;
+            this.lastNominationTime = Date.now();
+            this.lastAttemptResult = `Clicked search dropdown match for ${candidateName}`;
 
-          // Clear the search input after the nomination flow completes
-          setTimeout(() => {
-            this.clearPlayerSearch();
-          }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS + 1000);
+            // After ESPN processes the dropdown selection, click the "Nominate Player" confirm button.
+            // Two separate clicks: search match click selects the player, then "Nominate Player" finalizes.
+            setTimeout(() => {
+              this.pollForNominateButton(candidateName, 0);
+            }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS);
+
+            // Clear the search input after the nomination flow completes
+            setTimeout(() => {
+              this.clearPlayerSearch();
+            }, AutoBidController.SEARCH_DROPDOWN_SETTLE_MS + 1000);
+          }, AutoBidController.SEARCH_MATCH_SETTLE_MS);
           return;
         }
       }
@@ -997,7 +1010,9 @@ export class AutoBidController {
         setTimeout(() => pollForDropdown(elapsed + pollInterval), pollInterval);
       } else {
         logger.warn(
-          `[AutoNominate] No matching player in search dropdown for ${candidateName} (ID: ${playerId})`,
+          `[AutoNominate] Search dropdown timed out after ${maxElapsed}ms for ${candidateName} (ID: ${playerId}). ` +
+          `Dropdown visible: ${!!document.querySelector('.player--search--matches')}, ` +
+          `match buttons: ${document.querySelectorAll('button.player--search--match').length}`,
         );
         this.nominationAttempts++;
         this.lastNominationTime = Date.now();
@@ -1007,7 +1022,7 @@ export class AutoBidController {
     };
 
     // Start polling after a short delay to give ESPN time to open the dropdown
-    setTimeout(() => pollForDropdown(0), 300);
+    setTimeout(() => pollForDropdown(0), AutoBidController.SEARCH_INITIAL_DELAY_MS);
   }
 
   /**
