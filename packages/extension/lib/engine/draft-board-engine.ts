@@ -446,10 +446,26 @@ export function computeDraftBoardState(
         recommendedMaxBid = Math.round(boardPlayer.fgDollars * 0.5);
         bidReason = `${boardPlayer.positions.join("/")} has ${thisPlayerPositionCount} — fill ${emptyHitterPositions.join(",")} first`;
       } else if (nominatedPositionNeeded && (slotDestination === "dedicated" || slotDestination === "flex")) {
-        // Going to a real position slot — bid aggressively
+        // Going to a real position slot — bid aggressively using surplus multiplier
         if (boardPlayer.tier === "target") {
-          recommendedMaxBid = Math.round(boardPlayer.fgDollars * 1.25);
-          bidReason = `TARGET at ${boardPlayer.positions.join("/")} — bid aggressively`;
+          recommendedMaxBid = Math.round(boardPlayer.fgDollars * surplusMultiplier);
+          bidReason = `TARGET ×${surplusMultiplier.toFixed(2)} at ${boardPlayer.positions.join("/")} (surplus ${Math.round(surplusRatio * 100)}%)`;
+
+          // Wait for top guys: if a higher-FG$ target at this position is still on the board
+          // and we can't afford both, suppress surplus boost to preserve budget for the better player.
+          const betterTarget = availablePlayers.find(p =>
+            p.tier === "target" &&
+            p.positions.some(pos => boardPlayer.positions.includes(pos)) &&
+            p.fgDollars > boardPlayer.fgDollars
+          );
+          if (betterTarget) {
+            const canAffordBoth = budget - recommendedMaxBid >= betterTarget.fgDollars;
+            if (!canAffordBoth) {
+              // Drop surplus boost — bid at FG$ only to preserve budget for better player
+              recommendedMaxBid = Math.round(boardPlayer.fgDollars);
+              bidReason += ` — hold for ${betterTarget.name} ($${betterTarget.fgDollars})`;
+            }
+          }
         } else {
           // REACH: need cumulative surplus to cover the premium, OR no targets left
           const reachPremium = Math.max(0, boardPlayer.espnAsv - boardPlayer.fgDollars);
@@ -461,9 +477,9 @@ export function computeDraftBoardState(
           });
 
           if (noTargetsAtPos) {
-            // Forced reach — no targets left at this position, must pay market
-            recommendedMaxBid = Math.max(Math.round(boardPlayer.fgDollars), boardPlayer.espnAsv);
-            bidReason = `REACH at ${boardPlayer.positions.join("/")} — no targets left, forced (max $${recommendedMaxBid})`;
+            // Forced reach — no targets left at this position, apply surplus multiplier
+            recommendedMaxBid = Math.max(Math.round(boardPlayer.fgDollars * surplusMultiplier), boardPlayer.espnAsv);
+            bidReason = `REACH ×${surplusMultiplier.toFixed(2)} at ${boardPlayer.positions.join("/")} — forced (no targets)`;
           } else if (cumulativeSurplus >= reachPremium) {
             // Surplus covers the premium — reach is funded
             recommendedMaxBid = Math.round(boardPlayer.fgDollars) + Math.min(cumulativeSurplus, reachPremium);
