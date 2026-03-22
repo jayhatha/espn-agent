@@ -267,9 +267,11 @@ Plans:
 
 ### Phase 63: Mobile draft companion — update mobile interface to match new draft board layout, add manual bid and nominate controls
 
-**Goal:** [To be planned]
+**Goal:** Update mobile draft companion to match new draft board layout with cheatsheet-style table, add manual bid and nominate controls via WebSocket, relay draftBoardState and EV fields to mobile
 **Depends on:** Phase 62
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 63 to break down)
+- [ ] 63-01-PLAN.md — Extension relay: serialize draftBoardState + EV fields, add MANUAL_BID/MANUAL_NOMINATE control handlers
+- [ ] 63-02-PLAN.md — Frontend types + grafana theme: extend ControlActionMap, OptimizationSignal, add DraftBoardStateSignal, add grafana colors to tailwind.config
+- [ ] 63-03-PLAN.md — Mobile UI rebuild: MobileBidVerdict, MobileDraftBoardView, NominatePickerModal, rewrite LiveTab with new layout
