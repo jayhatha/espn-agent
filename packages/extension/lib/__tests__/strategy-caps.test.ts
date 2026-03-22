@@ -290,7 +290,8 @@ describe("computeStrategyBidCap — combined adjustments", () => {
         spCount: 1, // SP2 cap = $12
         isEndgame: true,
         inflationFactor: 1.15,
-        remainingSlots: { P: 5 },
+        // 6 slots remaining → > 5, budget flush does not fire
+        remainingSlots: { P: 6 },
       }),
     );
     // P slots available → no pitcher BN dampening
@@ -434,7 +435,8 @@ describe("computeStrategyBidCap — need multiplier", () => {
         isSP: true,
         positions: ["SP"],
         spCount: 0,
-        remainingSlots: { P: 3 },
+        // 6 slots remaining → > 5, budget flush does not fire
+        remainingSlots: { P: 6 },
       }),
     );
     // Pitcher, P>0 → dedicated. No need reduction.
@@ -456,7 +458,8 @@ describe("computeStrategyBidCap — DH UTIL exemption", () => {
         rawMaxBid: 20,
         positions: ["DH"],
         primaryPosition: "DH",
-        remainingSlots: { DH: 0, UTIL: 1 }, // no DH dedicated slot, UTIL available
+        // no DH dedicated slot, UTIL available; extra slots ensure > 5 so budget flush doesn't fire
+        remainingSlots: { DH: 0, UTIL: 1, OF: 2, SS: 1, "2B": 1, P: 3 },
       }),
     );
     // No 0.7x reduction: bidCap stays at rawMaxBid + posWeight(DH=2) = 22
@@ -506,15 +509,12 @@ describe("computeStrategyBidCap — DH UTIL exemption", () => {
 // ============================================================
 
 describe("computeStrategyBidCap — budget flush boost", () => {
-  it("3 slots remaining, $80 budget left, bidCap $15 → boosts by ~half excess", () => {
-    // hitterSpent=150, pitcherSpent=30 → totalSpent=180... not > 200
-    // Need totalSpent > 200: hitterSpent=170, pitcherSpent=40 → total=210, budgetRemaining=50
-    // But let's use: hitterSpent=180, pitcherSpent=30=210 → budgetRemaining=50... too low
-    // To get $80 budget left: hitterSpent=140, pitcherSpent=40 → total=180... not > 200
-    // With the totalSpent>200 guard: hitterSpent=170, pitcherSpent=30 → total=200... not strictly > 200
-    // Use hitterSpent=175, pitcherSpent=30 → total=205, budgetRemaining=55
-    // slotsRemaining=3, minReserves=2, bidCap=15
-    // excess = 55 - 2 - 15 = 38, boost = ceil(38*0.5)=19, bidCap=34
+  it("3 slots remaining, $80 budget left, bidCap $15 → boosts by full excess", () => {
+    // hitterSpent=175, pitcherSpent=30 → totalSpent=205, budgetRemaining=55
+    // slotsRemaining=3 ≤ 5, flush fires unconditionally (no totalSpent guard)
+    // minReserves = max(0, 3-1) = 2
+    // excess = 55 - 2 - 15 = 38, boost = 38 (full flush, no 50% dampening)
+    // bidCap = 15 + 38 = 53
     const result = computeStrategyBidCap(
       makeInput({
         rawMaxBid: 15,
@@ -524,12 +524,10 @@ describe("computeStrategyBidCap — budget flush boost", () => {
         remainingSlots: { OF: 1, "1B": 1, UTIL: 1 }, // 3 slots
       }),
     );
-    // 15 + 3 (OF pos weight) = 18 (OF has 1 slot left so hasDedicatedSlot=true)
-    // totalSpent=205>200, slotsRemaining=3≤5
-    // budgetRemaining=55, minReserves=2
-    // excess = 55 - 2 - 18 = 35, boost = ceil(35*0.5) = 18
-    // bidCap = 18 + 18 = 36
-    expect(result.bidCap).toBeGreaterThan(18);
+    // 15 (rawMaxBid, no positional weight)
+    // flush: slotsRemaining=3≤5, budgetRemaining=55, minReserves=2
+    // excess = 55 - 2 - 15 = 38, boost = 38 → bidCap = 53
+    expect(result.bidCap).toBe(53);
     expect(result.capSource).toContain("budget flush");
   });
 
@@ -568,11 +566,11 @@ describe("computeStrategyBidCap — budget flush boost", () => {
     expect(result.capSource).not.toContain("budget flush");
   });
 
-  it("3 slots remaining but no excess budget — no boost", () => {
+  it("3 slots remaining with tight budget — small flush boost", () => {
     // hitterSpent=210, pitcherSpent=30 → total=240, budgetRemaining=20
-    // slotsRemaining=3, minReserves=2, bidCap=15
-    // excess = 20 - 2 - 15 = 3, boost = ceil(3*0.5) = 2 → small boost actually fires
-    // Let's make bidCap consume all budget: bidCap=20, excess = 20-2-20 = -2 → no boost
+    // slotsRemaining=3 ≤ 5, flush fires unconditionally
+    // hitterCap: headroom=220-210=10, rawMaxBid=20 → bidCap=10 after hitter cap
+    // flush: excess = 20-2-10 = 8, boost=8 (full flush) → bidCap=18
     const result = computeStrategyBidCap(
       makeInput({
         rawMaxBid: 20,
@@ -582,11 +580,10 @@ describe("computeStrategyBidCap — budget flush boost", () => {
         remainingSlots: { OF: 1, "1B": 1, UTIL: 1 }, // 3 slots
       }),
     );
-    // totalSpent=240>200, slotsRemaining=3≤5
-    // budgetRemaining=20, hitterCap: 210+20=230>220, headroom=10 → bidCap=10 (after hitter cap)
-    // flush: excess = 20-2-10 = 8, boost=ceil(8*0.5)=4 → fires with small boost
-    // This test is better framed as "small excess → small boost"
-    expect(result.bidCap).toBeGreaterThanOrEqual(10); // baseline after hitter cap
+    // budgetRemaining=20, hitterCap applied → bidCap=10
+    // flush: excess=20-2-10=8, boost=8 → bidCap=18
+    expect(result.bidCap).toBe(18);
+    expect(result.capSource).toContain("budget flush");
   });
 });
 
