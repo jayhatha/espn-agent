@@ -14,33 +14,37 @@ interface ErrorAlertProps {
 
 const variantStyles = {
   error: {
-    container: "bg-negative-light border border-negative-border",
-    title: "text-negative",
-    message: "text-negative",
+    container:
+      "bg-negative-light border border-negative-border dark:bg-red-900/20 dark:border-red-800",
+    title: "text-negative dark:text-red-400",
+    message: "text-negative dark:text-red-400",
     button:
-      "text-negative hover:text-negative border-negative-border hover:bg-negative-light",
-    icon: "text-negative",
+      "text-negative hover:text-negative border-negative-border hover:bg-negative-light dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30",
+    icon: "text-negative dark:text-red-400",
     actionButton:
-      "bg-negative text-white hover:bg-red-700",
+      "bg-negative text-white hover:bg-red-700 dark:bg-red-800 dark:hover:bg-red-700",
   },
   warning: {
-    container: "bg-warning-light border border-warning-border",
-    title: "text-warning",
-    message: "text-warning",
+    container:
+      "bg-warning-light border border-warning-border dark:bg-amber-900/20 dark:border-amber-800",
+    title: "text-warning dark:text-amber-400",
+    message: "text-warning dark:text-amber-400",
     button:
-      "text-warning hover:text-warning border-warning-border hover:bg-warning-light",
-    icon: "text-warning",
+      "text-warning hover:text-warning border-warning-border hover:bg-warning-light dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/30",
+    icon: "text-warning dark:text-amber-400",
     actionButton:
-      "bg-warning text-white hover:bg-amber-600",
+      "bg-warning text-white hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700",
   },
   info: {
-    container: "bg-info-light border border-info-border",
-    title: "text-info",
-    message: "text-info",
-    button: "text-info hover:text-info border-info-border hover:bg-info-light",
-    icon: "text-info",
+    container:
+      "bg-info-light border border-info-border dark:bg-blue-900/20 dark:border-blue-800",
+    title: "text-info dark:text-blue-400",
+    message: "text-info dark:text-blue-400",
+    button:
+      "text-info hover:text-info border-info-border hover:bg-info-light dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/30",
+    icon: "text-info dark:text-blue-400",
     actionButton:
-      "bg-accent text-content-inverse hover:bg-accent-hover",
+      "bg-accent text-content-inverse hover:bg-accent-hover dark:bg-shell-accent dark:hover:bg-shell-accent/90",
   },
 };
 
@@ -112,7 +116,7 @@ export function ErrorAlert({
             {backLink && (
               <Link
                 href={backLink.href}
-                className="text-sm text-content-secondary hover:text-content transition-colors"
+                className="text-sm text-content-secondary hover:text-content dark:text-shell-muted dark:hover:text-shell-text transition-colors"
               >
                 {backLink.label}
               </Link>

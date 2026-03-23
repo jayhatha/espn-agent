@@ -11,7 +11,10 @@ interface TermProps {
 export function Term({ id, children }: TermProps) {
   const definition = GLOSSARY[id];
   if (!definition) {
-    return <span>{children ?? id}</span>;
+    // Fallback: render plain text in muted color
+    return (
+      <span className="dark:text-shell-muted">{children ?? id}</span>
+    );
   }
   return <Tooltip content={definition}>{children ?? id.toUpperCase()}</Tooltip>;
 }

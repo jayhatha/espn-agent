@@ -1,7 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
-export const headingVariants = cva("tracking-tight text-content", {
+export const headingVariants = cva("tracking-tight text-content dark:text-shell-text", {
   variants: {
     level: {
       1: "text-h1 font-display",

@@ -27,7 +27,8 @@ export function PageHeader({
             href={backLink.href}
             className={cn(
               "inline-flex items-center text-sm font-medium transition-colors",
-              "text-content-secondary hover:text-content"
+              "text-content-secondary hover:text-content",
+              "dark:text-shell-muted dark:hover:text-shell-text"
             )}
           >
             <ChevronLeft className="w-4 h-4 mr-1" />

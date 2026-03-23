@@ -42,7 +42,7 @@ export function StatsTable({
   defaultSortDir = "asc",
   rowKey = "id",
   highlightRow,
-  highlightClassName = "bg-accent-light",
+  highlightClassName = "bg-accent-light dark:bg-shell-accent/10",
   emptyMessage = "No data available",
   compact = false,
   stickyHeader = false,
@@ -89,17 +89,19 @@ export function StatsTable({
   if (data.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-body-sm text-content-secondary">{emptyMessage}</p>
+        <p className="text-body-sm text-content-secondary dark:text-shell-muted">
+          {emptyMessage}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-neutral-200">
+    <div className="overflow-x-auto dark:bg-shell-panel dark:border dark:border-shell-border dark:rounded-card">
+      <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
         <thead
           className={cn(
-            "bg-surface-secondary",
+            "bg-surface-secondary dark:bg-shell-bg",
             stickyHeader ? "sticky top-0 z-10" : ""
           )}
         >
@@ -111,11 +113,14 @@ export function StatsTable({
                   px,
                   py,
                   "text-body-sm font-medium text-content-secondary uppercase tracking-wider",
+                  "dark:text-shell-muted",
                   alignClasses[col.align || "left"],
                   col.headerClassName || "",
-                  col.sticky ? "sticky left-0 bg-surface-secondary z-10" : "",
+                  col.sticky
+                    ? "sticky left-0 bg-surface-secondary dark:bg-shell-bg z-10"
+                    : "",
                   sortable && col.sortable !== false
-                    ? "cursor-pointer hover:bg-surface-tertiary select-none"
+                    ? "cursor-pointer hover:bg-surface-tertiary dark:hover:bg-shell-panel select-none"
                     : ""
                 )}
                 onClick={() =>
@@ -125,7 +130,7 @@ export function StatsTable({
                 <span className="inline-flex items-center gap-1">
                   {col.label}
                   {sortable && sortKey === col.key && (
-                    <span className="text-accent">
+                    <span className="text-accent dark:text-shell-accent">
                       {sortDir === "asc" ? "\u2191" : "\u2193"}
                     </span>
                   )}
@@ -134,14 +139,14 @@ export function StatsTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-neutral-100">
+        <tbody className="bg-white divide-y divide-neutral-100 dark:bg-shell-panel dark:divide-shell-border">
           {sortedData.map((row, rowIdx) => {
             const isHighlighted = highlightRow?.(row);
             return (
               <tr
                 key={getRowKey(row, rowIdx)}
                 className={cn(
-                  "hover:bg-surface-secondary transition-colors",
+                  "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                   isHighlighted ? highlightClassName : ""
                 )}
               >
@@ -151,10 +156,13 @@ export function StatsTable({
                     className={cn(
                       px,
                       py,
-                      "whitespace-nowrap text-body-sm text-content",
+                      "whitespace-nowrap text-body-sm text-content font-mono",
+                      "dark:text-shell-text",
                       alignClasses[col.align || "left"],
                       col.className || "",
-                      col.sticky ? "sticky left-0 bg-inherit z-10" : ""
+                      col.sticky
+                        ? "sticky left-0 bg-inherit z-10"
+                        : ""
                     )}
                   >
                     {col.format

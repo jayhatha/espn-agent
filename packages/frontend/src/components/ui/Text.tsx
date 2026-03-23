@@ -11,9 +11,9 @@ export const textVariants = cva("", {
       data: "text-data",
     },
     color: {
-      default: "text-content",
-      secondary: "text-content-secondary",
-      tertiary: "text-content-tertiary",
+      default: "text-content dark:text-shell-text",
+      secondary: "text-content-secondary dark:text-shell-muted",
+      tertiary: "text-content-tertiary dark:text-shell-muted",
     },
   },
   defaultVariants: {

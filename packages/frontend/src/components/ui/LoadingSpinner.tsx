@@ -23,19 +23,21 @@ export function LoadingSpinner({
     <div className="text-center">
       <div
         className={cn(
-          "animate-spin rounded-full border-accent mx-auto",
+          "animate-spin rounded-full border-accent dark:border-shell-muted mx-auto",
           sizeClasses[size]
         )}
       />
       {message && (
-        <p className="mt-4 text-content-secondary text-body-sm">{message}</p>
+        <p className="mt-4 text-content-secondary dark:text-shell-muted text-body-sm">
+          {message}
+        </p>
       )}
     </div>
   );
 
   if (fullPage) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-secondary">
+      <div className="min-h-screen flex items-center justify-center bg-surface-secondary dark:bg-shell-bg">
         {spinner}
       </div>
     );
@@ -56,7 +58,7 @@ export function LoadingSkeleton({
   return (
     <div className={cn("animate-pulse space-y-4", className)}>
       {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-32 bg-neutral-200 rounded" />
+        <div key={i} className="h-32 bg-neutral-200 dark:bg-shell-border rounded" />
       ))}
     </div>
   );

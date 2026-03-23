@@ -15,6 +15,8 @@ export function TeamColorBadge({ teamIndex, teamName, className = "" }: TeamColo
     <span
       className={cn(
         "inline-flex items-center px-2 py-1 rounded-md text-xs font-medium",
+        // Dark mode: ensure text is legible against the dynamic background color
+        "dark:font-semibold",
         className
       )}
       style={{ backgroundColor: color + "20", color }}

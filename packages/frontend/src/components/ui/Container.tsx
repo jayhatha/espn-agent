@@ -20,7 +20,10 @@ export function Container({
   return (
     <div
       className={cn(
+        // Layout: max-width + 16px horizontal padding (SHELL-07: p-4 base padding)
         "mx-auto px-4 sm:px-6 lg:px-8",
+        // Dark mode: inherit text color from shell body (dark:text-shell-text set on body)
+        "dark:text-inherit",
         sizeClasses[size],
         className
       )}
