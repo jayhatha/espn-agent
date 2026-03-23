@@ -146,7 +146,10 @@ Plans:
   3. Cold players are flagged with a declining production indicator so the user knows who to consider dropping
   4. Lineup efficiency view shows production from benched players (HR, SB, OPS missed) for each recent day
   5. A warning indicator appears when a benched player produced more than a started player at the same position
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 70-01-PLAN.md — Backend trends API: hot/cold 7-day rolling stats + lineup efficiency endpoints
+- [ ] 70-02-PLAN.md — Frontend trends UI: hot/cold panel with driving stat labels + lineup efficiency view with bench warnings
 
 ## Progress
 
