@@ -364,6 +364,17 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/transaction-impacts/league-summary${qs}`);
   },
 
+  // Trends
+  async getHotColdTrends(leagueId: number, teamId: number, options?: { days?: number }) {
+    const days = options?.days || 7;
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trends/hot-cold?days=${days}`);
+  },
+
+  async getLineupEfficiency(leagueId: number, teamId: number, options?: { days?: number }) {
+    const days = options?.days || 7;
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trends/lineup-efficiency?days=${days}`);
+  },
+
   // Player pool sync
   async triggerPlayerPoolSync(season?: number) {
     return fetchAPI('/api/admin/player-pool/sync', {

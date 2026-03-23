@@ -75,7 +75,81 @@ interface Team {
   name: string;
 }
 
-type ViewMode = "overall" | "category" | "projected" | "values";
+interface HotColdPlayer {
+  playerId: number;
+  playerName: string;
+  rosterSlot: string | null;
+  rosterStatus: string;
+  playerType: "hitter" | "pitcher";
+  trend: "hot" | "cold" | "neutral" | "insufficient";
+  drivingStat: string | null;
+  sevenDay: { ops?: number; era?: number; whip?: number; kRate?: number; hr?: number; sb?: number; ab?: number; ip?: number };
+  season: { ops?: number; era?: number; whip?: number; kRate?: number; hr?: number; sb?: number; ab?: number; ip?: number };
+  ratios: { opsRatio?: number | null; eraRatio?: number | null; kRateRatio?: number | null };
+}
+
+interface EfficiencyDay {
+  date: string;
+  benchProduction: {
+    totalHR: number;
+    totalSB: number;
+    totalOPS: number | null;
+    totalAB: number;
+  };
+  warnings: Array<{
+    benchPlayerId: number;
+    benchPlayerName: string;
+    starterId: number;
+    starterName: string;
+    position: string;
+    benchStat: { hr: number; ops: number | null };
+    starterStat: { hr: number; ops: number | null };
+    reason: string;
+  }>;
+}
+
+type ViewMode = "overall" | "category" | "projected" | "values" | "hotcold" | "efficiency";
+
+function TrendBadge({ trend, drivingStat }: { trend: string; drivingStat: string | null }) {
+  if (trend === "hot") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+        <span className="text-green-400">&#9650;</span> HOT
+        {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
+      </span>
+    );
+  }
+  if (trend === "cold") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+        <span className="text-red-400">&#9660;</span> COLD
+        {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
+      </span>
+    );
+  }
+  if (trend === "insufficient") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400">
+        ? Insufficient
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400">
+      &#8212; Neutral
+    </span>
+  );
+}
+
+function formatRate(val: number | undefined, decimals = 3): string {
+  if (val == null) return "-";
+  return val < 1 && val >= 0 ? val.toFixed(decimals) : val.toFixed(2);
+}
+
+function formatPct(ratio: number | null | undefined): string {
+  if (ratio == null) return "-";
+  return `${Math.round(ratio * 100)}%`;
+}
 
 export default function TrendsPage() {
   const params = useParams();
@@ -88,6 +162,7 @@ export default function TrendsPage() {
   const [showInflectionPoints, setShowInflectionPoints] = useState(true);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
   const [toDate, setToDate] = useState<string | undefined>(undefined);
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   // Load selected team from localStorage
   useEffect(() => {
@@ -219,6 +294,20 @@ export default function TrendsPage() {
     enabled: !!leagueId && !!selectedTeamId && (viewMode === "category" || viewMode === "overall"),
   });
 
+  // Hot/Cold trends
+  const { data: hotColdData, isLoading: hotColdLoading } = useQuery({
+    queryKey: ["hot-cold-trends", leagueId, selectedTeamId],
+    queryFn: () => api.getHotColdTrends(parseInt(leagueId, 10), selectedTeamId!, { days: 7 }),
+    enabled: !!leagueId && !!selectedTeamId && viewMode === "hotcold",
+  });
+
+  // Lineup efficiency
+  const { data: efficiencyData, isLoading: efficiencyLoading } = useQuery({
+    queryKey: ["lineup-efficiency", leagueId, selectedTeamId],
+    queryFn: () => api.getLineupEfficiency(parseInt(leagueId, 10), selectedTeamId!, { days: 7 }),
+    enabled: !!leagueId && !!selectedTeamId && viewMode === "efficiency",
+  });
+
   const teams = teamsData?.teams || [];
   const teamMap = new Map(teams.map((t) => [t.id, t.name]));
 
@@ -302,7 +391,15 @@ export default function TrendsPage() {
   };
 
   const chartData = getChartData();
-  const isLoading = overallLoading || categoryLoading || projectedLoading || categoryTotalLoading || ((viewMode === "category" || viewMode === "values") && categoriesLoading);
+  const isChartView = viewMode === "overall" || viewMode === "category" || viewMode === "projected" || viewMode === "values";
+  const isLoading =
+    (viewMode === "overall" && overallLoading) ||
+    (viewMode === "category" && categoryLoading) ||
+    (viewMode === "projected" && projectedLoading) ||
+    (viewMode === "values" && categoryTotalLoading) ||
+    (viewMode === "hotcold" && hotColdLoading) ||
+    (viewMode === "efficiency" && efficiencyLoading) ||
+    ((viewMode === "category" || viewMode === "values") && categoriesLoading);
 
   const teamNames =
     chartData.length > 0
@@ -319,6 +416,33 @@ export default function TrendsPage() {
         : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300"
     );
 
+  // Sort hot/cold players: hot first, then cold, then neutral, then insufficient
+  const sortedHotColdPlayers = (() => {
+    const players = (hotColdData?.players || []) as HotColdPlayer[];
+    const order = { hot: 0, cold: 1, neutral: 2, insufficient: 3 };
+    return [...players].sort((a, b) => {
+      const ao = order[a.trend] ?? 4;
+      const bo = order[b.trend] ?? 4;
+      if (ao !== bo) return ao - bo;
+      // Within same trend group, sort by deviation magnitude
+      if (a.playerType === "hitter" && b.playerType === "hitter") {
+        const aRatio = Math.abs((a.ratios.opsRatio as number ?? 1) - 1);
+        const bRatio = Math.abs((b.ratios.opsRatio as number ?? 1) - 1);
+        return bRatio - aRatio;
+      }
+      return 0;
+    });
+  })();
+
+  const toggleDay = (date: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
   return (
     <Container size="wide" className="py-8">
       <PageHeader
@@ -331,7 +455,7 @@ export default function TrendsPage() {
       <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
         <div className="border-b border-neutral-200 dark:border-shell-border">
           <div className="flex items-center justify-between">
-            <nav className="-mb-px flex">
+            <nav className="-mb-px flex flex-wrap">
               <button
                 onClick={() => setViewMode("overall")}
                 className={tabClass(viewMode === "overall")}
@@ -356,23 +480,37 @@ export default function TrendsPage() {
               >
                 Category Values
               </button>
+              <button
+                onClick={() => setViewMode("hotcold")}
+                className={tabClass(viewMode === "hotcold")}
+              >
+                Hot/Cold Players
+              </button>
+              <button
+                onClick={() => setViewMode("efficiency")}
+                className={tabClass(viewMode === "efficiency")}
+              >
+                Lineup Efficiency
+              </button>
             </nav>
 
-            {/* Season Selector */}
-            <div className="pr-6">
-              <select
-                value={selectedSeason || ""}
-                onChange={(e) => setSelectedSeason(e.target.value || undefined)}
-                className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="">Current Season</option>
-                {seasonsData?.seasons?.map((s: number) => (
-                  <option key={s} value={String(s)}>
-                    {s} Season
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Season Selector - only for chart views */}
+            {isChartView && (
+              <div className="pr-6">
+                <select
+                  value={selectedSeason || ""}
+                  onChange={(e) => setSelectedSeason(e.target.value || undefined)}
+                  className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Current Season</option>
+                  {seasonsData?.seasons?.map((s: number) => (
+                    <option key={s} value={String(s)}>
+                      {s} Season
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -401,62 +539,258 @@ export default function TrendsPage() {
           </div>
         )}
 
-        {/* Filter controls */}
-        <div className="px-6 py-4 border-b border-neutral-200 dark:border-shell-border">
-          <div className="flex flex-row gap-6 items-end">
-            <DateRangeFilter
-              onRangeChange={(from, to) => {
-                setFromDate(from);
-                setToDate(to);
-              }}
-              initialFrom={fromDate}
-              initialTo={toDate}
-            />
+        {/* Filter controls - only for chart views */}
+        {isChartView && (
+          <div className="px-6 py-4 border-b border-neutral-200 dark:border-shell-border">
+            <div className="flex flex-row gap-6 items-end">
+              <DateRangeFilter
+                onRangeChange={(from, to) => {
+                  setFromDate(from);
+                  setToDate(to);
+                }}
+                initialFrom={fromDate}
+                initialTo={toDate}
+              />
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center">
-                <input
-                  id="show-annotations"
-                  type="checkbox"
-                  checked={showAnnotations}
-                  onChange={(e) => setShowAnnotations(e.target.checked)}
-                  className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
-                />
-                <label
-                  htmlFor="show-annotations"
-                  className="ml-2 block text-body-sm text-content-secondary"
-                >
-                  Show Transactions
-                </label>
-              </div>
-
-              {selectedTeamId && (viewMode === "overall" || viewMode === "category") && (
+              <div className="flex items-center gap-4">
                 <div className="flex items-center">
                   <input
-                    id="show-inflection-points"
+                    id="show-annotations"
                     type="checkbox"
-                    checked={showInflectionPoints}
-                    onChange={(e) => setShowInflectionPoints(e.target.checked)}
+                    checked={showAnnotations}
+                    onChange={(e) => setShowAnnotations(e.target.checked)}
                     className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
                   />
                   <label
-                    htmlFor="show-inflection-points"
+                    htmlFor="show-annotations"
                     className="ml-2 block text-body-sm text-content-secondary"
                   >
-                    Show Inflection Points
+                    Show Transactions
                   </label>
                 </div>
-              )}
+
+                {selectedTeamId && (viewMode === "overall" || viewMode === "category") && (
+                  <div className="flex items-center">
+                    <input
+                      id="show-inflection-points"
+                      type="checkbox"
+                      checked={showInflectionPoints}
+                      onChange={(e) => setShowInflectionPoints(e.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
+                    />
+                    <label
+                      htmlFor="show-inflection-points"
+                      className="ml-2 block text-body-sm text-content-secondary"
+                    >
+                      Show Inflection Points
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Chart Display */}
+      {/* Content Area */}
       <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-6">
         {isLoading ? (
-          <LoadingSpinner message="Loading chart data..." />
+          <LoadingSpinner message="Loading data..." />
+
+        ) : viewMode === "hotcold" ? (
+          /* ── Hot/Cold Players Panel ─────────────────────────── */
+          !selectedTeamId ? (
+            <div className="text-center py-12 text-content-secondary">
+              <p>Select your team to view player trends.</p>
+            </div>
+          ) : hotColdData?.dataAvailable === false ? (
+            <div className="text-center py-12 text-content-secondary">
+              <p>Insufficient trend data. Player period stats will accumulate after daily snapshots run.</p>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <Heading level={3}>7-Day Player Trends</Heading>
+                {hotColdData?.snapshotDate && (
+                  <span className="text-body-sm text-content-tertiary">
+                    as of {new Date(hotColdData.snapshotDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-body-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-200 dark:border-shell-border text-content-secondary">
+                      <th className="text-left py-3 px-3 font-medium">Player</th>
+                      <th className="text-left py-3 px-3 font-medium">Pos</th>
+                      <th className="text-left py-3 px-3 font-medium">Trend</th>
+                      <th className="text-right py-3 px-3 font-medium">7-Day</th>
+                      <th className="text-right py-3 px-3 font-medium">Season</th>
+                      <th className="text-right py-3 px-3 font-medium">vs Season</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedHotColdPlayers.map((player) => (
+                      <tr
+                        key={player.playerId}
+                        className="border-b border-neutral-100 dark:border-shell-border/50 dark:hover:bg-shell-bg transition-colors"
+                      >
+                        <td className="py-3 px-3 text-content dark:text-shell-text">
+                          {player.playerName}
+                        </td>
+                        <td className="py-3 px-3 text-content-secondary text-xs uppercase">
+                          {player.rosterSlot || "-"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <TrendBadge trend={player.trend} drivingStat={player.drivingStat} />
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono">
+                          {player.playerType === "hitter" ? (
+                            <span>
+                              {formatRate(player.sevenDay.ops)} OPS
+                              {player.sevenDay.hr != null && (
+                                <span className="text-content-tertiary ml-2">{player.sevenDay.hr} HR</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span>
+                              {formatRate(player.sevenDay.era, 2)} ERA
+                              {player.sevenDay.kRate != null && (
+                                <span className="text-content-tertiary ml-2">{formatRate(player.sevenDay.kRate, 2)} K/IP</span>
+                              )}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-content-tertiary text-xs">
+                          {player.playerType === "hitter"
+                            ? `${formatRate(player.season.ops)} OPS`
+                            : `${formatRate(player.season.era, 2)} ERA`}
+                        </td>
+                        <td className="py-3 px-3 text-right font-mono text-xs">
+                          {player.playerType === "hitter" ? (
+                            <span className={cn(
+                              (player.ratios.opsRatio as number ?? 1) > 1.1 && "text-green-400",
+                              (player.ratios.opsRatio as number ?? 1) < 0.9 && "text-red-400",
+                            )}>
+                              {formatPct(player.ratios.opsRatio as number | null)}
+                            </span>
+                          ) : (
+                            <span className={cn(
+                              (player.ratios.eraRatio as number ?? 1) < 0.9 && "text-green-400",
+                              (player.ratios.eraRatio as number ?? 1) > 1.1 && "text-red-400",
+                            )}>
+                              {player.ratios.eraRatio != null
+                                ? formatPct(player.ratios.eraRatio as number | null)
+                                : formatPct(player.ratios.kRateRatio as number | null)}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+
+        ) : viewMode === "efficiency" ? (
+          /* ── Lineup Efficiency Panel ────────────────────────── */
+          !selectedTeamId ? (
+            <div className="text-center py-12 text-content-secondary">
+              <p>Select your team to view lineup efficiency.</p>
+            </div>
+          ) : efficiencyData?.dataAvailable === false ? (
+            <div className="text-center py-12 text-content-secondary">
+              <p>Insufficient data. Lineup efficiency will appear after daily snapshots run.</p>
+            </div>
+          ) : (
+            <div>
+              <Heading level={3} className="mb-4">Lineup Efficiency &mdash; Last 7 Days</Heading>
+
+              <div className="space-y-3">
+                {((efficiencyData?.days || []) as EfficiencyDay[]).map((day) => {
+                  const isExpanded = expandedDays.has(day.date);
+                  const hasWarnings = day.warnings.length > 0;
+
+                  return (
+                    <div
+                      key={day.date}
+                      className="border border-neutral-200 dark:border-shell-border rounded-lg overflow-hidden"
+                    >
+                      <button
+                        onClick={() => toggleDay(day.date)}
+                        className="w-full flex items-center justify-between p-4 dark:hover:bg-shell-bg transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className="text-body-sm font-medium text-content dark:text-shell-text">
+                            {new Date(day.date).toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span className="text-body-sm font-mono text-content-secondary">
+                            Bench: {day.benchProduction.totalHR} HR, {day.benchProduction.totalSB} SB
+                            {day.benchProduction.totalOPS != null && (
+                              <>, {day.benchProduction.totalOPS.toFixed(3)} OPS</>
+                            )}
+                            {" "}({day.benchProduction.totalAB} AB)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {hasWarnings ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              {day.warnings.length} warning{day.warnings.length !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                              No issues
+                            </span>
+                          )}
+                          <span className="text-content-tertiary text-xs">
+                            {isExpanded ? "▲" : "▼"}
+                          </span>
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-4 border-t border-neutral-100 dark:border-shell-border/50">
+                          {hasWarnings ? (
+                            <div className="mt-3 space-y-2">
+                              {day.warnings.map((w, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-md bg-amber-500/5 border border-amber-500/20 text-body-sm"
+                                >
+                                  <span className="text-amber-400 font-medium">
+                                    {w.benchPlayerName}
+                                  </span>
+                                  <span className="text-content-secondary"> (bench) outperformed </span>
+                                  <span className="text-content dark:text-shell-text font-medium">
+                                    {w.starterName}
+                                  </span>
+                                  <span className="text-content-secondary"> ({w.position}): </span>
+                                  <span className="font-mono text-amber-400 text-xs">{w.reason}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-3 text-body-sm text-green-400">
+                              No lineup inefficiencies
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
+
         ) : chartData.length > 0 ? (
+          /* ── Chart Views (Overall, Category, Projected, Values) ── */
           <div>
             <Heading level={3} className="mb-4">
               {viewMode === "overall" && "Overall Standings Over Time"}
