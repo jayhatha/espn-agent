@@ -40,6 +40,7 @@ export interface WaiverRecommendation {
     deltaPoints: number;
   }>;
   explanation: string;
+  topCategoryLabel?: string;
   isLegal: boolean;
   legalityIssues?: string[];
 }
@@ -273,6 +274,7 @@ export class WaiverRecommendationAgent {
               deltaOverallPoints: delta.deltaOverallPoints,
               categoryImpacts: delta.categoryImpacts,
               explanation: this.generateExplanation(delta),
+              topCategoryLabel: this.generateTopCategoryLabel(delta.categoryImpacts),
               isLegal,
               legalityIssues,
             });
@@ -541,16 +543,40 @@ export class WaiverRecommendationAgent {
       deltaPoints: number;
     }>;
   }): string {
-    const topImpacts = delta.categoryImpacts
+    const sorted = delta.categoryImpacts
       .filter((i) => Math.abs(i.deltaPoints) > 0)
-      .slice(0, 3)
-      .map(
-        (i) =>
-          `${i.categoryName} (${i.deltaPoints > 0 ? "+" : ""}${i.deltaPoints.toFixed(1)})`,
-      )
-      .join(", ");
+      .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints));
 
-    return `Gain ${delta.deltaOverallPoints.toFixed(1)} projected points. Top impacts: ${topImpacts || "minimal category changes"}.`;
+    if (sorted.length === 0) {
+      return `Net ${delta.deltaOverallPoints.toFixed(1)} projected roto points. Minimal category changes.`;
+    }
+
+    const top = sorted[0];
+    const topLabel = `This move gets you ${top.deltaPoints > 0 ? "+" : ""}${top.deltaPoints.toFixed(0)} roto point${Math.abs(top.deltaPoints) !== 1 ? "s" : ""} in ${top.categoryName}.`;
+
+    const others = sorted.slice(1, 3);
+    const othersLabel = others.length > 0
+      ? " Also impacts: " + others.map(
+          (i) => `${i.categoryName} (${i.deltaPoints > 0 ? "+" : ""}${i.deltaPoints.toFixed(1)})`,
+        ).join(", ") + "."
+      : "";
+
+    return `${topLabel}${othersLabel} Net ${delta.deltaOverallPoints > 0 ? "+" : ""}${delta.deltaOverallPoints.toFixed(1)} projected roto points overall.`;
+  }
+
+  private generateTopCategoryLabel(categoryImpacts: Array<{
+    categoryId: string;
+    categoryName: string;
+    deltaRank: number;
+    deltaPoints: number;
+  }>): string | undefined {
+    const top = categoryImpacts
+      .filter((i) => Math.abs(i.deltaPoints) > 0)
+      .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
+
+    if (!top) return undefined;
+
+    return `This move gets you ${top.deltaPoints > 0 ? "+" : ""}${top.deltaPoints.toFixed(0)} roto point${Math.abs(top.deltaPoints) !== 1 ? "s" : ""} in ${top.categoryName}`;
   }
 
   /**

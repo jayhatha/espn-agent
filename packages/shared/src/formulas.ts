@@ -298,3 +298,244 @@ export function calculateAuctionDollarValue(
 
   return Math.max(minBid, dollarValue);
 }
+
+// ─── Roto Math Functions ───────────────────────────────────────────────
+
+export interface TeamCategoryProjection {
+  teamId: number;
+  teamName: string;
+  value: number;
+}
+
+export interface MarginalGain {
+  categoryId: string;
+  categoryName: string;
+  currentRank: number;
+  currentRotoPoints: number;
+  teamAbove: { teamId: number; teamName: string; value: number } | null;
+  myValue: number;
+  gap: number;
+  potentialPointsGain: number;
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  difficulty: "easy" | "medium" | "hard" | "elite";
+}
+
+export interface AtRiskCategory {
+  categoryId: string;
+  categoryName: string;
+  currentRank: number;
+  currentRotoPoints: number;
+  teamBelow: { teamId: number; teamName: string; value: number } | null;
+  myValue: number;
+  gap: number;
+  riskLevel: "safe" | "watch" | "danger";
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+}
+
+/**
+ * Rank teams by category value and assign roto points.
+ * Mirrors backend StandingsProjectionAgent.rankAndStore() logic:
+ * rotoPoints = numTeams - rank + 1
+ */
+export function interpolateRotoPoints(
+  teamProjections: TeamCategoryProjection[],
+  direction: "HIGHER_BETTER" | "LOWER_BETTER",
+): Array<{ teamId: number; teamName: string; rank: number; rotoPoints: number }> {
+  if (teamProjections.length === 0) return [];
+
+  const sorted = [...teamProjections].sort((a, b) =>
+    direction === "HIGHER_BETTER" ? b.value - a.value : a.value - b.value,
+  );
+  const numTeams = sorted.length;
+  return sorted.map((tp, i) => ({
+    teamId: tp.teamId,
+    teamName: tp.teamName,
+    rank: i + 1,
+    rotoPoints: numTeams - i,
+  }));
+}
+
+/**
+ * Compute the cheapest stat improvement needed to gain 1 roto point per category.
+ * For each category, finds the team immediately above in rank and computes
+ * the absolute gap. Results sorted by smallest gap first (cheapest improvement).
+ *
+ * For rate stats (ERA, WHIP), the gap is a raw rate differential.
+ * Component-level guidance is deferred to future phases.
+ */
+export function computeMarginalGains(
+  myTeamId: number,
+  allTeamProjections: Map<string, TeamCategoryProjection[]>,
+  categories: Array<{
+    category_id: string;
+    name: string;
+    direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  }>,
+): MarginalGain[] {
+  const gains: MarginalGain[] = [];
+
+  for (const cat of categories) {
+    const projections = allTeamProjections.get(cat.category_id);
+    if (!projections || projections.length === 0) continue;
+
+    const ranked = interpolateRotoPoints(projections, cat.direction);
+    const myEntry = ranked.find((r) => r.teamId === myTeamId);
+    if (!myEntry) continue;
+
+    const myProjection = projections.find((p) => p.teamId === myTeamId);
+    if (!myProjection) continue;
+
+    const myRankIndex = ranked.findIndex((r) => r.teamId === myTeamId);
+
+    // Team above is the one at myRankIndex - 1 (better rank)
+    let teamAbove: MarginalGain["teamAbove"] = null;
+    let gap = 0;
+
+    if (myRankIndex > 0) {
+      const above = ranked[myRankIndex - 1];
+      const aboveProjection = projections.find((p) => p.teamId === above.teamId);
+      if (aboveProjection) {
+        teamAbove = {
+          teamId: above.teamId,
+          teamName: above.teamName,
+          value: aboveProjection.value,
+        };
+        gap = Math.abs(aboveProjection.value - myProjection.value);
+      }
+    }
+
+    gains.push({
+      categoryId: cat.category_id,
+      categoryName: cat.name,
+      currentRank: myEntry.rank,
+      currentRotoPoints: myEntry.rotoPoints,
+      teamAbove,
+      myValue: myProjection.value,
+      gap,
+      potentialPointsGain: 1,
+      direction: cat.direction,
+      difficulty: "medium" as const, // placeholder, assigned below
+    });
+  }
+
+  // Compute average gap for difficulty assignment (exclude rank 1 teams)
+  const gapsWithTeamAbove = gains.filter((g) => g.teamAbove !== null && g.gap > 0);
+  const avgGap =
+    gapsWithTeamAbove.length > 0
+      ? gapsWithTeamAbove.reduce((sum, g) => sum + g.gap, 0) / gapsWithTeamAbove.length
+      : 1;
+
+  for (const gain of gains) {
+    if (gain.teamAbove === null) {
+      gain.difficulty = "elite"; // Already rank 1
+    } else if (gain.gap < 0.5 * avgGap) {
+      gain.difficulty = "easy";
+    } else if (gain.gap < 1.0 * avgGap) {
+      gain.difficulty = "medium";
+    } else if (gain.gap < 2.0 * avgGap) {
+      gain.difficulty = "hard";
+    } else {
+      gain.difficulty = "elite";
+    }
+  }
+
+  // Sort by gap ascending (cheapest improvement first)
+  // Rank 1 teams (gap = 0) go last since they can't improve
+  gains.sort((a, b) => {
+    if (a.teamAbove === null && b.teamAbove !== null) return 1;
+    if (a.teamAbove !== null && b.teamAbove === null) return -1;
+    return a.gap - b.gap;
+  });
+
+  return gains;
+}
+
+/**
+ * Compute categories where roto points are at risk of being lost.
+ * For each category, finds the team immediately BELOW in rank and computes
+ * the gap. Small gaps = danger (team closing in from behind).
+ * Sorted by gap ascending (most at-risk first).
+ */
+export function computeAtRiskCategories(
+  myTeamId: number,
+  allTeamProjections: Map<string, TeamCategoryProjection[]>,
+  categories: Array<{
+    category_id: string;
+    name: string;
+    direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  }>,
+): AtRiskCategory[] {
+  const risks: AtRiskCategory[] = [];
+
+  for (const cat of categories) {
+    const projections = allTeamProjections.get(cat.category_id);
+    if (!projections || projections.length === 0) continue;
+
+    const ranked = interpolateRotoPoints(projections, cat.direction);
+    const myEntry = ranked.find((r) => r.teamId === myTeamId);
+    if (!myEntry) continue;
+
+    const myProjection = projections.find((p) => p.teamId === myTeamId);
+    if (!myProjection) continue;
+
+    const myRankIndex = ranked.findIndex((r) => r.teamId === myTeamId);
+
+    // Team below is the one at myRankIndex + 1 (worse rank, trying to catch up)
+    let teamBelow: AtRiskCategory["teamBelow"] = null;
+    let gap = 0;
+
+    if (myRankIndex < ranked.length - 1) {
+      const below = ranked[myRankIndex + 1];
+      const belowProjection = projections.find((p) => p.teamId === below.teamId);
+      if (belowProjection) {
+        teamBelow = {
+          teamId: below.teamId,
+          teamName: below.teamName,
+          value: belowProjection.value,
+        };
+        gap = Math.abs(myProjection.value - belowProjection.value);
+      }
+    }
+
+    risks.push({
+      categoryId: cat.category_id,
+      categoryName: cat.name,
+      currentRank: myEntry.rank,
+      currentRotoPoints: myEntry.rotoPoints,
+      teamBelow,
+      myValue: myProjection.value,
+      gap,
+      riskLevel: "safe" as const, // placeholder, assigned below
+      direction: cat.direction,
+    });
+  }
+
+  // Compute average gap for risk assignment (exclude last-place teams)
+  const gapsWithTeamBelow = risks.filter((r) => r.teamBelow !== null && r.gap > 0);
+  const avgGap =
+    gapsWithTeamBelow.length > 0
+      ? gapsWithTeamBelow.reduce((sum, r) => sum + r.gap, 0) / gapsWithTeamBelow.length
+      : 1;
+
+  for (const risk of risks) {
+    if (risk.teamBelow === null) {
+      risk.riskLevel = "safe"; // Already last, no one below
+    } else if (risk.gap < 0.33 * avgGap) {
+      risk.riskLevel = "danger";
+    } else if (risk.gap < 0.75 * avgGap) {
+      risk.riskLevel = "watch";
+    } else {
+      risk.riskLevel = "safe";
+    }
+  }
+
+  // Sort by gap ascending (most at-risk first)
+  // Teams with no one below go last
+  risks.sort((a, b) => {
+    if (a.teamBelow === null && b.teamBelow !== null) return 1;
+    if (a.teamBelow !== null && b.teamBelow === null) return -1;
+    return a.gap - b.gap;
+  });
+
+  return risks;
+}
