@@ -6,14 +6,16 @@ export const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-accent-light text-content border-transparent",
+        default:
+          "bg-accent-light text-content border-transparent dark:bg-shell-border dark:text-shell-text dark:border-shell-border",
         positive:
-          "bg-positive-light text-positive border-positive-border",
+          "bg-positive-light text-positive border-positive-border dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
         negative:
-          "bg-negative-light text-negative border-negative-border",
+          "bg-negative-light text-negative border-negative-border dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
         warning:
-          "bg-warning-light text-warning border-warning-border",
-        info: "bg-info-light text-info border-info-border",
+          "bg-warning-light text-warning border-warning-border dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+        info:
+          "bg-info-light text-info border-info-border dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
       },
     },
     defaultVariants: {

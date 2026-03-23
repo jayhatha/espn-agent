@@ -7,11 +7,11 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-accent text-content-inverse hover:bg-accent-hover focus-visible:ring-accent",
+          "bg-accent text-content-inverse hover:bg-accent-hover focus-visible:ring-accent dark:bg-shell-accent dark:hover:bg-shell-accent/90 dark:text-white dark:focus-visible:ring-shell-accent",
         secondary:
-          "border border-neutral-300 bg-white text-content hover:bg-surface-secondary focus-visible:ring-accent",
+          "border border-neutral-300 bg-white text-content hover:bg-surface-secondary focus-visible:ring-accent dark:border-shell-border dark:bg-shell-panel dark:text-shell-text dark:hover:bg-shell-bg dark:focus-visible:ring-shell-accent",
         ghost:
-          "text-content-secondary hover:bg-accent-light hover:text-content focus-visible:ring-accent",
+          "text-content-secondary hover:bg-accent-light hover:text-content focus-visible:ring-accent dark:text-shell-muted dark:hover:text-shell-text dark:hover:bg-shell-panel dark:focus-visible:ring-shell-accent",
         danger:
           "bg-negative text-white hover:bg-red-700 focus-visible:ring-negative",
       },
