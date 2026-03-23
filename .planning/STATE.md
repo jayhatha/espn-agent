@@ -83,9 +83,10 @@ None yet.
 | 95 | Wire shouldBid from Monte Carlo into auto-bid | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/) |
 | 96 | Fix auto-nominate bug — add delay after search | 2026-03-22 | b3b5787 | [96-fix-auto-nominate-bug-add-delay-after-se](./quick/96-fix-auto-nominate-bug-add-delay-after-se/) |
 | 97 | Filter trade recommendations by ESPN ASV similarity | 2026-03-23 | 1047cd9 | [97-trade-recommendations-should-be-based-on](./quick/97-trade-recommendations-should-be-based-on/) |
+| 98 | Dashboard UX overhaul — hero card, status bar, tiered actions | 2026-03-23 | 5ac9ae2 | [98-dashboard-ux-overhaul-hero-card-status-b](./quick/98-dashboard-ux-overhaul-hero-card-status-b/) |
 
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed Quick Task 97 (Trade ASV Filter)
+Stopped at: Completed Quick Task 98 (Dashboard UX Overhaul)
 Resume file: None
