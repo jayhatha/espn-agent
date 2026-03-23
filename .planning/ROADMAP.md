@@ -165,5 +165,5 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 | 66. Roto Math Foundation | v6.0 | 0/2 | Not started | - |
 | 67. Net Waiver Analysis + Category Opportunity | 2/2 | Complete    | 2026-03-23 | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
-| 69. Trade Finder | 2/2 | Complete   | 2026-03-23 | - |
+| 69. Trade Finder | 2/2 | Complete    | 2026-03-23 | - |
 | 70. Trends and Efficiency | 2/2 | Complete   | 2026-03-23 | - |
