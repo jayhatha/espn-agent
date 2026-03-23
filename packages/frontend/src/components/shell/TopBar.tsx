@@ -56,11 +56,14 @@ export function TopBar() {
 
       {/* Right: summary stats */}
       <div className="flex items-center gap-6">
-        <StatItem label="Season" value={weekLabel} />
+        {/* TODO SHELL-03: wire current week from ESPN scoring period */}
+        <StatItem label="Week" value="--" />
         {/* TODO SHELL-03: wire FAAB from API */}
         <StatItem label="FAAB" value="--" />
         {/* TODO SHELL-03: wire GS pace from API */}
         <StatItem label="GS Pace" value="--" />
+        {/* TODO SHELL-03: wire projected total roto points */}
+        <StatItem label="Projected" value="--" />
       </div>
     </header>
   );
