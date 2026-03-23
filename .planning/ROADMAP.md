@@ -69,11 +69,12 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
   3. Top bar displays league name, current week, FAAB remaining, GS pace, and projected total points on every sub-page
   4. All numbers render in JetBrains Mono; all headers and body text render in Inter
   5. Right signals panel shows contextual daily action items that update per page
-**Plans**: 3 plans
+**Plans**: 4 plans
 Plans:
 - [ ] 65-01-PLAN.md — Dark mode foundation: next-themes, Tailwind config, shell tokens, JetBrains Mono
 - [ ] 65-02-PLAN.md — Shell layout + components: LeagueNav, TopBar, SignalsPanel, settings stub
 - [ ] 65-03-PLAN.md — Dark variant migration: all 16 UI components restyled for dark mode
+- [ ] 65-04-PLAN.md — Page-level dark migration: dark overrides on all 17 page/section files under leagues/[id]/
 
 ### Phase 66: Roto Math Foundation
 **Goal**: Users can see their projected roto standings with live rank-based points, per-category pace bars, and hover-to-inspect gap detail
@@ -145,7 +146,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 65. Dark Mode Shell | v6.0 | 0/3 | Planning complete | - |
+| 65. Dark Mode Shell | v6.0 | 0/4 | Planning complete | - |
 | 66. Roto Math Foundation | v6.0 | 0/? | Not started | - |
 | 67. Net Waiver Analysis + Category Opportunity | v6.0 | 0/? | Not started | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
