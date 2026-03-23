@@ -20,7 +20,7 @@ Progress: [███████████████████░] 169/174
 
 **Velocity:**
 - Total plans completed (v5.0): ~35 plans
-- v6.0 plans: 5 completed
+- v6.0 plans: 7 completed
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -30,6 +30,8 @@ Progress: [███████████████████░] 169/174
 | 65-dark-mode-shell | 04 | 10 min | 2 | 17 |
 | 66-roto-math-foundation | 01 | 5 min | 2 | 2 |
 | 66-roto-math-foundation | 02 | 8 min | 2 | 3 |
+| 69-trade-finder | 01 | 5 min | 2 | 1 |
+| 69-trade-finder | 02 | 8 min | 2 | 1 |
 
 *Updated after each plan completion*
 
