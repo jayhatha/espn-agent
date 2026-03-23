@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 65 of 70 (Dark Mode Shell)
-Plan: 3 of 4 in current phase
-Status: In Progress
-Last activity: 2026-03-23 — Completed 65-03: dark: variant classes on all 16 shared UI components
+Plan: 4 of 4 in current phase
+Status: Complete
+Last activity: 2026-03-23 — Completed 65-04: dark: overrides applied to all 17 page/section files under leagues/[id]/
 
 Progress: [█░░░░░░░░░] 4% (v6.0)
 
@@ -27,6 +27,7 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 | 65-dark-mode-shell | 01 | 8 min | 2 | 6 |
 | 65-dark-mode-shell | 02 | 15 min | 2 | 5 |
 | 65-dark-mode-shell | 03 | 3 min | 2 | 16 |
+| 65-dark-mode-shell | 04 | 10 min | 2 | 17 |
 
 *Updated after each plan completion*
 
@@ -50,6 +51,8 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 - [Phase 65-03]: StatsTable td cells get font-mono globally — all data cells render in JetBrains Mono (SHELL-05)
 - [Phase 65-03]: Container uses dark:text-inherit — transparent wrapper, inherits text from shell body
 - [Phase 65-03]: TeamColorBadge keeps dynamic inline styles for team colors, adds dark:font-semibold for legibility
+- [Phase 65-04]: Card surfaces use dark:bg-shell-panel, secondary/header areas use dark:bg-shell-bg to maintain visual hierarchy in dark mode
+- [Phase 65-04]: shadow-card dark:shadow-none — card shadows are removed in dark mode as they provide no visual value on dark backgrounds
 
 ### Blockers/Concerns
 
@@ -76,5 +79,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 65-03-PLAN.md — dark: variant classes on all 16 shared UI components (no white surfaces remain)
+Stopped at: Completed 65-04-PLAN.md — dark: overrides on all 17 page/section files under leagues/[id]/, Phase 65 complete
 Resume file: None
