@@ -46,19 +46,26 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 - ✓ League 112523 hardcoded with OPS categories — v4.0
 - ✓ Draft extension detection fixed with config-first pattern — v4.0
 - ✓ In-season pipeline verified with bootstrap endpoint — v4.0
+- ✓ Priority-scored auction engine with EV-based scoring + category scarcity — v5.0
+- ✓ Dynamic SGP recalculation, SP tier caps, positional need multiplier — v5.0
+- ✓ Dynamic budget allocation with surplus multiplier + endgame flush — v5.0
+- ✓ Grafana dark extension sidebar with signal strip + category heatmap — v5.0
+- ✓ Mobile draft companion with manual bid/nominate controls — v5.0
 
 ### Active
 
-#### Current Milestone: v5.0 Draft Engine Spec Alignment
+#### Current Milestone: v6.0 In-Season Command Center
 
-**Goal:** Align the draft engine with the original auction draft system spec — add endgame mode, rework nomination strategy, implement positional priority weights, SP tier caps, inflation interpretation bands, and budget allocation bands.
+**Goal:** Transform the in-season dashboard into a Linear-style dark trading terminal for fantasy baseball — on-pace roto tracker, category opportunity map, FAAB pacing, GS pacing with SP start planner, roto-point-aware waiver and trade analysis, and automatic trade finder.
 
-- [ ] Endgame mode ($20 budget threshold with value_per_dollar scoring)
-- [ ] Nomination strategy rework (espn_price - model_value for overpriced players)
-- [ ] Positional priority weights (SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1)
-- [ ] SP tier caps (SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3)
-- [ ] Inflation interpretation bands (buying window vs overspending signals)
-- [ ] Budget allocation bands (Hitters $185-205, Pitchers $55-70, Bench $5)
+- [ ] On-pace roto tracker with live standings + historical curve fallback
+- [ ] Category opportunity map (marginal gaps, difficulty, priority)
+- [ ] FAAB pacing (budget vs league, bid history, ROI, suggested bids)
+- [ ] GS pacing with SP start planner (weekly + season, optimize pace)
+- [ ] Improved waiver analysis (net roto point delta, category breakdown, marginal gains)
+- [ ] Trade analysis rework (roto-point delta + automatic trade finder)
+- [ ] Full Linear-style dark restyle across all pages
+- [ ] Hot/cold player trends + lineup efficiency tracking
 
 ### Deferred
 
@@ -105,4 +112,4 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | OPS as custom rate stat | OBP + SLG components, not a simple stat | ✓ Good |
 
 ---
-*Last updated: 2026-03-15 after v5.0 milestone start*
+*Last updated: 2026-03-23 after v6.0 milestone start*

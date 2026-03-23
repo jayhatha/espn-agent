@@ -66,3 +66,28 @@
 
 ---
 
+
+## v5.0 Draft Engine Spec Alignment (Shipped: 2026-03-23)
+
+**Phases completed:** 16 phases (48-64), ~35 plans
+**Scope:** Phases 48-64 (Phases 47, 51 dropped)
+**Timeline:** 8 days (2026-03-15 to 2026-03-23)
+
+**Key accomplishments:**
+- Priority-scored auction engine with EV-based scoring, category scarcity weights, team need tracking, surplus pool, replacement cliff detection, player tags
+- Dynamic SGP recalculation during draft (recompute values as pool shrinks)
+- SP tier caps, RP composition targeting (7SP+5RP), rank-based tier pricing
+- Positional need multiplier suppressing bids on filled positions
+- Inflation bands with bid ceiling adjustments
+- Dynamic budget allocation with surplus multiplier (1.0-1.5x), $1/slot reserve, unconditional endgame flush
+- Comprehensive test suite: unit, simulation, scenario tests for auction engine
+- Extension sidebar UI: Grafana dark theme, signal strip, category heatmap, position supply, next nominee
+- Mobile draft companion with manual bid/nominate controls
+- Overpriced-first nomination strategy to drain opponent budgets
+
+**Dropped:**
+- Phase 47 (Endgame Mode) — superseded by priority scoring engine
+- Phase 51 (Data Pipeline) — CSV upload sufficient for season
+
+---
+

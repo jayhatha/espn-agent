@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-15)
+See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 64 — Dynamic Budget Allocation
+**Current focus:** v6.0 In-Season Command Center — Defining requirements
 
 ## Current Position
 
-Phase: 64 of 64 (Dynamic Budget Allocation)
-Plan: 02 (2 of 2 plans complete)
-Status: Complete
-Last activity: 2026-03-22 - Completed quick task 96: Fix auto-nominate search timing delays
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-23 — Milestone v6.0 started
 
-Progress: [███] 100% (Phase 64: 2/2 plans complete)
+Progress: Milestone initialization
 
 ## Accumulated Context
 
