@@ -386,6 +386,85 @@ export interface TradeValidationResponse {
   receiveCount: number;
 }
 
+// FAAB Tracking types
+
+export interface FaabSummary {
+  teamId: number;
+  faabTotal: number;
+  faabSpent: number;
+  faabRemaining: number;
+  leagueAvgRemaining: number;
+  spendRate: number; // $ per week
+  projectedRunoutWeek: number | null;
+  weeksRemaining: number;
+  weeksElapsed: number;
+  willRunOut: boolean;
+}
+
+export interface FaabBidEntry {
+  date: string;
+  playerName: string;
+  playerId: number;
+  bidAmount: number;
+  outcome: "won" | "lost";
+  roi: number | null; // projected value / bid amount
+}
+
+export interface FaabSuggestedBid {
+  playerId: number;
+  playerName: string;
+  suggestedBid: number;
+  faabRemaining: number;
+  rationale: string;
+}
+
+// GS Pacing types
+
+export type PaceStatus = "on_track" | "burning_fast" | "too_slow";
+
+export interface GsSeasonSummary {
+  gsUsed: number;
+  gsCap: number;
+  gsRemaining: number;
+  projectedFinal: number;
+  pacePerWeek: number;
+  targetPacePerWeek: number;
+  paceStatus: PaceStatus;
+  weeksElapsed: number;
+  weeksRemaining: number;
+}
+
+export interface GsWeeklySummary {
+  weekStart: string;
+  weekEnd: string;
+  startsUsed: number;
+  startsRemaining: number;
+  targetPerWeek: number;
+  pitcherStarts: Array<{
+    playerName: string;
+    playerId: number;
+    dates: string[];
+  }>;
+}
+
+export type StartAction = "start" | "sit" | "stream";
+
+export interface GsStartRecommendation {
+  playerId: number;
+  playerName: string;
+  action: StartAction;
+  reason: string;
+  projectedK: number | null;
+  projectedIP: number | null;
+  kPerGs: number | null;
+}
+
+export interface GsStartPlan {
+  paceStatus: PaceStatus;
+  recommendations: GsStartRecommendation[];
+  alert: string | null;
+}
+
 // Chrome Extension Draft Assistant Types
 
 export interface DraftPick {
