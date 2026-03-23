@@ -21,7 +21,7 @@ interface CategoryTableSectionProps {
 
 export function CategoryTableSection({ categories, totalTeams }: CategoryTableSectionProps) {
   return (
-    <section className="bg-surface-secondary py-10">
+    <section className="bg-surface-secondary dark:bg-shell-bg py-10">
       <Container size="wide">
         <div className="overflow-x-auto">
           <CategoryStatsTable

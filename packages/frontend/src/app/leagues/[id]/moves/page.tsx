@@ -249,13 +249,13 @@ export default function MovesPage() {
       />
 
       {/* Team Selector */}
-      <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4 mb-6">
+      <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
           <label className="text-body-sm font-medium text-content-secondary">Team:</label>
           <select
             value={selectedTeamId || ""}
             onChange={(e) => handleTeamChange(parseInt(e.target.value, 10))}
-            className="rounded-lg border border-neutral-300 text-body-sm px-3 py-2 bg-white text-content focus:outline-none focus:ring-2 focus:ring-accent"
+            className="rounded-lg border border-neutral-300 dark:border-shell-border text-body-sm px-3 py-2 bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Select a team</option>
             {teams.map((t: Team) => (
@@ -269,7 +269,7 @@ export default function MovesPage() {
           <select
             value={season || ""}
             onChange={(e) => setSeason(parseInt(e.target.value, 10))}
-            className="rounded-lg border border-neutral-300 text-body-sm px-3 py-2 bg-white text-content focus:outline-none focus:ring-2 focus:ring-accent"
+            className="rounded-lg border border-neutral-300 dark:border-shell-border text-body-sm px-3 py-2 bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {seasonsData?.seasons?.map((s: number) => (
               <option key={s} value={s}>{s}</option>
@@ -290,11 +290,11 @@ export default function MovesPage() {
       {/* Team-specific Summary Cards */}
       {selectedTeamId && summary && activeTab !== "league" && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Moves</div>
             <div className="text-2xl font-bold text-content mt-1">{summary.totalMoves}</div>
           </div>
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Roster Mgmt Value</div>
             <div className="text-2xl font-bold mt-1">
               {summary.netRosterValue !== null && summary.netRosterValue !== undefined ? (
@@ -309,13 +309,13 @@ export default function MovesPage() {
               </div>
             )}
           </div>
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Avg Impact/Move</div>
             <div className="text-2xl font-bold mt-1">
               <ImpactBadge impact={summary.avgImpactPerMove} />
             </div>
           </div>
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Best Move</div>
             <div className="text-body-sm font-semibold text-positive mt-1">
               {summary.bestMove?.playerName || "N/A"}
@@ -324,7 +324,7 @@ export default function MovesPage() {
               <ImpactBadge impact={summary.bestMove.impact} size="sm" />
             )}
           </div>
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 p-4">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Worst Move</div>
             <div className="text-body-sm font-semibold text-negative mt-1">
               {summary.worstMove?.playerName || "N/A"}
@@ -339,8 +339,8 @@ export default function MovesPage() {
       {(selectedTeamId || activeTab === "league") ? (
         <>
           {/* Tab Navigation */}
-          <div className="bg-white shadow-card rounded-card border border-neutral-200 mb-6">
-            <nav className="-mb-px flex border-b border-neutral-200">
+          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
+            <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
               {(["league", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
                 const labels: Record<string, string> = {
                   league: "League Summary",
@@ -484,7 +484,7 @@ function LeagueSummaryTab({
     <div className="space-y-8">
       {/* League-wide stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-lg border border-neutral-200 bg-surface-secondary p-4">
+        <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-4">
           <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Moves (League)</div>
           <div className="text-2xl font-bold text-content mt-1">{data.totalMovesLeagueWide}</div>
         </div>
@@ -518,8 +518,8 @@ function LeagueSummaryTab({
       <div>
         <Heading level={3} className="mb-3">Roster Manager Rankings</Heading>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-surface-secondary">
+          <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+            <thead className="bg-surface-secondary dark:bg-shell-bg">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Rank</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Team</th>
@@ -529,12 +529,12 @@ function LeagueSummaryTab({
                 <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary uppercase tracking-wide">Draft-Only Pts</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
               {teamRankings.map((team, idx) => (
                 <tr
                   key={team.teamId}
                   className={cn(
-                    "border-b border-neutral-100 hover:bg-surface-secondary transition-colors",
+                    "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                     team.teamId === selectedTeamId && "bg-accent-light"
                   )}
                 >
@@ -609,8 +609,8 @@ function MoveListTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-neutral-200">
-        <thead className="bg-surface-secondary">
+      <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+        <thead className="bg-surface-secondary dark:bg-shell-bg">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Date</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Team</th>
@@ -620,12 +620,12 @@ function MoveListTable({
             <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary uppercase tracking-wide">Impact</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-100">
+        <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
           {moves.map((m) => (
             <tr
               key={m.id}
               className={cn(
-                "border-b border-neutral-100 hover:bg-surface-secondary transition-colors",
+                "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                 m.teamId === selectedTeamId && "bg-accent-light"
               )}
             >
@@ -678,7 +678,7 @@ function TradePackageList({
             "border rounded-lg p-4",
             pkg.teamId === selectedTeamId
               ? "border-accent bg-accent-light"
-              : "border-neutral-200"
+              : "border-neutral-200 dark:border-shell-border"
           )}
         >
           <div className="flex items-center justify-between mb-2">
@@ -747,7 +747,7 @@ function LeaderboardTab({
               "px-3 py-1 rounded-full text-xs font-medium transition-colors",
               moveFilter === f
                 ? "bg-accent text-content-inverse"
-                : "bg-surface-secondary text-content-secondary hover:bg-neutral-200"
+                : "bg-surface-secondary dark:bg-shell-bg text-content-secondary hover:bg-neutral-200 dark:hover:bg-shell-panel"
             )}
           >
             {f === "all" ? "All" : MOVE_TYPE_LABELS[f] || f}
@@ -757,8 +757,8 @@ function LeaderboardTab({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200">
-          <thead className="bg-surface-secondary">
+        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+          <thead className="bg-surface-secondary dark:bg-shell-bg">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Type</th>
@@ -768,7 +768,7 @@ function LeaderboardTab({
               <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary uppercase tracking-wide">Top Category</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
             {impacts.map((move) => {
               const topSgp = move.sgpCategoryImpacts
                 ?.filter((c: SgpCategoryImpact) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
@@ -782,7 +782,7 @@ function LeaderboardTab({
                 <tr key={move.id} className={cn("group", move.isUncertain && "opacity-80")}>
                   <td colSpan={6} className="p-0">
                     <div
-                      className="px-4 py-3 cursor-pointer hover:bg-surface-secondary grid grid-cols-6 items-center transition-colors"
+                      className="px-4 py-3 cursor-pointer hover:bg-surface-secondary dark:hover:bg-shell-bg grid grid-cols-6 items-center transition-colors"
                       onClick={() => setExpandedMoveId(expandedMoveId === move.id ? null : move.id)}
                     >
                       <div className="text-body-sm text-content-secondary">
@@ -881,11 +881,11 @@ function DraftReportTab({
       {/* Draft Summary */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="rounded-lg border border-neutral-200 bg-surface-secondary p-3">
+          <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Picks</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalPicks}</div>
           </div>
-          <div className="rounded-lg border border-neutral-200 bg-surface-secondary p-3">
+          <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Draft Value</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalDraftValue.toFixed(1)} pts</div>
           </div>
@@ -912,8 +912,8 @@ function DraftReportTab({
 
       {/* Draft Picks Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200">
-          <thead className="bg-surface-secondary">
+        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+          <thead className="bg-surface-secondary dark:bg-shell-bg">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">#</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Player</th>
@@ -924,14 +924,14 @@ function DraftReportTab({
               <th className="px-4 py-3 text-center text-xs font-medium text-content-secondary uppercase tracking-wide">Still On Team</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
             {draftPicks.map((pick, idx) => {
               const displayImpact = pick.shapleyImpact ?? pick.impactRotoPoints;
               return (
                 <tr
                   key={pick.playerId}
                   className={cn(
-                    "border-b border-neutral-100 hover:bg-surface-secondary transition-colors",
+                    "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                     !pick.stillOnTeam && "opacity-60"
                   )}
                 >
@@ -1069,11 +1069,11 @@ function TradesTab({
           return (
             <div
               key={group.key}
-              className="border border-neutral-200 rounded-lg overflow-hidden"
+              className="border border-neutral-200 dark:border-shell-border rounded-lg overflow-hidden"
             >
               {/* Trade header row */}
               <div
-                className="px-4 py-3 cursor-pointer hover:bg-surface-secondary flex items-center gap-4 transition-colors"
+                className="px-4 py-3 cursor-pointer hover:bg-surface-secondary dark:hover:bg-shell-bg flex items-center gap-4 transition-colors"
                 onClick={() => setExpandedMoveId(isExpanded ? null : group.legs[0].id)}
               >
                 {/* Date */}
@@ -1130,11 +1130,11 @@ function TradesTab({
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="border-t border-neutral-100 bg-surface-secondary px-4 py-3">
+                <div className="border-t border-neutral-100 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg px-4 py-3">
                   {group.legs.map((leg, idx) => {
                     const legImpact = leg.shapleyImpact ?? leg.impactRotoPoints;
                     return (
-                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-neutral-200" : ""}>
+                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-neutral-200 dark:border-shell-border" : ""}>
                         {group.isMultiPlayer && (
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-info uppercase">

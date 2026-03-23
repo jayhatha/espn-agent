@@ -269,8 +269,8 @@ export default function WaiversPage() {
       deltaPoints: number;
     }>,
   ) => (
-    <div className="mt-3 border-t border-neutral-200 pt-3 overflow-x-auto">
-      <table className="min-w-full divide-y divide-neutral-200">
+    <div className="mt-3 border-t border-neutral-200 dark:border-shell-border pt-3 overflow-x-auto">
+      <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
         <thead>
           <tr>
             <th className="px-2 sm:px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">
@@ -284,7 +284,7 @@ export default function WaiversPage() {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-200">
+        <tbody className="divide-y divide-neutral-200 dark:divide-shell-border">
           {impacts
             .filter((impact) => impact.deltaPoints !== 0)
             .sort(
@@ -393,7 +393,7 @@ export default function WaiversPage() {
       {/* Mode Switcher */}
       {selectedTeamId && (
         <div className="mb-6">
-          <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-1">
+          <div className="inline-flex rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel p-1">
             <Button
               variant={viewMode === "ai" ? "primary" : "ghost"}
               size="sm"
@@ -447,7 +447,7 @@ export default function WaiversPage() {
                       return (
                         <div
                           key={`${rec.addPlayerId}-${rec.dropPlayerId}`}
-                          className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
+                          className="border border-neutral-200 dark:border-shell-border rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
                         >
                           {/* Header with Rank and Delta */}
                           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
@@ -598,10 +598,10 @@ export default function WaiversPage() {
                         </button>
                       </div>
                     )}
-                    <div className="border border-neutral-200 rounded-lg max-h-96 overflow-y-auto">
+                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-96 overflow-y-auto">
                       {freeAgentsData?.freeAgents &&
                       freeAgentsData.freeAgents.length > 0 ? (
-                        <div className="divide-y divide-neutral-100">
+                        <div className="divide-y divide-neutral-100 dark:divide-shell-border">
                           {freeAgentsData.freeAgents.map((player) => (
                             <label
                               key={player.playerId}
@@ -656,9 +656,9 @@ export default function WaiversPage() {
                     <label className="block text-body-sm font-medium text-content mb-3">
                       Drop from Your Roster
                     </label>
-                    <div className="border border-neutral-200 rounded-lg max-h-96 overflow-y-auto">
+                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-96 overflow-y-auto">
                       {rosterData?.roster && rosterData.roster.length > 0 ? (
-                        <div className="divide-y divide-neutral-100">
+                        <div className="divide-y divide-neutral-100 dark:divide-shell-border">
                           {rosterData.roster.map((player) => (
                             <label
                               key={player.playerId}

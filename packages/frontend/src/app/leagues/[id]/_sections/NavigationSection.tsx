@@ -60,7 +60,7 @@ export function NavigationSection({ leagueId }: NavigationSectionProps) {
   };
 
   return (
-    <section className="bg-surface-tertiary py-6">
+    <section className="bg-surface-tertiary dark:bg-shell-panel py-6">
       <Container size="wide">
         {/* Primary tier — larger text, horizontal row */}
         <div className="flex items-center gap-1 mb-3">
@@ -82,7 +82,7 @@ export function NavigationSection({ leagueId }: NavigationSectionProps) {
           })}
         </div>
         {/* Divider */}
-        <div className="border-t border-neutral-200 mb-3" />
+        <div className="border-t border-neutral-200 dark:border-shell-border mb-3" />
         {/* Secondary tier — smaller text, wrapping row */}
         <div className="flex flex-wrap items-center gap-1">
           {secondaryLinks.map((link) => {

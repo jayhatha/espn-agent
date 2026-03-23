@@ -82,7 +82,7 @@ export function IdentitySection({
   const isPending = createSnapshotMutation.isPending;
 
   return (
-    <section className="bg-white pt-10 pb-8">
+    <section className="bg-white dark:bg-shell-panel pt-10 pb-8">
       <Container size="wide">
         {/* Top utility row: back link + action buttons */}
         <div className="flex items-center justify-between mb-6">

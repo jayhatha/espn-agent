@@ -26,7 +26,7 @@ interface RosterSectionProps {
 
 export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionProps) {
   return (
-    <section className="bg-white py-10">
+    <section className="bg-white dark:bg-shell-panel py-10">
       <Container size="wide">
         <Heading level={2} className="mb-6">Roster</Heading>
         {hasRosterData && groupedRoster ? (
@@ -38,9 +38,9 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                   Active Lineup ({groupedRoster.active.length})
                 </h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-neutral-200">
+                  <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                     <thead>
-                      <tr className="border-b-2 border-neutral-200">
+                      <tr className="border-b-2 border-neutral-200 dark:border-shell-border">
                         <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left w-12">
                           Slot
                         </th>
@@ -55,7 +55,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                       {groupedRoster.active.map((p) => (
                         <tr key={p.player_id}>
                           <td className="py-2 pr-4 text-data font-medium text-content-secondary w-12">
@@ -85,9 +85,9 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                   Bench ({groupedRoster.bench.length})
                 </h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-neutral-200">
+                  <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                     <thead>
-                      <tr className="border-b-2 border-neutral-200">
+                      <tr className="border-b-2 border-neutral-200 dark:border-shell-border">
                         <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left w-12">
                           Slot
                         </th>
@@ -102,7 +102,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                       {groupedRoster.bench.map((p) => (
                         <tr key={p.player_id}>
                           <td className="py-2 pr-4 text-data font-medium text-content-tertiary w-12">
@@ -132,7 +132,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                   Injured List ({groupedRoster.il.length})
                 </h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-neutral-200">
+                  <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                     <thead className="bg-negative-light">
                       <tr className="border-b-2 border-negative-border">
                         <th className="pb-2 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-negative text-left w-12">
@@ -149,7 +149,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-100">
+                    <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                       {groupedRoster.il.map((p) => (
                         <tr key={p.player_id} className="bg-negative-light/30">
                           <td className="py-2 pr-4 text-data font-medium text-negative w-12">

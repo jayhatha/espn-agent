@@ -193,10 +193,10 @@ export default function StandingsPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-neutral-200">
-              <thead className="bg-surface-secondary">
+            <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+              <thead className="bg-surface-secondary dark:bg-shell-bg">
                 <tr>
-                  <th className="px-3 py-3 text-left text-data font-medium text-content-secondary uppercase tracking-wider sticky left-0 bg-surface-secondary z-10">
+                  <th className="px-3 py-3 text-left text-data font-medium text-content-secondary uppercase tracking-wider sticky left-0 bg-surface-secondary dark:bg-shell-bg z-10">
                     Team
                   </th>
                   {categories.map((cat) => (
@@ -212,7 +212,7 @@ export default function StandingsPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-neutral-100">
+              <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                 {overallStandings.map((team) => {
                   const isSelected = selectedTeamId === team.team_id;
                   const teamCats = teamCategoryMap.get(team.team_id);
@@ -221,7 +221,7 @@ export default function StandingsPage() {
                     <tr
                       key={team.team_id}
                       className={cn(
-                        "hover:bg-surface-secondary transition-colors",
+                        "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                         isSelected ? "bg-accent-light" : "",
                       )}
                     >
@@ -302,7 +302,7 @@ export default function StandingsPage() {
         <>
           {/* View Mode Tabs */}
           <div className="mb-6">
-            <div className="border-b border-neutral-200">
+            <div className="border-b border-neutral-200 dark:border-shell-border">
               <nav className="-mb-px flex space-x-8">
                 <button
                   onClick={() => setViewMode("current")}

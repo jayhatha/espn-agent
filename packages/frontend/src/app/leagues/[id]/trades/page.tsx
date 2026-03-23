@@ -343,7 +343,7 @@ export default function TradesPage() {
                   setTradeAnalysis(null);
                   setValidationResult(null);
                 }}
-                className="block w-full rounded-lg border border-neutral-200 bg-white text-content focus:border-accent focus:ring-accent px-4 py-2"
+                className="block w-full rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:border-accent focus:ring-accent px-4 py-2"
               >
                 <option value="">-- Choose a team --</option>
                 {partnersData?.partners.map((team) => (
@@ -371,11 +371,11 @@ export default function TradesPage() {
                       <label className="block text-body-sm font-medium text-content mb-3">
                         You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
                       </label>
-                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 rounded-lg p-3">
+                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
                         {rostersData.userTeam.roster.map((player) => (
                           <label
                             key={player.playerId}
-                            className="flex items-center border border-neutral-200 rounded-lg cursor-pointer"
+                            className="flex items-center border border-neutral-200 dark:border-shell-border rounded-lg cursor-pointer"
                           >
                             <div className="pl-3">
                               <input
@@ -429,11 +429,11 @@ export default function TradesPage() {
                       <label className="block text-body-sm font-medium text-content mb-3">
                         You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
                       </label>
-                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 rounded-lg p-3">
+                      <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
                         {rostersData.partnerTeam.roster.map((player) => (
                           <label
                             key={player.playerId}
-                            className="flex items-center border border-neutral-200 rounded-lg cursor-pointer"
+                            className="flex items-center border border-neutral-200 dark:border-shell-border rounded-lg cursor-pointer"
                           >
                             <div className="pl-3">
                               <input
@@ -574,7 +574,7 @@ export default function TradesPage() {
               </CardHeader>
               <CardContent>
                 {/* Overall Impact */}
-                <div className="mb-6 p-4 border border-neutral-200 rounded-lg bg-surface-secondary">
+                <div className="mb-6 p-4 border border-neutral-200 dark:border-shell-border rounded-lg bg-surface-secondary dark:bg-shell-bg">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                       <div className="text-body-sm text-content-secondary mb-1">
@@ -600,7 +600,7 @@ export default function TradesPage() {
                     </Badge>
                   </div>
 
-                  <div className="mt-4 p-3 bg-white rounded-lg border border-neutral-200">
+                  <div className="mt-4 p-3 bg-white dark:bg-shell-panel rounded-lg border border-neutral-200 dark:border-shell-border">
                     <div className="text-body-sm font-medium text-content mb-1">
                       Analysis
                     </div>
@@ -639,8 +639,8 @@ export default function TradesPage() {
                     Category Impact
                   </Heading>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-neutral-200">
-                      <thead className="bg-surface-secondary">
+                    <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                      <thead className="bg-surface-secondary dark:bg-shell-bg">
                         <tr>
                           <th className="px-4 py-3 text-left text-data font-medium text-content-secondary uppercase">
                             Category
@@ -653,9 +653,9 @@ export default function TradesPage() {
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-neutral-100">
+                      <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                         {tradeAnalysis.categoryImpacts.map((cat) => (
-                          <tr key={cat.categoryName} className="hover:bg-surface-secondary">
+                          <tr key={cat.categoryName} className="hover:bg-surface-secondary dark:hover:bg-shell-bg">
                             <td className="px-4 py-3 text-body-sm font-medium text-content">
                               {cat.categoryName}
                             </td>
@@ -743,7 +743,7 @@ export default function TradesPage() {
                 {candidatesData.candidates.map((candidate, idx) => (
                   <div
                     key={idx}
-                    className="border border-neutral-200 rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-shadow"
+                    className="border border-neutral-200 dark:border-shell-border rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-shadow"
                   >
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">

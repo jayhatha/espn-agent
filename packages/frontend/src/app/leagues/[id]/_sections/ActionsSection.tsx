@@ -12,7 +12,7 @@ interface ActionsSectionProps {
 
 export function ActionsSection({ actionItems, leagueId }: ActionsSectionProps) {
   return (
-    <section className="bg-surface-secondary py-12">
+    <section className="bg-surface-secondary dark:bg-shell-bg py-12">
       <Container size="wide">
         <div className="flex items-baseline justify-between mb-8">
           <Heading level={2}>Recommended Actions</Heading>
