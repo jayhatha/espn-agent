@@ -1,105 +1,102 @@
 # Requirements: ESPN Fantasy Baseball Command Center
 
-**Defined:** 2026-03-15
-**Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
+**Defined:** 2026-03-23
+**Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
 
-## v5.0 Requirements
+## v6.0 Requirements
 
-Requirements for v5.0 Draft Engine Spec Alignment. Each maps to roadmap phases.
+Requirements for the In-Season Command Center milestone.
 
-### Endgame & Budget
+### Dark Mode & Shell
 
-- [ ] **END-01**: Engine activates endgame mode when budget_remaining ≤ $20, switching to value_per_dollar scoring
-- [ ] **END-02**: Budget allocation bands enforced: Hitters $185-205, Pitchers $55-70, Bench $5
-- [ ] **END-03**: Endgame prioritizes breakout hitters, cheap OF, and K pitchers; avoids backup C and weak OPS
+- [ ] **SHELL-01**: Dashboard uses Linear-style dark palette (#0B0D10 background, #111318 panels, #1D2128 borders)
+- [ ] **SHELL-02**: Left nav with icon + label navigation (Dashboard, Standings, Categories, Roster, Waivers, FAAB Market, Pitching Usage, Trades, Settings)
+- [ ] **SHELL-03**: Top bar shows league name, week, FAAB remaining, GS pace, projected total points
+- [ ] **SHELL-04**: Right signals panel with contextual daily action items
+- [ ] **SHELL-05**: Typography uses Inter for text, JetBrains Mono for numbers
+- [ ] **SHELL-06**: All existing dashboard pages restyled to dark theme (no light mode remnants)
+- [ ] **SHELL-07**: 8px base spacing, 16px panel padding, 24px section spacing
 
-### Nomination
+### Roto Tracker
 
-- [x] **NOM-07**: Nomination strategy uses espn_price - model_value to nominate overpriced players early
-- [x] **NOM-08**: Nomination strategy goal is to force league overspending and increase inflation
+- [ ] **ROTO-01**: Projected standings table shows all 13 teams with current points, projected points, and change
+- [ ] **ROTO-02**: Roto points computed from live standings (rank my projected totals against all teams' projected totals)
+- [ ] **ROTO-03**: Historical category curves used as fallback when live standings unavailable
+- [ ] **ROTO-04**: Category opportunity map shows gap to +1 and +2 roto points per category with difficulty rating
+- [ ] **ROTO-05**: Marginal gain engine computes cheapest path to next roto point per category
+- [ ] **ROTO-06**: "Standings Points at Risk" summary shows categories where points could be gained or lost
+- [ ] **ROTO-07**: Category pace bars show current vs target with progress visualization
+- [ ] **ROTO-08**: Hover on category row shows teams above/below and exact stat gaps
 
-### Positional & Pitching
+### Waiver Analysis
 
-- [x] **POS-01**: Positional priority weights applied: SS +4, OF +3, 3B +3, 1B +2, 2B +2, C +1
-- [x] **POS-02**: SP tier caps enforced: SP1 $12-18, SP2 $8-12, SP3 $6-10, SP4 $3-5, SP5 $1-3
-- [x] **POS-03**: 200 GS cap awareness in pitching strategy (limit SP spending)
+- [ ] **WAIVER-01**: Net roto point delta accounts for both added player projection AND dropped player loss
+- [ ] **WAIVER-02**: Per-category breakdown shows which categories improve and which get worse
+- [ ] **WAIVER-03**: Marginal analysis shows "this move gets you +N roto points in category X"
+- [ ] **WAIVER-04**: Fix hardcoded 0.5 deltaOverallPoints in WaiverRecommendationAgent with real computation
+- [ ] **WAIVER-05**: Rate stat adjustments (ERA, WHIP, OPS) use component math for add/drop simulation
 
-### Phase 60: SP Logic Audit
+### FAAB Pacing
 
-- [x] **SP-TIER**: SP tier cap determined by PitcherList rank (1-20→$18, 21-30→$12, 31-40→$10, 41-60→$5, 61+→$3)
-- [x] **SP-SAVINGS**: SP savings reallocation uses per-SP rank-based tier caps, not slot-position ideal
-- [x] **SP-COMP**: Target 7SP+5RP composition in draft strategy
-- [x] **RP-CAP**: RP hard cap $15 even with SP savings reallocation
-- [x] **PITCHER-SGP**: No pitcher SGP multiplier in bid pipeline
-- [x] **HIT-PITCH-CONFLICT**: Pitching vs hitting conflict audit documented with recommendations
+- [ ] **FAAB-01**: Show my remaining FAAB budget vs league average remaining
+- [ ] **FAAB-02**: Spend-rate projection showing if budget will run out before season ends
+- [ ] **FAAB-03**: Bid history with won/lost outcomes per claim
+- [ ] **FAAB-04**: ROI scoring (player value gained per FAAB dollar spent)
+- [ ] **FAAB-05**: Suggested bid amounts based on remaining budget, weeks left, and player value
 
-### Inflation & Signals
+### Pitching Usage
 
-- [x] **INF-01**: Inflation interpretation bands: <1.00 overspending, 1.00-1.05 neutral, 1.05-1.15 buying window, >1.15 strong value
-- [x] **INF-02**: Bid ceiling adjusts based on inflation bands (+2 when inflation > 1.10)
-- [x] **INF-03**: Category targets: OPS top 3, HR top 3, SB top 4, Saves top 4, K top 5
+- [ ] **PITCH-01**: Season GS tracker showing used vs 200 cap with projected pace
+- [ ] **PITCH-02**: Weekly GS usage showing this week's starts and remaining
+- [ ] **PITCH-03**: K/GS ratio tracking per pitcher to identify streaming value
+- [ ] **PITCH-04**: SP start planner recommending which SPs to start/sit to optimize GS pace
+- [ ] **PITCH-05**: Alert when GS pace is burning too fast or leaving starts unused
 
-### Data Pipeline
+### Trade Analysis
 
-- [ ] **DATA-01**: Easy way to load FanGraphs projections into the extension (CSV upload or paste)
-- [ ] **DATA-02**: Easy way to load ESPN auction values into the extension (scrape from DOM or CSV)
+- [ ] **TRADE-01**: Trade impact shows net roto point delta (same treatment as waiver analysis)
+- [ ] **TRADE-02**: Per-category breakdown for proposed trades
+- [ ] **TRADE-03**: Automatic trade finder scans all teams for roto-point-positive 1-for-1 swaps
+- [ ] **TRADE-04**: Trade finder results ranked by net roto points gained
+- [ ] **TRADE-05**: Rate stat adjustments use component math (not counting stats only)
 
-## Previous Requirements (Completed)
+### Trends & Efficiency
 
-### v4.0 (Completed)
-- [x] **SIMP-01** through **SIMP-03**: Auth stripped, env var ESPN creds
-- [x] **CONF-01** through **CONF-04**: League 112523 hardcoded, OPS math
-- [x] **DFIX-01** through **DFIX-03**: Draft detection fixed
-- [x] **SEAS-01** through **SEAS-04**: In-season pipeline verified
-
-### v3.0 (Completed)
-- [x] **DEV-01** through **DEV-03**: DevTools MCP
-- [x] **NOM-01** through **NOM-06**: Auto-nomination rework
-- [x] **MOB-01** through **MOB-14**: Mobile command center
+- [ ] **TREND-01**: Hot/cold player panel showing 7-day trend for roster players
+- [ ] **TREND-02**: Hot players highlighted by OPS surge, HR burst, K spike
+- [ ] **TREND-03**: Cold players flagged with declining production
+- [ ] **TREND-04**: Lineup efficiency tracks bench production (missed HR, SB, OPS from benched players)
+- [ ] **TREND-05**: Warning indicator when significant production is being left on the bench
 
 ## Future Requirements
 
-- **AGT-01** through **AGT-03**: Mastra AI agent
-- **MULTI-01** through **MULTI-03**: Multi-user re-enablement
-- **FMT-01**, **FMT-02**: Snake draft, Points/H2H
+### Advanced Analytics
+- **ADV-01**: Injury-adjusted projections (discount players on IL)
+- **ADV-02**: Schedule-strength adjustments per category
+- **ADV-03**: Opponent schedule tracking for streaming pitcher recommendations
+- **ADV-04**: Multi-player trade evaluation (2-for-2, 3-for-2) with roto delta
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Replace simulation-based BID/PASS | Win probability approach is more sophisticated than spec's formula |
-| Replace SGP bid optimizer | Binary search SGP-based is more accurate than model_value - 2 |
-| Auction simulator test harness | Nice-to-have but not needed for live draft use |
+| Points/H2H league support | Different scoring paradigm — roto only |
+| Snake draft features | Season is in auction mode only |
+| Real-time ESPN updates | ESPN API is read-only, batch snapshot model sufficient |
+| Mobile-specific in-season app | Desktop command center first, responsive later |
+| AI agent chat interface | Deferred to future milestone |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| END-01 | Phase 47 | Pending |
-| END-02 | Phase 47 | Pending |
-| END-03 | Phase 47 | Pending |
-| NOM-07 | Phase 48 | Complete |
-| NOM-08 | Phase 48 | Complete |
-| POS-01 | Phase 49 | Complete |
-| POS-02 | Phase 49 | Complete |
-| POS-03 | Phase 49 | Complete |
-| INF-01 | Phase 50 | Complete |
-| INF-02 | Phase 50 | Complete |
-| INF-03 | Phase 50 | Complete |
-| DATA-01 | Phase 51 | Pending |
-| DATA-02 | Phase 51 | Pending |
-| SP-TIER | Phase 60 | Complete |
-| SP-SAVINGS | Phase 60 | Complete |
-| SP-COMP | Phase 60 | Complete |
-| RP-CAP | Phase 60 | Complete |
-| PITCHER-SGP | Phase 60 | Complete |
-| HIT-PITCH-CONFLICT | Phase 60 | Complete |
+| (populated during roadmap creation) | | |
 
 **Coverage:**
-- v5.0 requirements: 13 total
-- Phase 60 requirements: 6 total
-- Mapped to phases: 17
-- Unmapped: 0 ✓
+- v6.0 requirements: 35 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 35
 
 ---
-*Requirements defined: 2026-03-15*
+*Requirements defined: 2026-03-23*
+*Last updated: 2026-03-23 after initial definition*
