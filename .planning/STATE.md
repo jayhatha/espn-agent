@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v6.0 In-Season Command Center — Phase 65: Dark Mode Shell
+**Current focus:** v6.0 In-Season Command Center — Phase 66: Roto Math Foundation
 
 ## Current Position
 
-Phase: 65 of 70 (Dark Mode Shell)
-Plan: 4 of 4 in current phase
+Phase: 66 of 70 (Roto Math Foundation)
+Plan: 2 of 2 in current phase
 Status: Complete
-Last activity: 2026-03-23 — Completed 65-04: dark: overrides applied to all 17 page/section files under leagues/[id]/
+Last activity: 2026-03-23 — Completed 66-02: standings page UI with delta column, pace bars, gap detail, fallback charts
 
-Progress: [█░░░░░░░░░] 4% (v6.0)
+Progress: [██░░░░░░░░] 8% (v6.0)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed (v5.0): ~35 plans
-- v6.0 plans: 3 completed
+- v6.0 plans: 5 completed
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -28,6 +28,8 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 | 65-dark-mode-shell | 02 | 15 min | 2 | 5 |
 | 65-dark-mode-shell | 03 | 3 min | 2 | 16 |
 | 65-dark-mode-shell | 04 | 10 min | 2 | 17 |
+| 66-roto-math-foundation | 01 | 5 min | 2 | 2 |
+| 66-roto-math-foundation | 02 | 8 min | 2 | 3 |
 
 *Updated after each plan completion*
 
@@ -79,5 +81,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 65-04-PLAN.md — dark: overrides on all 17 page/section files under leagues/[id]/, Phase 65 complete
+Stopped at: Completed Phase 66 (Roto Math Foundation) — both plans done, all requirements met
 Resume file: None
