@@ -5,11 +5,13 @@
 @layer base {
   body {
     @apply bg-surface text-content antialiased;
+    @apply dark:bg-shell-bg dark:text-shell-text;
   }
 
   /* Global focus-visible styles for keyboard accessibility */
   *:focus-visible {
     @apply outline-2 outline-offset-2 outline-accent;
+    @apply dark:outline-shell-accent;
   }
 
   /* Respect reduced motion preference */
