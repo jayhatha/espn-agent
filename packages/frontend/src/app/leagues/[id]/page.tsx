@@ -20,7 +20,7 @@ import { IdentitySection } from "./_sections/IdentitySection";
 import { ActionsSection } from "./_sections/ActionsSection";
 import { StatsSection } from "./_sections/StatsSection";
 import { CategoryTableSection } from "./_sections/CategoryTableSection";
-import { NavigationSection } from "./_sections/NavigationSection";
+// NavigationSection removed -- shell LeagueNav handles navigation
 import { RosterSection } from "./_sections/RosterSection";
 
 interface Team {
@@ -244,6 +244,25 @@ function LeagueDetailPageContent() {
       .sort((a: any, b: any) => a.date.localeCompare(b.date));
   }, [overallTimeseries, selectedTeamId]);
 
+  // Compute delta rank and delta points from timeseries
+  const { deltaRank, deltaPoints } = useMemo(() => {
+    if (!overallTimeseries?.series || !selectedTeamId) {
+      return { deltaRank: null, deltaPoints: null };
+    }
+    const teamSeries = overallTimeseries.series
+      .filter((p: any) => p.team_id === selectedTeamId)
+      .sort((a: any, b: any) => a.snapshot_date.localeCompare(b.snapshot_date));
+    if (teamSeries.length < 2) {
+      return { deltaRank: null, deltaPoints: null };
+    }
+    const last = teamSeries[teamSeries.length - 1];
+    const prev = teamSeries[teamSeries.length - 2];
+    return {
+      deltaRank: (last.overall_rank ?? 0) - (prev.overall_rank ?? 0),
+      deltaPoints: (last.overall_points ?? 0) - (prev.overall_points ?? 0),
+    };
+  }, [overallTimeseries, selectedTeamId]);
+
   const SLOT_ORDER = [
     "C",
     "1B",
@@ -328,6 +347,8 @@ function LeagueDetailPageContent() {
         createSnapshotMutation={createSnapshotMutation}
         showSnapshotBanner={showSnapshotBanner}
         onDismissSnapshotBanner={() => setShowSnapshotBanner(false)}
+        deltaRank={deltaRank}
+        deltaPoints={deltaPoints}
       />
 
       {selectedTeamId && teamOverview && (
@@ -347,8 +368,6 @@ function LeagueDetailPageContent() {
             categories={teamOverview.categories}
             totalTeams={teamOverview.overall?.total_teams ?? 10}
           />
-
-          <NavigationSection leagueId={leagueId} />
 
           <RosterSection
             groupedRoster={groupedRoster}

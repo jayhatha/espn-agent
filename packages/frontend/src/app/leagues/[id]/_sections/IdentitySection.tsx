@@ -60,6 +60,34 @@ interface IdentitySectionProps {
   createSnapshotMutation: UseMutationResult<unknown, unknown, void, unknown>;
   showSnapshotBanner: boolean;
   onDismissSnapshotBanner: () => void;
+  deltaRank: number | null;
+  deltaPoints: number | null;
+}
+
+/** Simple relative time helper -- no library needed */
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  if (diffMs < 0) return "just now";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function getSnapshotStatus(snapshot: LatestSnapshot | null): {
+  label: string;
+  color: string;
+} {
+  if (!snapshot) return { label: "No Data", color: "bg-neutral-400 text-white" };
+  if (snapshot.is_degraded) return { label: "Degraded", color: "bg-negative text-white" };
+  const age = Date.now() - new Date(snapshot.snapshot_date).getTime();
+  if (age > 24 * 60 * 60 * 1000) return { label: "Stale", color: "bg-yellow-500 text-white" };
+  return { label: "Live", color: "bg-positive text-white" };
 }
 
 export function IdentitySection({
@@ -78,14 +106,17 @@ export function IdentitySection({
   createSnapshotMutation,
   showSnapshotBanner,
   onDismissSnapshotBanner,
+  deltaRank,
+  deltaPoints,
 }: IdentitySectionProps) {
   const isPending = createSnapshotMutation.isPending;
+  const status = getSnapshotStatus(latestSnapshot);
 
   return (
-    <section className="bg-white dark:bg-shell-panel pt-10 pb-8">
+    <section className="bg-white dark:bg-shell-panel pt-6 pb-4">
       <Container size="wide">
         {/* Top utility row: back link + action buttons */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <Link
             href="/leagues"
             className="flex items-center gap-1 text-body-sm text-content-secondary hover:text-content transition-colors"
@@ -102,23 +133,12 @@ export function IdentitySection({
               <KeyRoundIcon className="mr-1.5 h-4 w-4" />
               Update Auth
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => createSnapshotMutation.mutate()}
-              disabled={isPending}
-            >
-              <RefreshCwIcon
-                className={cn("mr-1.5 h-4 w-4", isPending ? "animate-spin" : "")}
-              />
-              {isPending ? "Refreshing..." : "Refresh"}
-            </Button>
           </div>
         </div>
 
         {/* Snapshot banner */}
         {showSnapshotBanner && (
-          <div className="mb-6 bg-info-light border border-info-border rounded-lg p-4">
+          <div className="mb-4 bg-info-light border border-info-border rounded-lg p-4">
             <div className="flex items-start">
               <Loader2Icon className="h-5 w-5 text-info mt-0.5 mr-3 flex-shrink-0 animate-spin" />
               <div className="flex-1">
@@ -140,71 +160,156 @@ export function IdentitySection({
           </div>
         )}
 
-        {/* Degraded warning */}
-        {latestSnapshot?.is_degraded &&
-          latestSnapshot.degraded_reasons.length > 0 && (
-            <div className="mb-6">
-              <ErrorAlert
-                variant="warning"
-                message={`Snapshot Issues Detected: ${latestSnapshot.degraded_reasons.map((r) => r.replace(/_/g, " ")).join(", ")}`}
-                onRetry={
-                  !isPending
-                    ? () => createSnapshotMutation.mutate()
-                    : undefined
-                }
-              />
-            </div>
-          )}
-
         {/* Team identity: shows when team is selected and data loaded */}
         {teamOverviewLoading ? (
-          <div className="py-8">
+          <div className="py-6">
             <LoadingSkeleton lines={3} />
           </div>
         ) : teamOverview ? (
           <>
-            {/* Team name — editorial scale, serif */}
-            <h1 className="text-display font-display tracking-tight text-content mb-2">
-              {teamOverview.team.name}
-            </h1>
-            <p className="text-body-sm text-content-tertiary mb-10">
-              {league.name} &middot; Season {league.season} &middot;{" "}
-              {teamOverview.snapshotDate.split("T")[0]}
-            </p>
+            {/* Hero Card */}
+            <div className="border-l-4 border-shell-accent bg-white dark:bg-shell-panel rounded-r-lg pl-5 pr-4 py-5 mb-3">
+              {/* Team name */}
+              <h1 className="text-3xl font-display tracking-tight text-content dark:text-shell-text mb-4">
+                {teamOverview.team.name}
+              </h1>
 
-            {/* Rank + Points — oversized numerals, no box */}
-            {teamOverview.overall && (
-              <div className="flex items-end gap-12 mb-8">
-                <div>
-                  <p className="text-caption uppercase tracking-widest text-content-tertiary mb-1">
-                    Overall Rank
-                  </p>
-                  <p className="text-h1 font-display text-content leading-none">
-                    {teamOverview.overall.overall_rank}
-                    <span className="text-h3 font-sans font-normal text-content-tertiary ml-2">
-                      / {teamOverview.overall.total_teams}
-                    </span>
-                  </p>
+              {/* Primary KPIs: Rank + Points + Delta */}
+              {teamOverview.overall && (
+                <div className="flex items-end gap-10">
+                  <div>
+                    <p className="text-caption uppercase tracking-widest text-content-tertiary mb-1">
+                      Overall Rank
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-[28px] font-bold font-display text-content dark:text-shell-text leading-none">
+                        {teamOverview.overall.overall_rank}
+                      </p>
+                      <span className="text-base font-sans font-normal text-content-tertiary">
+                        / {teamOverview.overall.total_teams}
+                      </span>
+                      {deltaRank !== null && (
+                        <span
+                          className={cn(
+                            "text-sm font-semibold ml-1",
+                            deltaRank < 0
+                              ? "text-positive"
+                              : deltaRank > 0
+                              ? "text-negative"
+                              : "text-content-tertiary"
+                          )}
+                          title="Rank change vs yesterday (negative = improvement)"
+                        >
+                          {deltaRank < 0
+                            ? `+${Math.abs(deltaRank)}`
+                            : deltaRank > 0
+                            ? `-${deltaRank}`
+                            : "="}
+                        </span>
+                      )}
+                      {deltaRank === null && (
+                        <span className="text-sm text-content-tertiary ml-1">--</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-caption uppercase tracking-widest text-content-tertiary mb-1">
+                      Total Points
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-[28px] font-bold font-display text-content dark:text-shell-text leading-none">
+                        {Number(teamOverview.overall.overall_points)}
+                      </p>
+                      {deltaPoints !== null && (
+                        <span
+                          className={cn(
+                            "text-sm font-semibold",
+                            deltaPoints > 0
+                              ? "text-positive"
+                              : deltaPoints < 0
+                              ? "text-negative"
+                              : "text-content-tertiary"
+                          )}
+                        >
+                          {deltaPoints > 0
+                            ? `+${deltaPoints.toFixed(1)}`
+                            : deltaPoints < 0
+                            ? deltaPoints.toFixed(1)
+                            : "="}
+                        </span>
+                      )}
+                      {deltaPoints === null && (
+                        <span className="text-sm text-content-tertiary">--</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-caption uppercase tracking-widest text-content-tertiary mb-1">
-                    Total Points
-                  </p>
-                  <p className="text-h1 font-display text-content leading-none">
-                    {Number(teamOverview.overall.overall_points)}
-                  </p>
-                </div>
+              )}
+            </div>
+
+            {/* Status Bar */}
+            <div className="flex items-center gap-4 px-2 py-2 mb-2">
+              {/* Last updated */}
+              <span className="text-xs text-content-secondary dark:text-shell-muted">
+                Updated {latestSnapshot ? relativeTime(latestSnapshot.snapshot_date) : "never"}
+              </span>
+
+              {/* Status pill */}
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  status.color
+                )}
+              >
+                {status.label}
+              </span>
+
+              {/* Refresh CTA -- compact pill */}
+              <button
+                onClick={() => createSnapshotMutation.mutate()}
+                disabled={isPending}
+                className="flex items-center gap-1 text-xs text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text transition-colors disabled:opacity-50"
+              >
+                <RefreshCwIcon
+                  className={cn("h-3 w-3", isPending ? "animate-spin" : "")}
+                />
+                {isPending ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+
+            {/* Degraded reasons (small text, not a big banner) */}
+            {latestSnapshot?.is_degraded &&
+              latestSnapshot.degraded_reasons.length > 0 && (
+                <p className="text-xs text-negative dark:text-negative px-2 mb-2">
+                  {latestSnapshot.degraded_reasons
+                    .map((r) => r.replace(/_/g, " "))
+                    .join(", ")}
+                </p>
+              )}
+
+            {/* Inline team selector */}
+            {teamsData && teamsData.teams.length > 0 && (
+              <div className="mt-2 mb-1">
+                <TeamSelector
+                  leagueId={String(league.id)}
+                  teams={teamsData.teams}
+                  selectedTeamId={selectedTeamId}
+                  onSelect={onTeamSelect}
+                  autoDetectedTeamId={autoDetectedTeamId}
+                  loading={teamsLoading}
+                  error={teamsError}
+                />
               </div>
             )}
           </>
         ) : (
           /* No team selected: show team selector as the primary CTA */
-          <div className="mb-8">
-            <h1 className="text-h1 font-display tracking-tight text-content mb-2">
-              {league.name}
+          <div className="mb-4">
+            <h1 className="text-h1 font-display tracking-tight text-content dark:text-shell-text mb-2">
+              Season Snapshot &mdash; {league.season}
             </h1>
-            <p className="text-body-sm text-content-tertiary mb-8">
-              Season {league.season} &middot; Select your team to get started
+            <p className="text-body-sm text-content-tertiary mb-6">
+              {league.name} &middot; Select your team to get started
             </p>
 
             {teamsData && teamsData.teams.length > 0 ? (
@@ -266,24 +371,9 @@ export function IdentitySection({
           </div>
         )}
 
-        {/* Inline team selector when team is selected but not loading */}
-        {selectedTeamId && !teamOverviewLoading && teamsData && teamsData.teams.length > 0 && (
-          <div className="mt-6">
-            <TeamSelector
-              leagueId={String(league.id)}
-              teams={teamsData.teams}
-              selectedTeamId={selectedTeamId}
-              onSelect={onTeamSelect}
-              autoDetectedTeamId={autoDetectedTeamId}
-              loading={teamsLoading}
-              error={teamsError}
-            />
-          </div>
-        )}
-
-        {/* Snapshot count info — only shown when no snapshots yet */}
+        {/* Snapshot count info -- only shown when no snapshots yet */}
         {snapshotCount === 0 && (
-          <div className="mt-6">
+          <div className="mt-4">
             <ErrorAlert
               variant="info"
               message={`Your league is connected! The first snapshot will be created at 03:00 ${league.timezone}. You can upload projections now to start getting recommendations.`}
