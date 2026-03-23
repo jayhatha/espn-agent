@@ -97,7 +97,8 @@ export default function TradesPage() {
   const params = useParams();
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [showAnalyzer, setShowAnalyzer] = useState(true);
+  const [showAnalyzer, setShowAnalyzer] = useState(false);
+  const [expandedCandidate, setExpandedCandidate] = useState<number | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(
     null,
   );
@@ -299,6 +300,16 @@ export default function TradesPage() {
           <CardContent className="py-4">
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
+                variant={!showAnalyzer ? "primary" : "secondary"}
+                className="flex-1"
+                onClick={() => {
+                  setShowAnalyzer(false);
+                  setExpandedCandidate(null);
+                }}
+              >
+                Auto Trade Finder
+              </Button>
+              <Button
                 variant={showAnalyzer ? "primary" : "secondary"}
                 className="flex-1"
                 onClick={() => {
@@ -309,14 +320,7 @@ export default function TradesPage() {
                 }}
               >
                 <ArrowRightLeft className="h-4 w-4 mr-2" />
-                Build & Analyze Trade
-              </Button>
-              <Button
-                variant={!showAnalyzer ? "primary" : "secondary"}
-                className="flex-1"
-                onClick={() => setShowAnalyzer(false)}
-              >
-                Browse AI Suggestions
+                Manual Trade Builder
               </Button>
             </div>
           </CardContent>
@@ -578,13 +582,13 @@ export default function TradesPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                       <div className="text-body-sm text-content-secondary mb-1">
-                        Overall Point Change
+                        Net Roto Point Impact
                       </div>
                       <div
                         className={cn("text-3xl font-bold", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}
                       >
                         {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
-                        {tradeAnalysis.deltaOverallPoints.toFixed(1)} pts
+                        {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto pts
                       </div>
                       <div className="text-body-sm text-content-secondary mt-1">
                         {tradeAnalysis.currentOverallPoints.toFixed(1)} &rarr;{" "}
@@ -605,16 +609,13 @@ export default function TradesPage() {
                       Analysis
                     </div>
                     <p className="text-body-sm text-content-secondary">
+                      {tradeAnalysis.deltaOverallPoints > 0
+                        ? `This trade gains you ${tradeAnalysis.deltaOverallPoints.toFixed(1)} roto points. `
+                        : tradeAnalysis.deltaOverallPoints < 0
+                          ? `This trade costs you ${Math.abs(tradeAnalysis.deltaOverallPoints).toFixed(1)} roto points. `
+                          : ""}
                       {tradeAnalysis.explanation}
                     </p>
-                  </div>
-
-                  <div className="mt-3 text-data text-content-secondary">
-                    Fairness Score:{" "}
-                    <span className="font-semibold text-content">
-                      {tradeAnalysis.fairnessScore.toFixed(2)}
-                    </span>{" "}
-                    (Range: -1 to 1, closer to 0 is more balanced)
                   </div>
 
                   {/* ESPN Link */}
@@ -654,8 +655,14 @@ export default function TradesPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
-                        {tradeAnalysis.categoryImpacts.map((cat) => (
-                          <tr key={cat.categoryName} className="hover:bg-surface-secondary dark:hover:bg-shell-bg">
+                        {[...tradeAnalysis.categoryImpacts]
+                          .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
+                          .map((cat) => (
+                          <tr key={cat.categoryName} className={cn(
+                            "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                            cat.deltaPoints > 0 && "bg-positive-light/30",
+                            cat.deltaPoints < 0 && "bg-negative-light/30",
+                          )}>
                             <td className="px-4 py-3 text-body-sm font-medium text-content">
                               {cat.categoryName}
                             </td>
@@ -673,11 +680,21 @@ export default function TradesPage() {
                                 className={cn("font-semibold text-data", renderDeltaColor(cat.deltaPoints))}
                               >
                                 {cat.deltaPoints > 0 ? "+" : ""}
-                                {cat.deltaPoints.toFixed(1)} pts
+                                {cat.deltaPoints.toFixed(1)} roto pts
                               </span>
                             </td>
                           </tr>
                         ))}
+                        <tr className="bg-surface-secondary dark:bg-shell-bg font-semibold">
+                          <td className="px-4 py-3 text-body-sm text-content">Total</td>
+                          <td className="px-4 py-3" />
+                          <td className="px-4 py-3 text-body-sm text-right">
+                            <span className={cn("text-data", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}>
+                              {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
+                              {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto pts
+                            </span>
+                          </td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -688,13 +705,13 @@ export default function TradesPage() {
         </div>
       )}
 
-      {/* AI Trade Suggestions */}
+      {/* Auto Trade Finder */}
       {!showAnalyzer && (
         <Card>
           <CardHeader>
-            <Heading level={3}>AI-Generated Trade Suggestions</Heading>
+            <Heading level={3}>Auto Trade Finder</Heading>
             <p className="text-body-sm text-content-secondary mt-1">
-              These are trades that would improve your projected standings
+              Scanning all 12 teams for roto-point-positive 1-for-1 swaps
             </p>
           </CardHeader>
           <CardContent>
@@ -743,25 +760,35 @@ export default function TradesPage() {
                 {candidatesData.candidates.map((candidate, idx) => (
                   <div
                     key={idx}
-                    className="border border-neutral-200 dark:border-shell-border rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-shadow"
+                    className="border border-neutral-200 dark:border-shell-border rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-shadow cursor-pointer"
+                    onClick={() => setExpandedCandidate(expandedCandidate === idx ? null : idx)}
                   >
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                      <div>
+                    {/* Header with prominent roto delta */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                      <div className={cn(
+                        "inline-flex items-center px-3 py-1.5 rounded-lg font-bold text-lg font-mono",
+                        "bg-positive-light text-positive border border-positive-border"
+                      )}>
+                        +{candidate.deltaOverallPoints.toFixed(1)} roto pts
+                      </div>
+                      <div className="flex-1">
                         <div className="text-data text-content-secondary">
-                          Trade Partner
+                          Trade with
                         </div>
                         <div className="text-h4 font-bold text-content">
                           {candidate.partnerTeamName}
                         </div>
                       </div>
-                      <div className="text-left sm:text-right">
-                        <div className="text-data text-content-secondary">
-                          Projected Gain
-                        </div>
-                        <div className="text-h4 font-bold text-positive">
-                          +{candidate.deltaOverallPoints.toFixed(1)} pts
-                        </div>
+                      <div className="text-body-sm">
+                        <span className="text-content-secondary">
+                          Likelihood:{" "}
+                        </span>
+                        <span
+                          className={cn("font-semibold", getLikelihoodColor(candidate.likelihood))}
+                        >
+                          {candidate.likelihood.charAt(0).toUpperCase() +
+                            candidate.likelihood.slice(1)}
+                        </span>
                       </div>
                     </div>
 
@@ -821,45 +848,81 @@ export default function TradesPage() {
                       </div>
                     )}
 
-                    {/* Metadata */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-body-sm">
-                      <div>
-                        <span className="text-content-secondary">
-                          Acceptance Likelihood:{" "}
-                        </span>
-                        <span
-                          className={cn("font-semibold", getLikelihoodColor(candidate.likelihood))}
-                        >
-                          {candidate.likelihood.charAt(0).toUpperCase() +
-                            candidate.likelihood.slice(1)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-content-secondary">Fairness: </span>
-                        <span className="font-semibold text-content">
-                          {candidate.fairnessScore.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 text-data text-content-secondary">
+                    <div className="text-data text-content-secondary">
                       {candidate.explanation}
                     </div>
 
-                    {/* ESPN Link */}
-                    {espnLeagueId && season && (
-                      <div className="mt-3">
-                        <a
-                          href={getESPNTradeUrl(espnLeagueId, season)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
-                        >
-                          Propose on ESPN
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                    {/* Expandable Category Breakdown */}
+                    {expandedCandidate === idx && (
+                      <div className="mt-4 border-t border-neutral-200 dark:border-shell-border pt-4">
+                        <div className="text-body-sm font-medium text-content-secondary mb-2 uppercase tracking-wider">
+                          Category Impact
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                            <thead className="bg-surface-secondary dark:bg-shell-bg">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-data font-medium text-content-secondary">
+                                  Category
+                                </th>
+                                <th className="px-3 py-2 text-center text-data font-medium text-content-secondary">
+                                  Rank
+                                </th>
+                                <th className="px-3 py-2 text-right text-data font-medium text-content-secondary">
+                                  Points
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                              {candidate.categoryImpacts
+                                .filter((cat) => cat.deltaPoints !== 0)
+                                .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
+                                .map((cat) => (
+                                  <tr key={cat.categoryName} className={cn(
+                                    cat.deltaPoints > 0 && "bg-positive-light/30",
+                                    cat.deltaPoints < 0 && "bg-negative-light/30",
+                                  )}>
+                                    <td className="px-3 py-2 text-body-sm font-medium text-content">
+                                      {cat.categoryName}
+                                    </td>
+                                    <td className="px-3 py-2 text-body-sm text-center">
+                                      <span className={cn("font-mono text-data", renderDeltaColor(cat.deltaRank * -1))}>
+                                        {cat.currentRank} &rarr; {cat.projectedRank}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-body-sm text-right">
+                                      <span className={cn("font-semibold font-mono text-data", renderDeltaColor(cat.deltaPoints))}>
+                                        {cat.deltaPoints > 0 ? "+" : ""}{cat.deltaPoints.toFixed(1)}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* ESPN Link */}
+                        {espnLeagueId && season && (
+                          <div className="mt-3">
+                            <a
+                              href={getESPNTradeUrl(espnLeagueId, season)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Propose on ESPN
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    {/* Expand hint */}
+                    <div className="mt-2 text-data text-content-tertiary text-center">
+                      {expandedCandidate === idx ? "Click to collapse" : "Click to see category breakdown"}
+                    </div>
                   </div>
                 ))}
               </div>
