@@ -27,6 +27,7 @@ interface PlayerData {
   positions: string[];
   pctOwned: number;
   currentSeasonStats: Record<string, number>;
+  espnAsv: number | null;
 }
 
 export class PlayerPoolSyncAgent {
@@ -191,6 +192,12 @@ export class PlayerPoolSyncAgent {
         const proTeamId = player.proTeamId as number | undefined;
         const mlbTeam = proTeamId ? this.mapProTeamId(proTeamId) : "FA";
 
+        // Extract ESPN ASV (Average Season Value) from draft ranks
+        const espnAsv: number | null =
+          player.draftRanksByRankType?.STANDARD?.auctionValue ??
+          player.draftRanksByRankType?.ROTO?.auctionValue ??
+          null;
+
         playerDataList.push({
           espnPlayerId: entry.id,
           name: player.fullName || `Player ${entry.id}`,
@@ -198,6 +205,7 @@ export class PlayerPoolSyncAgent {
           positions: [...new Set(positions)], // Deduplicate
           pctOwned,
           currentSeasonStats,
+          espnAsv,
         });
       }
 
@@ -245,6 +253,7 @@ export class PlayerPoolSyncAgent {
                 pct_owned: p.pctOwned,
                 current_season_stats_json: p.currentSeasonStats,
                 last_synced_at: new Date(),
+                espn_asv: p.espnAsv,
               })),
             )
             .execute();
@@ -264,6 +273,7 @@ export class PlayerPoolSyncAgent {
               pct_owned: playerData.pctOwned,
               current_season_stats_json: playerData.currentSeasonStats,
               last_synced_at: new Date(),
+              espn_asv: playerData.espnAsv,
             })
             .where("id", "=", playerData.espnPlayerId)
             .execute();

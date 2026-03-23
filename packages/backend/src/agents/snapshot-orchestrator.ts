@@ -446,6 +446,7 @@ export class SnapshotOrchestratorAgent {
       injury_status: string | null;
       injury_updated_at: Date | undefined;
       created_at: Date;
+      espn_asv: number | null;
     }> = [];
 
     const injuryEventRows: Array<{
@@ -485,6 +486,7 @@ export class SnapshotOrchestratorAgent {
           injury_status: injuryStatus,
           injury_updated_at: injuryStatus ? new Date() : undefined,
           created_at: new Date(),
+          espn_asv: null, // ASV is populated by player-pool-sync, not snapshot orchestrator
         });
 
         // Collect injury event if status changed or new player with injury

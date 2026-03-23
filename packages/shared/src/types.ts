@@ -93,6 +93,7 @@ export interface Player {
   last_synced_at?: Date | null;
   injury_status?: string | null; // 'IL', 'DTD', 'OUT', 'HEALTHY', or NULL
   injury_updated_at?: Date | null;
+  espn_asv?: number | null; // ESPN Average Season Value (auction dollar value)
 }
 
 // Team
