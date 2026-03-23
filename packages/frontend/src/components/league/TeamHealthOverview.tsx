@@ -43,11 +43,11 @@ export function TeamHealthOverview({
       <div>
         <div className="flex items-center gap-2 mb-4">
           <CheckCircleIcon className="h-5 w-5 text-positive" />
-          <h3 className="text-h4 font-semibold text-content">Top Strengths</h3>
+          <h3 className="text-h4 font-semibold text-content dark:text-shell-text">Top Strengths</h3>
         </div>
 
         {strengths.length > 0 ? (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-neutral-100 dark:divide-shell-border">
             {strengths.map((cat) => (
               <div
                 key={cat.category_id}
@@ -55,7 +55,7 @@ export function TeamHealthOverview({
               >
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-body font-medium text-content">
+                    <span className="text-body font-medium text-content dark:text-shell-text">
                       {cat.name}
                     </span>
                     <ScarcityBadge
@@ -88,11 +88,11 @@ export function TeamHealthOverview({
       <div>
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangleIcon className="h-5 w-5 text-negative" />
-          <h3 className="text-h4 font-semibold text-content">Areas for Improvement</h3>
+          <h3 className="text-h4 font-semibold text-content dark:text-shell-text">Areas for Improvement</h3>
         </div>
 
         {weaknesses.length > 0 ? (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-neutral-100 dark:divide-shell-border">
             {weaknesses.map((cat) => (
               <div
                 key={cat.category_id}
@@ -100,7 +100,7 @@ export function TeamHealthOverview({
               >
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-body font-medium text-content">
+                    <span className="text-body font-medium text-content dark:text-shell-text">
                       {cat.name}
                     </span>
                     <ScarcityBadge

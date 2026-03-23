@@ -75,7 +75,7 @@ function ActionItemRow({ item, borderColor }: { item: ActionItem; borderColor: s
     >
       {/* Impact number */}
       <div className="sm:w-20 sm:text-right flex-shrink-0 pt-1">
-        <span className={cn("text-h3 font-display leading-none", getImpactClasses(item.impact))}>
+        <span className={cn("text-h3 font-mono leading-none", getImpactClasses(item.impact))}>
           {item.impact}
         </span>
       </div>
@@ -141,7 +141,7 @@ function TierSection({ tier }: { tier: TierGroup }) {
         <span className="text-body-sm font-semibold text-content dark:text-shell-text uppercase tracking-wide">
           {tier.label}
         </span>
-        <span className="text-caption text-content-tertiary">({tier.items.length})</span>
+        <span className="text-caption text-content-tertiary font-mono">({tier.items.length})</span>
       </button>
 
       {!collapsed && (

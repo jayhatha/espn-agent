@@ -53,7 +53,7 @@ export function TeamSelector({
   if (loading) {
     return (
       <div className="animate-pulse">
-        <div className="h-10 bg-neutral-200 rounded-lg w-full" />
+        <div className="h-10 bg-neutral-200 dark:bg-shell-border rounded-lg w-full" />
       </div>
     );
   }
@@ -95,7 +95,7 @@ export function TeamSelector({
 
       <label
         htmlFor="team-select"
-        className="block text-body-sm font-medium text-content mb-2"
+        className="block text-body-sm font-medium text-content dark:text-shell-text mb-2"
       >
         {autoDetectedTeamId
           ? "Your auto-detected team:"

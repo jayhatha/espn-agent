@@ -106,7 +106,7 @@ export default function ImpactDetailCard({
           <div className="overflow-x-auto">
             <table className="min-w-full text-data">
               <thead>
-                <tr className="border-b border-neutral-100">
+                <tr className="border-b border-neutral-100 dark:border-shell-border">
                   <th className="text-left py-1 pr-3 text-content-secondary font-medium">Category</th>
                   <th className="text-right py-1 px-2 text-content-secondary font-medium">Net Stats</th>
                   <th className="text-right py-1 pl-2 text-content-secondary font-medium">Roto Pts</th>
@@ -118,8 +118,8 @@ export default function ImpactDetailCard({
                   .map((sgp) => {
                     const delta = impactVal(sgp);
                     return (
-                      <tr key={sgp.categoryId} className="border-b border-neutral-50">
-                        <td className="py-1 pr-3 font-medium text-content">{sgp.categoryId}</td>
+                      <tr key={sgp.categoryId} className="border-b border-neutral-50 dark:border-shell-border">
+                        <td className="py-1 pr-3 font-medium text-content dark:text-shell-text">{sgp.categoryId}</td>
                         <td className="py-1 px-2 text-right text-content-secondary">
                           {(() => {
                             const isLowerBetter = ["ERA", "WHIP"].includes(sgp.categoryId);

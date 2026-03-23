@@ -25,7 +25,7 @@ export default function ImpactBadge({ impact, size = "md", isUncertain = false, 
     return (
       <span
         className={cn(
-          "inline-flex items-center rounded-full font-semibold border border-dashed border-neutral-300 text-content-secondary bg-surface-secondary",
+          "inline-flex items-center rounded-full font-semibold border border-dashed border-neutral-300 text-content-secondary bg-surface-secondary dark:border-shell-border dark:text-shell-muted dark:bg-shell-bg",
           textSize,
           padding,
         )}

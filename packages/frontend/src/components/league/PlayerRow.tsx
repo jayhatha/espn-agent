@@ -53,7 +53,7 @@ export function PlayerRow({
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <div className="text-body-sm font-medium text-content truncate">
+          <div className="text-body-sm font-medium text-content dark:text-shell-text truncate">
             {player.name}
           </div>
           {player.rosterSlot && (

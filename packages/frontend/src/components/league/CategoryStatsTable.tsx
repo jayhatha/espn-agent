@@ -64,12 +64,12 @@ export function CategoryStatsTable({
   return (
     <div>
       {title && (
-        <h2 className="text-h4 font-semibold text-content mb-4">{title}</h2>
+        <h2 className="text-h4 font-semibold text-content dark:text-shell-text mb-4">{title}</h2>
       )}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200">
+        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
           <thead>
-            <tr className="border-b-2 border-neutral-200">
+            <tr className="border-b-2 border-neutral-200 dark:border-shell-border">
               <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
                 Category
               </th>
@@ -94,13 +94,13 @@ export function CategoryStatsTable({
               )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
             {categories.map((cat) => (
               <tr key={cat.category_id || cat.name}>
-                <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm font-medium text-content">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text">
                   {cat.name}
                 </td>
-                <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content dark:text-shell-text">
                   {formatStatValue(cat.value, cat.type, cat.stat_key)}
                 </td>
                 <td className="py-2.5 pr-4 whitespace-nowrap text-body-sm text-center">
@@ -113,7 +113,7 @@ export function CategoryStatsTable({
                     #{cat.rank}
                   </span>
                 </td>
-                <td className="py-2.5 pr-4 whitespace-nowrap text-data font-semibold text-right text-content">
+                <td className="py-2.5 pr-4 whitespace-nowrap text-data font-semibold text-right text-content dark:text-shell-text">
                   {Number(cat.roto_points)}
                 </td>
                 {showProjected && (

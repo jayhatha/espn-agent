@@ -38,7 +38,7 @@ export function CategoryMiniChart({
   return (
     <div className={cn(className)}>
       {label && (
-        <h4 className="text-body-sm font-medium text-content mb-1">{label}</h4>
+        <h4 className="text-body-sm font-medium text-content dark:text-shell-text mb-1">{label}</h4>
       )}
       <ResponsiveContainer width="100%" height={height}>
         <LineChart

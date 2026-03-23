@@ -97,10 +97,10 @@ export function TransactionMarker({ viewBox, annotation }: TransactionMarkerProp
               borderRadius: CHART_THEME.tooltip.borderRadius,
             }}
           >
-            <div className="font-bold uppercase mb-1 text-content">{annotation.event_type}</div>
+            <div className="font-bold uppercase mb-1 text-content dark:text-shell-text">{annotation.event_type}</div>
             <div className="text-content-secondary mb-1">{formatDate(annotation.event_date)}</div>
             {annotation.team_name && (
-              <div className="text-content mb-1">{annotation.team_name}</div>
+              <div className="text-content dark:text-shell-text mb-1">{annotation.team_name}</div>
             )}
             {(annotation.players_added_details?.length ?? 0) > 0 && (
               <div className="text-positive">

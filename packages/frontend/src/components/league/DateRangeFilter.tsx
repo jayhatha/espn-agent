@@ -39,8 +39,10 @@ export function DateRangeFilter({
 
   const inputClass = cn(
     "block rounded-lg border border-neutral-300 bg-white text-content",
+    "dark:bg-shell-bg dark:border-shell-border dark:text-shell-text",
     "text-body-sm px-3 py-2",
     "focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent",
+    "dark:focus:ring-shell-accent",
     "transition-colors"
   );
 
@@ -51,7 +53,7 @@ export function DateRangeFilter({
         <div>
           <label
             htmlFor="from-date"
-            className="block text-body-sm font-medium text-content-secondary mb-1"
+            className="block text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-1"
           >
             From
           </label>
@@ -68,7 +70,7 @@ export function DateRangeFilter({
         <div>
           <label
             htmlFor="to-date"
-            className="block text-body-sm font-medium text-content-secondary mb-1"
+            className="block text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-1"
           >
             To
           </label>

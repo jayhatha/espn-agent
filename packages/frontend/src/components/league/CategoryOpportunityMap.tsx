@@ -72,16 +72,16 @@ export function CategoryOpportunityMap({
                   key={gain.categoryId}
                   className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
                 >
-                  <td className="px-3 py-2.5 text-body-sm font-medium text-content whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
                     {gain.categoryName}
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    <span className="font-mono text-data text-content">
+                    <span className="font-mono text-data text-content dark:text-shell-text">
                       #{gain.currentRank}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <span className="font-mono text-data text-content">
+                    <span className="font-mono text-data text-content dark:text-shell-text">
                       {formatStatValue(gain.myValue, statType, gain.categoryName)}
                     </span>
                   </td>

@@ -72,10 +72,10 @@ export function AtRiskSummary({
                   >
                     {config.label}
                   </span>
-                  <span className="font-medium text-body-sm text-content">
+                  <span className="font-medium text-body-sm text-content dark:text-shell-text">
                     {risk.categoryName}
                   </span>
-                  <span className="text-content-tertiary text-body-sm">
+                  <span className="text-content-tertiary text-body-sm font-mono">
                     #{risk.currentRank}
                   </span>
                 </div>

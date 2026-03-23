@@ -122,7 +122,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
               borderRadius: CHART_THEME.tooltip.borderRadius,
             }}
           >
-            <div className="font-bold mb-2 text-content">
+            <div className="font-bold mb-2 text-content dark:text-shell-text">
               {formatDate(point.date)}: Rank {point.rankBefore}{rankSuffix(point.rankBefore)} → {point.rankAfter}{rankSuffix(point.rankAfter)}
               {isCategoryMode && ` (${point.categoryId})`}
               {!isCategoryMode && point.pointsDelta != null && ` · ${point.pointsDelta > 0 ? "+" : ""}${point.pointsDelta} pts`}
