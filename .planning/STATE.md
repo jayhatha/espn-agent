@@ -82,9 +82,10 @@ None yet.
 | 94 | Simplify nomination — overpriced-first | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/) |
 | 95 | Wire shouldBid from Monte Carlo into auto-bid | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/) |
 | 96 | Fix auto-nominate bug — add delay after search | 2026-03-22 | b3b5787 | [96-fix-auto-nominate-bug-add-delay-after-se](./quick/96-fix-auto-nominate-bug-add-delay-after-se/) |
+| 97 | Filter trade recommendations by ESPN ASV similarity | 2026-03-23 | 1047cd9 | [97-trade-recommendations-should-be-based-on](./quick/97-trade-recommendations-should-be-based-on/) |
 
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed Phase 69 (Trade Finder) — 2 plans done, ready to plan Phase 70
+Stopped at: Completed Quick Task 97 (Trade ASV Filter)
 Resume file: None
