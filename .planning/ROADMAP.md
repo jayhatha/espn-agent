@@ -52,7 +52,7 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
 
 - [x] **Phase 65: Dark Mode Shell** - Linear-style dark layout with left nav, top bar, typography, and full-app dark theme (completed 2026-03-23)
 - [ ] **Phase 66: Roto Math Foundation** - Projected standings with live roto points, marginal gain engine, category pace visualization
-- [ ] **Phase 67: Net Waiver Analysis + Category Opportunity** - Fix hardcoded delta, real roto-point add/drop simulation, category opportunity map
+- [ ] **Phase 67: Net Waiver Analysis + Category Opportunity** - Enhanced waiver labels, category opportunity map with difficulty, at-risk summary
 - [ ] **Phase 68: FAAB Tracking + Pitching Usage** - FAAB budget tracker with ROI + GS/K pacing with SP start planner
 - [ ] **Phase 69: Trade Finder** - Roto-point-framed trade impact and automatic 1-for-1 trade finder
 - [ ] **Phase 70: Trends and Efficiency** - Hot/cold player trends and lineup efficiency tracking
@@ -103,7 +103,10 @@ Plans:
   4. Rate stat add/drop simulation uses component math (ERA, WHIP, OPS recalculated from components — never averaged)
   5. Category opportunity map displays gap-to-next-rank per category with a difficulty rating
   6. "Standings Points at Risk" summary highlights categories where points could shift up or down within the current week
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 67-01-PLAN.md — Backend: enhanced waiver labels, marginal gain difficulty, at-risk categories
+- [ ] 67-02-PLAN.md — Frontend: category opportunity map, at-risk summary, waiver marginal labels
 
 ### Phase 68: FAAB Tracking + Pitching Usage
 **Goal**: Users can track FAAB budget pace against the league and monitor GS usage with weekly start recommendations
