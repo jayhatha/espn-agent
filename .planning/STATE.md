@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 65 of 70 (Dark Mode Shell)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In Progress
-Last activity: 2026-03-23 — Completed 65-01: dark mode foundation (next-themes, shell tokens, JetBrains Mono)
+Last activity: 2026-03-23 — Completed 65-02: three-column dark shell (LeagueNav, TopBar, SignalsPanel, layout.tsx)
 
 Progress: [█░░░░░░░░░] 4% (v6.0)
 
@@ -20,11 +20,12 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 
 **Velocity:**
 - Total plans completed (v5.0): ~35 plans
-- v6.0 plans: 1 completed
+- v6.0 plans: 2 completed
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 65-dark-mode-shell | 01 | 8 min | 2 | 6 |
+| 65-dark-mode-shell | 02 | 15 min | 2 | 5 |
 
 *Updated after each plan completion*
 
@@ -42,6 +43,9 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 - [Phase 65-01]: ThemeProvider placed outside QueryClientProvider (outermost wrapper) so theme state is available to all children
 - [Phase 65-01]: defaultTheme=dark with enableSystem=false — forces dark mode, no light/system toggle in v6.0
 - [Phase 65-01]: Shell tokens are separate from grafana tokens — grafana palette kept for mobile draft companion, shell palette for Command Center
+- [Phase 65-02]: layout.tsx uses pl-60 offset on main area so fixed LeagueNav doesn't overlap content
+- [Phase 65-02]: LucideIcon type used in NavItem (not ComponentType) to avoid TypeScript size prop mismatch
+- [Phase 65-02]: SignalsPanel reads localStorage in useEffect to avoid SSR hydration mismatch
 
 ### Blockers/Concerns
 
@@ -68,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 65-01-PLAN.md — dark mode foundation shipped (next-themes, Tailwind shell tokens, JetBrains Mono, ThemeProvider)
+Stopped at: Completed 65-02-PLAN.md — three-column dark shell shipped (LeagueNav, TopBar, SignalsPanel, leagues/[id]/layout.tsx)
 Resume file: None
