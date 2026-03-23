@@ -131,7 +131,10 @@ Plans:
   3. Automatic trade finder scans all 12 other teams and returns a ranked list of 1-for-1 swaps that produce a net positive roto-point gain
   4. Trade finder results are ranked by net roto points gained (highest benefit first)
   5. Rate stat adjustments in trade simulation use component math — not counting-stat-only approximations
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 69-01-PLAN.md — Backend: fix rate stat component math in TradeRecommendationAgent to match waiver pattern
+- [ ] 69-02-PLAN.md — Frontend: roto-point-framed trade UI with auto finder as primary view
 
 ### Phase 70: Trends and Efficiency
 **Goal**: Users can see which roster players are running hot or cold over 7 days and how much production is being left on the bench
@@ -156,5 +159,5 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 | 66. Roto Math Foundation | v6.0 | 0/2 | Not started | - |
 | 67. Net Waiver Analysis + Category Opportunity | 2/2 | Complete    | 2026-03-23 | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
-| 69. Trade Finder | v6.0 | 0/? | Not started | - |
+| 69. Trade Finder | v6.0 | 0/2 | Not started | - |
 | 70. Trends and Efficiency | v6.0 | 0/? | Not started | - |
