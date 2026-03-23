@@ -352,6 +352,7 @@ export class TradeRecommendationAgent {
     snapshotDate: string,
     maxCandidates: number = 10,
   ): Promise<TradeCandidate[]> {
+    const startTime = Date.now();
     this.logger?.info(
       { leagueId, teamId, snapshotDate, maxCandidates },
       "Generating trade candidates",
@@ -622,8 +623,9 @@ export class TradeRecommendationAgent {
       }
     }
 
+    const elapsed = Date.now() - startTime;
     this.logger?.info(
-      { simulationsRun, candidatesFound: candidates.length },
+      { simulationsRun, candidatesFound: candidates.length, elapsedMs: elapsed },
       "Trade candidate generation complete",
     );
 
@@ -825,14 +827,14 @@ export class TradeRecommendationAgent {
     // Store original values before modifications (for currentValue in CategoryImpact)
     const originalValues = new Map<string, number>();
     for (const category of categories) {
-      const catId = category.stat_key;
+      const catId = category.category_id;
       const current = userTeamCategories.get(catId);
       originalValues.set(catId, current?.value || 0);
     }
 
     // Apply trade adjustments to user team's projected category values
     for (const category of categories) {
-      const catId = category.stat_key;
+      const catId = category.category_id;
       const current = userTeamCategories.get(catId) || {
         value: 0,
         components: null,
@@ -858,9 +860,9 @@ export class TradeRecommendationAgent {
         for (const givePlayer of trade.givePlayers) {
           const proj = projections.get(givePlayer.playerId);
           if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents = JSON.parse(proj.stat_components_json) as Record<string, number>;
+            const playerComponents = proj.stat_components_json as StatComponents;
             for (const [key, value] of Object.entries(playerComponents)) {
-              adjustedComponents[key] = (adjustedComponents[key] || 0) - (value || 0);
+              adjustedComponents[key] = (adjustedComponents[key] || 0) - (Number(value) || 0);
             }
           }
         }
@@ -869,9 +871,9 @@ export class TradeRecommendationAgent {
         for (const receivePlayer of trade.receivePlayers) {
           const proj = projections.get(receivePlayer.playerId);
           if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents = JSON.parse(proj.stat_components_json) as Record<string, number>;
+            const playerComponents = proj.stat_components_json as StatComponents;
             for (const [key, value] of Object.entries(playerComponents)) {
-              adjustedComponents[key] = (adjustedComponents[key] || 0) + (value || 0);
+              adjustedComponents[key] = (adjustedComponents[key] || 0) + (Number(value) || 0);
             }
           }
         }
@@ -886,6 +888,13 @@ export class TradeRecommendationAgent {
             {}, // Empty current components
             adjustedComponents // All combined components (current + projected - given + received)
           );
+
+          this.logger?.info({
+            category: category.stat_key,
+            oldValue: current.value,
+            newValue: projectedValue,
+            adjustedComponents,
+          }, "Rate stat calculation for trade simulation");
         } catch (error) {
           // Fallback: preserve current value for unknown rate stats or calculation errors
           this.logger?.warn(
@@ -931,7 +940,7 @@ export class TradeRecommendationAgent {
     let projectedOverallPoints = 0;
 
     for (const category of categories) {
-      const catId = category.stat_key;
+      const catId = category.category_id;
 
       // Build array of {teamId, value} for ranking
       const teamValues: Array<{ teamId: number; value: number }> = [];
@@ -995,7 +1004,7 @@ export class TradeRecommendationAgent {
   private isCategoryRelevant(category: any, projection: any): boolean {
     // Check if the projection has data for this category
     // Pitching categories apply to pitchers (has IP or ER), batting to batters (has AB)
-    const components: StatComponents = JSON.parse(projection.stat_components_json);
+    const components = projection.stat_components_json as StatComponents;
     const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
     if (isPitchingCat) {
       return (components.IP ?? 0) > 0 || components.ER !== undefined;
@@ -1005,7 +1014,7 @@ export class TradeRecommendationAgent {
   }
 
   private getProjectedCategoryValue(category: any, projection: any): number {
-    const components: StatComponents = JSON.parse(projection.stat_components_json);
+    const components = projection.stat_components_json as StatComponents;
 
     // RATE stats: use formula_id with calculateFinalRate
     if (category.type === "RATE" && category.formula_id) {
