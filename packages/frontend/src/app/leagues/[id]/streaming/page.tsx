@@ -149,7 +149,7 @@ export default function StreamingPitchersPage() {
       {/* Controls */}
       {selectedTeamId && (
         <div className="mb-6 flex items-center justify-between">
-          <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-1 gap-1">
+          <div className="inline-flex rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel p-1 gap-1">
             {[1, 3, 7].map((days) => (
               <button
                 key={days}
@@ -158,7 +158,7 @@ export default function StreamingPitchersPage() {
                   "px-4 py-2 text-body-sm font-medium rounded-md transition-colors",
                   lookAheadDays === days
                     ? "bg-accent text-content-inverse shadow-sm"
-                    : "text-content hover:bg-surface-secondary"
+                    : "text-content hover:bg-surface-secondary dark:hover:bg-shell-bg"
                 )}
               >
                 {days === 1 ? "1 Day" : days === 3 ? "3 Days" : "7 Days"}
@@ -282,7 +282,7 @@ export default function StreamingPitchersPage() {
       ) : (
         <Card>
           <CardContent className="py-12 text-center">
-            <div className="w-16 h-16 bg-surface-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-surface-secondary dark:bg-shell-bg rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-8 h-8 text-content-tertiary" />
             </div>
             <h3 className="text-h4 font-semibold text-content mb-2">

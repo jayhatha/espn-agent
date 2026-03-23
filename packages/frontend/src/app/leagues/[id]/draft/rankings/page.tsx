@@ -104,7 +104,7 @@ export default function DraftRankingsPage() {
             id="position-filter"
             value={position}
             onChange={(e) => setPosition(e.target.value)}
-            className="border border-neutral-300 rounded-lg px-3 py-2 text-body-sm text-content bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="border border-neutral-300 dark:border-shell-border rounded-lg px-3 py-2 text-body-sm text-content dark:text-shell-text bg-white dark:bg-shell-bg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {POSITIONS.map((pos) => (
               <option key={pos} value={pos}>
@@ -116,7 +116,7 @@ export default function DraftRankingsPage() {
 
         <Link
           href={`/leagues/${leagueId}/draft/auction`}
-          className="inline-flex items-center px-4 py-2 border border-neutral-300 rounded-lg text-body-sm font-medium text-content bg-white hover:bg-surface-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
+          className="inline-flex items-center px-4 py-2 border border-neutral-300 dark:border-shell-border rounded-lg text-body-sm font-medium text-content dark:text-shell-text bg-white dark:bg-shell-bg hover:bg-surface-secondary dark:hover:bg-shell-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors"
         >
           View Auction Values
         </Link>
@@ -156,10 +156,10 @@ export default function DraftRankingsPage() {
 
       {/* Rankings Table */}
       {!isLoading && !error && data && data.rankings.length > 0 && (
-        <div className="rounded-card border border-neutral-200 bg-white shadow-card overflow-hidden">
+        <div className="rounded-card border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel shadow-card dark:shadow-none overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-neutral-100">
-              <thead className="bg-surface-secondary sticky top-0">
+            <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+              <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0">
                 <tr>
                   <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
                     Rank
@@ -181,11 +181,11 @@ export default function DraftRankingsPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-neutral-100">
+              <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                 {data.rankings.map((ranking, index) => (
                   <tr
                     key={ranking.playerId}
-                    className="border-b border-neutral-100 hover:bg-surface-secondary transition-colors"
+                    className="border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
                       {index + 1}
@@ -216,7 +216,7 @@ export default function DraftRankingsPage() {
           </div>
 
           {/* Meta Info */}
-          <div className="bg-surface-secondary px-4 py-3 border-t border-neutral-100">
+          <div className="bg-surface-secondary dark:bg-shell-bg px-4 py-3 border-t border-neutral-100 dark:border-shell-border">
             <p className="text-body-sm text-content-secondary">
               Showing {data.rankings.length} player
               {data.rankings.length !== 1 ? "s" : ""} for{" "}

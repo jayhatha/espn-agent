@@ -360,7 +360,7 @@ function LeagueDetailPageContent() {
       {/* Auth modal: fixed overlay, not a section */}
       {showAuthModal && (
         <div className="fixed inset-0 bg-neutral-900/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-card max-w-lg w-full p-6 shadow-card">
+          <div className="bg-white dark:bg-shell-panel rounded-card max-w-lg w-full p-6 shadow-card dark:shadow-none">
             <div className="flex items-center justify-between mb-4">
               <Heading level={3}>
                 Update ESPN Authentication

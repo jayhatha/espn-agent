@@ -92,7 +92,7 @@ export default function ProjectionsUploadPage() {
                 "relative border-2 border-dashed rounded-lg p-8 text-center transition-colors",
                 dragActive
                   ? "border-accent bg-accent-light"
-                  : "border-neutral-300 bg-surface-secondary"
+                  : "border-neutral-300 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg"
               )}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}

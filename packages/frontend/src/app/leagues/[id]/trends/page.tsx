@@ -328,8 +328,8 @@ export default function TrendsPage() {
       />
 
       {/* View Mode Tabs */}
-      <div className="bg-white shadow-card rounded-card border border-neutral-200 mb-6">
-        <div className="border-b border-neutral-200">
+      <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
+        <div className="border-b border-neutral-200 dark:border-shell-border">
           <div className="flex items-center justify-between">
             <nav className="-mb-px flex">
               <button
@@ -363,7 +363,7 @@ export default function TrendsPage() {
               <select
                 value={selectedSeason || ""}
                 onChange={(e) => setSelectedSeason(e.target.value || undefined)}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-body-sm bg-white text-content focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="">Current Season</option>
                 {seasonsData?.seasons?.map((s: number) => (
@@ -378,7 +378,7 @@ export default function TrendsPage() {
 
         {/* Category selector for category view */}
         {(viewMode === "category" || viewMode === "values") && (
-          <div className="p-6 border-b border-neutral-200">
+          <div className="p-6 border-b border-neutral-200 dark:border-shell-border">
             <label
               htmlFor="category-select"
               className="block text-body-sm font-medium text-content-secondary mb-2"
@@ -390,7 +390,7 @@ export default function TrendsPage() {
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               disabled={categoriesLoading}
-              className="block w-full md:w-64 rounded-lg border border-neutral-300 bg-white text-content text-body-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="block w-full md:w-64 rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-bg text-content dark:text-shell-text text-body-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {categories.map((cat: { value: string; label: string }) => (
                 <option key={cat.value} value={cat.value}>
@@ -402,7 +402,7 @@ export default function TrendsPage() {
         )}
 
         {/* Filter controls */}
-        <div className="px-6 py-4 border-b border-neutral-200">
+        <div className="px-6 py-4 border-b border-neutral-200 dark:border-shell-border">
           <div className="flex flex-row gap-6 items-end">
             <DateRangeFilter
               onRangeChange={(from, to) => {
@@ -453,7 +453,7 @@ export default function TrendsPage() {
       </div>
 
       {/* Chart Display */}
-      <div className="bg-white shadow-card rounded-card border border-neutral-200 p-6">
+      <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-6">
         {isLoading ? (
           <LoadingSpinner message="Loading chart data..." />
         ) : chartData.length > 0 ? (
