@@ -14,7 +14,7 @@ Requirements for the In-Season Command Center milestone.
 - [x] **SHELL-03**: Top bar shows league name, week, FAAB remaining, GS pace, projected total points
 - [x] **SHELL-04**: Right signals panel with contextual daily action items
 - [x] **SHELL-05**: Typography uses Inter for text, JetBrains Mono for numbers
-- [ ] **SHELL-06**: All existing dashboard pages restyled to dark theme (no light mode remnants)
+- [x] **SHELL-06**: All existing dashboard pages restyled to dark theme (no light mode remnants)
 - [x] **SHELL-07**: 8px base spacing, 16px panel padding, 24px section spacing
 
 ### Roto Tracker
@@ -95,7 +95,7 @@ Requirements for the In-Season Command Center milestone.
 | SHELL-03 | Phase 65 | Complete |
 | SHELL-04 | Phase 65 | Complete |
 | SHELL-05 | Phase 65 | Complete |
-| SHELL-06 | Phase 65 | Pending |
+| SHELL-06 | Phase 65 | Complete |
 | SHELL-07 | Phase 65 | Complete |
 | ROTO-01 | Phase 66 | Pending |
 | ROTO-02 | Phase 66 | Pending |
