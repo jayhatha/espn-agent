@@ -9,13 +9,13 @@ Requirements for the In-Season Command Center milestone.
 
 ### Dark Mode & Shell
 
-- [ ] **SHELL-01**: Dashboard uses Linear-style dark palette (#0B0D10 background, #111318 panels, #1D2128 borders)
+- [x] **SHELL-01**: Dashboard uses Linear-style dark palette (#0B0D10 background, #111318 panels, #1D2128 borders)
 - [ ] **SHELL-02**: Left nav with icon + label navigation (Dashboard, Standings, Categories, Roster, Waivers, FAAB Market, Pitching Usage, Trades, Settings)
 - [ ] **SHELL-03**: Top bar shows league name, week, FAAB remaining, GS pace, projected total points
 - [ ] **SHELL-04**: Right signals panel with contextual daily action items
-- [ ] **SHELL-05**: Typography uses Inter for text, JetBrains Mono for numbers
+- [x] **SHELL-05**: Typography uses Inter for text, JetBrains Mono for numbers
 - [ ] **SHELL-06**: All existing dashboard pages restyled to dark theme (no light mode remnants)
-- [ ] **SHELL-07**: 8px base spacing, 16px panel padding, 24px section spacing
+- [x] **SHELL-07**: 8px base spacing, 16px panel padding, 24px section spacing
 
 ### Roto Tracker
 
@@ -90,13 +90,13 @@ Requirements for the In-Season Command Center milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SHELL-01 | Phase 65 | Pending |
+| SHELL-01 | Phase 65 | Complete |
 | SHELL-02 | Phase 65 | Pending |
 | SHELL-03 | Phase 65 | Pending |
 | SHELL-04 | Phase 65 | Pending |
-| SHELL-05 | Phase 65 | Pending |
+| SHELL-05 | Phase 65 | Complete |
 | SHELL-06 | Phase 65 | Pending |
-| SHELL-07 | Phase 65 | Pending |
+| SHELL-07 | Phase 65 | Complete |
 | ROTO-01 | Phase 66 | Pending |
 | ROTO-02 | Phase 66 | Pending |
 | ROTO-03 | Phase 66 | Pending |

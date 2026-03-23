@@ -10,17 +10,21 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 65 of 70 (Dark Mode Shell)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-03-23 — v6.0 roadmap created, 35 requirements mapped to 6 phases
+Plan: 1 of 4 in current phase
+Status: In Progress
+Last activity: 2026-03-23 — Completed 65-01: dark mode foundation (next-themes, shell tokens, JetBrains Mono)
 
-Progress: [░░░░░░░░░░] 0% (v6.0)
+Progress: [█░░░░░░░░░] 4% (v6.0)
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed (v5.0): ~35 plans
-- v6.0 plans: 0 started
+- v6.0 plans: 1 completed
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 65-dark-mode-shell | 01 | 8 min | 2 | 6 |
 
 *Updated after each plan completion*
 
@@ -35,6 +39,9 @@ Progress: [░░░░░░░░░░] 0% (v6.0)
 - [v6.0 roadmap]: Phase 69 (trade finder) comes last — depends on Phase 67 waiver delta being production-trusted
 - [v6.0 roadmap]: FAAB balance must come from ESPN mRoster view (acquisitionBudgetRemaining) — not derived from transaction sums
 - [v6.0 roadmap]: next-themes for SSR-safe dark mode, @tanstack/react-table for sortable trade scanner, @tanstack/react-virtual for virtualized rows
+- [Phase 65-01]: ThemeProvider placed outside QueryClientProvider (outermost wrapper) so theme state is available to all children
+- [Phase 65-01]: defaultTheme=dark with enableSystem=false — forces dark mode, no light/system toggle in v6.0
+- [Phase 65-01]: Shell tokens are separate from grafana tokens — grafana palette kept for mobile draft companion, shell palette for Command Center
 
 ### Blockers/Concerns
 
@@ -61,5 +68,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: v6.0 roadmap written — 35 requirements mapped to phases 65-70. Ready to plan Phase 65.
+Stopped at: Completed 65-01-PLAN.md — dark mode foundation shipped (next-themes, Tailwind shell tokens, JetBrains Mono, ThemeProvider)
 Resume file: None
