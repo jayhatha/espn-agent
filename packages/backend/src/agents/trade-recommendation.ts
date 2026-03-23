@@ -88,6 +88,8 @@ export interface TradeCandidate {
   likelihood: "high" | "medium" | "low";
   explanation: string;
   positionalContext?: PositionalContext;
+  givePlayerAsv?: number | null;
+  receivePlayerAsv?: number | null;
 }
 
 export class TradeRecommendationAgent {
@@ -399,6 +401,7 @@ export class TradeRecommendationAgent {
         "player.positions",
         "roster.roster_status",
         "roster.roster_slot",
+        "player.espn_asv",
       ])
       .where("roster.league_id", "=", leagueId)
       .where("roster.snapshot_date", "=", snapshotDate)
@@ -511,6 +514,24 @@ export class TradeRecommendationAgent {
         const giveValue = getPlayerValue(givePlayer.player_id);
 
         for (const receivePlayer of partnerRoster) {
+          // Filter by ESPN ASV similarity for trade realism
+          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
+          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : null;
+
+          // Skip if both players have ASV data and values are too far apart
+          if (giveAsv != null && receiveAsv != null && giveAsv > 0 && receiveAsv > 0) {
+            const asvDiff = Math.abs(giveAsv - receiveAsv);
+            const maxAsv = Math.max(giveAsv, receiveAsv);
+            const pctDiff = asvDiff / maxAsv;
+            // Allow trades within +/-30% OR +/-$5, whichever is more generous
+            const withinPct = pctDiff <= 0.30;
+            const withinAbsolute = asvDiff <= 5;
+            if (!withinPct && !withinAbsolute) {
+              continue; // Skip this pair — ASV too far apart
+            }
+          }
+          // If either player has no ASV data, allow the trade (don't penalize missing data)
+
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
 
@@ -584,6 +605,12 @@ export class TradeRecommendationAgent {
 
           // Only consider trades that improve the team
           if (impact.deltaOverallPoints > 0.5) {
+            const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
+            const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : null;
+            const asvNote = giveAsv != null && receiveAsv != null
+              ? ` Similar value ($${Math.round(giveAsv)} vs $${Math.round(receiveAsv)}).`
+              : "";
+
             candidates.push({
               trade,
               partnerTeamId: partnerTeam.id,
@@ -597,8 +624,10 @@ export class TradeRecommendationAgent {
                 impact.deltaOverallPoints,
                 impact.categoryImpacts,
                 positionalContext,
-              ),
+              ) + asvNote,
               positionalContext,
+              givePlayerAsv: giveAsv,
+              receivePlayerAsv: receiveAsv,
             });
 
             // OPTIMIZATION 5: Early termination if we have enough good candidates
