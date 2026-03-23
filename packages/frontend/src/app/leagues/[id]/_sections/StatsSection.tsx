@@ -34,14 +34,14 @@ export function StatsSection({ categories, totalTeams, miniChartData }: StatsSec
       <Container size="wide">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8">
-            <Heading level={2} className="mb-6">Team Health</Heading>
+            <Heading level={2} className="mb-6 text-content dark:text-shell-text">Team Health</Heading>
             <TeamHealthOverview
               categories={categories}
               totalTeams={totalTeams}
             />
           </div>
           <div className="lg:col-span-4">
-            <h3 className="text-body font-medium text-content-secondary uppercase tracking-wider mb-4">
+            <h3 className="text-body font-semibold text-content dark:text-shell-text uppercase tracking-wider mb-4">
               Standings Trend
             </h3>
             <Card>

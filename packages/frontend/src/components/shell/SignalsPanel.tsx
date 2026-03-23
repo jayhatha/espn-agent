@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -31,14 +31,20 @@ interface TradeCandidate {
   };
 }
 
+type TabKey = "all" | "trade" | "waiver";
+
 // ---- Signal item renderer ---------------------------------------------------
 
 function SignalItem({ item }: { item: ActionItem }) {
+  const [expanded, setExpanded] = useState(false);
   const Icon = item.type === "waiver" ? RefreshCw : ArrowLeftRight;
   const isPositive = item.impact.startsWith("+");
 
   return (
-    <div className="py-3 px-3 border-b border-shell-border last:border-0">
+    <div
+      className="py-3 px-3 border-b border-shell-border last:border-0 cursor-pointer"
+      onClick={() => setExpanded(!expanded)}
+    >
       <div className="flex items-start gap-2">
         <Icon
           size={14}
@@ -48,7 +54,10 @@ function SignalItem({ item }: { item: ActionItem }) {
           <p className="text-xs font-medium text-shell-text leading-tight truncate">
             {item.title}
           </p>
-          <p className="text-xs text-shell-muted mt-0.5 line-clamp-2">
+          <p className={cn(
+            "text-xs text-shell-muted mt-0.5",
+            expanded ? "" : "line-clamp-2"
+          )}>
             {item.description}
           </p>
           <div className="flex items-center justify-between mt-1">
@@ -64,6 +73,7 @@ function SignalItem({ item }: { item: ActionItem }) {
               <Link
                 href={item.internalLink}
                 className="text-xs text-shell-accent hover:underline"
+                onClick={(e) => e.stopPropagation()}
               >
                 Analyze
               </Link>
@@ -82,6 +92,8 @@ export function SignalsPanel() {
   const id = params?.id as string;
 
   const [teamId, setTeamId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [showLowImpact, setShowLowImpact] = useState(false);
 
   // Read selected team from localStorage (same key pattern as the dashboard)
   useEffect(() => {
@@ -97,7 +109,7 @@ export function SignalsPanel() {
     queryKey: ["signals-waivers", id, teamId],
     queryFn: () =>
       api.getWaiverRecommendations(parseInt(id, 10), teamId!, {
-        maxRecommendations: 3,
+        maxRecommendations: 5,
       }),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
@@ -111,54 +123,81 @@ export function SignalsPanel() {
   });
 
   // Build action items list
-  const signals: ActionItem[] = [];
+  const allSignals: ActionItem[] = useMemo(() => {
+    const signals: ActionItem[] = [];
 
-  if (waiverData?.recommendations) {
-    for (const rec of (waiverData.recommendations as WaiverRec[]).slice(0, 3)) {
-      signals.push({
-        id: `waiver-${rec.addPlayerId}-${rec.dropPlayerId}`,
-        type: "waiver",
-        priority:
-          rec.deltaOverallPoints >= 2
-            ? "high"
-            : rec.deltaOverallPoints >= 1
-            ? "medium"
-            : "low",
-        title: `Add ${rec.addPlayerName}, Drop ${rec.dropPlayerName}`,
-        description: rec.explanation,
-        impact: `+${rec.deltaOverallPoints.toFixed(1)} pts`,
-        internalLink: `/leagues/${id}/waivers`,
-      });
+    if (waiverData?.recommendations) {
+      for (const rec of (waiverData.recommendations as WaiverRec[]).slice(0, 5)) {
+        signals.push({
+          id: `waiver-${rec.addPlayerId}-${rec.dropPlayerId}`,
+          type: "waiver",
+          priority:
+            rec.deltaOverallPoints >= 2
+              ? "high"
+              : rec.deltaOverallPoints >= 1
+              ? "medium"
+              : "low",
+          title: `Add ${rec.addPlayerName}, Drop ${rec.dropPlayerName}`,
+          description: rec.explanation,
+          impact: `+${rec.deltaOverallPoints.toFixed(1)} pts`,
+          internalLink: `/leagues/${id}/waivers`,
+        });
+      }
     }
-  }
 
-  if (tradeData?.candidates) {
-    for (const cand of (tradeData.candidates as TradeCandidate[]).slice(0, 2)) {
-      const giveName = cand.trade.givePlayers
-        .map((p) => p.playerName)
-        .join(", ");
-      const getName = cand.trade.receivePlayers
-        .map((p) => p.playerName)
-        .join(", ");
-      signals.push({
-        id: `trade-${cand.partnerTeamId}-${giveName}`,
-        type: "trade",
-        priority:
-          cand.deltaOverallPoints >= 3
-            ? "high"
-            : cand.deltaOverallPoints >= 1.5
-            ? "medium"
-            : "low",
-        title: `Trade ${giveName} for ${getName}`,
-        description: `${cand.partnerTeamName}: ${cand.explanation}`,
-        impact: `+${cand.deltaOverallPoints.toFixed(1)} pts`,
-        internalLink: `/leagues/${id}/trades`,
-      });
+    if (tradeData?.candidates) {
+      for (const cand of (tradeData.candidates as TradeCandidate[]).slice(0, 3)) {
+        const giveName = cand.trade.givePlayers
+          .map((p) => p.playerName)
+          .join(", ");
+        const getName = cand.trade.receivePlayers
+          .map((p) => p.playerName)
+          .join(", ");
+        signals.push({
+          id: `trade-${cand.partnerTeamId}-${giveName}`,
+          type: "trade",
+          priority:
+            cand.deltaOverallPoints >= 3
+              ? "high"
+              : cand.deltaOverallPoints >= 1.5
+              ? "medium"
+              : "low",
+          title: `Trade ${giveName} for ${getName}`,
+          description: `${cand.partnerTeamName}: ${cand.explanation}`,
+          impact: `+${cand.deltaOverallPoints.toFixed(1)} pts`,
+          internalLink: `/leagues/${id}/trades`,
+        });
+      }
     }
-  }
 
-  // Sort by impact descending
-  signals.sort((a, b) => parseFloat(b.impact) - parseFloat(a.impact));
+    // Sort by impact descending
+    signals.sort((a, b) => parseFloat(b.impact) - parseFloat(a.impact));
+    return signals;
+  }, [waiverData, tradeData, id]);
+
+  const waiverCount = allSignals.filter((s) => s.type === "waiver").length;
+  const tradeCount = allSignals.filter((s) => s.type === "trade").length;
+
+  const filteredSignals = useMemo(() => {
+    let filtered = activeTab === "all"
+      ? allSignals
+      : allSignals.filter((s) => s.type === activeTab);
+
+    // Separate high and low impact
+    const highImpact = filtered.filter((s) => parseFloat(s.impact) >= 0.5);
+    const lowImpact = filtered.filter((s) => parseFloat(s.impact) < 0.5);
+
+    if (!showLowImpact) {
+      return { visible: highImpact.slice(0, 3), hidden: highImpact.slice(3).length + lowImpact.length, lowCount: lowImpact.length };
+    }
+    return { visible: filtered.slice(0, 6), hidden: filtered.length - Math.min(filtered.length, 6), lowCount: 0 };
+  }, [allSignals, activeTab, showLowImpact]);
+
+  const tabs: { key: TabKey; label: string; count: number }[] = [
+    { key: "all", label: "All", count: allSignals.length },
+    { key: "trade", label: "Trades", count: tradeCount },
+    { key: "waiver", label: "Waivers", count: waiverCount },
+  ];
 
   return (
     <aside className="hidden xl:flex xl:flex-col w-[280px] flex-shrink-0 bg-shell-panel border-l border-shell-border overflow-y-auto">
@@ -170,11 +209,32 @@ export function SignalsPanel() {
             Signals
           </span>
         </div>
-        {signals.length > 0 && (
+        {allSignals.length > 0 && (
           <span className="text-xs font-mono bg-shell-accent/20 text-shell-accent px-1.5 py-0.5 rounded-full">
-            {signals.length}
+            {allSignals.length}
           </span>
         )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-shell-border flex-shrink-0">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              "flex-1 px-2 py-2 text-xs font-medium transition-colors",
+              activeTab === tab.key
+                ? "border-b-2 border-shell-accent text-shell-accent"
+                : "text-shell-muted hover:text-shell-text"
+            )}
+          >
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="ml-1 text-xs opacity-70">({tab.count})</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Content */}
@@ -185,14 +245,44 @@ export function SignalsPanel() {
               Select a team to see signals
             </p>
           </div>
-        ) : signals.length === 0 ? (
+        ) : allSignals.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
               Loading signals...
             </p>
           </div>
+        ) : filteredSignals.visible.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs text-shell-muted">
+              No {activeTab === "all" ? "" : activeTab} signals
+            </p>
+          </div>
         ) : (
-          signals.map((item) => <SignalItem key={item.id} item={item} />)
+          <>
+            {filteredSignals.visible.map((item) => (
+              <SignalItem key={item.id} item={item} />
+            ))}
+
+            {filteredSignals.lowCount > 0 && !showLowImpact && (
+              <button
+                onClick={() => setShowLowImpact(true)}
+                className="w-full px-3 py-2 text-xs text-shell-muted hover:text-shell-text transition-colors text-center"
+              >
+                Show low impact ({filteredSignals.lowCount})
+              </button>
+            )}
+
+            {filteredSignals.hidden > 0 && (
+              <div className="px-3 py-2 text-center">
+                <Link
+                  href={`/leagues/${id}/${activeTab === "trade" ? "trades" : activeTab === "waiver" ? "waivers" : "waivers"}`}
+                  className="text-xs text-shell-accent hover:underline"
+                >
+                  View all
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
     </aside>

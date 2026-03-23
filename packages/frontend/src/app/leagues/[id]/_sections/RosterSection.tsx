@@ -28,7 +28,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
   return (
     <section className="bg-white dark:bg-shell-panel py-10">
       <Container size="wide">
-        <Heading level={2} className="mb-6">Roster</Heading>
+        <Heading level={2} className="mb-6 text-content dark:text-shell-text font-semibold">Roster</Heading>
         {hasRosterData && groupedRoster ? (
           <div className="space-y-6">
             {/* Active Lineup */}

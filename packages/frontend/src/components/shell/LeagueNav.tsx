@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Trophy,
@@ -15,11 +17,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { api } from "@/lib/api";
 
 interface NavItem {
   label: string;
   href: string; // relative to /leagues/[id]
   icon: LucideIcon;
+  badgeKey?: "waivers" | "trades";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -27,10 +31,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Standings",      href: "/standings", icon: Trophy },
   { label: "Categories",     href: "/trends",    icon: BarChart3 },
   { label: "Roster",         href: "/lineup",    icon: Users },
-  { label: "Waivers",        href: "/waivers",   icon: RefreshCw },
+  { label: "Waivers",        href: "/waivers",   icon: RefreshCw, badgeKey: "waivers" },
   { label: "FAAB Market",    href: "/moves",     icon: DollarSign },
   { label: "Pitching Usage", href: "/streaming", icon: Activity },
-  { label: "Trades",         href: "/trades",    icon: ArrowLeftRight },
+  { label: "Trades",         href: "/trades",    icon: ArrowLeftRight, badgeKey: "trades" },
   { label: "Settings",       href: "/settings",  icon: Settings },
 ];
 
@@ -38,6 +42,38 @@ export function LeagueNav() {
   const pathname = usePathname();
   const params = useParams();
   const id = params?.id as string;
+
+  const [teamId, setTeamId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = localStorage.getItem(`league_${id}_team`);
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) setTeamId(parsed);
+    }
+  }, [id]);
+
+  const leagueId = id ? parseInt(id, 10) : 0;
+
+  const { data: waiverData } = useQuery({
+    queryKey: ["signals-waivers", id, teamId],
+    queryFn: () => api.getWaiverRecommendations(leagueId, teamId!, { maxRecommendations: 5 }),
+    enabled: !!teamId && !!id,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: tradeData } = useQuery({
+    queryKey: ["signals-trades", id, teamId],
+    queryFn: () => api.getTradeRecommendations(leagueId, teamId!),
+    enabled: !!teamId && !!id,
+    staleTime: 5 * 60_000,
+  });
+
+  const badgeCounts: Record<string, number> = {
+    waivers: waiverData?.recommendations?.length ?? 0,
+    trades: tradeData?.candidates?.length ?? 0,
+  };
 
   const isActive = (href: string) => {
     const base = `/leagues/${id}`;
@@ -62,6 +98,7 @@ export function LeagueNav() {
           const active = isActive(item.href);
           const href = `/leagues/${id}${item.href}`;
           const Icon = item.icon;
+          const count = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
 
           return (
             <li key={item.href}>
@@ -75,7 +112,12 @@ export function LeagueNav() {
                 )}
               >
                 <Icon size={18} className="flex-shrink-0" />
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {count > 0 && (
+                  <span className="bg-shell-accent text-shell-bg text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium">
+                    {count}
+                  </span>
+                )}
               </Link>
             </li>
           );

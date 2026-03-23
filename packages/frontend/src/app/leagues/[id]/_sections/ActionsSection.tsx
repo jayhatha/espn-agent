@@ -12,9 +12,9 @@ interface ActionsSectionProps {
 
 export function ActionsSection({ actionItems, leagueId }: ActionsSectionProps) {
   return (
-    <section className="bg-surface-secondary dark:bg-shell-bg py-12">
+    <section className="bg-surface-secondary dark:bg-shell-bg py-8">
       <Container size="wide">
-        <div className="flex items-baseline justify-between mb-8">
+        <div className="flex items-baseline justify-between mb-6">
           <Heading level={2}>Recommended Actions</Heading>
           <div className="flex gap-6">
             <Link
@@ -31,7 +31,7 @@ export function ActionsSection({ actionItems, leagueId }: ActionsSectionProps) {
             </Link>
           </div>
         </div>
-        <ActionItemsList items={actionItems} maxItems={5} />
+        <ActionItemsList items={actionItems} />
       </Container>
     </section>
   );

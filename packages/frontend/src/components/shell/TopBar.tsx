@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { Calendar, DollarSign, BarChart2, TrendingUp, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/cn";
 
 interface LeagueStatus {
   league: {
@@ -31,13 +34,46 @@ interface GsSummaryResponse {
   gsCap: number;
 }
 
-function StatItem({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-baseline gap-2">
+function StatItem({
+  label,
+  value,
+  icon: Icon,
+  href,
+  warning,
+  warningTitle,
+}: {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+  href?: string;
+  warning?: boolean;
+  warningTitle?: string;
+}) {
+  const content = (
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        href ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
+      )}
+      title={warningTitle}
+    >
+      <Icon size={14} className="text-shell-muted flex-shrink-0" />
       <span className="text-shell-muted text-xs uppercase tracking-wide">{label}</span>
-      <span className="text-shell-text font-mono text-sm">{value}</span>
+      <span
+        className={cn(
+          "font-mono text-sm",
+          warning ? "text-negative font-semibold" : "text-shell-text"
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
+
+  if (href) {
+    return <Link href={href}>{content}</Link>;
+  }
+  return content;
 }
 
 export function TopBar() {
@@ -78,15 +114,16 @@ export function TopBar() {
     staleTime: 5 * 60_000,
   });
 
-  const leagueName = data?.league?.name ?? "—";
+  const leagueName = data?.league?.name ?? "--";
   const season = data?.league?.season;
-  const weekLabel = season ? `${season}` : "—";
+  const weekLabel = season ? `${season}` : "--";
 
   const faabValue = faabData ? `$${faabData.faabRemaining}` : "--";
   const gsValue = gsData ? `${gsData.gsUsed}/${gsData.gsCap}` : "--";
+  const gsOverCap = gsData ? gsData.gsUsed > gsData.gsCap : false;
 
   return (
-    <header className="h-14 bg-shell-panel border-b border-shell-border px-4 flex items-center justify-between flex-shrink-0">
+    <header className="h-14 bg-shell-panel border-b border-shell-border px-4 flex items-center justify-between flex-shrink-0 sticky top-0 z-20">
       {/* Left: league name */}
       <div className="flex items-center gap-2">
         <span className="text-shell-text font-semibold text-sm truncate max-w-xs">
@@ -94,13 +131,29 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Right: summary stats */}
+      {/* Right: summary stats with icons and links */}
       <div className="flex items-center gap-6">
-        <StatItem label="Week" value="--" />
-        <StatItem label="FAAB" value={faabValue} />
-        <StatItem label="GS" value={gsValue} />
-        {/* TODO SHELL-03: wire projected total roto points */}
-        <StatItem label="Projected" value="--" />
+        <StatItem label="Week" value={weekLabel} icon={Calendar} />
+        <StatItem
+          label="FAAB"
+          value={faabValue}
+          icon={DollarSign}
+          href={id ? `/leagues/${id}/moves` : undefined}
+        />
+        <StatItem
+          label="GS"
+          value={gsValue}
+          icon={BarChart2}
+          href={id ? `/leagues/${id}/streaming` : undefined}
+          warning={gsOverCap}
+          warningTitle={gsOverCap ? "Warning: GS usage exceeds cap" : undefined}
+        />
+        <StatItem
+          label="Projected"
+          value="--"
+          icon={TrendingUp}
+          href={id ? `/leagues/${id}/standings` : undefined}
+        />
       </div>
     </header>
   );
