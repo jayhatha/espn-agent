@@ -90,13 +90,52 @@ Requirements for the In-Season Command Center milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| SHELL-01 | Phase 65 | Pending |
+| SHELL-02 | Phase 65 | Pending |
+| SHELL-03 | Phase 65 | Pending |
+| SHELL-04 | Phase 65 | Pending |
+| SHELL-05 | Phase 65 | Pending |
+| SHELL-06 | Phase 65 | Pending |
+| SHELL-07 | Phase 65 | Pending |
+| ROTO-01 | Phase 66 | Pending |
+| ROTO-02 | Phase 66 | Pending |
+| ROTO-03 | Phase 66 | Pending |
+| ROTO-05 | Phase 66 | Pending |
+| ROTO-07 | Phase 66 | Pending |
+| ROTO-08 | Phase 66 | Pending |
+| ROTO-04 | Phase 67 | Pending |
+| ROTO-06 | Phase 67 | Pending |
+| WAIVER-01 | Phase 67 | Pending |
+| WAIVER-02 | Phase 67 | Pending |
+| WAIVER-03 | Phase 67 | Pending |
+| WAIVER-04 | Phase 67 | Pending |
+| WAIVER-05 | Phase 67 | Pending |
+| FAAB-01 | Phase 68 | Pending |
+| FAAB-02 | Phase 68 | Pending |
+| FAAB-03 | Phase 68 | Pending |
+| FAAB-04 | Phase 68 | Pending |
+| FAAB-05 | Phase 68 | Pending |
+| PITCH-01 | Phase 68 | Pending |
+| PITCH-02 | Phase 68 | Pending |
+| PITCH-03 | Phase 68 | Pending |
+| PITCH-04 | Phase 68 | Pending |
+| PITCH-05 | Phase 68 | Pending |
+| TRADE-01 | Phase 69 | Pending |
+| TRADE-02 | Phase 69 | Pending |
+| TRADE-03 | Phase 69 | Pending |
+| TRADE-04 | Phase 69 | Pending |
+| TRADE-05 | Phase 69 | Pending |
+| TREND-01 | Phase 70 | Pending |
+| TREND-02 | Phase 70 | Pending |
+| TREND-03 | Phase 70 | Pending |
+| TREND-04 | Phase 70 | Pending |
+| TREND-05 | Phase 70 | Pending |
 
 **Coverage:**
 - v6.0 requirements: 35 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 35
+- Mapped to phases: 35
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 after roadmap creation — all 35 requirements mapped*
