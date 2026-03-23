@@ -5,9 +5,11 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
         display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       fontSize: {
@@ -65,6 +67,16 @@ module.exports = {
           DEFAULT: '#2563eb',
           light: '#eff6ff',
           border: '#bfdbfe',
+        },
+        // Shell dark theme palette (v6.0 Command Center)
+        shell: {
+          bg:     '#0B0D10',   // page background
+          panel:  '#111318',   // card/panel background
+          border: '#1D2128',   // borders
+          nav:    '#0E1014',   // sidebar background (slightly deeper)
+          text:   '#E2E8F0',   // primary text on dark
+          muted:  '#8B97AB',   // secondary/muted text
+          accent: '#6366F1',   // interactive highlight (indigo)
         },
         // Grafana dark theme palette (for mobile draft companion)
         grafana: {
