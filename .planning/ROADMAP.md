@@ -119,7 +119,10 @@ Plans:
   4. Season GS tracker shows starts used vs 200-start cap with a projected pace line
   5. Weekly GS view shows this week's starts consumed and remaining starts available
   6. SP start planner recommends which SPs to start or sit to keep GS pace on target, with an alert when pace is burning too fast or too slow
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 68-01-PLAN.md — Backend: FaabTrackerAgent + GsPacingAgent agents, FAAB and pitching usage API endpoints
+- [ ] 68-02-PLAN.md — Frontend: FAAB Market page with budget gauge + bid history, Pitching Usage page with GS tracker + start planner, TopBar wiring
 
 ### Phase 69: Trade Finder
 **Goal**: Trade analysis shows roto-point delta with per-category breakdown and an automatic scan surfaces all roto-positive 1-for-1 swaps
