@@ -383,6 +383,33 @@ export const api = {
     });
   },
 
+  // FAAB tracking
+  async getFaabSummary(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/faab`);
+  },
+
+  async getFaabHistory(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/faab/history`);
+  },
+
+  async getFaabSuggestedBid(leagueId: number, teamId: number, playerId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/faab/suggested-bid/${playerId}`);
+  },
+
+  // Pitching usage / GS pacing
+  async getGsSummary(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/gs`);
+  },
+
+  async getGsWeekly(leagueId: number, teamId: number, weekStart?: string) {
+    const query = weekStart ? `?weekStart=${weekStart}` : '';
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/gs/weekly${query}`);
+  },
+
+  async getStartPlan(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/start-plan`);
+  },
+
   // Auction value validation
   async validateAuctionValues(params: {
     numTeams: number;

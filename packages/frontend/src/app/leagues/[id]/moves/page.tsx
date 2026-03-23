@@ -27,8 +27,9 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import ImpactBadge from "@/components/league/ImpactBadge";
 import ImpactDetailCard from "@/components/league/ImpactDetailCard";
+import { FaabGauge } from "@/components/league/FaabGauge";
 
-type TabView = "timeline" | "leaderboard" | "draft" | "trades" | "league";
+type TabView = "timeline" | "leaderboard" | "draft" | "trades" | "league" | "faab";
 type MoveFilter = "all" | "draft" | "add_drop" | "trade";
 
 interface Team {
@@ -341,9 +342,10 @@ export default function MovesPage() {
           {/* Tab Navigation */}
           <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
             <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
-              {(["league", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
+              {(["league", "faab", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
                 const labels: Record<string, string> = {
                   league: "League Summary",
+                  faab: "FAAB Budget",
                   leaderboard: "Move Leaderboard",
                   trades: "Trades",
                   draft: "Draft Report",
@@ -368,6 +370,9 @@ export default function MovesPage() {
                   isLoading={leagueSummaryLoading}
                   selectedTeamId={selectedTeamId}
                 />
+              )}
+              {activeTab === "faab" && (
+                <FaabBudgetTab leagueId={leagueId} teamId={selectedTeamId} />
               )}
               {activeTab === "leaderboard" && selectedTeamId && (
                 <LeaderboardTab
@@ -451,6 +456,128 @@ interface TradePackage {
   totalImpact: number;
   playersGained: Array<{ id: number; name: string; positions: string[] }>;
   playersLost: Array<{ id: number; name: string; positions: string[] }>;
+}
+
+// --- FAAB Budget Tab ---
+
+interface FaabSummaryData {
+  faabTotal: number;
+  faabSpent: number;
+  faabRemaining: number;
+  leagueAvgRemaining: number;
+  spendRate: number;
+  projectedRunoutWeek: number | null;
+  weeksRemaining: number;
+  willRunOut: boolean;
+}
+
+interface FaabBid {
+  date: string;
+  playerName: string;
+  playerId: number;
+  bidAmount: number;
+  outcome: string;
+  roi: number | null;
+}
+
+function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number | null }) {
+  const { data: faabSummary, isLoading: summaryLoading } = useQuery<FaabSummaryData>({
+    queryKey: ["faab-summary", leagueId, teamId],
+    queryFn: () => api.getFaabSummary(leagueId, teamId!) as Promise<FaabSummaryData>,
+    enabled: !!teamId,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: historyData, isLoading: historyLoading } = useQuery<{ bids: FaabBid[] }>({
+    queryKey: ["faab-history", leagueId, teamId],
+    queryFn: () => api.getFaabHistory(leagueId, teamId!) as Promise<{ bids: FaabBid[] }>,
+    enabled: !!teamId,
+    staleTime: 5 * 60_000,
+  });
+
+  if (!teamId) {
+    return (
+      <div className="text-center py-8 text-shell-muted">
+        Select a team to view FAAB budget.
+      </div>
+    );
+  }
+
+  if (summaryLoading) {
+    return <div className="flex justify-center py-8"><LoadingSpinner /></div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Budget Overview */}
+      {faabSummary && (
+        <div>
+          <h3 className="text-sm font-semibold text-shell-text mb-3">Budget Overview</h3>
+          <FaabGauge
+            spent={faabSummary.faabSpent}
+            total={faabSummary.faabTotal}
+            leagueAvg={faabSummary.leagueAvgRemaining}
+          />
+          <p className="text-xs text-shell-muted mt-3">
+            {faabSummary.spendRate > 0 ? (
+              faabSummary.willRunOut ? (
+                <span className="text-red-400">
+                  Spending ${faabSummary.spendRate}/week — projected to run out by Week {faabSummary.projectedRunoutWeek}
+                </span>
+              ) : (
+                <span className="text-emerald-400">
+                  Spending ${faabSummary.spendRate}/week — on pace to finish with ${faabSummary.faabRemaining} remaining
+                </span>
+              )
+            ) : (
+              "No FAAB spending recorded yet."
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Bid History */}
+      <div>
+        <h3 className="text-sm font-semibold text-shell-text mb-3">Bid History</h3>
+        {historyLoading ? (
+          <div className="flex justify-center py-4"><LoadingSpinner /></div>
+        ) : historyData?.bids && historyData.bids.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-shell-border text-left">
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Date</th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Player</th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">Bid</th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Result</th>
+                  <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-right">ROI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyData.bids.map((bid, i) => (
+                  <tr key={i} className="border-b border-shell-border/50">
+                    <td className="py-2 pr-4 font-mono text-xs text-shell-muted">{bid.date}</td>
+                    <td className="py-2 pr-4 text-shell-text">{bid.playerName}</td>
+                    <td className="py-2 pr-4 font-mono text-right text-shell-text">${bid.bidAmount}</td>
+                    <td className="py-2 pr-4">
+                      <Badge variant="positive" className="text-xs">{bid.outcome}</Badge>
+                    </td>
+                    <td className="py-2 font-mono text-right text-shell-text">
+                      {bid.roi !== null ? `${bid.roi}x` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-shell-muted text-sm">
+            No bid history found.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function LeagueSummaryTab({

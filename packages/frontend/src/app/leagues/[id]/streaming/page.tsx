@@ -13,6 +13,9 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import { FileText } from "lucide-react";
+import { GsTracker } from "@/components/league/GsTracker";
+
+type PitchingTab = "gs-pacing" | "start-plan" | "streaming";
 
 interface Team {
   id: number;
@@ -46,6 +49,7 @@ export default function StreamingPitchersPage() {
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [lookAheadDays, setLookAheadDays] = useState(7);
+  const [activeTab, setActiveTab] = useState<PitchingTab>("gs-pacing");
 
   // Fetch teams
   const {
@@ -104,11 +108,41 @@ export default function StreamingPitchersPage() {
     return "text-content-secondary";
   };
 
+  // GS pacing data
+  const { data: gsSummary } = useQuery({
+    queryKey: ["gs-summary", leagueId, selectedTeamId],
+    queryFn: () => api.getGsSummary(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
+    enabled: !!selectedTeamId,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: gsWeekly } = useQuery({
+    queryKey: ["gs-weekly", leagueId, selectedTeamId],
+    queryFn: () => api.getGsWeekly(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
+    enabled: !!selectedTeamId && activeTab === "gs-pacing",
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: startPlan } = useQuery({
+    queryKey: ["start-plan", leagueId, selectedTeamId],
+    queryFn: () => api.getStartPlan(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
+    enabled: !!selectedTeamId && activeTab === "start-plan",
+    staleTime: 5 * 60_000,
+  });
+
+  const tabClass = (isActive: boolean) =>
+    cn(
+      "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+      isActive
+        ? "border-accent text-accent"
+        : "border-transparent text-shell-muted hover:text-shell-text hover:border-shell-border"
+    );
+
   return (
     <Container className="py-8">
       <PageHeader
-        title="Streaming Pitchers"
-        subtitle="Favorable matchup analysis for short-term pitcher adds"
+        title="Pitching Usage"
+        subtitle="GS pacing, start/sit recommendations, and streaming picks"
         backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
       />
 
@@ -146,8 +180,163 @@ export default function StreamingPitchersPage() {
         )}
       </div>
 
-      {/* Controls */}
+      {/* Tab Navigation */}
       {selectedTeamId && (
+        <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
+          <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
+            {(["gs-pacing", "start-plan", "streaming"] as const).map((tab) => {
+              const labels: Record<string, string> = {
+                "gs-pacing": "GS Pacing",
+                "start-plan": "Start Plan",
+                streaming: "Streaming Picks",
+              };
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={tabClass(activeTab === tab)}
+                >
+                  {labels[tab]}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="p-6">
+            {/* GS Pacing Tab */}
+            {activeTab === "gs-pacing" && (
+              <div className="space-y-6">
+                {gsSummary && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-shell-text mb-3">Season Tracker</h3>
+                    <GsTracker
+                      gsUsed={gsSummary.gsUsed}
+                      gsCap={gsSummary.gsCap}
+                      projectedFinal={gsSummary.projectedFinal}
+                      paceStatus={gsSummary.paceStatus}
+                      pacePerWeek={gsSummary.pacePerWeek}
+                    />
+                    <p className="text-xs text-shell-muted mt-3">
+                      {gsSummary.gsRemaining} starts remaining over {gsSummary.weeksRemaining} weeks = {gsSummary.targetPacePerWeek} starts/week target
+                    </p>
+                    {gsSummary.paceStatus === "burning_fast" && (
+                      <div className="mt-3 p-3 rounded bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                        Pace alert: You'll exceed the {gsSummary.gsCap}-GS cap. Consider sitting low-value SPs.
+                      </div>
+                    )}
+                    {gsSummary.paceStatus === "too_slow" && (
+                      <div className="mt-3 p-3 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+                        You have {gsSummary.gsRemaining} unused starts available — consider streaming.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Weekly Breakdown */}
+                {gsWeekly && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-shell-text mb-3">
+                      This Week ({gsWeekly.weekStart} — {gsWeekly.weekEnd})
+                    </h3>
+                    <p className="text-xs text-shell-muted mb-2">
+                      {gsWeekly.startsUsed} starts used / {gsWeekly.targetPerWeek} target this week
+                    </p>
+                    {gsWeekly.pitcherStarts.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-shell-border text-left">
+                            <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Pitcher</th>
+                            <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Dates</th>
+                            <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-right">Starts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gsWeekly.pitcherStarts.map((ps: any) => (
+                            <tr key={ps.playerId} className="border-b border-shell-border/50">
+                              <td className="py-2 pr-4 text-shell-text">{ps.playerName}</td>
+                              <td className="py-2 pr-4">
+                                <div className="flex gap-1">
+                                  {ps.dates.map((d: string) => (
+                                    <Badge key={d} variant="default" className="text-xs font-mono">{d.slice(5)}</Badge>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-2 font-mono text-right text-shell-text">{ps.dates.length}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="text-sm text-shell-muted">No SP starts recorded this week.</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Start Plan Tab */}
+            {activeTab === "start-plan" && (
+              <div className="space-y-4">
+                {startPlan?.alert && (
+                  <div className={cn(
+                    "p-3 rounded text-xs",
+                    startPlan.paceStatus === "burning_fast"
+                      ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                      : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                  )}>
+                    {startPlan.alert}
+                  </div>
+                )}
+                {startPlan?.recommendations?.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-shell-border text-left">
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Pitcher</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">K/GS</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Rec</th>
+                        <th className="py-2 text-xs text-shell-muted uppercase tracking-wide">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {startPlan.recommendations.map((rec: any) => (
+                        <tr key={rec.playerId} className="border-b border-shell-border/50">
+                          <td className="py-2 pr-4 text-shell-text">{rec.playerName}</td>
+                          <td className="py-2 pr-4 font-mono text-right text-shell-text">
+                            {rec.kPerGs !== null ? rec.kPerGs.toFixed(1) : "—"}
+                          </td>
+                          <td className="py-2 pr-4">
+                            <Badge
+                              variant={rec.action === "start" ? "positive" : rec.action === "stream" ? "info" : "default"}
+                              className="text-xs"
+                            >
+                              {rec.action}
+                            </Badge>
+                          </td>
+                          <td className="py-2 text-xs text-shell-muted">{rec.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-shell-muted text-sm">
+                    No SP start plan available. Ensure roster snapshots exist.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Streaming Picks Tab (existing content) */}
+            {activeTab === "streaming" && (
+              <div>
+                {/* Streaming controls moved inside tab */}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Streaming Picks Content (only when tab active) */}
+      {selectedTeamId && activeTab === "streaming" && (
         <div className="mb-6 flex items-center justify-between">
           <div className="inline-flex rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel p-1 gap-1">
             {[1, 3, 7].map((days) => (
@@ -175,8 +364,8 @@ export default function StreamingPitchersPage() {
         </div>
       )}
 
-      {/* Content */}
-      {!selectedTeamId ? (
+      {/* Streaming Content */}
+      {activeTab !== "streaming" ? null : !selectedTeamId ? (
         <ErrorAlert
           variant="warning"
           message="Select a team to see streaming pitcher recommendations."
@@ -297,7 +486,7 @@ export default function StreamingPitchersPage() {
       )}
 
       {/* Note */}
-      {data && data.candidates.length > 0 && (
+      {activeTab === "streaming" && data && data.candidates.length > 0 && (
         <div className="text-body-sm text-content-tertiary text-center mt-6">
           Probable pitchers sourced from MLB StatsAPI. Pitchers may change before
           game time.
