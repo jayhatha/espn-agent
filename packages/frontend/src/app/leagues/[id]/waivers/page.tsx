@@ -285,24 +285,25 @@ export default function WaiversPage() {
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-200 dark:divide-shell-border">
-          {impacts
-            .filter((impact) => impact.deltaPoints !== 0)
+          {[...impacts]
             .sort(
               (a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints),
             )
             .map((impact) => (
-              <tr key={impact.categoryId}>
-                <td className="px-2 sm:px-3 py-2 text-data font-medium text-content whitespace-nowrap">
+              <tr key={impact.categoryId} className={impact.deltaPoints === 0 ? "opacity-40" : ""}>
+                <td className={cn("px-2 sm:px-3 py-2 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary" : "text-content")}>
                   {impact.categoryName}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-center whitespace-nowrap">
                   {renderDeltaValue(impact.deltaRank)}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-right whitespace-nowrap">
-                  {impact.deltaPoints !== 0 && (
+                  {impact.deltaPoints !== 0 ? (
                     <span className={cn("font-semibold text-data", impact.deltaPoints > 0 ? "text-positive" : "text-negative")}>
                       {impact.deltaPoints > 0 ? "+" : ""}{impact.deltaPoints.toFixed(1)}
                     </span>
+                  ) : (
+                    <span className="text-content-tertiary text-data">{"\u2014"}</span>
                   )}
                 </td>
               </tr>
@@ -490,6 +491,21 @@ export default function WaiversPage() {
                               )}
                             </div>
                           </div>
+
+                          {/* Marginal Analysis Label (WAIVER-03) */}
+                          {(() => {
+                            const topImpact = rec.categoryImpacts
+                              ?.filter((ci) => Math.abs(ci.deltaPoints) > 0)
+                              .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
+                            const label = topImpact
+                              ? `This move gets you ${topImpact.deltaPoints > 0 ? "+" : ""}${topImpact.deltaPoints.toFixed(0)} roto point${Math.abs(topImpact.deltaPoints) !== 1 ? "s" : ""} in ${topImpact.categoryName}`
+                              : null;
+                            return label ? (
+                              <div className="text-body-sm font-semibold text-accent mb-3">
+                                {label}
+                              </div>
+                            ) : null;
+                          })()}
 
                           {/* Swap Visualization */}
                           {renderSwapVisualization(

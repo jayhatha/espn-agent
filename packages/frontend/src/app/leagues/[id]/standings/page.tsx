@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
+import { computeMarginalGains, computeAtRiskCategories } from "@espn-fantasy/shared";
+import type { TeamCategoryProjection } from "@espn-fantasy/shared";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
@@ -15,6 +17,11 @@ import {
   formatStatValue,
   getRankColor,
 } from "@/components/league/CategoryStatsTable";
+import { CategoryPaceBar } from "@/components/league/CategoryPaceBar";
+import { GapDetailRow } from "@/components/league/GapDetailRow";
+import { CategoryMiniChart } from "@/components/league/CategoryMiniChart";
+import { CategoryOpportunityMap } from "@/components/league/CategoryOpportunityMap";
+import { AtRiskSummary } from "@/components/league/AtRiskSummary";
 import { Term } from "@/components/ui/Term";
 import { cn } from "@/lib/cn";
 
@@ -55,6 +62,8 @@ interface OverallStanding {
   projected_overall_points: number;
   projected_overall_rank: number;
   teamName: string;
+  previousProjectedPoints: number | null;
+  pointsDelta: number | null;
 }
 
 interface CurrentOverallStanding {
@@ -68,6 +77,7 @@ interface CurrentOverallStanding {
 
 interface StandingsData {
   snapshotDate: string;
+  previousSnapshotDate: string | null;
   categories: Category[];
   categoryStandings: CategoryStanding[];
   overallStandings: OverallStanding[];
@@ -82,6 +92,7 @@ export default function StandingsPage() {
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("current");
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(`league_${leagueId}_team`);
@@ -98,6 +109,32 @@ export default function StandingsPage() {
         parseInt(leagueId, 10),
       ) as Promise<StandingsData>;
     },
+  });
+
+  // Fetch historical category-rank data as fallback when projected data unavailable
+  const { data: categoryRankHistory } = useQuery({
+    queryKey: ["category-rank-history", leagueId, selectedTeamId],
+    queryFn: async () => {
+      if (!selectedTeamId || !data?.categories) return null;
+      const results: Record<string, Array<{ date: string; rank: number }>> = {};
+      for (const cat of data.categories) {
+        try {
+          const res = await api.getCategoryRankTimeSeries(
+            parseInt(leagueId, 10),
+            cat.category_id,
+            { teamIds: String(selectedTeamId) },
+          );
+          results[cat.category_id] = (res as any).series?.map((s: any) => ({
+            date: s.snapshot_date,
+            rank: s.rank,
+          })) ?? [];
+        } catch {
+          results[cat.category_id] = [];
+        }
+      }
+      return results;
+    },
+    enabled: viewMode === "projected" && !!data && data.overallStandings.length === 0 && !!selectedTeamId,
   });
 
   const currentMatrix = useMemo(() => {
@@ -132,6 +169,59 @@ export default function StandingsPage() {
 
     return { categories, overallStandings, teamCategoryMap };
   }, [data]);
+
+  // Build current-category lookup for pace bars
+  const currentCategoryLookup = useMemo(() => {
+    if (!data?.currentCategoryStandings) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const cs of data.currentCategoryStandings) {
+      map.set(`${cs.team_id}_${cs.category_id}`, cs.value);
+    }
+    return map;
+  }, [data]);
+
+  // Build projected category values for gap detail
+  const projectedCategoryValues = useMemo(() => {
+    if (!data?.categoryStandings) return new Map<string, TeamCategoryProjection[]>();
+    const map = new Map<string, TeamCategoryProjection[]>();
+    for (const cs of data.categoryStandings) {
+      if (!map.has(cs.category_id)) map.set(cs.category_id, []);
+      map.get(cs.category_id)!.push({
+        teamId: cs.team_id,
+        teamName: cs.teamName,
+        value: cs.projected_value,
+      });
+    }
+    return map;
+  }, [data]);
+
+  // Compute marginal gains for selected team
+  const marginalGains = useMemo(() => {
+    if (!selectedTeamId || !data?.categories || projectedCategoryValues.size === 0) return [];
+    return computeMarginalGains(
+      selectedTeamId,
+      projectedCategoryValues,
+      data.categories.map((c) => ({
+        category_id: c.category_id,
+        name: c.name || c.stat_key,
+        direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
+      })),
+    );
+  }, [selectedTeamId, data?.categories, projectedCategoryValues]);
+
+  // Compute at-risk categories for selected team
+  const atRiskCategories = useMemo(() => {
+    if (!selectedTeamId || !data?.categories || projectedCategoryValues.size === 0) return [];
+    return computeAtRiskCategories(
+      selectedTeamId,
+      projectedCategoryValues,
+      data.categories.map((c) => ({
+        category_id: c.category_id,
+        name: c.name || c.stat_key,
+        direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
+      })),
+    );
+  }, [selectedTeamId, data?.categories, projectedCategoryValues]);
 
   const hasCurrentData = currentMatrix !== null;
   const hasProjectedData = projectedMatrix !== null;
@@ -169,6 +259,54 @@ export default function StandingsPage() {
     },
   ];
 
+  // Projected overall columns include delta
+  const projectedOverallColumns: StatsTableColumn[] = [
+    {
+      key: "rank",
+      label: "Rank",
+      align: "left",
+      format: (val) => (
+        <span className="font-medium text-content">{val}</span>
+      ),
+    },
+    {
+      key: "teamName",
+      label: "Team",
+      align: "left",
+      format: (val, row) => (
+        <div className="flex items-center">
+          {selectedTeamId === row.team_id && (
+            <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
+          )}
+          <span className="font-medium text-content">{val}</span>
+        </div>
+      ),
+    },
+    {
+      key: "points",
+      label: "Total Roto Points",
+      align: "right",
+      format: (val) => (
+        <span className="font-semibold text-data text-content">{Number(val)}</span>
+      ),
+    },
+    {
+      key: "pointsDelta",
+      label: "Change",
+      align: "right",
+      format: (val) => {
+        if (val == null) return <span className="text-content-tertiary">--</span>;
+        const num = Number(val);
+        if (num === 0) return <span className="text-content-tertiary">0</span>;
+        return (
+          <span className={num > 0 ? "text-positive font-medium" : "text-negative font-medium"}>
+            {num > 0 ? "+" : ""}{num}
+          </span>
+        );
+      },
+    },
+  ];
+
   // Helper to render the category breakdown matrix table
   const renderCategoryBreakdown = (
     title: string,
@@ -183,13 +321,21 @@ export default function StandingsPage() {
     rankKey: string,
     pointsKey: string,
     overallPointsKey: string,
+    showPaceBars: boolean,
+    showGapDetail: boolean,
   ) => {
     const numTeams = overallStandings.length;
+    const totalColSpan = categories.length + 2; // team col + categories + total col
 
     return (
       <Card>
         <CardHeader>
           <Heading level={3}>{title}</Heading>
+          {showGapDetail && (
+            <p className="text-body-sm text-content-tertiary mt-1">
+              Click a category header to see gap detail
+            </p>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -202,9 +348,26 @@ export default function StandingsPage() {
                   {categories.map((cat) => (
                     <th
                       key={cat.category_id}
-                      className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider min-w-[80px]"
+                      className={cn(
+                        "px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider min-w-[80px]",
+                        showGapDetail && "cursor-pointer hover:text-accent transition-colors",
+                        expandedCategory === cat.category_id && "text-accent",
+                      )}
+                      onClick={
+                        showGapDetail
+                          ? () =>
+                              setExpandedCategory(
+                                expandedCategory === cat.category_id
+                                  ? null
+                                  : cat.category_id,
+                              )
+                          : undefined
+                      }
                     >
                       {cat.name || cat.stat_key}
+                      {showGapDetail && expandedCategory === cat.category_id && (
+                        <span className="ml-1 text-accent">{"\u25BC"}</span>
+                      )}
                     </th>
                   ))}
                   <th className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider font-bold">
@@ -218,58 +381,105 @@ export default function StandingsPage() {
                   const teamCats = teamCategoryMap.get(team.team_id);
 
                   return (
-                    <tr
-                      key={team.team_id}
-                      className={cn(
-                        "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
-                        isSelected ? "bg-accent-light" : "",
-                      )}
-                    >
-                      <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content sticky left-0 bg-inherit z-10">
-                        <div className="flex items-center">
-                          {isSelected && (
-                            <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
-                          )}
-                          <span className="truncate max-w-[150px]">
-                            {team.teamName}
-                          </span>
-                        </div>
-                      </td>
-                      {categories.map((cat) => {
-                        const catData = teamCats?.get(cat.category_id);
-                        if (!catData) {
+                    <>
+                      <tr
+                        key={team.team_id}
+                        className={cn(
+                          "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                          isSelected ? "bg-accent-light" : "",
+                        )}
+                      >
+                        <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content sticky left-0 bg-inherit z-10">
+                          <div className="flex items-center">
+                            {isSelected && (
+                              <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
+                            )}
+                            <span className="truncate max-w-[150px]">
+                              {team.teamName}
+                            </span>
+                          </div>
+                        </td>
+                        {categories.map((cat) => {
+                          const catData = teamCats?.get(cat.category_id);
+                          if (!catData) {
+                            return (
+                              <td
+                                key={cat.category_id}
+                                className="px-3 py-3 text-center text-data text-content-tertiary"
+                              >
+                                -
+                              </td>
+                            );
+                          }
+
+                          const currentValue = currentCategoryLookup.get(
+                            `${team.team_id}_${cat.category_id}`,
+                          );
+
                           return (
                             <td
                               key={cat.category_id}
-                              className="px-3 py-3 text-center text-data text-content-tertiary"
+                              className="px-3 py-3 text-center"
                             >
-                              -
+                              <div className="flex flex-col items-center">
+                                <span className="text-data text-content font-medium">
+                                  {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
+                                </span>
+                                <span
+                                  className={`text-data rounded px-1 mt-0.5 ${getRankColor(catData[rankKey], numTeams)}`}
+                                >
+                                  #{catData[rankKey]} ({Number(catData[pointsKey])}
+                                  pts)
+                                </span>
+                                {/* Pace bar: show for selected team in projected view */}
+                                {showPaceBars &&
+                                  isSelected &&
+                                  currentValue != null &&
+                                  catData[valueKey] != null && (
+                                    <CategoryPaceBar
+                                      current={currentValue}
+                                      projected={Number(catData[valueKey])}
+                                      statKey={cat.stat_key}
+                                      type={cat.type as "COUNTING" | "RATE"}
+                                    />
+                                  )}
+                              </div>
                             </td>
                           );
-                        }
-                        return (
-                          <td
-                            key={cat.category_id}
-                            className="px-3 py-3 text-center"
-                          >
-                            <div className="flex flex-col items-center">
-                              <span className="text-data text-content font-medium">
-                                {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
-                              </span>
-                              <span
-                                className={`text-data rounded px-1 mt-0.5 ${getRankColor(catData[rankKey], numTeams)}`}
-                              >
-                                #{catData[rankKey]} ({Number(catData[pointsKey])}
-                                pts)
-                              </span>
-                            </div>
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-3 text-center text-data font-bold text-content">
-                        {Number(team[overallPointsKey])}
-                      </td>
-                    </tr>
+                        })}
+                        <td className="px-3 py-3 text-center text-data font-bold text-content">
+                          {Number(team[overallPointsKey])}
+                        </td>
+                      </tr>
+
+                      {/* Gap detail row: show after the selected team's row when a category is expanded */}
+                      {showGapDetail &&
+                        isSelected &&
+                        expandedCategory &&
+                        (() => {
+                          const cat = categories.find(
+                            (c) => c.category_id === expandedCategory,
+                          );
+                          if (!cat) return null;
+                          const values = projectedCategoryValues.get(cat.category_id);
+                          if (!values) return null;
+                          return (
+                            <GapDetailRow
+                              key={`gap-${team.team_id}-${expandedCategory}`}
+                              categoryId={cat.category_id}
+                              categoryName={cat.name || cat.stat_key}
+                              myTeamId={team.team_id}
+                              allTeamValues={values}
+                              direction={cat.direction as "HIGHER_BETTER" | "LOWER_BETTER"}
+                              numTeams={numTeams}
+                              statType={cat.type}
+                              statKey={cat.stat_key}
+                              isExpanded={true}
+                              colSpan={totalColSpan}
+                            />
+                          );
+                        })()}
+                    </>
                   );
                 })}
               </tbody>
@@ -291,6 +501,11 @@ export default function StandingsPage() {
       {data?.snapshotDate && (
         <p className="mt-1 mb-6 text-body-sm text-content-secondary">
           As of snapshot: {data.snapshotDate}
+          {data.previousSnapshotDate && viewMode === "projected" && (
+            <span className="text-content-tertiary ml-2">
+              (change since {data.previousSnapshotDate})
+            </span>
+          )}
         </p>
       )}
 
@@ -361,6 +576,8 @@ export default function StandingsPage() {
                 "rank",
                 "roto_points",
                 "overall_points",
+                false, // no pace bars in current view
+                false, // no gap detail in current view
               )}
             </>
           ) : viewMode === "current" && !currentMatrix ? (
@@ -377,18 +594,19 @@ export default function StandingsPage() {
 
           {viewMode === "projected" && projectedMatrix ? (
             <>
-              {/* Projected Overall Standings */}
+              {/* Projected Overall Standings with Delta */}
               <Card className="mb-8">
                 <CardHeader>
                   <Heading level={3}>Overall Projected Standings</Heading>
                 </CardHeader>
                 <CardContent className="p-0">
                   <StatsTable
-                    columns={overallColumns}
+                    columns={projectedOverallColumns}
                     data={projectedMatrix.overallStandings.map((t) => ({
                       ...t,
                       rank: t.projected_overall_rank,
                       points: t.projected_overall_points,
+                      pointsDelta: t.pointsDelta,
                     }))}
                     rowKey="team_id"
                     highlightRow={(row) => selectedTeamId === row.team_id}
@@ -396,7 +614,100 @@ export default function StandingsPage() {
                 </CardContent>
               </Card>
 
-              {/* Projected Category Breakdown */}
+              {/* Marginal Gains Summary */}
+              {selectedTeamId && marginalGains.length > 0 && (
+                <Card className="mb-8">
+                  <CardHeader>
+                    <Heading level={3}>Cheapest Path to Next Roto Point</Heading>
+                    <p className="text-body-sm text-content-tertiary mt-1">
+                      Categories sorted by smallest gap to gain 1 roto point
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {marginalGains
+                        .filter((g) => g.teamAbove !== null)
+                        .slice(0, 5)
+                        .map((gain) => {
+                          const cat = data?.categories?.find(
+                            (c) => c.category_id === gain.categoryId,
+                          );
+                          return (
+                            <div
+                              key={gain.categoryId}
+                              className="flex items-center justify-between py-2 px-3 rounded bg-surface-secondary dark:bg-shell-bg"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                    getRankColor(
+                                      gain.currentRank,
+                                      data?.overallStandings?.length ?? 13,
+                                    ),
+                                  )}
+                                >
+                                  #{gain.currentRank}
+                                </span>
+                                <span className="font-medium text-body-sm text-content">
+                                  {gain.categoryName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-body-sm">
+                                <span className="text-content-secondary font-mono text-data">
+                                  {formatStatValue(
+                                    gain.gap,
+                                    cat?.type ?? "COUNTING",
+                                    cat?.stat_key ?? "",
+                                  )}
+                                </span>
+                                <span className="text-content-tertiary text-[10px]">
+                                  gap to #{gain.currentRank - 1}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Category Opportunity Map (ROTO-04) */}
+              {selectedTeamId && marginalGains.length > 0 && (
+                <Card className="mb-8">
+                  <CardHeader>
+                    <Heading level={3}>
+                      <Term id="category-opportunity">Category Opportunity Map</Term>
+                    </Heading>
+                    <p className="text-body-sm text-content-tertiary mt-1">
+                      All categories ranked by gap to next roto point with difficulty rating
+                    </p>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <CategoryOpportunityMap marginalGains={marginalGains} />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Standings Points at Risk (ROTO-06) */}
+              {selectedTeamId && atRiskCategories.length > 0 && (
+                <Card className="mb-8">
+                  <CardHeader>
+                    <Heading level={3}>
+                      <Term id="at-risk">Standings Points at Risk</Term>
+                    </Heading>
+                    <p className="text-body-sm text-content-tertiary mt-1">
+                      Categories where another team could overtake you
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <AtRiskSummary atRiskCategories={atRiskCategories} />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Projected Category Breakdown with pace bars and gap detail */}
               {renderCategoryBreakdown(
                 "Projected Category Breakdown",
                 projectedMatrix.categories,
@@ -406,18 +717,51 @@ export default function StandingsPage() {
                 "projected_rank",
                 "projected_roto_points",
                 "projected_overall_points",
+                true, // show pace bars
+                true, // show gap detail
               )}
             </>
           ) : viewMode === "projected" && !projectedMatrix ? (
-            <Card>
-              <CardContent className="py-4">
-                <ErrorAlert
-                  variant="info"
-                  message="Projected standings unavailable. Trigger a snapshot to compute projections."
-                  action={{ label: "Upload Projections", href: "/admin" }}
-                />
-              </CardContent>
-            </Card>
+            <>
+              <Card>
+                <CardContent className="py-4">
+                  <ErrorAlert
+                    variant="info"
+                    message="Projected standings unavailable. Trigger a snapshot to compute projections."
+                    action={{ label: "Upload Projections", href: "/admin" }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* ROTO-03: Historical fallback charts */}
+              {categoryRankHistory && data?.categories && (
+                <Card className="mt-8">
+                  <CardHeader>
+                    <Heading level={3}>
+                      Historical Category Trends
+                    </Heading>
+                    <p className="text-body-sm text-content-tertiary mt-1">
+                      Projected standings unavailable. Showing historical rank trends.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {data.categories.map((cat) => {
+                        const history = categoryRankHistory[cat.category_id] ?? [];
+                        return (
+                          <CategoryMiniChart
+                            key={cat.category_id}
+                            data={history}
+                            label={cat.name || cat.stat_key}
+                            height={100}
+                          />
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : null}
         </>
       ) : (
