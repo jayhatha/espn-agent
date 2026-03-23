@@ -52,7 +52,7 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
 
 - [x] **Phase 65: Dark Mode Shell** - Linear-style dark layout with left nav, top bar, typography, and full-app dark theme (completed 2026-03-23)
 - [ ] **Phase 66: Roto Math Foundation** - Projected standings with live roto points, marginal gain engine, category pace visualization
-- [ ] **Phase 67: Net Waiver Analysis + Category Opportunity** - Enhanced waiver labels, category opportunity map with difficulty, at-risk summary
+- [x] **Phase 67: Net Waiver Analysis + Category Opportunity** - Enhanced waiver labels, category opportunity map with difficulty, at-risk summary (completed 2026-03-23)
 - [ ] **Phase 68: FAAB Tracking + Pitching Usage** - FAAB budget tracker with ROI + GS/K pacing with SP start planner
 - [ ] **Phase 69: Trade Finder** - Roto-point-framed trade impact and automatic 1-for-1 trade finder
 - [ ] **Phase 70: Trends and Efficiency** - Hot/cold player trends and lineup efficiency tracking
@@ -154,7 +154,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 |-------|-----------|----------------|--------|-----------|
 | 65. Dark Mode Shell | 4/4 | Complete    | 2026-03-23 | - |
 | 66. Roto Math Foundation | v6.0 | 0/2 | Not started | - |
-| 67. Net Waiver Analysis + Category Opportunity | 1/2 | In Progress|  | - |
+| 67. Net Waiver Analysis + Category Opportunity | 2/2 | Complete   | 2026-03-23 | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
 | 69. Trade Finder | v6.0 | 0/? | Not started | - |
 | 70. Trends and Efficiency | v6.0 | 0/? | Not started | - |
