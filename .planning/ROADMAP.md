@@ -87,7 +87,10 @@ Plans:
   4. Marginal gain engine returns the cheapest path (stat improvement needed) to gain one roto point in each category
   5. Category pace bars show current total vs projected target with a color-coded progress indicator
   6. Hovering a category row expands to show teams immediately above and below with exact stat gaps
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 66-01-PLAN.md — Roto math engine: interpolateRotoPoints() + computeMarginalGains() pure functions, standings API delta
+- [ ] 66-02-PLAN.md — Standings UI upgrade: delta column, pace bars, expandable gap detail, historical fallback charts
 
 ### Phase 67: Net Waiver Analysis + Category Opportunity
 **Goal**: Waiver recommendations show real roto-point delta (including the drop side) and a category opportunity map prioritizes which categories to target
@@ -147,7 +150,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 65. Dark Mode Shell | 4/4 | Complete    | 2026-03-23 | - |
-| 66. Roto Math Foundation | v6.0 | 0/? | Not started | - |
+| 66. Roto Math Foundation | v6.0 | 0/2 | Not started | - |
 | 67. Net Waiver Analysis + Category Opportunity | v6.0 | 0/? | Not started | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
 | 69. Trade Finder | v6.0 | 0/? | Not started | - |
