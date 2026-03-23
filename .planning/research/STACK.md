@@ -1,250 +1,24 @@
-# Technology Stack Additions
+# Technology Stack — In-Season Command Center (v6.0)
 
-**Project:** ESPN Fantasy Baseball Assistant — Chrome DevTools MCP, Auto-Nomination Rework, Mobile Draft Command Center
-**Researched:** 2026-03-14
-**Confidence:** HIGH (official docs + npm registry + verified via multiple sources for all critical choices)
+**Project:** ESPN Fantasy Baseball Assistant — In-Season Command Center
+**Researched:** 2026-03-23
+**Confidence:** HIGH (all critical choices verified via npm registry, official docs, or multiple sources)
 
 ## Executive Summary
 
-This milestone adds three distinct capabilities on top of the existing validated stack:
-
-1. **Chrome DevTools MCP server** — Developer tooling (not shipped code) that gives Claude Code live DOM inspection of the ESPN draft page. Zero new production dependencies. Setup is a single `.mcp.json` file and a `chrome-devtools-mcp@latest` npx invocation.
-
-2. **Auto-nomination selector rework** — No new libraries needed. The fix is architectural: inject a script in the MAIN world (using WXT's `injectScript` utility) to access ESPN's React fiber tree instead of querying opaque CSS classes. The existing `dom-observers.ts` and `auto-bid-controller.ts` are restructured, not replaced.
-
-3. **Mobile draft command center** — The existing Next.js page at `draft/live/page.tsx` gains richer interactive controls. Two additions: `motion` (v12, the renamed Framer Motion) for swipe-dismissible alert cards and smooth state transitions, and the Screen Wake Lock API (browser-native, zero dependencies) to prevent the phone screen from sleeping during a 3-hour draft.
-
-**Net new production packages:** 1 (`motion` in `packages/frontend`)
-**Net new dev tooling:** 1 (`chrome-devtools-mcp` via npx, not installed in repo)
-**Extension changes:** Architectural refactor (injectScript pattern), no new npm packages
-
----
-
-## Feature 1: Chrome DevTools MCP Server
-
-### What It Is
-
-`chrome-devtools-mcp` is the official Chrome team MCP server (published by `ChromeDevTools/chrome-devtools-mcp` on GitHub, available as `chrome-devtools-mcp` on npm). It connects Claude Code to a live Chrome browser via the Chrome DevTools Protocol (CDP), exposing DOM snapshots, console output, CSS inspection, and network traffic as MCP tools.
-
-The primary use in this project: **inspecting the live ESPN auction draft page DOM during a real or test draft session** so selector failures in `dom-observers.ts` can be diagnosed and fixed with ground truth rather than guesswork.
-
-### Setup (Developer Tooling Only — Not a Runtime Dependency)
-
-This is configured per-developer via Claude Code's MCP system. Do NOT add to `package.json`.
-
-**Option A: Project-scoped `.mcp.json`** (checked in, available to all contributors)
-
-```json
-{
-  "mcpServers": {
-    "chrome-devtools": {
-      "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"]
-    }
-  }
-}
-```
-
-Place `.mcp.json` at the repo root. Claude Code reads this automatically on startup.
-
-**Option B: Claude Code CLI (user-scoped)**
-
-```bash
-claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest
-```
-
-**Option C: With specific Chrome instance** (recommended when ESPN draft page is already open)
-
-```bash
-# Start Chrome with remote debugging enabled:
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 \
-  --user-data-dir=/tmp/chrome-debug
-
-# Then configure MCP to connect to it:
-claude mcp add --transport stdio chrome-devtools -- \
-  npx -y chrome-devtools-mcp@latest --browserUrl=http://127.0.0.1:9222
-```
-
-The `--browserUrl` flag is critical for ESPN inspection: it connects to an already-authenticated Chrome session rather than opening a fresh incognito instance that would require ESPN login.
-
-### Requirements
-
-| Requirement | Value | Notes |
-|-------------|-------|-------|
-| Node.js | 20.19+ (22+ recommended) | The `chrome-devtools-mcp@latest` (v0.20.0 as of March 2026) requires modern Node |
-| Chrome | Current stable | Must be the same Chrome where ESPN draft page is open |
-| npm/npx | Any current version | Used via `npx -y` — no install needed |
-
-**Verify Node version:**
-```bash
-node --version  # Must be v20.19 or newer
-```
-
-### DOM Inspection Workflow for ESPN Selector Debugging
-
-Once configured, Claude Code can:
-- Take a DOM snapshot of the ESPN draft page mid-session
-- Read console output for selector query results
-- Execute arbitrary JavaScript (`document.querySelector(...)`) against the live page
-- Inspect CSS classes, data attributes, and React fiber keys on specific elements
-
-This replaces the current workflow of adding `console.log` statements to `dom-observers.ts`, rebuilding the extension, and reloading — which is destructive to a live draft session.
-
----
-
-## Feature 2: ESPN DOM Selector Rework (Extension)
-
-### The Core Problem
-
-ESPN's auction draft page is a React SPA. CSS classes like `.draftBoardCell` and `[class*="jsx-XXXXX"]` are either generated at build time (stable but opaque) or dynamic JSX hashes (unstable across ESPN deploys). After ~10 selector iterations, the pattern is clear: querying CSS classes is the wrong primary strategy.
-
-### The Right Strategy: MAIN World Script Injection
-
-ESPN stores draft state in React component state (not the DOM directly). From the extension's current isolated content script world, only the serialized DOM is visible — not React state. The fix is a WXT `injectScript` pattern that places a small probe script in the **page's own JavaScript context** (MAIN world), giving it access to `__reactFiber$*` and `__reactInternalInstance$*` keys attached to DOM nodes by React.
-
-**This requires zero new npm packages.** WXT's `injectScript` utility is already available in the extension package.
-
-### Architecture Change (Extension Package)
-
-**New file:** `packages/extension/entrypoints/espn-probe.ts` (unlisted script — runs in MAIN world)
-
-```typescript
-// Runs in page's MAIN world — has access to React internals
-export default defineUnlistedScript(() => {
-  // Find React fiber key (format: __reactFiber$XXXXXXXX)
-  function findFiberKey(el: Element): string | null {
-    return Object.keys(el).find(k => k.startsWith('__reactFiber$')) ?? null;
-  }
-
-  // Read ESPN's internal auction state from React tree
-  function readAuctionState() {
-    // Walk fiber tree from a known stable anchor element
-    // ESPN's root is typically document.getElementById('espnfitt-root')
-  }
-
-  // Expose to content script via custom events
-  window.addEventListener('espn-probe:read-auction', () => {
-    const state = readAuctionState();
-    window.dispatchEvent(new CustomEvent('espn-probe:auction-state', { detail: state }));
-  });
-});
-```
-
-**Modified:** `packages/extension/entrypoints/content.tsx` — calls `injectScript('/espn-probe.js')` on startup, then communicates with it via `CustomEvent`.
-
-**`wxt.config.ts` addition:**
-```typescript
-manifest: {
-  web_accessible_resources: [
-    { resources: ['espn-probe.js'], matches: ['*://*.fantasy.espn.com/*'] }
-  ]
-}
-```
-
-### Fallback Selector Hierarchy (Revised Priority Order)
-
-When React fiber access succeeds: use it as the authoritative source.
-When it fails (e.g., ESPN rewrites their React root): fall back in this order:
-
-1. `data-player-id` attributes — ESPN does use these on player rows (confirmed by current codebase)
-2. `[data-testid]` attributes — More stable than generated class names across ESPN redeploys
-3. Text-content matching (player name extraction) — Brittle but universal fallback
-4. CSS class patterns — Last resort, expect breakage on ESPN deploys
-
-### Nomination Queue Selector Fix
-
-The current `scrapeESPNNominationQueue()` in `dom-observers.ts` uses `.queue-item` and similar CSS selectors that ESPN may have changed. The MAIN world probe replaces this with direct React state reads where available, eliminating the "selector drift" problem entirely for supported ESPN React components.
-
----
-
-## Feature 3: Mobile Draft Command Center (Frontend)
-
-### Current State
-
-`packages/frontend/src/app/draft/live/page.tsx` is a ~530-line single-file page with:
-- WebSocket connection to backend
-- Read-only displays (nomination, win probability, budget, roster, alerts)
-- 3 controls in a sticky footer (auto-bid toggle, position filter, pitcher/hitter split)
-
-### New Additions Needed
-
-The redesign adds: swipe-dismissible alerts, animated state transitions when a new nomination arrives, a nomination queue override panel (send nominations from mobile), and screen wake lock so the phone doesn't sleep mid-draft.
-
-#### `motion` (Framer Motion v12)
-
-**Package:** `motion` (NOT `framer-motion` — the package was renamed at v11+)
-**Version:** `^12.36.0` (current stable as of March 2026)
-**Install location:** `packages/frontend`
-
-```bash
-cd packages/frontend
-pnpm add motion
-```
-
-**Why motion over alternatives:**
-- `framer-motion` is the old package name — still works as an alias but installs the same package. Use `motion` for clarity.
-- `@use-gesture/react` handles raw gesture math but doesn't integrate with animation. Motion has both gesture recognition AND animation in one package — drag + spring physics in `<motion.div drag="x" onDragEnd={...}>` is 5 lines.
-- CSS animations cannot do the spring-physics dismissal feel needed for swipeable alert cards.
-- The existing frontend uses React 18 — Motion 12.x is compatible with React 18 (`react@18` is the minimum from Motion v7+).
-
-**Usage in mobile page:**
-
-```typescript
-import { motion, AnimatePresence } from 'motion/react';
-// Note: import from 'motion/react', not 'framer-motion' or 'motion' directly
-
-// Swipe-to-dismiss alert card
-<motion.div
-  drag="x"
-  dragConstraints={{ left: 0, right: 0 }}
-  onDragEnd={(_, info) => {
-    if (Math.abs(info.offset.x) > 80) dismissAlert(alert.id);
-  }}
-  exit={{ x: 200, opacity: 0 }}
->
-  {/* alert content */}
-</motion.div>
-```
-
-**Next.js 14 compatibility note:** Motion components must be in `"use client"` files. The draft live page is already `"use client"` — no change needed.
-
-#### Screen Wake Lock API (No Package — Browser Native)
-
-Keep the phone screen on during a 3-hour auction draft. This is a browser API requiring zero new dependencies.
-
-```typescript
-// In useDraftLiveSocket hook or the page component:
-useEffect(() => {
-  if (!connected) return;
-  let wakeLock: WakeLockSentinel | null = null;
-
-  async function acquireWakeLock() {
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-    } catch {
-      // Device denied (low battery, etc.) — non-fatal, draft continues
-    }
-  }
-
-  acquireWakeLock();
-
-  // Re-acquire when tab regains visibility (lock releases on tab hide)
-  const handleVisibility = () => {
-    if (document.visibilityState === 'visible') acquireWakeLock();
-  };
-  document.addEventListener('visibilitychange', handleVisibility);
-
-  return () => {
-    wakeLock?.release();
-    document.removeEventListener('visibilitychange', handleVisibility);
-  };
-}, [connected]);
-```
-
-**Browser support:** Chrome 84+, Safari 16.4+, Edge 84+ — covers all mobile browsers used on local network. LOW risk.
-
-**Caveat:** iOS Safari 16.4 added Wake Lock support, but it only works for PWA home-screen installs or full-screen mode in some iOS versions. For in-browser Safari visits, a `<video>` autoplay workaround was historically needed. Since this is a local network tool accessed in mobile Chrome or as a PWA, native Wake Lock is the right approach. Log a warning (not an error) if the API is unavailable.
+The v6.0 milestone is a **frontend-heavy overhaul** of the in-season experience. The backend already has all the computation primitives needed (snapshot pipeline, projections engine, roto ranking, waiver/trade agents). New backend work is pure logic changes to existing agents — no new backend libraries required. The frontend needs:
+
+1. **Dark mode theming** — `next-themes` + Tailwind `darkMode: 'class'` + a new dark design token layer in `tailwind.config.js`
+2. **JetBrains Mono for numerics** — loaded via `next/font/google` alongside existing Inter
+3. **Recharts upgrade 2.x → 3.x** — v3 rewrote state management, fixes long-standing bugs, and the project is already on `^2.10.4` (not yet 3.x); a controlled upgrade is needed
+4. **Dense table rendering** — `@tanstack/react-table` v8 for sortable/filterable data tables; `@tanstack/react-virtual` v3 for virtualized rows in the trade scanner (potentially hundreds of candidates)
+5. **Sparklines in table rows** — Recharts `ComposedChart` with width/height clamped to table cell dimensions works; no new charting library needed
+6. **Backend concurrency** — `p-limit` is already installed; the trade scanner will use it for controlled parallel team comparisons. No additions.
+
+**Net new production packages:** 3 (`next-themes`, `@tanstack/react-table`, `@tanstack/react-virtual`)
+**Upgrades:** 1 (`recharts` 2.x → 3.x)
+**Font additions:** 1 (`JetBrains_Mono` from `next/font/google` — zero npm packages, built into Next.js)
+**Backend changes:** Zero new packages
 
 ---
 
@@ -254,25 +28,296 @@ useEffect(() => {
 
 | Action | Package | Version | Reason |
 |--------|---------|---------|--------|
-| ADD | `motion` | `^12.36.0` | Swipe gestures + spring animations for mobile alerts panel |
-
-### `packages/extension`
-
-| Action | Package | Version | Reason |
-|--------|---------|---------|--------|
-| NONE | — | — | WXT `injectScript` is already available in the WXT package. No new npm deps. |
+| ADD | `next-themes` | `^0.4.6` | Dark mode toggle + SSR-safe theme persistence. Flicker-free via `suppressHydrationWarning`. |
+| ADD | `@tanstack/react-table` | `^8.21.3` | Headless sortable/filterable tables for roto tracker, trade scanner, FAAB history |
+| ADD | `@tanstack/react-virtual` | `^3.13.23` | Virtualized row rendering for trade scanner (all-team permutations) |
+| UPGRADE | `recharts` | `^2.10.4` → `^3.8.0` | v3 rewrote state management, fixed long-standing tooltip/axis bugs, adds `responsive` prop |
 
 ### `packages/backend`
 
 | Action | Package | Version | Reason |
 |--------|---------|---------|--------|
-| NONE | — | — | WebSocket, backend logic, nomination flow are already implemented |
+| NONE | — | — | All needed libraries (`p-limit`, `date-fns`, `kysely`) already installed |
 
-### Developer Tooling (NOT in package.json)
+### Configuration Changes (No npm packages)
 
-| Action | Tool | Version | Reason |
-|--------|------|---------|--------|
-| CONFIGURE | `chrome-devtools-mcp` | `@latest` (0.20.0) | DOM inspection via MCP. Installed via npx, not added to any package.json |
+| Change | Location | What |
+|--------|----------|------|
+| Add `JetBrains_Mono` font | `packages/frontend/src/app/layout.tsx` | Load via `next/font/google` alongside existing Inter |
+| Add `--font-mono` CSS var | `packages/frontend/src/app/layout.tsx` | Exposes font as Tailwind-compatible CSS variable |
+| Add `darkMode: 'class'` | `packages/frontend/tailwind.config.js` | Enables `dark:` prefix on all utility classes |
+| Add dark token layer | `packages/frontend/tailwind.config.js` | New `dark` color palette mirroring existing tokens |
+| Update `CHART_THEME` | `packages/frontend/src/lib/chart-theme.ts` | Add `dark` variant tokens for Recharts components |
+
+---
+
+## Feature-by-Feature Breakdown
+
+### 1. Dark Mode Theming (Linear-Style)
+
+**Strategy:** Tailwind `darkMode: 'class'` + `next-themes` for SSR-safe toggle.
+
+The existing frontend is light-mode-only with hardcoded surface/content tokens. The dark command center needs a parallel token set on the `dark` class. The Grafana dark tokens already exist in `tailwind.config.js` under `grafana.*` — promote them to `dark:surface-*` / `dark:content-*` counterparts.
+
+**`next-themes` — why it's needed:**
+- `localStorage` persistence: user preference survives page reload
+- SSR-safe: prevents the flash of light mode on dark preference by injecting an inline script before React hydrates
+- System preference sync: `media` strategy reads `prefers-color-scheme` as default
+- Requires `suppressHydrationWarning` on `<html>` — one-line change to `layout.tsx`
+- Version `^0.4.6` — last published ~1 year ago but actively maintained; no breaking changes expected
+
+**Tailwind config addition:**
+
+```js
+// tailwind.config.js
+darkMode: 'class',
+theme: {
+  extend: {
+    colors: {
+      // Existing light tokens stay unchanged.
+      // Dark command center palette (Linear-inspired):
+      dark: {
+        bg:      '#0d0d0f',   // near-black body
+        surface: '#141417',   // card/panel background
+        raised:  '#1c1c21',   // elevated surface (dropdowns, modals)
+        border:  '#2a2a32',   // subtle border
+        text:    '#e2e2e8',   // primary text
+        muted:   '#8888a0',   // secondary/muted text
+        positive:'#34d399',   // green (gain)
+        negative:'#f87171',   // red (loss)
+        warning: '#fbbf24',   // amber (caution)
+        accent:  '#6366f1',   // indigo accent (interactive elements)
+      }
+    }
+  }
+}
+```
+
+**`globals.css` addition:**
+
+```css
+.dark body {
+  @apply bg-dark-bg text-dark-text;
+}
+```
+
+**`layout.tsx` changes:**
+
+```tsx
+import { JetBrains_Mono } from 'next/font/google';
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-mono',
+});
+
+// On <html>:
+<html
+  lang="en"
+  suppressHydrationWarning
+  className={`${inter.variable} ${dmSerifDisplay.variable} ${jetbrainsMono.variable}`}
+>
+```
+
+The existing `tailwind.config.js` already has `'data': { fontFamily: 'var(--font-mono, ui-monospace)' }` — wiring JetBrains Mono to `--font-mono` means all `text-data` class usages automatically get JetBrains Mono. No component changes needed for numeric data already styled with `text-data`.
+
+**`next-themes` provider setup (in `packages/frontend/src/app/providers.tsx`):**
+
+```tsx
+'use client';
+import { ThemeProvider } from 'next-themes';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      {/* existing TanStack Query provider wraps here */}
+      {children}
+    </ThemeProvider>
+  );
+}
+```
+
+`defaultTheme="dark"` makes the command center dark by default (suitable for a trading terminal aesthetic). `enableSystem` allows falling back to OS preference when user hasn't chosen explicitly.
+
+---
+
+### 2. JetBrains Mono for Numerics
+
+JetBrains Mono is available on Google Fonts and loads via `next/font/google` — zero npm packages. The font pairs well with Inter (both are clean, geometric, designed for screen readability). The combination scores 88/100 for text/code pairing (MEDIUM confidence — marketing source).
+
+The existing `tailwind.config.js` already has a `data` font size token that references `var(--font-mono)`. Wire JetBrains Mono to `--font-mono` in layout.tsx and all stat cells, standings numbers, and budget figures styled with `text-data` (or `font-mono` utility class) will automatically use it.
+
+**Usage pattern in command center components:**
+
+```tsx
+// Dense stat table cell
+<td className="font-mono text-xs tabular-nums text-dark-text">
+  {formatStat(value)}
+</td>
+```
+
+`tabular-nums` (Tailwind utility) is critical for aligned number columns — activates OpenType `tnum` feature so digits are all the same width.
+
+---
+
+### 3. Recharts Upgrade: 2.x → 3.x
+
+The project is on `recharts@^2.10.4`. Version 3 (current: `3.8.0`, last published 16 days ago) is a major rewrite of internal state management with ~3,500 new unit tests. It fixes the infinite re-render loop bug (common in multi-series charts) and the tooltip flicker bug (visible in the current trends page).
+
+**Breaking changes relevant to this codebase:**
+
+| Change | Impact | Fix |
+|--------|--------|-----|
+| `CategoricalChartState` removed from event handlers | LOW — not used in this codebase | None |
+| `activeIndex` prop removed | LOW — not used | None |
+| `accessibilityLayer` defaults to `true` (was `false`) | LOW — adds a11y attributes | None needed; it's beneficial |
+| `ResponsiveContainer` accepts `responsive` prop on charts directly | LOW — old pattern still works | Optional cleanup |
+| `activeShape`/`inactiveShape` deprecated on Pie | NONE — no Pie charts used | None |
+
+The existing `CHART_THEME` in `chart-theme.ts` uses hardcoded hex colors. For dark mode, the theme needs a variant. The cleanest approach: export `CHART_THEME_DARK` alongside `CHART_THEME_LIGHT` and select based on `useTheme()` from `next-themes`.
+
+**Dark chart theme:**
+
+```ts
+export const CHART_THEME_DARK = {
+  colors: [
+    '#818cf8', // indigo-400 (primary series — readable on dark bg)
+    '#94a3b8', // slate-400
+    '#475569', // slate-600
+    '#34d399', // emerald-400 (positive)
+    '#f87171', // red-400 (negative)
+    '#60a5fa', // blue-400 (info)
+  ],
+  grid: {
+    stroke: '#2a2a32',
+    strokeDasharray: '3 3',
+  },
+  axis: {
+    tick: { fill: '#8888a0', fontSize: 12 },
+    label: { fill: '#e2e2e8', fontSize: 12 },
+  },
+  tooltip: {
+    backgroundColor: '#1c1c21',
+    borderColor: '#2a2a32',
+    borderRadius: 8,
+  },
+};
+```
+
+---
+
+### 4. Dense Tables: @tanstack/react-table
+
+**Version:** `^8.21.3` (latest as of March 2026, 5.3M weekly downloads)
+**Install:** `packages/frontend`
+
+The command center features require sortable, filterable, dense data tables:
+- On-pace roto tracker: 10–12 teams × 13 categories = 130+ cells, sortable by category
+- Trade scanner: potentially 200+ trade candidates, sortable by roto delta
+- FAAB history: transactions over a season, filterable by team/player/date
+
+TanStack Table v8 is headless — it provides the data model (sorting, filtering, pagination, column visibility) and you supply the JSX. This integrates with the existing Tailwind token system and dark mode classes without imposing component library opinions.
+
+**Why not alternatives:**
+- `react-table` v7: old API, use v8 (same team, clean break)
+- AG Grid Community: brings its own CSS framework — conflicts with Tailwind dark mode strategy
+- Shadcn data table: it's TanStack Table v8 underneath with opinionated styling — use TanStack directly for full control over the trading terminal aesthetic
+
+**Usage pattern:**
+
+```tsx
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  flexRender,
+} from '@tanstack/react-table';
+
+// Minimal dense table for roto tracker
+const table = useReactTable({
+  data: standings,
+  columns,
+  getCoreRowModel: getCoreRowModel(),
+  getSortedRowModel: getSortedRowModel(),
+});
+```
+
+---
+
+### 5. Virtualized Rows: @tanstack/react-virtual
+
+**Version:** `^3.13.23` (latest as of March 2026, last published 7 days ago)
+**Install:** `packages/frontend`
+**Use case:** Trade scanner output
+
+The automatic trade finder scans all possible 1-for-1 (and potentially N-for-M) trades across all teams. For a 12-team league with 25-man rosters, a 1-for-1 scan produces ~7,200 candidate pairs. Rendering 7,200 DOM rows causes layout thrashing. `@tanstack/react-virtual` renders only the rows in the viewport.
+
+TanStack Virtual integrates directly with TanStack Table's `getRowModel()` output — the two are designed to work together.
+
+**Why not `react-window`:** TanStack Virtual is the maintained successor and integrates cleanly with TanStack Table. `react-window` requires wrapping the entire table structure, which conflicts with sticky column headers.
+
+**Usage pattern:**
+
+```tsx
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+const rowVirtualizer = useVirtualizer({
+  count: table.getRowModel().rows.length,
+  getScrollElement: () => parentRef.current,
+  estimateSize: () => 36, // 36px dense row height
+});
+```
+
+---
+
+### 6. Sparklines in Table Rows
+
+**Decision: Use Recharts directly, no additional library.**
+
+The hot/cold trends table and roto tracker need small trend lines in table cells (last 7-day or last 30-day sparklines). Options:
+
+- `react-sparklines` (`npm install react-sparklines`): 3.4KB, very simple API. Last commit 2019 — unmaintained.
+- `recharts` miniature chart (already installed): `<LineChart width={80} height={32}>` with `CartesianGrid` and axes suppressed. Slightly more verbose but zero new dependency.
+- SVG path manually: raw `<polyline>` over normalized data. Smallest, no dependency. Manageable for this use case.
+
+**Recommendation: SVG polyline for sparklines.** It's 10 lines of code, has zero bundle cost, and is trivially styled with dark mode Tailwind classes. Reserve Recharts for full-height charts where axis labels and tooltips matter. A 80×32px cell sparkline does not need Recharts overhead.
+
+```tsx
+function Sparkline({ values, width = 80, height = 24 }: { values: number[]; width?: number; height?: number }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    </svg>
+  );
+}
+```
+
+---
+
+### 7. Backend: No New Libraries
+
+The backend already has everything needed for the new computation:
+
+| Feature | Existing Tool | Notes |
+|---------|--------------|-------|
+| On-pace interpolation | `date-fns` v2 (backend), `date-fns` v3 (frontend) | Day-of-year math for pace calculation |
+| Roto delta computation | `StandingsProjectionAgent` | Extend with marginal gain output |
+| Trade scan concurrency | `p-limit@^7.3.0` (already installed) | Already used for ESPN API batching |
+| FAAB history queries | `Kysely` + PostgreSQL | Add query to existing `league_transaction_event` table |
+| GS counting | `date-fns` + ESPN roster data | Count starts in current week window |
+| Hot/cold trends | Snapshot data in `team_daily_category_totals` | 7-day rolling delta query |
+
+**Note on `date-fns` version mismatch:** Backend uses `date-fns@^2.30.0`, frontend uses `date-fns@^3.0.6`. These are separate package installs in the monorepo — no conflict. Do not upgrade the backend `date-fns` in this milestone; v2 has a stable API and upgrading would require ESM import changes across backend files.
 
 ---
 
@@ -280,15 +325,14 @@ useEffect(() => {
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `framer-motion` package | Renamed to `motion` at v11. The old package name still resolves but installs the same code under an alias — confusing. | `motion@^12` |
-| `@use-gesture/react` | Handles gesture math only, no animation integration. You'd need both this and a separate animation library. | `motion` (includes both drag gestures and animations) |
-| `puppeteer` or `playwright` in the extension | Heavy headless browser automation frameworks — wrong tool for a content script context. Extension content scripts already have DOM access. | WXT `injectScript` + CustomEvent pattern |
-| `@types/chrome` version bump | The existing `^0.1.37` covers all APIs used. No MV3 APIs added in this milestone need newer types. | Keep as-is |
-| XPath selectors for ESPN DOM | XPath is verbose and breaks on structural changes just as CSS classes do. | React fiber reads via MAIN world script |
-| `react-spring` | Older animation library, smaller ecosystem than Motion, no drag gesture support built in. | `motion` |
-| `hammerjs` | Unmaintained (last release 2016). `motion`'s drag API covers all needed gestures. | `motion` drag API |
-| `react-swipeable` | Single-purpose swipe library, no animation. Redundant if using `motion`. | `motion` onDragEnd pattern |
-| Wake Lock polyfill packages | Browser support (Chrome 84+, Safari 16.4+) covers all realistic mobile users of this local network tool. | Native `navigator.wakeLock` API |
+| `tremor` or `shadcn/ui` chart components | Both wrap Recharts — adding a wrapper library on top of an already-installed library adds bundle weight and theming friction. Dark mode requires overriding their token system. | Use Recharts directly with `CHART_THEME_DARK` |
+| `visx` or `d3` | Full D3 binding layers are appropriate for bespoke visualizations. The command center needs standard chart types (line, bar, area). Recharts handles this with far less boilerplate. | Recharts `^3.8.0` |
+| `react-sparklines` | Last commit 2019. Unmaintained. | SVG `<polyline>` (10 lines) |
+| AG Grid | Brings its own CSS framework and opinionated dark mode. Conflicts with Tailwind dark class strategy. | `@tanstack/react-table` v8 |
+| `numeral.js` or `accounting.js` | Unmaintained or overkill for stat formatting. | Native `Intl.NumberFormat` or `toFixed()` for the narrow formatting needs here |
+| `react-window` | Older virtual scrolling library. Doesn't integrate cleanly with TanStack Table headers. | `@tanstack/react-virtual` v3 |
+| `tailwindcss-animate` | Not needed. `motion` (already installed) handles all animations in the command center. | Existing `motion@^12.36.0` |
+| Any new state management library | TanStack Query v5 handles server state; React `useState`/`useReducer` handles UI state. No global client state needed for in-season views. | Existing `@tanstack/react-query@^5` |
 
 ---
 
@@ -296,12 +340,26 @@ useEffect(() => {
 
 | Category | Recommended | Alternative | Why Not |
 |----------|-------------|-------------|---------|
-| ESPN DOM inspection (dev) | `chrome-devtools-mcp` | Manual console.log + rebuild | Rebuilding extension mid-session destroys draft state. MCP enables live inspection without rebuild. |
-| ESPN state reading | MAIN world React fiber probe via `injectScript` | CSS class selectors | Classes have failed ~10 times. React fiber data is stable — ESPN's own code depends on it, so it won't break silently. |
-| ESPN state reading | MAIN world React fiber probe via `injectScript` | XHR/network interception | Network interception in MV3 requires `declarativeNetRequest` (blocking) — can't read response bodies in real-time. The React state approach gives parsed data without network overhead. |
-| Mobile animations | `motion` v12 | CSS transitions only | CSS `transition` can't do spring physics or gesture-driven drag. The alert dismiss interaction specifically needs drag offset → spring snap. |
-| Screen wake lock | Native browser API | `nosleep.js` library | `nosleep.js` uses a silent autoplay video hack — fragile and the API approach is now well-supported. Adding a library for a 3-line API call is unnecessary. |
-| DOM inspection MCP | `chrome-devtools-mcp` (official Chrome team) | `playwright-mcp` | Playwright spins up a new browser instance. For ESPN inspection you need the browser instance that is already authenticated and has the draft open. Chrome DevTools MCP connects to an existing Chrome via CDP. |
+| Dark mode management | `next-themes@^0.4.6` | CSS `@media (prefers-color-scheme: dark)` only | Media query alone can't be overridden by user preference. `next-themes` adds the `dark` class on `<html>` from localStorage, avoiding both FOUC and media-query lock-in. |
+| Dark mode management | `next-themes@^0.4.6` | `use-dark-mode` npm package | `use-dark-mode` is not SSR-aware and causes hydration mismatches in Next.js App Router. `next-themes` is built for this exact stack. |
+| Recharts upgrade | 3.x | Stay on 2.x | The infinite re-render and tooltip flicker bugs visible in the current trends page are fixed in 3.x. Multi-series charts in the on-pace tracker will hit these bugs at higher data density. The breaking changes list has zero impact on this codebase. |
+| Table library | `@tanstack/react-table` v8 | Native `<table>` with manual sort | Manual sort is fine for 20 rows. The trade scanner can produce 200+ rows with multi-column sort needed. TanStack Table eliminates sorting/filtering boilerplate. |
+| Virtualization | `@tanstack/react-virtual` v3 | Pagination | Pagination hides data. Trading terminal users want to scroll through all candidates ranked by impact. Virtualization gives infinite-scroll feel with DOM efficiency. |
+| Sparklines | SVG polyline | `react-sparklines` | Zero dependency wins over an unmaintained 7-year-old library for a 10-line implementation. |
+| Font (numerics) | JetBrains Mono via `next/font/google` | `@fontsource/jetbrains-mono` | `next/font/google` self-hosts automatically with zero network requests to Google at runtime. `@fontsource` requires a manual npm package. Both work; `next/font` is the Next.js-native approach. |
+
+---
+
+## Installation
+
+```bash
+# From repo root
+cd packages/frontend
+pnpm add next-themes @tanstack/react-table @tanstack/react-virtual
+pnpm add recharts@^3.8.0  # upgrade from 2.x
+```
+
+Verify the upgrade did not introduce Pie chart regressions (none used here, but review `CHART_THEME` usage across all page files after upgrade).
 
 ---
 
@@ -309,27 +367,33 @@ useEffect(() => {
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| `motion@^12.36.0` | `react@^18.2.0` | React 18 is the minimum from Motion v7+. No issues with Next.js 14 App Router. Must be in `"use client"` files. Import from `'motion/react'` subpath. |
-| `motion@^12.36.0` | `next@14.x` | App Router compatible. No special Next.js config needed — just `"use client"` directive. |
-| `chrome-devtools-mcp@latest` | Node.js 20.19+ | `npx` fetches latest. Node 22 is the recommended runtime for the MCP server process itself (separate from the project's Node runtime). |
-| WXT `injectScript` | `wxt@^0.20.18` | Already in the extension package. No version bump needed. |
+| `next-themes@^0.4.6` | `next@^14.1.0`, `react@^18.2.0` | Requires `suppressHydrationWarning` on `<html>`. ThemeProvider must be in a `"use client"` file. |
+| `next-themes@^0.4.6` | Tailwind `darkMode: 'class'` | The `attribute="class"` prop on ThemeProvider tells next-themes to apply the `dark` class to `<html>`. |
+| `recharts@^3.8.0` | `react@^18.2.0` | React 18 supported. No Next.js App Router special config needed. |
+| `recharts@^3.8.0` | `recharts@^2.10.4` migration | `CategoricalChartState`, `activeIndex`, `alwaysShow` props removed. Not used in this codebase. |
+| `@tanstack/react-table@^8.21.3` | `react@^18.2.0` | React 16.8+ minimum. No SSR concerns — all tables are client-rendered in this app. |
+| `@tanstack/react-virtual@^3.13.23` | `@tanstack/react-table@^8.x` | Designed to work together. Use `getRowModel().rows` as the virtualizer `count` source. |
+| `JetBrains_Mono` via `next/font/google` | `next@^14.1.0` | `next/font/google` is stable in Next.js 14. Variable font (100–900 weights) loads as a single file. |
 
 ---
 
 ## Sources
 
-- [Chrome DevTools MCP — Official Chrome Developers Blog](https://developer.chrome.com/blog/chrome-devtools-mcp) — Setup steps, capabilities, public preview status (September 2025)
-- [ChromeDevTools/chrome-devtools-mcp GitHub](https://github.com/ChromeDevTools/chrome-devtools-mcp) — Node.js version requirement (v20.19+), Claude Code integration
-- [chrome-devtools-mcp npm page](https://www.npmjs.com/package/chrome-devtools-mcp) — Current version 0.20.0, install command
-- [How to Set Up Chrome DevTools MCP with Claude Code (raf.dev)](https://raf.dev/blog/chrome-debugging-profile-mcp/) — `--browserUrl` flag for authenticated Chrome sessions, `--` separator syntax
-- [WXT Content Scripts — Official Docs](https://wxt.dev/guide/essentials/content-scripts.html) — `injectScript` API, MAIN world vs isolated world, `web_accessible_resources` requirement
-- [Motion for React — Official Docs](https://motion.dev/docs/react) — v12.36.0 current stable, React 18 compatibility, import path `'motion/react'`
-- [motion npm registry](https://registry.npmjs.org/motion/latest) — Version 12.36.0 confirmed March 2026
-- [@use-gesture/react npm registry](https://registry.npmjs.org/@use-gesture/react/latest) — Version 10.3.1, confirmed for alternative comparison
-- [Screen Wake Lock API — MDN](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API) — Browser support table, `visibilitychange` re-acquire pattern
-- [Chrome Extension MAIN World Access](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/bSKgvG0hipc) — `__reactFiber$` key pattern, isolated world limitation
+- [next-themes npm registry](https://www.npmjs.com/package/next-themes) — Version 0.4.6 confirmed; last published ~1 year ago
+- [next-themes GitHub (pacocoursey)](https://github.com/pacocoursey/next-themes) — App Router `suppressHydrationWarning` pattern
+- [shadcn/ui Dark Mode — Next.js guide](https://ui.shadcn.com/docs/dark-mode/next) — ThemeProvider `"use client"` wrapper pattern
+- [Tailwind CSS Dark Mode docs](https://tailwindcss.com/docs/dark-mode) — `class` strategy configuration
+- [recharts npm registry](https://www.npmjs.com/package/recharts) — Version 3.8.0 confirmed, last published 16 days ago
+- [recharts 3.0 migration guide (GitHub Wiki)](https://github.com/recharts/recharts/wiki/3.0-migration-guide) — Breaking changes list verified
+- [@tanstack/react-table npm registry](https://www.npmjs.com/package/@tanstack/react-table) — Version 8.21.3, last published April 2025
+- [TanStack Table v8 docs](https://tanstack.com/table/v8) — Sorting, filtering, headless API
+- [@tanstack/react-virtual npm registry](https://www.npmjs.com/package/@tanstack/react-virtual) — Version 3.13.23, last published 7 days ago
+- [TanStack Virtual docs](https://tanstack.com/virtual/latest/docs/framework/react/react-virtual) — React integration, `useVirtualizer` API
+- [JetBrains Mono — Google Fonts](https://fonts.google.com/specimen/JetBrains+Mono) — Available in `next/font/google` as `JetBrains_Mono`
+- [Next.js Font Optimization docs](https://nextjs.org/docs/14/app/building-your-application/optimizing/fonts) — `next/font/google` variable font usage
+- [Inter + JetBrains Mono pairing](https://fontalternatives.com/pairings/inter-and-jetbrains-mono/) — Pairing score 88/100 (LOW confidence — marketing source, subjective)
 
 ---
 
-*Stack research for: Chrome DevTools MCP + ESPN DOM rework + mobile draft command center*
-*Researched: 2026-03-14*
+*Stack research for: In-Season Command Center (v6.0) — dark mode theming, dense data tables, font additions, charting upgrades*
+*Researched: 2026-03-23*

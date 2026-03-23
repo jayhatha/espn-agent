@@ -1,8 +1,8 @@
 # Feature Research
 
-**Domain:** Chrome DevTools MCP + ESPN DOM Automation + Mobile Draft Command Center
-**Researched:** 2026-03-14
-**Confidence:** MEDIUM overall — Chrome DevTools MCP ecosystem is HIGH (official Google tooling, verified), ESPN DOM specifics are LOW (no public documentation, must be inspected live), mobile feature patterns are MEDIUM (verified against existing code and competitor analysis)
+**Domain:** In-season rotisserie fantasy baseball command center (13-team, 5x5 plus OPS)
+**Researched:** 2026-03-23
+**Confidence:** HIGH for feature categorization (ecosystem well-understood) / MEDIUM for complexity estimates (codebase-specific)
 
 ---
 
@@ -10,16 +10,17 @@
 
 This is a subsequent milestone. The following features are already built and must NOT be re-scoped:
 
-**Auto-nomination:** 5 turn-detection strategies, search-and-queue flow, `.action-btn` selectors, 15s queue population cooldown, `NominationDiagnostics` panel.
+- **Projected standings** with component-based rate stat math (StandingsProjectionAgent)
+- **Waiver add/drop recommendations** — but `deltaOverallPoints` is hardcoded to 0.5; drop player's roto point loss not computed
+- **Trade impact analysis** — category deltas computed, but roto-point treatment missing for rate stats
+- **1-for-1 trade candidate generation** — scans partners for positive-delta swaps
+- **Time series data** with transaction annotations and category trend charts
+- **Daily snapshot pipeline** with category totals, ranks, overall roto points
+- **TransactionImpactAgent** — derives historical roster moves and computes counterfactual roto-point impact
+- **StreamingPitcherAgent** — ranks available pitchers by matchup, detects 2-start weeks
+- **MorningReportAgent** — daily summary with standings + waiver highlights (stubs not yet fully wired)
 
-**Mobile (`/draft/live`):** WebSocket page showing current nomination, budget, roster, alerts. Controls: auto-bid toggle, position filter, pitcher/hitter split slider.
-
-**Extension sidebar:** inflation, scarcity, category gaps, budget curves, ideal roster, win probability, AI narrator, build archetype.
-
-**Key pain points this milestone addresses:**
-1. Auto-nomination breaks when ESPN updates its DOM (class names, button structure) — selectors become stale silently
-2. Mobile page is a read-only viewer; user cannot control queue or review what the engine is recommending to nominate next
-3. No tooling for a developer to inspect the live ESPN draft page and verify/update selectors without manually opening DevTools
+The 9 features requested in this milestone are framed as **new capabilities** on top of this foundation.
 
 ---
 
@@ -27,171 +28,138 @@ This is a subsequent milestone. The following features are already built and mus
 
 ### Table Stakes (Users Expect These)
 
-#### Chrome DevTools MCP Server
+These are the things every serious roto manager does today in spreadsheets or with tools like FantasyPros League Analyzer, Smart Fantasy Baseball SGP tools, and FanGraphs Player Rater. Missing these makes the app feel like a box-score viewer, not a command center.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Attach to active ESPN draft tab | MCP is useless without live page access; needed to inspect real ESPN DOM | LOW | `chrome-devtools-mcp` exposes `list_pages` + `select_page` (HIGH confidence — official Google tooling, 29 tools confirmed). Chrome M144+ also supports attaching to existing sessions without separate launch. |
-| DOM snapshot of live draft page | Need to capture current ESPN HTML structure so Claude can identify what selectors are available | LOW | `take_snapshot` tool confirmed in `chrome-devtools-mcp`. Returns full DOM structure. Use as the primary discovery mechanism. |
-| Evaluate JavaScript in live tab | Must run `document.querySelector(...)` probes to test selectors against real ESPN DOM | LOW | `evaluate_script` tool confirmed (HIGH confidence — official Google). This is how you test selector candidates without modifying extension code. |
-| Screenshot of draft overlay | Visual confirmation that extension overlay is rendering correctly | LOW | `take_screenshot` tool confirmed (HIGH confidence). No extra work. |
-| Console log capture | Extension logs all selector failures (`[ESPN Draft Assistant] All X selectors failed`) — need to surface these during debugging | LOW | `list_console_messages` confirmed. Filter by `[ESPN Draft Assistant]` prefix. |
-
-#### Auto-Nomination Rework
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Selector health check report on page load | Selectors silently fail today; user only knows after a wasted nomination turn | MEDIUM | `validateAndFindElement` fallback chain already exists in `dom-observers.ts`. Add structured health check that runs once on load and broadcasts result to mobile. |
-| Queue-sourced nomination (from ESPN's nomination queue, not search-click) | Search-click flow races ESPN's DOM; queue-based is deterministic and uses ESPN's primary affordance | MEDIUM | Phase 35 in planning already identifies this as the fix. Confirmed pattern — RotoWire, DraftPunk all use two-way queue sync. Requires verifying ESPN queue DOM selectors before coding. |
-| Turn detection that survives ESPN DOM changes | 5 strategies exist; need at least one that does not depend on ESPN class names | HIGH | ESPN React class names churn. Only `data-*` attributes, `aria-*` attributes, or budget-change detection are stable candidates. DevTools MCP inspection required to find stable anchors. |
-| Cooldown/backoff on failed nomination attempts | Runaway click loops are a real failure mode (max 3 attempts, 5s cooldown exists but needs validation) | LOW | Already implemented in `auto-bid-controller.ts`. Keep, but surface failures to mobile via WS. |
-
-#### Mobile Draft Command Center
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| Current nomination card (player, bid, positions) | Core table stakes for any draft companion | LOW | Already exists. Keep prominent. |
-| Max bid and BID/PASS verdict | Primary decision support — user needs a number to type into ESPN | LOW | Already exists via `optimization` signal. Keep. |
-| Remaining budget display | Table stakes — know how much you have left | LOW | Already exists. |
-| Auto-bid on/off toggle | Users expect remote control of automation from phone | LOW | Already exists. |
-| Win probability indicator | All serious competitor tools surface this (Draft Punk, FantasyPros Draft Wizard) | LOW | Already exists via simulation signal. |
-| Connection status indicator | Must know if phone is still synced to desktop | LOW | Already exists as `ConnectionDot`. |
-
----
+| Live standings with roto points per category | Every roto tool shows current points-per-category as the primary at-a-glance display | LOW | Data already in `team_daily_category_ranks` and `team_daily_overall`. This is a UI rendering question, not a computation question. |
+| Gap to +1 roto point per category | Core in-season decision framework: "how many HRs do I need to move from rank 7 to rank 6?" This is the SGP concept applied live. Every serious roto player calculates this manually. | MEDIUM | Requires querying live category values for all teams and computing the delta between the team ahead in each category. No new data needed, new computation logic needed. |
+| Projected final standings (with RoS projections) | Users expect to see where they'll finish, not just where they are today. StandingsProjectionAgent already does this. | LOW (already built) | Already exists. Expose it prominently. |
+| 7-day hot/cold player trends | Yahoo, ESPN, Fantrax all surface hot/cold indicators. Users check this daily when deciding who to stream or pick up. | MEDIUM | Requires `player_period_stats` populated from ESPN recent stat data. ESPN API exposes recent stats by time period. |
+| Waiver wire roto-point delta (net of dropped player) | Every waiver decision has two sides: gain from add + loss from drop. Current implementation ignores the drop side. Users expect a single net number. | MEDIUM | Existing WaiverRecommendationAgent has the add-side logic. Extend to compute category impact of removing the drop player from your roster, then net the two deltas. Depends on `StandingsProjectionAgent` being called correctly. |
+| FAAB budget tracker with spending history | Any FAAB league user needs to know how much they've spent, who they acquired, and how much remains. This is basic budget accounting. | LOW | ESPN API returns transaction data including FAAB bids. `league_transaction_event` already stores transactions. Needs a query layer + UI. |
 
 ### Differentiators (Competitive Advantage)
 
-#### Chrome DevTools MCP Server
+These go beyond what commodity tools offer. The existing architecture (component-based rate math, SGP-style roto point modeling, RoS projections pipeline) makes these tractable in ways that generic tools can't match.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| ESPN-specific selector test harness | Claude can be asked "test all nomination selectors against the live ESPN page" and get structured pass/fail per selector constant | MEDIUM | Custom workflow wrapping `evaluate_script`: probe each selector in `NOMINATION_BUTTON_SELECTORS`, `SEARCH_INPUT_SELECTORS`, etc. from `dom-observers.ts` and return which indices pass/fail. Enables safe selector verification before any code changes. |
-| DOM snapshot diff (before/after nomination event) | Attach to ESPN draft, capture snapshot before nominating and after, diff to identify stable attributes on nomination button | HIGH | Requires two snapshots plus structural diff. Implement as a Claude Code workflow (two `take_snapshot` calls + JSON diff analysis), not as a built tool. Identifies `data-*` and `aria-*` candidates for robust selectors. |
-| Console error stream for regression detection | Stream `[ESPN Draft Assistant] All X selectors failed` lines to surface selector regressions during live drafts without opening a laptop | LOW | Filter `list_console_messages` by extension prefix. Trivial wrapper. Lets Claude detect that selectors broke before the user knows. |
-| Network request inspection for ESPN API shape | Inspect ESPN API calls during a nomination to determine if turn detection can be DOM-free | LOW | `list_network_requests` already in `chrome-devtools-mcp`. Filter for `fantasy.espn.com` / `lm-api-reads`. Could reveal a signal (e.g., nomination available state) not reflected in DOM. |
-
-#### Auto-Nomination Rework
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Nomination status broadcast to mobile | Mobile user knows if autopilot is stuck before the 30-second nomination timer expires — can intervene manually | LOW | `NominationDiagnostics` struct already exists in `auto-bid-controller.ts`. Wire it into the WS state payload. High value, low effort. |
-| DOM-independent turn detection fallback (budget change) | Survives ESPN class name reshuffles entirely | MEDIUM | Track remaining budget display as a numeric value. A reduction indicates my team spent money = it is now my turn (or I won an auction). Scrape as secondary signal. |
-| Selector version fingerprint | Extension logs which selector index (primary vs fallback) is being used per field, enabling early detection of ESPN DOM drift before complete breakage | LOW | Already partially exists via `validateAndFindElement` fallback warnings. Aggregate into a structured health object. |
-
-#### Mobile Draft Command Center
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Top targets list (what to nominate next) | Tells user what the engine recommends bidding on — no competitors expose this on mobile | MEDIUM | Nomination strategy trap scores and ideal roster are already computed in extension. Add `topTargets` field to WS state payload. No new computation needed. |
-| Category progress bars | See which categories are winning/losing at a glance — inform what position to target next | MEDIUM | `categoryGaps` signal already exists in engine output. Add mobile section for it. Data is already in WS payload structure, just not rendered. |
-| Nomination autopilot status section | Know if autopilot is running, waiting, jammed, or in cooldown — and why | LOW | Wire `NominationDiagnostics` into WS state payload. Render last attempt result, candidate source, cooldown remaining. |
-| Ideal roster snapshot on mobile | Know what the engine thinks you should be targeting without opening the laptop | MEDIUM | `idealRoster` data exists in engine signals. Add condensed position-slot list to mobile page. |
-| Build archetype status badge | Confirm strategy has not drifted mid-draft | LOW | `archetype` signal exists in engine output. Single-line display alongside win probability. |
-| Nomination queue management (view and reorder) | Competitors (Draft Punk, RotoWire) all expose queue sync; lets user prioritize players from phone | HIGH | Requires bidirectional WS commands (`GET_QUEUE`, `REORDER_QUEUE`, `ADD_TO_QUEUE`, `REMOVE_FROM_QUEUE`). Extension must relay mutations to ESPN queue DOM. Selector verification required first. HIGH risk — treat as P2 after queue selectors confirmed stable. |
-| Per-player bid limit override from mobile | Hard cap a specific player mid-draft from the phone (e.g., "never pay more than $30 for this guy") | MEDIUM | Add `SET_PLAYER_BID_LIMIT` WS control. Store per-player overrides in extension `useDraftStore`. Auto-bid controller already respects bid caps — just needs per-player storage. |
-
----
+| Category opportunity map with difficulty score | Not just "gap to +1 point" but a priority-ranked list across all 10 categories: gap size, how many teams you'd pass, how achievable it is with available free agents. Competitors surface raw standings; they don't synthesize priority. | HIGH | Requires: (1) gap-to-next computation, (2) scoring difficulty (how many SB does the #6 team have vs you?), (3) available FA pool's contribution to that category. Ties together waiver data and standings data. |
+| Trade finder with roto-point optimization | Current trade agent generates 1-for-1 candidates. The differentiator is framing it as: "you are losing by 2 points in ERA — here are trades that fix ERA without costing you HR points." Competitor tools don't connect trade search to roto standings gap. | HIGH | Extends existing TradeRecommendationAgent. Requires the waiver roto-delta fix first (so the roto-point impact model is reliable). Rate stat adjustments (currently missing) must be fixed before this is meaningful. |
+| GS/K pacing with SP start planner | Tracks how many starts you've used vs the season limit, projects pace, and shows which 2-start weeks remain for your SPs. Competitors show "2-start pitchers this week" as a static list; this shows your personal pace and flags if you're burning starts too fast or sitting them. | MEDIUM | Requires ESPN GS limit from `league_settings_version` + cumulative starts from snapshot data + MLB schedule from MLBStatsAPIAdapter (already built). StreamingPitcherAgent already detects 2-start weeks. |
+| FAAB ROI scoring per acquisition | After the season, each FAAB acquisition gets a roto-point impact score derived from TransactionImpactAgent. Shows which acquisitions were worth their bid and which were wasted. No competitor tool does this. | MEDIUM | TransactionImpactAgent already computes counterfactual roto-point impact per roster move. FAAB bid amounts need to be stored at transaction time. Wire TransactionImpactAgent output into the transaction/FAAB history view. |
+| "Standings points at risk" summary | A single dashboard widget: "You are projected to lose X roto points in the next 14 days due to injuries, IL moves, and schedule." Surfaces systemic risk across all categories at once. No static competitor tool does this dynamically. | HIGH | Requires: injury data (InjuryEvent table exists), schedule-aware projection adjustment (MLBStatsAPIAdapter), and delta from current projected standings. Highest data integration complexity of all features. |
+| Suggested FAAB bid based on roto-point value | Not just "this player is good" but "given your current standings gap in SB, this player is worth $X in FAAB to you specifically." Personalizes bid to your league position. | HIGH | Requires: category gap computation (from gap-to-next), player RoS projection in that category, and conversion from stat delta to roto points to FAAB dollars. SGP methodology applied to your live standings. |
+| Lineup efficiency / bench production tracking | Shows cumulative roto-scoring stats from bench players per week — "you left X HRs and Y Ks on your bench this week." Helps identify roster construction waste. | MEDIUM | `team_roster_snapshot` contains bench designations. `team_daily_category_totals` only counts active roster. Need to also accumulate bench player stats separately. Requires ESPN stats by roster slot from each snapshot. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Full bid automation with zero human confirmation | "Set it and forget it" experience | ESPN ToS risk; if DOM changes and extension fires bids on wrong player, expensive mistake with no recourse; auto-nomination after DOM change is already causing silent failures | Keep auto-bid with max-cap safety. Require human re-activation each session. Show what would have been bid before enabling. |
-| Direct ESPN API calls from mobile page (bypassing extension) | Seems like simpler architecture | ESPN auth (SWID + espn_s2 cookies) lives in the browser session; cannot be replicated from a Node.js server without manual extraction and re-injection. Any ESPN auth rotation breaks it. | Extension is the single source of truth. Mobile page is a display + control terminal only. |
-| DOM polling every 100ms | Catch every possible state change | CPU-saturating in Chrome tab; service worker sleeps and cannot sustain this rate; causes sidebar jank | MutationObserver on the auction container only. Poll budget display at 2s interval maximum. |
-| Auto-submit nominations without queue validation | Faster autopilot — skip queue population step | ESPN queue population is the safest nomination path. Skipping it means falling back to search-click which is exactly what breaks. Queue validation confirms player is nominatable before touching DOM. | Keep queue population as mandatory pre-step. Improve queue population reliability instead of bypassing it. |
-| Persist auto-bid mode across page reloads | Convenience for multi-day drafts | Auto-bid can fire before extension is fully initialized after page load; player pool data and ideal roster may be stale on reload; silent errors with no user awareness | Explicit re-activation each session. Add session-active indicator. Current behavior (reset on load) is a safety feature. |
-| MCP server that writes to ESPN DOM directly | Seems powerful for AI-driven automation | Claude operating on live auction data with direct DOM mutation is a footgun. MCP should be read-only — inspect and diagnose. All writes go through extension content script which has guard rails (cooldowns, attempt limits, bid caps). | MCP = read and inspect only. Claude uses MCP to discover correct selectors, then updates extension constants. Extension executes writes. |
-| Real-time opponent roster tracking via ESPN API calls in hot path | Richer context for AI decisions | ESPN API rate limiting during a live auction would cause failures at the worst moment. Adds latency to nomination path. | Use `opponentPressure` data already computed by `opponent-model.ts`. No ESPN API calls in the live bid path. |
+| Real-time intraday standings updates | Users want to watch their roto standing change during games | ESPN roto standings only update after games complete; scraping intraday stats would require a different data source, rate-limiting is a real risk, and standings don't actually shift mid-game in the same way H2H does. Work is high, value is low for roto. | Daily snapshot is correct for roto. Make the morning snapshot fast and reliable instead. Add manual refresh button for end-of-night. |
+| Roster optimizer (auto-set lineups) | Seems like the obvious extension of lineup efficiency tracking | ESPN API does not expose lineup-setting endpoints in the public API. Would require undocumented POST endpoints that are fragile and could get accounts flagged. | Focus on surfacing which bench players outproduced starters (insight) rather than auto-setting lineups (action). |
+| Multi-league rollup | Users in multiple ESPN leagues want a single dashboard | Adds significant data model complexity (projections are global but standings are per-league; free agent pools differ). The ESPN auth cookie system makes multi-league harder. | Current architecture already supports multiple leagues as separate entities. The UI just needs a league switcher, not a merged view. |
+| Opponent-by-opponent H2H scheduling analysis | Some roto variants use H2H scoring with a roto scoring system | This project is pure roto. H2H scheduling analysis requires a fundamentally different decision framework (weekly matchup win rates, not seasonal standings). Out of scope for this milestone. | If league ever converts to H2H roto, add as a separate mode. Don't complicate the current roto-optimized features. |
+| AI narrative generation beyond existing narrator | "Explain my standings in natural language" | The DraftNarratorAgent exists but is draft-focused. Building a general-purpose in-season narrative layer requires LLM API integration, prompt engineering for roto context, and cost management. | The category opportunity map and gap analysis ARE the narrative — structured data is more actionable than prose summaries for in-season management. |
+| Player news / injury feed (original sourcing) | Users want a single place for news | Scraping beat reporters, injury feeds from multiple sources, or building a news aggregator is a product unto itself. Fraught with copyright and reliability issues. | Surface ESPN player status/injury flags that come through the ESPN API (already in `injury_event` table). Link out to Rotoworld/ESPN player news for full context. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Chrome DevTools MCP]
-    └──requires──> chrome-devtools-mcp package installed in Claude Code env
-    └──requires──> Chrome launched with --remote-debugging-port=9222 OR M144 session attach
-    └──enables──> ESPN Selector Test Harness (evaluate_script probe workflow)
-                      └──requires──> ESPN draft tab open in browser during inspection
-                      └──produces──> Verified selector constants → update dom-observers.ts
-                      └──unblocks──> Auto-Nomination Queue Rework
+[Waiver Roto-Point Delta (net of drop)]
+    └──requires──> StandingsProjectionAgent correctly called for add+drop simulation
+    └──blocks──> Trade Finder (roto-point optimization)
+    └──blocks──> Suggested FAAB Bid (bid needs reliable delta values)
 
-[Auto-Nomination Queue Rework]
-    └──requires──> Verified queue button selectors from DevTools MCP inspection
-    └──requires──> NominationDiagnostics struct (already exists in auto-bid-controller.ts)
-    └──enables──> Nomination Status Broadcast to Mobile
-    └──enables──> Queue Management from Mobile (after queue selectors confirmed stable)
+[Gap to +1 Roto Point per Category]
+    └──requires──> team_daily_category_totals (already populated)
+    └──requires──> standings ranked correctly across all 13 teams
+    └──enables──> Category Opportunity Map (gap is an input to the map)
+    └──enables──> Suggested FAAB Bid (gap drives the bid value)
 
-[Nomination Status Broadcast to Mobile]
-    └──requires──> NominationDiagnostics wired into WS state payload
-    └──requires──> WebSocket relay in background.ts (already exists)
+[Category Opportunity Map]
+    └──requires──> Gap to +1 Roto Point (foundational computation)
+    └──requires──> Waiver Roto-Point Delta (to score FA availability)
+    └──requires──> Waiver Delta fix in place (accurate add impact)
 
-[Mobile Top Targets List]
-    └──requires──> nominationStrategy signals already computed in extension
-    └──requires──> topTargets field added to WS payload schema
-    └──low effort — data exists, gap is only WS plumbing
+[Trade Finder with Roto-Point Optimization]
+    └──requires──> Waiver Roto-Point Delta fix (reliable roto impact model)
+    └──requires──> Rate stat adjustments in TradeRecommendationAgent (currently missing)
+    └──enhances──> Category Opportunity Map (can show "trade fix" paths)
 
-[Mobile Category Progress]
-    └──requires──> categoryGaps already in DraftEngineSignals
-    └──requires──> categoryGaps included in WS state broadcast
-    └──low effort — same pattern as budgetCurve which already works
+[FAAB ROI Scoring]
+    └──requires──> TransactionImpactAgent fully wired and populated (exists, needs wiring)
+    └──requires──> FAAB bid amounts stored on transaction_event rows (check ESPN API)
+    └──enhances──> FAAB Budget Tracker (adds ROI column to history)
 
-[Mobile Ideal Roster]
-    └──requires──> idealRoster already in engine signals
-    └──requires──> idealRoster field added to WS payload schema
+[Suggested FAAB Bid]
+    └──requires──> Gap to +1 Roto Point (to know your standing position)
+    └──requires──> Waiver Roto-Point Delta fix (to know player's category contribution)
+    └──requires──> FAAB Budget Tracker (to know remaining budget context)
 
-[Mobile Queue Management]
-    └──requires──> Auto-Nomination Queue Rework complete
-    └──requires──> ESPN queue DOM selectors verified and stable
-    └──requires──> Bidirectional WS control protocol extended with queue commands
-    └──HIGH RISK — do not implement until queue selector verification is complete
+[Standings Points at Risk]
+    └──requires──> InjuryEvent table populated
+    └──requires──> MLBStatsAPIAdapter schedule data
+    └──requires──> Projected standings baseline (already exists)
+    └──complex integration — treat as standalone phase
 
-[Per-Player Bid Limit Override]
-    └──requires──> useDraftStore extended with per-player bid limit map
-    └──requires──> AutoBidController reads per-player cap before firing bid
-    └──requires──> SET_PLAYER_BID_LIMIT WS control command handled in content script
+[GS/K Pacing + SP Start Planner]
+    └──requires──> ESPN GS limit from league_settings_version
+    └──requires──> Cumulative GS per pitcher from snapshot data
+    └──requires──> MLBStatsAPIAdapter (already exists for StreamingPitcherAgent)
+    └──extends──> StreamingPitcherAgent (multi-start week detection already there)
+
+[7-Day Hot/Cold Trends]
+    └──requires──> player_period_stats populated (table exists, needs ESPN feeding)
+    └──requires──> ESPN API period stats endpoint verified for rolling windows
+    └──independent of standings computation
+
+[Lineup Efficiency / Bench Production]
+    └──requires──> bench player stats accumulated separately from active stats
+    └──requires──> ESPN roster slot designation at time of stats (snapshot must capture bench)
+    └──independent of standings computation, but shares snapshot data
 ```
 
 ### Dependency Notes
 
-- **DevTools MCP inspection must come before queue rework code**: Writing queue-based nomination code against unverified selectors reproduces the existing breakage pattern. Inspection first, code second.
-- **Mobile queue management is the highest risk item**: It requires ESPN DOM relay for queue mutations. Treat as P2 and only implement after queue selectors are verified stable across at least one draft session.
-- **Mobile category progress, top targets, and ideal roster are low-risk**: Data already flows through the engine. The gap is adding fields to the WS broadcast payload and rendering them on the mobile page.
-- **Chrome M144 session attach**: As of 2026-03-14, M144 is in Beta channel per the Chrome developer blog. Stable channel may not have this feature yet. Fallback: launch Chrome with `--remote-debugging-port=9222` flag (HIGH confidence, works in all Chrome versions).
+- **Waiver delta fix is a prerequisite for several features**: The current hardcoded 0.5 deltaOverallPoints means every feature that builds on it (trade finder, suggested FAAB bid, category opportunity map) would produce unreliable outputs. Fix this before building on top of it.
+- **Gap to +1 is the mathematical foundation for the category layer**: Every category-level feature (opportunity map, suggested bids, "at risk" summary) converts the category gap into a common currency. Build it once, reuse everywhere.
+- **TransactionImpactAgent exists but needs wiring**: The counterfactual roto-impact computation is built. FAAB ROI is low-effort once the transaction history is confirmed to include bid amounts from ESPN.
+- **Standings Points at Risk is the most complex**: It requires injury data, schedule awareness, and projection adjustment. Do not attempt this in the same phase as simpler features.
+- **7-day trends and lineup efficiency are independent**: Neither depends on the roto-standings computation layer. They can be built in parallel with other work.
 
 ---
 
 ## MVP Definition
 
-### Launch With (v1 — this milestone)
+### Launch With (v1 — this milestone's core)
 
-Minimum set that fixes the auto-nomination regression and upgrades mobile from viewer to command center.
+Minimum set that transforms the app from a standings viewer into a decision-making tool.
 
-- [ ] Chrome DevTools MCP configured in Claude Code environment — unblocks all inspection work
-- [ ] ESPN selector test harness workflow (Claude uses `evaluate_script` to probe selector constants against live ESPN page) — enables safe selector verification
-- [ ] Auto-nomination rework: queue-sourced nomination path with verified selectors — fixes the primary breakage
-- [ ] Nomination status broadcast to mobile (wire `NominationDiagnostics` into WS payload) — lets user know if autopilot is jammed
-- [ ] Mobile: nomination autopilot status section — low effort, directly addresses "is it working?" anxiety
-- [ ] Mobile: top targets list — `nominationStrategy` is computed, WS plumbing only
-- [ ] Mobile: category progress bars — `categoryGaps` exists, WS plumbing only
+- [ ] **Gap to +1 roto point per category** — the mathematical core that every other decision depends on; without this the app doesn't answer "what should I do?"
+- [ ] **Waiver roto-point delta fix (net of drop)** — current waiver recommendations are inaccurate; this is a correctness fix, not a feature addition
+- [ ] **Category opportunity map** — synthesizes gap + FA availability into a priority list; the "what to do" answer for daily management
+- [ ] **FAAB budget tracker with spending history** — data exists (transaction_event), low effort, users check this constantly
+- [ ] **GS/K pacing with SP start planner** — directly answers a question users face every week; builds on existing StreamingPitcherAgent infrastructure
 
 ### Add After Validation (v1.x)
 
-Add once P1 items work across 2-3 real draft sessions.
+Add once core features are working across a real in-season period (a few weeks of use).
 
-- [ ] Mobile: ideal roster snapshot — data exists, adds useful context
-- [ ] Mobile: build archetype badge — trivial, pairs with win probability
-- [ ] Per-player bid limit override — useful mid-draft control, MEDIUM complexity
-- [ ] DOM-independent turn detection fallback (budget change detection) — add if queue-sourced nomination still shows reliability issues after initial fix
+- [ ] **Trade finder with roto-point optimization** — requires waiver delta fix to be in production first; high value once the delta model is reliable
+- [ ] **7-day hot/cold player trends** — table stakes by industry standards; defer until `player_period_stats` feeding is confirmed stable
+- [ ] **FAAB ROI scoring** — requires TransactionImpactAgent wired to FAAB bid amounts; confirm ESPN stores bid amounts in transaction data first
+- [ ] **Suggested FAAB bid** — requires gap + delta model; add when category opportunity map is in production and trusted
 
 ### Future Consideration (v2+)
 
-Defer until queue selectors confirmed stable and queue management pattern validated.
+Defer until simpler features are validated.
 
-- [ ] Mobile queue management (view and reorder) — HIGH complexity, requires ESPN queue DOM relay; only viable after queue selectors are confirmed across multiple drafts
-- [ ] Selector candidate discovery via DOM snapshot diff — complex Claude workflow; valuable for long-term maintenance automation
-- [ ] ESPN network API shape inspection for DOM-free turn detection — research-heavy; could eliminate DOM dependency entirely if ESPN API exposes nomination state
+- [ ] **"Standings points at risk" summary** — highest integration complexity; requires injury + schedule + projection layers working together
+- [ ] **Lineup efficiency / bench production tracking** — requires capturing bench-slot stats at snapshot time; snapshot schema may need extension; valuable but not urgent
 
 ---
 
@@ -199,60 +167,83 @@ Defer until queue selectors confirmed stable and queue management pattern valida
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Chrome DevTools MCP setup | HIGH | LOW | P1 |
-| ESPN selector test harness | HIGH | LOW | P1 |
-| Auto-nomination queue rework | HIGH | MEDIUM | P1 |
-| Nomination status to mobile | HIGH | LOW | P1 |
-| Mobile autopilot status section | MEDIUM | LOW | P1 |
-| Mobile top targets list | HIGH | LOW | P1 |
-| Mobile category progress bars | MEDIUM | LOW | P1 |
-| Mobile ideal roster snapshot | MEDIUM | LOW | P2 |
-| Mobile build archetype badge | LOW | LOW | P2 |
-| Per-player bid limit override | MEDIUM | MEDIUM | P2 |
-| DOM-independent turn detection | MEDIUM | MEDIUM | P2 |
-| Mobile queue management | HIGH | HIGH | P2 |
-| Selector snapshot diff workflow | LOW | HIGH | P3 |
-| ESPN network API shape inspection | LOW | LOW | P3 |
+| Gap to +1 roto point per category | HIGH | LOW | P1 |
+| Waiver roto-point delta fix (net of drop) | HIGH | MEDIUM | P1 |
+| Category opportunity map | HIGH | HIGH | P1 |
+| FAAB budget tracker with spending history | MEDIUM | LOW | P1 |
+| GS/K pacing + SP start planner | MEDIUM | MEDIUM | P1 |
+| Trade finder with roto-point optimization | HIGH | HIGH | P2 |
+| 7-day hot/cold player trends | MEDIUM | MEDIUM | P2 |
+| FAAB ROI scoring per acquisition | MEDIUM | MEDIUM | P2 |
+| Suggested FAAB bid | HIGH | HIGH | P2 |
+| Standings points at risk summary | HIGH | HIGH | P3 |
+| Lineup efficiency / bench production | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for this milestone — fixes the regression and delivers command center MVP
-- P2: Should have — add once P1 items are working in production
-- P3: Nice to have — defer until explicit user demand
+- P1: Core milestone deliverables — transforms the app into an in-season tool
+- P2: Should have — add once P1 features are trusted in production
+- P3: Defer — too much integration complexity relative to immediate value
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | Draft Punk (mobile) | RotoWire Live Sync | FantasyPros Draft Wizard | Our Approach |
-|---------|---------------------|--------------------|--------------------------|--------------|
-| Current nomination display | Yes | Yes | Yes | Exists, keep |
-| Max bid recommendation | Yes | No | Yes | Exists, keep |
-| BID/PASS verdict | No | No | Yes | Exists, differentiator |
-| Queue management from mobile | Yes | Yes (two-way) | No | P2 — after selector verification |
-| Win probability | No | No | No | Exists, unique differentiator |
-| Category gap progress | No | No | No | New — P1 |
-| Top targets from engine | Partial (position scarcity) | No | No | New — P1 |
-| Autopilot status | N/A | N/A | N/A | New — P1 |
-| Build archetype status | No | No | No | New — P2 |
+| Feature | FantasyPros League Analyzer | FanGraphs Player Rater | Smart Fantasy Baseball SGP Tool | Our Approach |
+|---------|-----------------------------|-----------------------|----------------------------------|--------------|
+| Current roto standings by category | Yes | No (player-level) | Draft-time only | Already built |
+| Gap to next rank in category | No (shows rank, not gap size) | No | Draft-time SGP | Build this — gap + difficulty score |
+| Projected final standings | Yes (generic projections) | No | No | Already built with RoS projections |
+| Category-specific trade targets | Partial (strength/weakness) | No | No | Trade finder uses actual roto-point delta |
+| FAAB budget tracking | No | No | No | Build with transaction history |
+| FAAB bid suggestion | No | No | No | Build with gap + delta model |
+| Pitcher start pacing | No | No | No | Build on StreamingPitcherAgent |
+| 7-day hot/cold indicator | Yes (basic) | Player Rater (rolling) | No | Build with player_period_stats |
+| Waiver net roto delta | No (raw stats only) | No | No | Fix existing agent to include drop side |
+| FAAB ROI per acquisition | No | No | No | TransactionImpactAgent + bid amounts |
+| Bench production / lineup efficiency | No | No | No | Requires snapshot schema extension |
+
+The primary differentiation is the combination of: (1) roto-point framing for every decision (not raw stats), (2) your specific standings position as the lens (not generic rankings), and (3) RoS projections already integrated (not FanGraphs-generic projections patched in). No competitor tool ties all three together at the decision level.
+
+---
+
+## Data Requirements per Feature
+
+| Feature | Data Sources Needed | Already Stored? | Gap |
+|---------|--------------------|-----------------|----|
+| Gap to +1 roto point | `team_daily_category_totals`, all 13 teams | Yes | Query logic only |
+| Waiver delta fix | `player_projection`, `team_daily_category_totals`, `league_settings_version` | Yes | Computation logic only |
+| Category opportunity map | Gap computation + free agent pool + player projections | Partial | Free agent pool still not fetched (known issue #1 in CLAUDE.md) |
+| FAAB budget tracker | `league_transaction_event` with bid amounts | Partial | Confirm ESPN stores FAAB bid amounts in transaction payload |
+| GS/K pacing | `team_roster_snapshot` for cumulative GS + `league_settings_version` for GS limit | Partial | Need cumulative GS per pitcher query |
+| Trade finder | `team_daily_category_totals`, `player_projection`, `team_roster_snapshot` | Yes | Rate stat fix in TradeRecommendationAgent |
+| 7-day hot/cold | `player_period_stats` | Table exists | ESPN period-stats feeding not confirmed |
+| FAAB ROI | `transaction_impact`, `roster_move`, FAAB bid amounts | Partial | TransactionImpactAgent needs wiring + bid amount storage |
+| Suggested FAAB bid | Gap computation + player projection + remaining budget | Partial | Same gaps as above |
+| Standings at risk | `injury_event`, MLB schedule, `team_daily_projected_overall` | Partial | Schedule-aware projection adjustment not built |
+| Lineup efficiency | Bench player stats by slot per day | No | Snapshot captures roster but not bench player stat accumulation |
+
+**Critical blocker for category opportunity map:** The free agent pool is never fetched from ESPN (Known Issue #1 in CLAUDE.md). Any feature that requires "what FAs can help in category X" requires this to be fixed first. The waiver agent already has a `freeAgentPool defaults to empty` note. This must be addressed in the same phase as category opportunity map, or that feature must degrade gracefully when FA data is unavailable.
 
 ---
 
 ## Sources
 
-- [Chrome DevTools MCP official announcement](https://developer.chrome.com/blog/chrome-devtools-mcp) — HIGH confidence (Google official)
-- [chrome-devtools-mcp GitHub (29 tools confirmed)](https://github.com/ChromeDevTools/chrome-devtools-mcp) — HIGH confidence
-- [Chrome DevTools MCP session attach (M144)](https://developer.chrome.com/blog/chrome-devtools-mcp-debug-your-browser-session) — MEDIUM confidence (M144 is Beta as of research date)
-- [chrome-inspector-mcp (DOM inspection via CDP)](https://github.com/devtoolcss/chrome-inspector-mcp) — MEDIUM confidence
-- [chrome.debugger API reference](https://developer.chrome.com/docs/extensions/reference/api/debugger) — HIGH confidence (official)
-- [MutationObserver MDN](https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver) — HIGH confidence
-- [RotoWire Live Draft Sync (queue two-way pattern)](https://www.rotowire.com/football/article/live-draft-assistant-sync-explained-95417) — MEDIUM confidence
-- [Draft Punk mobile features](https://play.google.com/store/apps/details?id=com.joshclemm.android.draftpunk) — MEDIUM confidence
-- Existing codebase: `packages/extension/lib/auto-bid-controller.ts` — HIGH confidence (ground truth)
-- Existing codebase: `packages/extension/lib/dom-observers.ts` — HIGH confidence (ground truth)
-- Existing codebase: `packages/frontend/src/app/draft/live/page.tsx` — HIGH confidence (ground truth)
-- Existing codebase: `packages/extension/entrypoints/background.ts` — HIGH confidence (ground truth)
+- FanGraphs RotoGraphs (SGP methodology, in-season roto management): https://fantasy.fangraphs.com/rotographs
+- Smart Fantasy Baseball (SGP denominators, standings gain points approach): https://www.smartfantasybaseball.com/tag/standings-gain-points/
+- BaseballHQ (Standings Gain Points 2025-2026): https://www.baseballhq.com/articles/gaming/rotisserie/standings-gain-points-for-2026
+- FantasyPros League Analyzer (competitor feature set): https://www.fantasypros.com/mlb/myplaybook/baseball-league-analyzer.php
+- FantasyPros Best Fantasy Baseball Tools 2026: https://www.fantasypros.com/2025/02/fantasy-baseball-tools/
+- ESPN GS Limit documentation: https://support.espn.com/hc/en-us/articles/360025379951-Games-Started-Pitching-Limits
+- Fantrax Hot/Cold Indicator (competitor 7-day trend implementation): https://chromewebstore.google.com/detail/fantrax-baseball-hotcold/cnpegfafmefkhloaleakhhknfoaaoeio
+- Pitcher List FAAB Insights (FAAB budget pacing methodology): https://pitcherlist.com/2025-fantasy-baseball-week-23-faab-insights/
+- Codebase: `packages/backend/src/agents/waiver-recommendation.ts` — HIGH confidence
+- Codebase: `packages/backend/src/agents/trade-recommendation.ts` — HIGH confidence
+- Codebase: `packages/backend/src/agents/standings-projection.ts` — HIGH confidence
+- Codebase: `packages/backend/src/agents/streaming-pitcher.ts` — HIGH confidence
+- Codebase: `packages/backend/src/agents/transaction-impact.ts` — HIGH confidence
+- Codebase: `packages/backend/src/db/schema.ts` — HIGH confidence
 
 ---
 
-*Feature research for: Chrome DevTools MCP + ESPN DOM Automation Rework + Mobile Draft Command Center*
-*Researched: 2026-03-14*
+*Feature research for: In-season roto command center — 13-team 10-category ESPN fantasy baseball*
+*Researched: 2026-03-23*
