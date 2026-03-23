@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 65 of 70 (Dark Mode Shell)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In Progress
-Last activity: 2026-03-23 — Completed 65-02: three-column dark shell (LeagueNav, TopBar, SignalsPanel, layout.tsx)
+Last activity: 2026-03-23 — Completed 65-03: dark: variant classes on all 16 shared UI components
 
 Progress: [█░░░░░░░░░] 4% (v6.0)
 
@@ -20,12 +20,13 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 
 **Velocity:**
 - Total plans completed (v5.0): ~35 plans
-- v6.0 plans: 2 completed
+- v6.0 plans: 3 completed
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 65-dark-mode-shell | 01 | 8 min | 2 | 6 |
 | 65-dark-mode-shell | 02 | 15 min | 2 | 5 |
+| 65-dark-mode-shell | 03 | 3 min | 2 | 16 |
 
 *Updated after each plan completion*
 
@@ -46,6 +47,9 @@ Progress: [█░░░░░░░░░] 4% (v6.0)
 - [Phase 65-02]: layout.tsx uses pl-60 offset on main area so fixed LeagueNav doesn't overlap content
 - [Phase 65-02]: LucideIcon type used in NavItem (not ComponentType) to avoid TypeScript size prop mismatch
 - [Phase 65-02]: SignalsPanel reads localStorage in useEffect to avoid SSR hydration mismatch
+- [Phase 65-03]: StatsTable td cells get font-mono globally — all data cells render in JetBrains Mono (SHELL-05)
+- [Phase 65-03]: Container uses dark:text-inherit — transparent wrapper, inherits text from shell body
+- [Phase 65-03]: TeamColorBadge keeps dynamic inline styles for team colors, adds dark:font-semibold for legibility
 
 ### Blockers/Concerns
 
@@ -72,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed 65-02-PLAN.md — three-column dark shell shipped (LeagueNav, TopBar, SignalsPanel, leagues/[id]/layout.tsx)
+Stopped at: Completed 65-03-PLAN.md — dark: variant classes on all 16 shared UI components (no white surfaces remain)
 Resume file: None

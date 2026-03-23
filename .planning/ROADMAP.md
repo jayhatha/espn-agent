@@ -146,7 +146,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 65. Dark Mode Shell | 2/4 | In Progress|  | - |
+| 65. Dark Mode Shell | 3/4 | In Progress|  | - |
 | 66. Roto Math Foundation | v6.0 | 0/? | Not started | - |
 | 67. Net Waiver Analysis + Category Opportunity | v6.0 | 0/? | Not started | - |
 | 68. FAAB Tracking + Pitching Usage | v6.0 | 0/? | Not started | - |
