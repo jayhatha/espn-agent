@@ -6,6 +6,30 @@ import {
   type RosterValidationResult,
   type StatComponents,
 } from "../../../shared/dist/index.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+// --- Static ASV lookup from tools/espn-predraft-values.json ---
+let asvMapCache: Map<string, number> | null = null;
+
+function loadAsvMap(): Map<string, number> {
+  if (asvMapCache) return asvMapCache;
+  try {
+    const filePath = resolve(process.cwd(), "tools/espn-predraft-values.json");
+    const raw = readFileSync(filePath, "utf-8");
+    const entries: Array<{ name: string; salary: number }> = JSON.parse(raw);
+    asvMapCache = new Map(entries.map((e) => [e.name.toLowerCase(), e.salary]));
+  } catch {
+    // Graceful degradation — file missing or unparseable
+    asvMapCache = new Map();
+  }
+  return asvMapCache;
+}
+
+function getAsvForPlayer(playerName: string): number | null {
+  const map = loadAsvMap();
+  return map.get(playerName.toLowerCase()) ?? null;
+}
 
 /**
  * Trade Recommendation Agent
@@ -515,8 +539,8 @@ export class TradeRecommendationAgent {
 
         for (const receivePlayer of partnerRoster) {
           // Filter by ESPN ASV similarity for trade realism
-          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
-          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : null;
+          const giveAsv = getAsvForPlayer(givePlayer.player_name);
+          const receiveAsv = getAsvForPlayer(receivePlayer.player_name);
 
           // Skip if both players have ASV data and values are too far apart
           if (giveAsv != null && receiveAsv != null && giveAsv > 0 && receiveAsv > 0) {
@@ -605,8 +629,8 @@ export class TradeRecommendationAgent {
 
           // Only consider trades that improve the team
           if (impact.deltaOverallPoints > 0.5) {
-            const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
-            const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : null;
+            const giveAsv = getAsvForPlayer(givePlayer.player_name);
+            const receiveAsv = getAsvForPlayer(receivePlayer.player_name);
             const asvNote = giveAsv != null && receiveAsv != null
               ? ` Similar value ($${Math.round(giveAsv)} vs $${Math.round(receiveAsv)}).`
               : "";
