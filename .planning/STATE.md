@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v6.0 In-Season Command Center — Phase 66: Roto Math Foundation
+**Current focus:** v6.0 In-Season Command Center — Phase 70: Trends and Efficiency
 
 ## Current Position
 
-Phase: 66 of 70 (Roto Math Foundation)
-Plan: 2 of 2 in current phase
-Status: Complete
-Last activity: 2026-03-23 — Completed 66-02: standings page UI with delta column, pace bars, gap detail, fallback charts
+Phase: 70 of 70 (Trends and Efficiency)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-23 — Completed Phase 69 (Trade Finder) — 2 plans, all requirements met
 
-Progress: [██░░░░░░░░] 8% (v6.0)
+Progress: [███████████████████░] 169/174 plans (97%)
 
 ## Performance Metrics
 
@@ -55,6 +55,9 @@ Progress: [██░░░░░░░░] 8% (v6.0)
 - [Phase 65-03]: TeamColorBadge keeps dynamic inline styles for team colors, adds dark:font-semibold for legibility
 - [Phase 65-04]: Card surfaces use dark:bg-shell-panel, secondary/header areas use dark:bg-shell-bg to maintain visual hierarchy in dark mode
 - [Phase 65-04]: shadow-card dark:shadow-none — card shadows are removed in dark mode as they provide no visual value on dark backgrounds
+- [Phase 69]: Trade simulation uses category_id (not stat_key) as map key — matches DB schema for team_daily_projected_category
+- [Phase 69]: Auto trade finder is default view on trades page (showAnalyzer=false)
+- [Phase 69]: Fairness score numeric removed from UI — likelihood label (high/medium/low) is sufficient
 
 ### Blockers/Concerns
 
@@ -81,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-23
-Stopped at: Completed Phase 66 (Roto Math Foundation) — both plans done, all requirements met
+Stopped at: Completed Phase 69 (Trade Finder) — 2 plans done, ready to plan Phase 70
 Resume file: None
