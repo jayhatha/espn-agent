@@ -261,6 +261,26 @@ export default function WaiversPage() {
     </span>
   );
 
+  // Rank deltas use INVERTED colors: negative = improved (green), positive = worsened (red)
+  const renderDeltaRank = (value: number) => (
+    <span
+      className={cn(
+        "font-semibold text-data",
+        value < 0
+          ? "text-positive"
+          : value > 0
+            ? "text-negative"
+            : "text-content-secondary",
+      )}
+    >
+      {value === 0
+        ? "\u2014"
+        : value < 0
+          ? `\u2191${Math.abs(value)}`
+          : `\u2193${value}`}
+    </span>
+  );
+
   const renderCategoryImpactTable = (
     impacts: Array<{
       categoryId: string;
@@ -295,7 +315,7 @@ export default function WaiversPage() {
                   {impact.categoryName}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-center whitespace-nowrap">
-                  {renderDeltaValue(impact.deltaRank)}
+                  {renderDeltaRank(impact.deltaRank)}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-right whitespace-nowrap">
                   {impact.deltaPoints !== 0 ? (
