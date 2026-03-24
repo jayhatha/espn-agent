@@ -1396,46 +1396,83 @@ export class SnapshotOrchestratorAgent {
   }
 
   /**
-   * Fetch ESPN auction values and store as espn_asv on player table.
+   * Fetch ESPN live draft avg salary (auctionValueAverage from ownership data)
+   * and store as espn_asv on player table.
    * Non-blocking: failure does not stop the snapshot pipeline.
    */
   private async fetchAndStoreAuctionValues(
-    espnLeagueId: number,
+    _espnLeagueId: number,
     season: number,
-    auth: ESPNAuthCookies | undefined,
+    _auth: ESPNAuthCookies | undefined,
   ): Promise<number> {
-    const auctionValues = await this.espnAdapter.fetchPreDraftAuctionValues({
-      leagueId: espnLeagueId,
-      season,
-      auth,
-    });
+    // Use the leaguedefaults endpoint (no auth needed) to get live draft trends
+    // This is the same data as https://fantasy.espn.com/baseball/livedraftresults
+    try {
+      const batchSize = 500;
+      const allPlayers: Array<{ id: number; asv: number }> = [];
 
-    if (auctionValues.length === 0) {
-      this.logger?.info("No auction values returned from ESPN");
-      return 0;
-    }
+      for (let offset = 0; offset < 2000; offset += batchSize) {
+        const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${season}/segments/0/leaguedefaults/1?view=kona_player_info`;
+        const filter = JSON.stringify({
+          players: {
+            filterSlotIds: { value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15] },
+            sortPercOwned: { sortAsc: false, sortPriority: 1 },
+            limit: batchSize,
+            offset,
+          },
+        });
 
-    let updated = 0;
-    for (const av of auctionValues) {
-      if (av.espnAuctionValue > 0) {
+        const { default: axios } = await import("axios");
+        const response = await axios.get(url, {
+          headers: {
+            "x-fantasy-filter": filter,
+            Accept: "application/json",
+          },
+          timeout: 30000,
+        });
+
+        const players = response.data?.players || [];
+        for (const p of players) {
+          const asv = p.player?.ownership?.auctionValueAverage;
+          if (asv != null && asv > 0) {
+            allPlayers.push({ id: p.id, asv });
+          }
+        }
+
+        if (players.length < batchSize) break;
+      }
+
+      if (allPlayers.length === 0) {
+        this.logger?.info("No live draft ASV data returned from ESPN");
+        return 0;
+      }
+
+      let updated = 0;
+      for (const av of allPlayers) {
         try {
           const result = await this.db
             .updateTable("player")
-            .set({ espn_asv: av.espnAuctionValue })
-            .where("id", "=", av.playerId)
+            .set({ espn_asv: av.asv })
+            .where("id", "=", av.id)
             .executeTakeFirst();
           if (result.numUpdatedRows > 0n) updated++;
         } catch {
           // Player may not exist in our DB yet — skip silently
         }
       }
+
+      this.logger?.info(
+        { totalFetched: allPlayers.length, playersUpdated: updated },
+        "ESPN live draft ASV (auctionValueAverage) stored on player.espn_asv",
+      );
+
+      return updated;
+    } catch (error) {
+      this.logger?.warn(
+        { error },
+        "Failed to fetch ESPN live draft ASV — non-blocking",
+      );
+      return 0;
     }
-
-    this.logger?.info(
-      { totalValues: auctionValues.length, playersUpdated: updated },
-      "ESPN auction values stored on player.espn_asv",
-    );
-
-    return updated;
   }
 }
