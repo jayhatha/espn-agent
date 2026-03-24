@@ -167,3 +167,13 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 | 68. FAAB Tracking + Pitching Usage | 2/2 | Complete    | 2026-03-23 | - |
 | 69. Trade Finder | 2/2 | Complete    | 2026-03-23 | - |
 | 70. Trends and Efficiency | 2/2 | Complete    | 2026-03-23 | - |
+
+### Phase 71: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
+
+**Goal:** Populate the moves page with real data by fixing disconnected data pipeline: dynamic season defaults, UI trigger for impact computation, and actionable empty states
+**Depends on:** Phase 70
+**Requirements:** MOVES-01, MOVES-02, MOVES-03, MOVES-04
+**Plans:** 1 plan
+
+Plans:
+- [ ] 71-01-PLAN.md — Fix season defaults, add Compute Impacts button, improve empty states
