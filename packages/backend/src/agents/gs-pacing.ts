@@ -48,11 +48,6 @@ export class GsPacingAgent {
       gsUsed = await this.estimateGsFromIP(leagueId, teamId);
     }
 
-    // Fallback: count from roster snapshots
-    if (gsUsed === null) {
-      gsUsed = await this.countGsFromRosterSnapshots(leagueId, teamId);
-    }
-
     gsUsed = gsUsed ?? 0;
 
     const { weeksElapsed, weeksRemaining } =
@@ -213,6 +208,7 @@ export class GsPacingAgent {
       .select([
         "trs.player_id",
         "p.name as player_name",
+        "p.positions",
         "trs.roster_slot",
         "trs.roster_status",
       ])
@@ -234,6 +230,10 @@ export class GsPacingAgent {
     const recommendations: GsStartRecommendation[] = [];
 
     for (const pitcher of rosterPitchers) {
+      // Only include pitchers with SP eligibility
+      const positions = (pitcher.positions as string[]) ?? [];
+      if (!positions.includes("SP")) continue;
+
       let projectedK: number | null = null;
       let projectedIP: number | null = null;
       let kPerGs: number | null = null;
@@ -265,9 +265,8 @@ export class GsPacingAgent {
         }
       }
 
-      // Only include pitchers who look like SPs (have IP projections)
-      const isPitcher = projectedIP !== null && projectedIP > 0;
-      if (!isPitcher && pitcher.roster_slot === "BENCH") continue;
+      // Skip low-IP pitchers (likely RPs/bulk relievers even with SP eligibility)
+      if (projectedIP !== null && projectedIP < 80) continue;
 
       let action: GsStartRecommendation["action"];
       let reason: string;
@@ -288,7 +287,7 @@ export class GsPacingAgent {
               : "Starting pitcher with no projection data";
         }
       } else if (season.paceStatus === "too_slow") {
-        if (pitcher.roster_slot === "BENCH" && isPitcher) {
+        if (pitcher.roster_slot === "BENCH") {
           action = "start";
           reason = "Activate to increase GS pace — currently underutilizing starts";
         } else {
@@ -407,23 +406,6 @@ export class GsPacingAgent {
     }
 
     return null;
-  }
-
-  private async countGsFromRosterSnapshots(
-    leagueId: number,
-    teamId: number,
-  ): Promise<number | null> {
-    // Count distinct (date, pitcher) pairs in SP slots
-    const count = await this.db
-      .selectFrom("team_roster_snapshot")
-      .select(({ fn }) => [fn.count<number>("player_id").as("count")])
-      .where("league_id", "=", leagueId)
-      .where("team_id", "=", teamId)
-      .where("roster_status", "=", "active")
-      .where("roster_slot", "in", SP_ROSTER_SLOTS)
-      .executeTakeFirst();
-
-    return count ? Number(count.count) : null;
   }
 
   private async getSeasonProgress(
