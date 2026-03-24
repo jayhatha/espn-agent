@@ -541,11 +541,11 @@ export class TradeRecommendationAgent {
           if (receiveAsv < 1) continue;
 
           // ASV realism: the other manager must see this as reasonable.
-          // Rule: the cheaper player must be worth at least 40% of the expensive player.
-          // Examples: $10 for $25 = 40% → OK. $5 for $25 = 20% → blocked. $15 for $20 = 75% → OK.
+          // Rule: the cheaper player must be worth at least 80% of the expensive player.
+          // Examples: $18 for $22 = 82% → OK. $10 for $25 = 40% → blocked. $20 for $24 = 83% → OK.
           const cheaperAsv = Math.min(giveAsv, receiveAsv);
           const expensiveAsv = Math.max(giveAsv, receiveAsv);
-          if (expensiveAsv > 0 && cheaperAsv / expensiveAsv < 0.40) {
+          if (expensiveAsv > 0 && cheaperAsv / expensiveAsv < 0.80) {
             continue; // Too lopsided — won't be accepted
           }
 
