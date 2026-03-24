@@ -534,23 +534,30 @@ export class TradeRecommendationAgent {
           // ASV-based trade realism filter
           // Philosophy: it's OK to give up ASV (overpay on paper) for standings improvement.
           // The other manager is more likely to accept if THEY get more ASV.
-          // So we filter out trades where WE get the higher-ASV player (other side won't accept).
-          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
-          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
+          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 0;
+          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 0;
 
-          // Block unrealistic trades: skip if the ASV gap is extreme AND we're getting the better value
-          // (Other manager won't trade away $50 player for a $5 player)
+          // Block 1: Don't offer our low-value player for their good player.
+          // A $0-$3 player is essentially untradeable for anyone with real value.
+          const MIN_TRADEABLE_ASV = 4;
+          if (giveAsv < MIN_TRADEABLE_ASV && receiveAsv >= MIN_TRADEABLE_ASV * 2) {
+            continue; // Our scrub for their real player — will never be accepted
+          }
+          if (receiveAsv < MIN_TRADEABLE_ASV && giveAsv >= MIN_TRADEABLE_ASV * 2) {
+            continue; // Their scrub for our real player — we'd never propose this
+          }
+
+          // Block 2: If we're trying to get a much more expensive player, the
+          // other side won't accept unless the gap is reasonable.
           if (receiveAsv > giveAsv) {
-            // We're trying to get the more expensive player — other side unlikely to accept
             const asvDiff = receiveAsv - giveAsv;
-            const pctOverpay = giveAsv > 0 ? asvDiff / receiveAsv : 1;
-            // Block if we'd need to overpay by >50% of the expensive player's value AND >$10
+            const pctOverpay = receiveAsv > 0 ? asvDiff / receiveAsv : 1;
+            // Block if gap is >50% of expensive player's value AND >$10
             if (pctOverpay > 0.50 && asvDiff > 10) {
               continue;
             }
           }
           // We're giving up the more expensive player — other side likely to accept
-          // No filter needed: this is exactly the "give up ASV for standings" scenario
 
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
