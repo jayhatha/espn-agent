@@ -27,7 +27,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
 
       const agent = new TransactionImpactAgent(db, request.log as any);
 
@@ -62,7 +62,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
       const sortBy = request.query.sortBy || "impact";
 
       const startDate = `${season}-04-01`;
@@ -174,7 +174,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
       const limit = request.query.limit ? parseInt(request.query.limit, 10) : 10;
 
       const startDate = `${season}-04-01`;
@@ -339,7 +339,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : 2025;
+      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
 
       const startDate = `${season}-04-01`;
       const endDate = `${season}-10-31`;
