@@ -41,8 +41,8 @@ const POSITIONS = ["ALL", "C", "1B", "2B", "3B", "SS", "OF", "SP", "RP", "DH"];
 
 const getDollarValueClass = (value: number): string => {
   if (value >= 20) return "text-positive font-semibold";
-  if (value >= 10) return "text-content font-medium";
-  return "text-content-secondary";
+  if (value >= 10) return "text-content dark:text-shell-text font-medium";
+  return "text-content-secondary dark:text-shell-muted";
 };
 
 export default function AuctionValuationPage() {
@@ -94,7 +94,7 @@ export default function AuctionValuationPage() {
           <div className="flex items-center gap-3">
             <label
               htmlFor="budget-input"
-              className="text-body-sm font-medium text-content whitespace-nowrap"
+              className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
             >
               Budget:
             </label>
@@ -116,7 +116,7 @@ export default function AuctionValuationPage() {
           <div className="flex items-center gap-3">
             <label
               htmlFor="minbid-input"
-              className="text-body-sm font-medium text-content whitespace-nowrap"
+              className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
             >
               Min Bid:
             </label>
@@ -138,7 +138,7 @@ export default function AuctionValuationPage() {
           <div className="flex items-center gap-3">
             <label
               htmlFor="position-filter"
-              className="text-body-sm font-medium text-content whitespace-nowrap"
+              className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
             >
               Position:
             </label>
@@ -175,11 +175,11 @@ export default function AuctionValuationPage() {
         {data && (
           <div className="flex flex-wrap gap-4 text-body-sm text-content-secondary">
             <span>
-              <span className="font-medium text-content">Players above replacement:</span>{" "}
+              <span className="font-medium text-content dark:text-shell-text">Players above replacement:</span>{" "}
               {data.meta.playersAboveReplacement}
             </span>
             <span>
-              <span className="font-medium text-content">Total spending:</span> $
+              <span className="font-medium text-content dark:text-shell-text">Total spending:</span> $
               {data.meta.budget * data.meta.totalTeams}
             </span>
           </div>
@@ -209,7 +209,7 @@ export default function AuctionValuationPage() {
       {!isLoading && !error && data?.valuations.length === 0 && (
         <div className="text-center py-12">
           <DollarSign className="mx-auto h-12 w-12 text-content-tertiary" />
-          <h3 className="mt-2 text-body-sm font-medium text-content">
+          <h3 className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
             No valuations available
           </h3>
           <p className="mt-1 text-body-sm text-content-secondary">
@@ -251,11 +251,11 @@ export default function AuctionValuationPage() {
                     key={valuation.playerId}
                     className="border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content dark:text-shell-text">
                       {index + 1}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-body-sm font-medium text-content">
+                      <div className="text-body-sm font-medium text-content dark:text-shell-text">
                         {valuation.playerName}
                       </div>
                     </td>

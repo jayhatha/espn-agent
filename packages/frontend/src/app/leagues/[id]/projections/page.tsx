@@ -108,7 +108,7 @@ export default function ProjectionsUploadPage() {
               />
               <label htmlFor="file-upload" className="cursor-pointer">
                 <Upload className="mx-auto h-12 w-12 text-content-tertiary mb-2" />
-                <p className="text-body-sm font-medium text-content">
+                <p className="text-body-sm font-medium text-content dark:text-shell-text">
                   {file ? file.name : "Drop CSV file here or click to browse"}
                 </p>
                 <p className="mt-1 text-xs text-content-secondary">

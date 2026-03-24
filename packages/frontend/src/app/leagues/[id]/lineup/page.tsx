@@ -157,7 +157,7 @@ export default function LineupOptimizerPage() {
                 <div className="flex items-center">
                   <CheckCircle className="h-8 w-8 text-positive mr-3 flex-shrink-0" />
                   <div>
-                    <h2 className="text-h3 font-semibold text-content">
+                    <h2 className="text-h3 font-semibold text-content dark:text-shell-text">
                       Your Lineup is Optimal!
                     </h2>
                     <p className="text-body-sm text-content-secondary mt-1">
@@ -174,7 +174,7 @@ export default function LineupOptimizerPage() {
                   <div className="flex items-center">
                     <AlertTriangle className="h-8 w-8 text-warning mr-3 flex-shrink-0" />
                     <div>
-                      <h2 className="text-h3 font-semibold text-content">
+                      <h2 className="text-h3 font-semibold text-content dark:text-shell-text">
                         {data.recommendations.length} Recommended Swap
                         {data.recommendations.length !== 1 ? "s" : ""}
                       </h2>
@@ -196,7 +196,7 @@ export default function LineupOptimizerPage() {
                   <CardContent className="py-5">
                     {/* Slot Header */}
                     <div className="mb-4">
-                      <h3 className="text-h4 font-semibold text-content">
+                      <h3 className="text-h4 font-semibold text-content dark:text-shell-text">
                         {rec.slotName}
                       </h3>
                     </div>
@@ -210,13 +210,13 @@ export default function LineupOptimizerPage() {
                             Start
                           </Badge>
                         </div>
-                        <div className="font-bold text-lg text-content mb-1">
+                        <div className="font-bold text-lg text-content dark:text-shell-text mb-1">
                           {rec.benchPlayerName}
                         </div>
                         <div className="text-body-sm text-content-secondary mb-2">
                           {rec.benchPlayerPositions.join(", ")}
                         </div>
-                        <div className="text-2xl font-bold text-positive">
+                        <div className="text-2xl font-bold font-mono text-positive">
                           {rec.benchPlayerProjectedValue.toFixed(2)}
                         </div>
                       </div>
@@ -233,20 +233,20 @@ export default function LineupOptimizerPage() {
                             Sit
                           </Badge>
                         </div>
-                        <div className="font-bold text-lg text-content mb-1">
+                        <div className="font-bold text-lg text-content dark:text-shell-text mb-1">
                           {rec.starterPlayerName}
                         </div>
                         <div className="text-body-sm text-content-secondary mb-2">
                           {rec.starterPlayerPositions.join(", ")}
                         </div>
-                        <div className="text-2xl font-medium text-content-secondary">
+                        <div className="text-2xl font-medium font-mono text-content-secondary">
                           {rec.starterPlayerProjectedValue.toFixed(2)}
                         </div>
                       </div>
                     </div>
 
                     {/* Reason and Gain */}
-                    <div className="mt-4 pt-4 border-t border-neutral-100">
+                    <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-shell-border">
                       <p className="text-body-sm text-content-secondary mb-2">{rec.reason}</p>
                       <div className="inline-flex items-center px-3 py-1 rounded-full bg-positive-light border border-positive-border text-body-sm font-semibold text-positive">
                         <TrendingUp className="w-4 h-4 mr-1" />

@@ -291,7 +291,7 @@ export default function WaiversPage() {
             )
             .map((impact) => (
               <tr key={impact.categoryId} className={impact.deltaPoints === 0 ? "opacity-40" : ""}>
-                <td className={cn("px-2 sm:px-3 py-2 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary" : "text-content")}>
+                <td className={cn("px-2 sm:px-3 py-2 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary" : "text-content dark:text-shell-text")}>
                   {impact.categoryName}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-center whitespace-nowrap">
@@ -345,7 +345,7 @@ export default function WaiversPage() {
             Drop
           </span>
         </div>
-        <div className="text-base sm:text-lg font-bold text-content truncate">
+        <div className="text-base sm:text-lg font-bold text-content dark:text-shell-text truncate">
           {dropName}
         </div>
         {dropPositions && (
@@ -367,7 +367,7 @@ export default function WaiversPage() {
             Add
           </span>
         </div>
-        <div className="text-base sm:text-lg font-bold text-content truncate">
+        <div className="text-base sm:text-lg font-bold text-content dark:text-shell-text truncate">
           {addName}
         </div>
         {addPositions && (
@@ -436,7 +436,7 @@ export default function WaiversPage() {
             <CardContent className="space-y-8">
               {groupByTopCategory(aiData.recommendations).map((group, groupIdx) => (
                 <div key={group.category} className="mb-2">
-                  <h3 className="text-h4 font-semibold text-content mb-3 flex items-center gap-2">
+                  <h3 className="text-h4 font-semibold text-content dark:text-shell-text mb-3 flex items-center gap-2">
                     {group.category}
                     <span className="text-caption text-content-secondary font-normal">
                       ({group.recs.length} {group.recs.length === 1 ? "recommendation" : "recommendations"})
@@ -567,14 +567,14 @@ export default function WaiversPage() {
                   {/* Free Agents Column */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <label className="block text-body-sm font-medium text-content">
+                      <label className="block text-body-sm font-medium text-content dark:text-shell-text">
                         Add from Waiver Wire
                       </label>
                       <div className="flex gap-2">
                         <select
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value)}
-                          className="text-data border border-neutral-200 rounded px-2 py-1 text-content"
+                          className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 text-content dark:text-shell-text dark:bg-shell-bg"
                         >
                           <option value="pct_owned">% Rostered</option>
                           <option value="name">Name A-Z</option>
@@ -614,7 +614,7 @@ export default function WaiversPage() {
                         </button>
                       </div>
                     )}
-                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-96 overflow-y-auto">
+                    <div className="border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel rounded-lg max-h-96 overflow-y-auto">
                       {freeAgentsData?.freeAgents &&
                       freeAgentsData.freeAgents.length > 0 ? (
                         <div className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -672,7 +672,7 @@ export default function WaiversPage() {
                     <label className="block text-body-sm font-medium text-content mb-3">
                       Drop from Your Roster
                     </label>
-                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-96 overflow-y-auto">
+                    <div className="border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel rounded-lg max-h-96 overflow-y-auto">
                       {rosterData?.roster && rosterData.roster.length > 0 ? (
                         <div className="divide-y divide-neutral-100 dark:divide-shell-border">
                           {rosterData.roster.map((player) => (
@@ -760,7 +760,7 @@ export default function WaiversPage() {
                   </div>
                   <div
                     className={cn(
-                      "text-3xl font-bold",
+                      "text-3xl font-bold font-mono",
                       evaluationResult.deltaOverallPoints > 0
                         ? "text-positive"
                         : evaluationResult.deltaOverallPoints < 0

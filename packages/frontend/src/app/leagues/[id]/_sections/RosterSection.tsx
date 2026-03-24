@@ -34,7 +34,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
             {/* Active Lineup */}
             {groupedRoster.active.length > 0 && (
               <div>
-                <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider mb-2">
+                <h3 className="text-body-sm font-semibold text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
                   Active Lineup ({groupedRoster.active.length})
                 </h3>
                 <div className="overflow-x-auto">
@@ -61,13 +61,13 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                           <td className="py-2 pr-4 text-data font-medium text-content-secondary w-12">
                             {p.roster_slot}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content dark:text-shell-text">
                             {p.player_name}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>
@@ -81,7 +81,7 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
             {/* Bench */}
             {groupedRoster.bench.length > 0 && (
               <div>
-                <h3 className="text-body-sm font-semibold text-content-secondary uppercase tracking-wider mb-2">
+                <h3 className="text-body-sm font-semibold text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
                   Bench ({groupedRoster.bench.length})
                 </h3>
                 <div className="overflow-x-auto">
@@ -108,13 +108,13 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                           <td className="py-2 pr-4 text-data font-medium text-content-tertiary w-12">
                             BE
                           </td>
-                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content dark:text-shell-text">
                             {p.player_name}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>
@@ -155,13 +155,13 @@ export function RosterSection({ groupedRoster, hasRosterData }: RosterSectionPro
                           <td className="py-2 pr-4 text-data font-medium text-negative w-12">
                             IL
                           </td>
-                          <td className="py-2 pr-4 text-body-sm font-medium text-content">
+                          <td className="py-2 pr-4 text-body-sm font-medium text-content dark:text-shell-text">
                             {p.player_name}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {p.mlb_team || "-"}
                           </td>
-                          <td className="py-2 pr-4 text-body-sm text-content-secondary">
+                          <td className="py-2 pr-4 text-body-sm text-content-secondary dark:text-shell-muted">
                             {(p.positions || []).join(", ")}
                           </td>
                         </tr>

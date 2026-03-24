@@ -116,11 +116,11 @@ export default function ConnectLeaguePage() {
                   className={cn(
                     "w-full text-left px-4 py-3 rounded-lg border-2 transition-colors",
                     selectedTeamEspnId === team.espnTeamId
-                      ? "border-accent bg-accent-light"
-                      : "border-neutral-200 hover:border-neutral-300"
+                      ? "border-accent bg-accent-light dark:bg-shell-accent/10"
+                      : "border-neutral-200 dark:border-shell-border hover:border-neutral-300 dark:hover:border-shell-muted"
                   )}
                 >
-                  <span className="font-medium text-content">{team.name}</span>
+                  <span className="font-medium text-content dark:text-shell-text">{team.name}</span>
                 </button>
               ))}
             </div>
@@ -133,7 +133,7 @@ export default function ConnectLeaguePage() {
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-neutral-100">
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-neutral-100 dark:border-shell-border">
               <button
                 type="button"
                 onClick={() => { setStep("form"); connectMutation.reset(); }}
@@ -262,7 +262,7 @@ export default function ConnectLeaguePage() {
             </div>
 
             {/* Advanced Options - Private League Auth */}
-            <div className="border-t border-neutral-200 pt-6">
+            <div className="border-t border-neutral-200 dark:border-shell-border pt-6">
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
@@ -281,7 +281,7 @@ export default function ConnectLeaguePage() {
               </Text>
 
               {showAdvanced && (
-                <div className="mt-4 space-y-4 bg-surface-secondary p-4 rounded-lg">
+                <div className="mt-4 space-y-4 bg-surface-secondary dark:bg-shell-bg p-4 rounded-lg">
                   <Text size="sm" color="secondary">
                     If your league is private, you'll need to provide authentication cookies from ESPN.{" "}
                     <a

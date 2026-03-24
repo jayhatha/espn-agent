@@ -19,13 +19,13 @@ export function ActionsSection({ actionItems, leagueId }: ActionsSectionProps) {
           <div className="flex gap-6">
             <Link
               href={`/leagues/${leagueId}/waivers`}
-              className="text-body-sm text-content-secondary hover:text-content transition-colors"
+              className="text-body-sm text-content-secondary hover:text-content dark:text-shell-muted dark:hover:text-shell-text transition-colors"
             >
               All Waivers &rarr;
             </Link>
             <Link
               href={`/leagues/${leagueId}/trades`}
-              className="text-body-sm text-content-secondary hover:text-content transition-colors"
+              className="text-body-sm text-content-secondary hover:text-content dark:text-shell-muted dark:hover:text-shell-text transition-colors"
             >
               All Trades &rarr;
             </Link>

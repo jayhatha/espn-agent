@@ -145,7 +145,7 @@ export default function DraftRankingsPage() {
       {!isLoading && !error && data?.rankings.length === 0 && (
         <div className="text-center py-12">
           <ClipboardList className="mx-auto h-12 w-12 text-content-tertiary" />
-          <h3 className="mt-2 text-body-sm font-medium text-content">
+          <h3 className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
             No rankings available
           </h3>
           <p className="mt-1 text-body-sm text-content-secondary">
@@ -187,11 +187,11 @@ export default function DraftRankingsPage() {
                     key={ranking.playerId}
                     className="border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content dark:text-shell-text">
                       {index + 1}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-body-sm font-medium text-content">
+                      <div className="text-body-sm font-medium text-content dark:text-shell-text">
                         {ranking.playerName}
                       </div>
                     </td>

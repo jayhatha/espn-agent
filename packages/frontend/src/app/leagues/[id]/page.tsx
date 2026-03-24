@@ -419,7 +419,7 @@ function LeagueDetailPageContent() {
               <div>
                 <label
                   htmlFor="swid"
-                  className="block text-body-sm font-medium text-content mb-1"
+                  className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
                 >
                   SWID
                 </label>
@@ -435,7 +435,7 @@ function LeagueDetailPageContent() {
               <div>
                 <label
                   htmlFor="espn_s2"
-                  className="block text-body-sm font-medium text-content mb-1"
+                  className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
                 >
                   espn_s2
                 </label>

@@ -191,12 +191,12 @@ export default function AuctionValidatePage() {
           {/* Top Players */}
           <div className="mb-6 flex flex-wrap gap-4 text-body-sm text-content-secondary">
             <span>
-              <span className="font-medium text-content">ESPN #1:</span>{" "}
+              <span className="font-medium text-content dark:text-shell-text">ESPN #1:</span>{" "}
               {data.summary.espnTopPlayer.name} ($
               {data.summary.espnTopPlayer.value})
             </span>
             <span>
-              <span className="font-medium text-content">Our #1:</span>{" "}
+              <span className="font-medium text-content dark:text-shell-text">Our #1:</span>{" "}
               {data.summary.ourTopPlayer.name} ($
               {data.summary.ourTopPlayer.value})
             </span>
@@ -207,7 +207,7 @@ export default function AuctionValidatePage() {
             <div className="flex items-center gap-3">
               <label
                 htmlFor="position-filter"
-                className="text-body-sm font-medium text-content whitespace-nowrap"
+                className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
               >
                 Position:
               </label>
@@ -228,7 +228,7 @@ export default function AuctionValidatePage() {
             <div className="flex items-center gap-3">
               <label
                 htmlFor="sort-select"
-                className="text-body-sm font-medium text-content whitespace-nowrap"
+                className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
               >
                 Sort by:
               </label>
@@ -314,11 +314,11 @@ export default function AuctionValidatePage() {
                                   <ChevronRight className="h-4 w-4" />
                                 ))}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
+                            <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content dark:text-shell-text">
                               {index + 1}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <div className="text-body-sm font-medium text-content">
+                              <div className="text-body-sm font-medium text-content dark:text-shell-text">
                                 {comp.playerName}
                               </div>
                             </td>
@@ -365,7 +365,7 @@ export default function AuctionValidatePage() {
                                   colSpan={9}
                                   className="px-8 py-3 bg-surface-secondary dark:bg-shell-bg"
                                 >
-                                  <div className="text-body-sm font-medium text-content mb-2">
+                                  <div className="text-body-sm font-medium text-content dark:text-shell-text mb-2">
                                     Projection Comparison (FanGraphs vs ESPN)
                                   </div>
                                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -425,7 +425,7 @@ export default function AuctionValidatePage() {
           ) : (
             <div className="text-center py-12">
               <BarChart3 className="mx-auto h-12 w-12 text-content-tertiary" />
-              <h3 className="mt-2 text-body-sm font-medium text-content">
+              <h3 className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
                 No comparisons available
               </h3>
               <p className="mt-1 text-body-sm text-content-secondary">
@@ -453,7 +453,7 @@ function SummaryCard({
   return (
     <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel px-4 py-3">
       <div className="text-body-sm text-content-secondary">{label}</div>
-      <div className={cn("text-lg font-semibold text-content", className)}>
+      <div className={cn("text-lg font-semibold font-mono text-content dark:text-shell-text", className)}>
         {value}
       </div>
     </div>

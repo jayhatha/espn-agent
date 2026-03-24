@@ -405,11 +405,11 @@ export default function StreamingPitchersPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="text-h4 font-semibold text-content mb-1">
+                        <h3 className="text-h4 font-semibold text-content dark:text-shell-text mb-1">
                           {candidate.playerName}
                         </h3>
                         <div className="flex items-center gap-2 text-body-sm text-content-secondary">
-                          <span className="font-medium text-content">{candidate.mlbTeam}</span>
+                          <span className="font-medium text-content dark:text-shell-text">{candidate.mlbTeam}</span>
                           <span className="text-content-tertiary">•</span>
                           <span>
                             {candidate.isHome ? "vs." : "@"}{" "}
@@ -424,7 +424,7 @@ export default function StreamingPitchersPage() {
                       <div className="flex flex-col items-end">
                         <div
                           className={cn(
-                            "text-3xl font-bold",
+                            "text-3xl font-bold font-mono",
                             getScoreClass(candidate.compositeScore)
                           )}
                         >
@@ -474,7 +474,7 @@ export default function StreamingPitchersPage() {
             <div className="w-16 h-16 bg-surface-secondary dark:bg-shell-bg rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-8 h-8 text-content-tertiary" />
             </div>
-            <h3 className="text-h4 font-semibold text-content mb-2">
+            <h3 className="text-h4 font-semibold text-content dark:text-shell-text mb-2">
               No Streaming Candidates Found
             </h3>
             <p className="text-body-sm text-content-secondary mb-4">

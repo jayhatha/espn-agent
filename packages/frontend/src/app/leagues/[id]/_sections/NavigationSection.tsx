@@ -73,7 +73,7 @@ export function NavigationSection({ leagueId }: NavigationSectionProps) {
                 className={
                   active
                     ? "px-4 py-2 rounded-md text-body font-semibold bg-accent text-content-inverse transition-colors"
-                    : "px-4 py-2 rounded-md text-body font-semibold text-content hover:bg-accent-light hover:text-content transition-colors"
+                    : "px-4 py-2 rounded-md text-body font-semibold text-content dark:text-shell-text hover:bg-accent-light dark:hover:bg-shell-panel hover:text-content transition-colors"
                 }
               >
                 {link.label}
@@ -94,7 +94,7 @@ export function NavigationSection({ leagueId }: NavigationSectionProps) {
                 className={
                   active
                     ? "px-3 py-1.5 rounded text-body-sm font-medium bg-accent text-content-inverse transition-colors"
-                    : "px-3 py-1.5 rounded text-body-sm text-content-secondary hover:bg-accent-light hover:text-content transition-colors"
+                    : "px-3 py-1.5 rounded text-body-sm text-content-secondary dark:text-shell-muted hover:bg-accent-light dark:hover:bg-shell-panel hover:text-content dark:hover:text-shell-text transition-colors"
                 }
               >
                 {link.label}
