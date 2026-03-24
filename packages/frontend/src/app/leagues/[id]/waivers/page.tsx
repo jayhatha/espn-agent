@@ -357,41 +357,34 @@ export default function WaiversPage() {
     dropPositions?: string[],
     addPositions?: string[],
   ) => (
-    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 mb-4">
-      {/* Drop Player */}
-      <div className="bg-negative-light border-2 border-negative-border rounded-lg p-3 sm:p-4">
-        <div className="flex items-center mb-2">
-          <span className="text-negative font-semibold text-data uppercase tracking-wide">
-            Drop
-          </span>
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
+      <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
+        <div className="text-[11px] font-semibold text-negative uppercase tracking-wider mb-1.5">
+          Drop
         </div>
-        <div className="text-base sm:text-lg font-bold text-content dark:text-shell-text truncate">
+        <div className="text-sm font-medium text-content dark:text-shell-text truncate">
           {dropName}
         </div>
         {dropPositions && (
-          <div className="text-data text-content-secondary mt-1">
+          <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">
             {dropPositions.join(", ")}
           </div>
         )}
       </div>
 
-      {/* Arrow */}
-      <div className="flex items-center justify-center sm:px-2">
-        <ArrowRight className="w-6 h-6 sm:w-8 sm:h-8 text-content-tertiary rotate-90 sm:rotate-0" />
+      <div className="flex items-center justify-center">
+        <ArrowRight className="w-5 h-5 text-shell-muted rotate-90 sm:rotate-0" />
       </div>
 
-      {/* Add Player */}
-      <div className="bg-positive-light border-2 border-positive-border rounded-lg p-3 sm:p-4">
-        <div className="flex items-center mb-2">
-          <span className="text-positive font-semibold text-data uppercase tracking-wide">
-            Add
-          </span>
+      <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
+        <div className="text-[11px] font-semibold text-positive uppercase tracking-wider mb-1.5">
+          Add
         </div>
-        <div className="text-base sm:text-lg font-bold text-content dark:text-shell-text truncate">
+        <div className="text-sm font-medium text-content dark:text-shell-text truncate">
           {addName}
         </div>
         {addPositions && (
-          <div className="text-data text-content-secondary mt-1">
+          <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">
             {addPositions.join(", ")}
           </div>
         )}
@@ -401,37 +394,41 @@ export default function WaiversPage() {
 
   return (
     <Container size="wide" className="py-6 sm:py-8">
-      <PageHeader
-        title="Waiver Wire"
-        subtitle={
-          viewMode === "ai"
-            ? "AI-generated add/drop moves that could maximize your roto points."
-            : "Manually evaluate the impact of any add/drop move."
-        }
-        backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
-      />
-
-      {/* Mode Switcher */}
-      {selectedTeamId && (
-        <div className="mb-6">
-          <div className="inline-flex rounded-lg border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel p-1">
-            <Button
-              variant={viewMode === "ai" ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("ai")}
-            >
-              AI Recommendations
-            </Button>
-            <Button
-              variant={viewMode === "manual" ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("manual")}
-            >
-              Manual Evaluation
-            </Button>
-          </div>
+      {/* Compact header with inline mode toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-content dark:text-shell-text">Waivers</h1>
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted">
+            {viewMode === "ai" ? "AI-generated add/drop recommendations" : "Evaluate any add/drop move"}
+          </p>
         </div>
-      )}
+        {selectedTeamId && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode("ai")}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                viewMode === "ai"
+                  ? "bg-accent text-white"
+                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+              )}
+            >
+              AI Picks
+            </button>
+            <button
+              onClick={() => setViewMode("manual")}
+              className={cn(
+                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                viewMode === "manual"
+                  ? "bg-accent text-white"
+                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+              )}
+            >
+              Manual Eval
+            </button>
+          </div>
+        )}
+      </div>
 
       {!selectedTeamId ? (
         <ErrorAlert
@@ -468,64 +465,36 @@ export default function WaiversPage() {
                       return (
                         <div
                           key={`${rec.addPlayerId}-${rec.dropPlayerId}`}
-                          className="border border-neutral-200 dark:border-shell-border rounded-lg p-4 sm:p-6 hover:shadow-card-hover transition-all"
+                          className="border border-shell-border rounded-lg p-4 sm:p-5 bg-shell-panel dark:bg-shell-panel hover:border-accent/40 transition-colors"
                         >
-                          {/* Header with Rank and Delta */}
-                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                            <div className="flex items-center space-x-3 sm:space-x-4">
-                              <span className="flex-shrink-0 inline-flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-accent text-content-inverse font-bold text-base sm:text-lg shadow-card">
-                                #{globalIdx + 1}
-                              </span>
-
-                              {/* Overall Impact */}
-                              <div>
-                                <div className="text-data font-medium text-content-secondary">
-                                  <Term id="roto-points">Projected Gain</Term>
-                                </div>
-                                <div className="text-h4 font-bold text-positive">
-                                  {rec.deltaOverallPoints > 0 ? "+" : ""}
-                                  {rec.deltaOverallPoints.toFixed(1)} pts
-                                </div>
-                              </div>
+                          {/* Compact header: delta + marginal label + ESPN link */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="px-2.5 py-1 rounded-md font-bold text-base font-mono bg-positive/10 text-positive">
+                              +{rec.deltaOverallPoints.toFixed(1)}
                             </div>
-
-                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                disabled
-                                title="Waiver claim execution coming soon"
+                            <div className="flex-1 min-w-0">
+                              {(() => {
+                                const topImpact = rec.categoryImpacts
+                                  ?.filter((ci) => Math.abs(ci.deltaPoints) > 0)
+                                  .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
+                                return topImpact ? (
+                                  <span className="text-xs font-semibold text-accent truncate block">
+                                    +{topImpact.deltaPoints.toFixed(0)} roto pts in {topImpact.categoryName}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                            {espnLeagueId && season && (
+                              <a
+                                href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-shrink-0 inline-flex items-center px-2.5 py-1 text-xs font-medium text-accent border border-accent/30 rounded hover:bg-accent/10 gap-1"
                               >
-                                Add to Queue
-                              </Button>
-                              {espnLeagueId && season && (
-                                <a
-                                  href={getESPNFreeAgentsUrl(espnLeagueId, season)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center justify-center px-3 h-8 bg-positive text-white rounded-md hover:bg-emerald-700 font-medium text-body-sm gap-2"
-                                >
-                                  Add on ESPN
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              )}
-                            </div>
+                                ESPN <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
                           </div>
-
-                          {/* Marginal Analysis Label (WAIVER-03) */}
-                          {(() => {
-                            const topImpact = rec.categoryImpacts
-                              ?.filter((ci) => Math.abs(ci.deltaPoints) > 0)
-                              .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
-                            const label = topImpact
-                              ? `This move gets you ${topImpact.deltaPoints > 0 ? "+" : ""}${topImpact.deltaPoints.toFixed(0)} roto point${Math.abs(topImpact.deltaPoints) !== 1 ? "s" : ""} in ${topImpact.categoryName}`
-                              : null;
-                            return label ? (
-                              <div className="text-body-sm font-semibold text-accent mb-3">
-                                {label}
-                              </div>
-                            ) : null;
-                          })()}
 
                           {/* Swap Visualization */}
                           {renderSwapVisualization(
@@ -534,7 +503,7 @@ export default function WaiversPage() {
                           )}
 
                           {/* Explanation */}
-                          <p className="text-data text-content-secondary mb-3 leading-relaxed">
+                          <p className="text-xs text-content-secondary dark:text-shell-muted leading-relaxed line-clamp-2 mb-2">
                             {rec.explanation}
                           </p>
 
@@ -608,7 +577,7 @@ export default function WaiversPage() {
                             ).map((opt) => opt.value);
                             setPositionFilter(selected);
                           }}
-                          className="text-data border border-neutral-200 rounded px-2 py-1 max-h-8 text-content"
+                          className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 max-h-8 text-content dark:text-shell-text dark:bg-shell-bg"
                           size={1}
                           title="Hold Ctrl/Cmd to select multiple positions"
                         >
