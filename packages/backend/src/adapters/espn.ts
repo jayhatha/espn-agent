@@ -134,7 +134,7 @@ export interface ESPNLeagueData {
     name: string;
     scoringFormat: string;
     categories: ESPNScoringCategory[];
-    rosterSlots: unknown[];
+    rosterSlots: Record<string, number>;
     acquisitionRules: unknown;
   };
   teams: ESPNTeamData[];
@@ -1181,7 +1181,7 @@ export class ESPNAdapter {
         name: settings?.name || "Unknown League",
         scoringFormat: settings?.scoringType || "roto",
         categories,
-        rosterSlots: settings?.rosterSettings?.lineupSlotCounts || [],
+        rosterSlots: this.mapRosterSlotIds(settings?.rosterSettings?.lineupSlotCounts || {}),
         acquisitionRules: {
           waiverType: settings?.acquisitionSettings?.waiverProcessDays,
           acquisitionLimit: settings?.acquisitionSettings?.acquisitionLimit,
@@ -1312,6 +1312,25 @@ export class ESPNAdapter {
       return result;
     }
     return typeof obj;
+  }
+
+  /**
+   * Map ESPN numeric lineup slot IDs to position name keys.
+   * ESPN's lineupSlotCounts uses numeric IDs like {"0": 1, "2": 1, "14": 5}.
+   * We convert to {"C": 1, "2B": 1, "SP": 5} for readable roster_slots.
+   */
+  private mapRosterSlotIds(slotCounts: Record<string, number>): Record<string, number> {
+    const mapped: Record<string, number> = {};
+    for (const [slotIdStr, count] of Object.entries(slotCounts)) {
+      if (count <= 0) continue;
+      const slotId = parseInt(slotIdStr, 10);
+      const posName = ESPN_LINEUP_SLOT_MAP[slotId];
+      if (posName) {
+        // Merge duplicates (e.g., slot 16 "BE" = bench)
+        mapped[posName] = (mapped[posName] || 0) + count;
+      }
+    }
+    return mapped;
   }
 
   private getCacheKey(options: ESPNFetchOptions): string {
