@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v6.0
+milestone_name: In-Season Command Center
+status: completed
+stopped_at: Completed 71-01-PLAN.md
+last_updated: "2026-03-24T22:24:37.308Z"
+last_activity: 2026-03-24 — Completed Phase 71 Plan 01 (Moves Page Data Population)
+progress:
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
+---
+
 # Project State
 
 ## Project Reference
@@ -5,20 +21,21 @@
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v6.0 In-Season Command Center — Phase 70: Trends and Efficiency
+**Current focus:** v6.0 In-Season Command Center — Phase 71: Moves Page Data Population
 
 ## Current Position
 
-Phase: 70 of 70 (Trends and Efficiency)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-23 — Completed Phase 69 (Trade Finder) — 2 plans, all requirements met
+Phase: 71 (Moves Page Data Population)
+Plan: 01 complete (1 of 1)
+Status: Phase complete
+Last activity: 2026-03-24 — Completed Phase 71 Plan 01 (Moves Page Data Population)
 
-Progress: [███████████████████░] 169/174 plans (97%)
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed (v5.0): ~35 plans
 - v6.0 plans: 7 completed
 
@@ -34,6 +51,7 @@ Progress: [███████████████████░] 169/174
 | 69-trade-finder | 02 | 8 min | 2 | 1 |
 
 *Updated after each plan completion*
+| Phase 71 P01 | 3 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -61,6 +79,11 @@ Progress: [███████████████████░] 169/174
 - [Phase 69]: Auto trade finder is default view on trades page (showAnalyzer=false)
 - [Phase 69]: Fairness score numeric removed from UI — likelihood label (high/medium/low) is sufficient
 - [Phase 103]: Replaced font-display (DM Serif Display) with font-extrabold/font-bold for Inter-only typography; dark:text-shell-text/dark:text-shell-muted as standard contrast pairing
+- [Phase 71]: new Date().getFullYear() for API season defaults -- self-updating across seasons with zero maintenance
+
+### Roadmap Evolution
+
+- Phase 71 added: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 
 ### Blockers/Concerns
 
@@ -92,10 +115,10 @@ None yet.
 | 103 | Fix standings page readability — remove DM Serif, dark mode contrast | 2026-03-24 | 762a42f | [103-fix-standings-page-readability-redesign-](./quick/103-fix-standings-page-readability-redesign-/) |
 | 104 | Fix snapshot freshness — clear ESPN cache on forceFresh, add scoringPeriodId | 2026-03-24 | 139f644 | [104-fix-snapshot-freshness-clear-espn-cache-](./quick/104-fix-snapshot-freshness-clear-espn-cache-/) |
 | 105 | Fix FAAB — extract remaining budget from ESPN team data | 2026-03-24 | e7a5ec9 | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/) |
-| 106 | Fix ASV filter — default missing players to $1 instead of skipping | 2026-03-24 | pending | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/) |
+| 106 | Fix ASV filter — default missing players to $1 instead of skipping | 2026-03-24 | 6192346 | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/) |
 
 ## Session Continuity
 
-Last session: 2026-03-24
-Stopped at: Completed Quick Task 106 (Fix ASV Filter)
+Last session: 2026-03-24T22:24:37.298Z
+Stopped at: Completed 71-01-PLAN.md
 Resume file: None

@@ -173,7 +173,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 **Goal:** Populate the moves page with real data by fixing disconnected data pipeline: dynamic season defaults, UI trigger for impact computation, and actionable empty states
 **Depends on:** Phase 70
 **Requirements:** MOVES-01, MOVES-02, MOVES-03, MOVES-04
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 71-01-PLAN.md — Fix season defaults, add Compute Impacts button, improve empty states
+- [x] 71-01-PLAN.md — Fix season defaults, add Compute Impacts button, improve empty states
