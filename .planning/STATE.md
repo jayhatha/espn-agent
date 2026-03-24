@@ -60,6 +60,7 @@ Progress: [███████████████████░] 169/174
 - [Phase 69]: Trade simulation uses category_id (not stat_key) as map key — matches DB schema for team_daily_projected_category
 - [Phase 69]: Auto trade finder is default view on trades page (showAnalyzer=false)
 - [Phase 69]: Fairness score numeric removed from UI — likelihood label (high/medium/low) is sufficient
+- [Phase 103]: Replaced font-display (DM Serif Display) with font-extrabold/font-bold for Inter-only typography; dark:text-shell-text/dark:text-shell-muted as standard contrast pairing
 
 ### Blockers/Concerns
 
@@ -88,9 +89,10 @@ None yet.
 | 100 | UI audit — Inter/JetBrains Mono consistency + dark mode contrast | 2026-03-23 | 756c5cd | [100-ui-audit-inter-jetbrains-mono-consistenc](./quick/100-ui-audit-inter-jetbrains-mono-consistenc/) |
 | 101 | Fix waiver rank color inversion and trade roster slot validation | 2026-03-24 | fde4071 | [101-fix-waiver-rank-color-inversion-and-trad](./quick/101-fix-waiver-rank-color-inversion-and-trad/) |
 | 102 | Fix GS tracker counting roster slots and FAAB budget default | 2026-03-24 | 0f19c72 | [102-fix-gs-tracker-counting-roster-slots-not](./quick/102-fix-gs-tracker-counting-roster-slots-not/) |
+| 103 | Fix standings page readability — remove DM Serif, dark mode contrast | 2026-03-24 | 762a42f | [103-fix-standings-page-readability-redesign-](./quick/103-fix-standings-page-readability-redesign-/) |
 
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed Quick Task 102 (Fix GS Tracker and FAAB Budget)
+Stopped at: Completed Quick Task 103 (Fix Standings Page Readability)
 Resume file: None
