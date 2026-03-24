@@ -108,11 +108,17 @@ export class SnapshotOrchestratorAgent {
         rawData = prefetchedData;
         this.logger?.info({ leagueId, snapshotDate }, "Using pre-fetched ESPN data");
       } else {
+        // Clear adapter cache on forceFresh to ensure we get live ESPN data
+        if (forceFresh) {
+          this.espnAdapter.clearCache();
+        }
+
         const espnData = await this.espnAdapter.fetchLeague({
           leagueId: league.espn_league_id,
           season: league.season,
           auth: espnAuth,
           views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+          scoringPeriodId: 1,
           xFantasyFilter: {
             players: {
               limit: 1500,

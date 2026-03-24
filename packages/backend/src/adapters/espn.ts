@@ -1328,4 +1328,13 @@ export class ESPNAdapter {
       expiresAt: Date.now() + ttlMs,
     });
   }
+
+  /**
+   * Clear all cached ESPN responses. Call before forceFresh fetches
+   * to ensure the adapter doesn't serve stale data.
+   */
+  clearCache(): void {
+    this.cache.clear();
+    this.logger?.info("ESPN adapter cache cleared");
+  }
 }
