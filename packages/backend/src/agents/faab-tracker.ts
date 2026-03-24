@@ -14,7 +14,7 @@ import type {
  * spend-rate projections, and suggested bid amounts.
  */
 
-const DEFAULT_FAAB_BUDGET = 100;
+const DEFAULT_FAAB_BUDGET = 1000;
 const MLB_SEASON_WEEKS = 26;
 
 export class FaabTrackerAgent {
@@ -291,11 +291,25 @@ export class FaabTrackerAgent {
     if (settings?.settings_json) {
       const json = settings.settings_json as unknown as Record<string, unknown>;
       const acqRules = json.acquisition_rules as Record<string, unknown> | undefined;
-      if (acqRules?.acquisition_budget !== undefined) {
-        return acqRules.acquisition_budget as number;
+
+      // Check multiple possible field names for FAAB budget
+      const candidates: (unknown | undefined)[] = [
+        acqRules?.acquisition_budget,
+        acqRules?.acquisitionBudget,
+        acqRules?.budget,
+        acqRules?.faab_budget,
+        (json as Record<string, unknown>).acquisitionBudget,
+        (json as Record<string, unknown>).acquisition_budget,
+      ];
+
+      for (const val of candidates) {
+        if (val !== undefined && val !== null && typeof val === "number" && val > 0) {
+          return val;
+        }
       }
     }
 
+    this.logger?.warn({ leagueId }, "FAAB budget not found in settings, using default");
     return DEFAULT_FAAB_BUDGET;
   }
 
