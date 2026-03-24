@@ -12,6 +12,11 @@ export function Navigation() {
   const pathname = usePathname();
   const { user, logout: authLogout } = useAuth();
 
+  // Hide global nav on league pages — LeagueNav handles navigation there
+  if (pathname.startsWith("/leagues/") && pathname.split("/").length > 3) {
+    return null;
+  }
+
   const isLoggedIn = !!user;
   const isAdmin = user?.role === "admin";
 
@@ -34,7 +39,7 @@ export function Navigation() {
     <nav
       aria-label="Main navigation"
       role="navigation"
-      className="bg-white border-b border-neutral-200 sticky top-0 z-50"
+      className="bg-white dark:bg-shell-panel border-b border-neutral-200 dark:border-shell-border sticky top-0 z-50"
     >
       <div className="max-w-content-wide mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
