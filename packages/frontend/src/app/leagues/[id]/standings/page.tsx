@@ -233,7 +233,7 @@ export default function StandingsPage() {
       label: "Rank",
       align: "left",
       format: (val) => (
-        <span className="font-medium text-content">{val}</span>
+        <span className="font-medium text-content dark:text-shell-text">{val}</span>
       ),
     },
     {
@@ -245,7 +245,7 @@ export default function StandingsPage() {
           {selectedTeamId === row.team_id && (
             <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
           )}
-          <span className="font-medium text-content">{val}</span>
+          <span className="font-medium text-content dark:text-shell-text">{val}</span>
         </div>
       ),
     },
@@ -254,7 +254,7 @@ export default function StandingsPage() {
       label: "Total Roto Points",
       align: "right",
       format: (val) => (
-        <span className="font-semibold text-data text-content">{Number(val)}</span>
+        <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
       ),
     },
   ];
@@ -266,7 +266,7 @@ export default function StandingsPage() {
       label: "Rank",
       align: "left",
       format: (val) => (
-        <span className="font-medium text-content">{val}</span>
+        <span className="font-medium text-content dark:text-shell-text">{val}</span>
       ),
     },
     {
@@ -278,7 +278,7 @@ export default function StandingsPage() {
           {selectedTeamId === row.team_id && (
             <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
           )}
-          <span className="font-medium text-content">{val}</span>
+          <span className="font-medium text-content dark:text-shell-text">{val}</span>
         </div>
       ),
     },
@@ -287,7 +287,7 @@ export default function StandingsPage() {
       label: "Total Roto Points",
       align: "right",
       format: (val) => (
-        <span className="font-semibold text-data text-content">{Number(val)}</span>
+        <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
       ),
     },
     {
@@ -342,14 +342,14 @@ export default function StandingsPage() {
             <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
               <thead className="bg-surface-secondary dark:bg-shell-bg">
                 <tr>
-                  <th className="px-3 py-3 text-left text-data font-medium text-content-secondary uppercase tracking-wider sticky left-0 bg-surface-secondary dark:bg-shell-bg z-10">
+                  <th className="px-3 py-3 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider sticky left-0 bg-surface-secondary dark:bg-shell-bg z-10">
                     Team
                   </th>
                   {categories.map((cat) => (
                     <th
                       key={cat.category_id}
                       className={cn(
-                        "px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider min-w-[80px]",
+                        "px-3 py-3 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider min-w-[80px]",
                         showGapDetail && "cursor-pointer hover:text-accent transition-colors",
                         expandedCategory === cat.category_id && "text-accent",
                       )}
@@ -370,7 +370,7 @@ export default function StandingsPage() {
                       )}
                     </th>
                   ))}
-                  <th className="px-3 py-3 text-center text-data font-medium text-content-secondary uppercase tracking-wider font-bold">
+                  <th className="px-3 py-3 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider font-bold">
                     <Term id="roto-points">Total</Term>
                   </th>
                 </tr>
@@ -386,10 +386,10 @@ export default function StandingsPage() {
                         key={team.team_id}
                         className={cn(
                           "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
-                          isSelected ? "bg-accent-light" : "",
+                          isSelected ? "bg-accent-light dark:bg-shell-accent/10" : "",
                         )}
                       >
-                        <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content sticky left-0 bg-inherit z-10">
+                        <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text sticky left-0 bg-inherit z-10">
                           <div className="flex items-center">
                             {isSelected && (
                               <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
@@ -422,7 +422,7 @@ export default function StandingsPage() {
                               className="px-3 py-3 text-center"
                             >
                               <div className="flex flex-col items-center">
-                                <span className="text-data text-content font-medium">
+                                <span className="text-data text-content dark:text-shell-text font-medium">
                                   {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
                                 </span>
                                 <span
@@ -447,7 +447,7 @@ export default function StandingsPage() {
                             </td>
                           );
                         })}
-                        <td className="px-3 py-3 text-center text-data font-bold text-content">
+                        <td className="px-3 py-3 text-center text-data font-bold text-content dark:text-shell-text">
                           {Number(team[overallPointsKey])}
                         </td>
                       </tr>
@@ -499,7 +499,7 @@ export default function StandingsPage() {
       />
 
       {data?.snapshotDate && (
-        <p className="mt-1 mb-6 text-body-sm text-content-secondary">
+        <p className="mt-1 mb-6 text-body-sm text-content-secondary dark:text-shell-muted">
           As of snapshot: {data.snapshotDate}
           {data.previousSnapshotDate && viewMode === "projected" && (
             <span className="text-content-tertiary ml-2">
@@ -524,8 +524,8 @@ export default function StandingsPage() {
                   className={cn(
                     "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
                     viewMode === "current"
-                      ? "border-accent text-content"
-                      : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300",
+                      ? "border-accent text-content dark:text-shell-text"
+                      : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300",
                   )}
                 >
                   Current Standings
@@ -535,8 +535,8 @@ export default function StandingsPage() {
                   className={cn(
                     "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
                     viewMode === "projected"
-                      ? "border-accent text-content"
-                      : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300",
+                      ? "border-accent text-content dark:text-shell-text"
+                      : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300",
                   )}
                 >
                   Projected Standings
@@ -649,7 +649,7 @@ export default function StandingsPage() {
                                 >
                                   #{gain.currentRank}
                                 </span>
-                                <span className="font-medium text-body-sm text-content">
+                                <span className="font-medium text-body-sm text-content dark:text-shell-text">
                                   {gain.categoryName}
                                 </span>
                               </div>
