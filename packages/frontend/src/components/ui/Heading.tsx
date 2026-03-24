@@ -4,8 +4,8 @@ import { cn } from "@/lib/cn";
 export const headingVariants = cva("tracking-tight text-content dark:text-shell-text", {
   variants: {
     level: {
-      1: "text-h1 font-display",
-      2: "text-h2 font-display",
+      1: "text-h1 font-extrabold",
+      2: "text-h2 font-bold",
       3: "text-h3 font-semibold",
       4: "text-h4 font-semibold",
     },

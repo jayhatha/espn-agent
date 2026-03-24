@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, DM_Serif_Display, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Navigation } from "./navigation";
 
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
-
-const dmSerifDisplay = DM_Serif_Display({
-  weight: "400",
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-display",
-});
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -31,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${dmSerifDisplay.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="font-sans">
         <a href="#main-content" className="skip-to-content">
           Skip to content

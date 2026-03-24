@@ -10,7 +10,6 @@ module.exports = {
     extend: {
       fontFamily: {
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
-        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       fontSize: {
         // Display (landing page hero only)

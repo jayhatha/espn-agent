@@ -170,7 +170,7 @@ export function IdentitySection({
             {/* Hero Card */}
             <div className="border-l-4 border-shell-accent bg-white dark:bg-shell-panel rounded-r-lg pl-5 pr-4 py-5 mb-3">
               {/* Team name */}
-              <h1 className="text-3xl font-display tracking-tight text-content dark:text-shell-text mb-4">
+              <h1 className="text-3xl font-extrabold tracking-tight text-content dark:text-shell-text mb-4">
                 {teamOverview.team.name}
               </h1>
 
@@ -305,7 +305,7 @@ export function IdentitySection({
         ) : (
           /* No team selected: show team selector as the primary CTA */
           <div className="mb-4">
-            <h1 className="text-h1 font-display tracking-tight text-content dark:text-shell-text mb-2">
+            <h1 className="text-h1 font-extrabold tracking-tight text-content dark:text-shell-text mb-2">
               Season Snapshot &mdash; {league.season}
             </h1>
             <p className="text-body-sm text-content-tertiary mb-6">
