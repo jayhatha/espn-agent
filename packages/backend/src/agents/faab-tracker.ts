@@ -32,32 +32,36 @@ export class FaabTrackerAgent {
     // Get FAAB total budget from league settings
     const faabTotal = await this.getFaabBudget(leagueId);
 
-    // Get all teams in the league
+    // Get all teams with FAAB spent from ESPN data (populated by snapshot)
     const teams = await this.db
       .selectFrom("team")
-      .select(["id"])
+      .select(["id", "faab_spent"])
       .where("league_id", "=", leagueId)
       .execute();
 
-    const teamIds = teams.map((t) => t.id);
+    // Use ESPN-reported faab_spent directly (falls back to transaction-derived if null)
+    const myTeam = teams.find((t) => t.id === teamId);
+    let mySpent: number;
 
-    // Get all waiver bids with amounts for all teams
-    const allBids = await this.getTeamBids(leagueId, teamIds);
-
-    // Compute per-team spending
-    const spendByTeam = new Map<number, number>();
-    for (const bid of allBids) {
-      const current = spendByTeam.get(bid.teamId) || 0;
-      spendByTeam.set(bid.teamId, current + bid.bidAmount);
+    if (myTeam?.faab_spent !== null && myTeam?.faab_spent !== undefined) {
+      mySpent = Number(myTeam.faab_spent);
+    } else {
+      // Fallback: derive from transaction events (legacy path)
+      const teamIds = teams.map((t) => t.id);
+      const allBids = await this.getTeamBids(leagueId, teamIds);
+      mySpent = allBids
+        .filter((b) => b.teamId === teamId)
+        .reduce((sum, b) => sum + b.bidAmount, 0);
     }
 
-    const mySpent = spendByTeam.get(teamId) || 0;
     const faabRemaining = faabTotal - mySpent;
 
-    // League average remaining
+    // League average remaining — use ESPN faab_spent where available
     let totalLeagueRemaining = 0;
     for (const t of teams) {
-      const spent = spendByTeam.get(t.id) || 0;
+      const spent = t.faab_spent !== null && t.faab_spent !== undefined
+        ? Number(t.faab_spent)
+        : 0;
       totalLeagueRemaining += faabTotal - spent;
     }
     const leagueAvgRemaining =

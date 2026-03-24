@@ -86,6 +86,7 @@ export interface ESPNTeamData {
   roster: ESPNRosterEntry[];
   primaryOwner?: string; // SWID of primary owner
   owners?: string[]; // Array of SWIDs
+  faabSpent?: number; // FAAB dollars spent from transactionCounter
 }
 
 export interface ESPNFreeAgent {
@@ -1231,6 +1232,12 @@ export class ESPNAdapter {
           });
         }
 
+        // Extract FAAB spent from ESPN transactionCounter
+        const faabSpent: number | undefined =
+          t.transactionCounter?.acquisitionBudgetSpent ??
+          t.transactionCounter?.spent ??
+          undefined;
+
         return {
           id: t.id,
           name: teamName,
@@ -1239,6 +1246,7 @@ export class ESPNAdapter {
           roster: rosterEntries,
           primaryOwner: t.primaryOwner,
           owners: t.owners || [],
+          faabSpent: typeof faabSpent === "number" ? faabSpent : undefined,
         };
       }),
       standings: teams.map((t: any) => ({

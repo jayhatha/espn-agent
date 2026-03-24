@@ -293,6 +293,11 @@ export class SnapshotOrchestratorAgent {
 
         // Write teams and collect DB team IDs
         for (const team of normalized.teams) {
+          const updateSet: Record<string, unknown> = { name: team.name };
+          if (team.faabSpent !== undefined) {
+            updateSet.faab_spent = team.faabSpent;
+          }
+
           const result = await trx
             .insertInto("team")
             .values({
@@ -300,11 +305,10 @@ export class SnapshotOrchestratorAgent {
               espn_team_id: team.id,
               name: team.name,
               created_at: new Date(),
+              ...(team.faabSpent !== undefined ? { faab_spent: team.faabSpent } : {}),
             })
             .onConflict((oc) =>
-              oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
-                name: team.name,
-              }),
+              oc.columns(["league_id", "espn_team_id"]).doUpdateSet(updateSet),
             )
             .returning("id")
             .executeTakeFirstOrThrow();

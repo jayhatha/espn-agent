@@ -104,6 +104,7 @@ export interface Team {
   name: string;
   user_id: number | null;
   created_at: Date;
+  faab_spent: number | null;
 }
 
 // League
