@@ -235,10 +235,10 @@ export default function MovesPage() {
 
   const tabClass = (active: boolean) =>
     cn(
-      "whitespace-nowrap py-4 px-6 border-b-2 font-medium text-body-sm transition-colors",
+      "whitespace-nowrap py-3 px-5 border-b-2 font-medium text-sm transition-colors",
       active
-        ? "border-accent text-content font-semibold"
-        : "border-transparent text-content-secondary hover:text-content hover:border-accent/40"
+        ? "border-accent text-accent font-semibold"
+        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-accent/40"
     );
 
   return (
@@ -612,32 +612,36 @@ function LeagueSummaryTab({
     <div className="space-y-8">
       {/* League-wide stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-4">
-          <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Moves (League)</div>
-          <div className="text-2xl font-bold text-content mt-1">{data.totalMovesLeagueWide}</div>
+        <div className="rounded-lg border border-shell-border bg-shell-panel p-4">
+          <div className="text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Total Moves (League)</div>
+          <div className="text-2xl font-bold font-mono text-content dark:text-shell-text mt-1">{data.totalMovesLeagueWide}</div>
         </div>
-        <div className="rounded-lg border border-positive-border bg-positive-light p-4">
+        <div className="rounded-lg border border-shell-border bg-shell-panel p-4">
           <div className="text-xs font-medium text-positive uppercase tracking-wide">Best Single Move</div>
-          {bestMoves[0] && (
+          {bestMoves[0] ? (
             <>
-              <div className="text-body-sm font-semibold text-content mt-1">
+              <div className="text-sm font-semibold text-content dark:text-shell-text mt-1">
                 {bestMoves[0].playerGained?.name || "—"}
               </div>
-              <div className="text-xs text-content-secondary">{bestMoves[0].teamName}</div>
+              <div className="text-xs text-content-secondary dark:text-shell-muted">{bestMoves[0].teamName}</div>
               <ImpactBadge impact={bestMoves[0].impact} size="sm" />
             </>
+          ) : (
+            <div className="text-sm text-content-secondary dark:text-shell-muted mt-1">No moves yet</div>
           )}
         </div>
-        <div className="rounded-lg border border-negative-border bg-negative-light p-4">
+        <div className="rounded-lg border border-shell-border bg-shell-panel p-4">
           <div className="text-xs font-medium text-negative uppercase tracking-wide">Worst Single Move</div>
-          {worstMoves[0] && (
+          {worstMoves[0] ? (
             <>
-              <div className="text-body-sm font-semibold text-content mt-1">
+              <div className="text-sm font-semibold text-content dark:text-shell-text mt-1">
                 {worstMoves[0].playerGained?.name || worstMoves[0].playerLost?.name || "—"}
               </div>
-              <div className="text-xs text-content-secondary">{worstMoves[0].teamName}</div>
+              <div className="text-xs text-content-secondary dark:text-shell-muted">{worstMoves[0].teamName}</div>
               <ImpactBadge impact={worstMoves[0].impact} size="sm" />
             </>
+          ) : (
+            <div className="text-sm text-content-secondary dark:text-shell-muted mt-1">No moves yet</div>
           )}
         </div>
       </div>
@@ -646,8 +650,8 @@ function LeagueSummaryTab({
       <div>
         <Heading level={3} className="mb-3">Roster Manager Rankings</Heading>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
-            <thead className="bg-surface-secondary dark:bg-shell-bg">
+          <table className="min-w-full divide-y divide-shell-border">
+            <thead className="bg-shell-bg">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Rank</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Team</th>
@@ -662,8 +666,8 @@ function LeagueSummaryTab({
                 <tr
                   key={team.teamId}
                   className={cn(
-                    "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
-                    team.teamId === selectedTeamId && "bg-accent-light"
+                    "border-b border-shell-border hover:bg-shell-bg transition-colors",
+                    team.teamId === selectedTeamId && "bg-accent/10"
                   )}
                 >
                   <td className="px-4 py-3 text-body-sm font-medium text-content">
@@ -737,8 +741,8 @@ function MoveListTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
-        <thead className="bg-surface-secondary dark:bg-shell-bg">
+      <table className="min-w-full divide-y divide-shell-border">
+        <thead className="bg-shell-bg">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Date</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Team</th>
@@ -753,8 +757,8 @@ function MoveListTable({
             <tr
               key={m.id}
               className={cn(
-                "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
-                m.teamId === selectedTeamId && "bg-accent-light"
+                "border-b border-shell-border hover:bg-shell-bg transition-colors",
+                m.teamId === selectedTeamId && "bg-accent/10"
               )}
             >
               <td className="px-4 py-3 text-body-sm text-content-secondary">
@@ -805,7 +809,7 @@ function TradePackageList({
           className={cn(
             "border rounded-lg p-4",
             pkg.teamId === selectedTeamId
-              ? "border-accent bg-accent-light"
+              ? "border-accent bg-accent/10"
               : "border-shell-border"
           )}
         >
@@ -875,7 +879,7 @@ function LeaderboardTab({
               "px-3 py-1 rounded-full text-xs font-medium transition-colors",
               moveFilter === f
                 ? "bg-accent text-content-inverse"
-                : "bg-surface-secondary dark:bg-shell-bg text-content-secondary hover:bg-neutral-200 dark:hover:bg-shell-panel"
+                : "bg-shell-bg text-content-secondary hover:bg-neutral-200 dark:hover:bg-shell-panel"
             )}
           >
             {f === "all" ? "All" : MOVE_TYPE_LABELS[f] || f}
@@ -885,8 +889,8 @@ function LeaderboardTab({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
-          <thead className="bg-surface-secondary dark:bg-shell-bg">
+        <table className="min-w-full divide-y divide-shell-border">
+          <thead className="bg-shell-bg">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Date</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Type</th>
@@ -910,7 +914,7 @@ function LeaderboardTab({
                 <tr key={move.id} className={cn("group", move.isUncertain && "opacity-80")}>
                   <td colSpan={6} className="p-0">
                     <div
-                      className="px-4 py-3 cursor-pointer hover:bg-surface-secondary dark:hover:bg-shell-bg grid grid-cols-6 items-center transition-colors"
+                      className="px-4 py-3 cursor-pointer hover:bg-shell-bg grid grid-cols-6 items-center transition-colors"
                       onClick={() => setExpandedMoveId(expandedMoveId === move.id ? null : move.id)}
                     >
                       <div className="text-body-sm text-content-secondary">
@@ -1009,11 +1013,11 @@ function DraftReportTab({
       {/* Draft Summary */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
+          <div className="rounded-lg border border-shell-border bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Picks</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalPicks}</div>
           </div>
-          <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
+          <div className="rounded-lg border border-shell-border bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Draft Value</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalDraftValue.toFixed(1)} pts</div>
           </div>
@@ -1040,8 +1044,8 @@ function DraftReportTab({
 
       {/* Draft Picks Table */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
-          <thead className="bg-surface-secondary dark:bg-shell-bg">
+        <table className="min-w-full divide-y divide-shell-border">
+          <thead className="bg-shell-bg">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">#</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary uppercase tracking-wide">Player</th>
@@ -1059,7 +1063,7 @@ function DraftReportTab({
                 <tr
                   key={pick.playerId}
                   className={cn(
-                    "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                    "border-b border-shell-border hover:bg-shell-bg transition-colors",
                     !pick.stillOnTeam && "opacity-60"
                   )}
                 >
@@ -1201,7 +1205,7 @@ function TradesTab({
             >
               {/* Trade header row */}
               <div
-                className="px-4 py-3 cursor-pointer hover:bg-surface-secondary dark:hover:bg-shell-bg flex items-center gap-4 transition-colors"
+                className="px-4 py-3 cursor-pointer hover:bg-shell-bg flex items-center gap-4 transition-colors"
                 onClick={() => setExpandedMoveId(isExpanded ? null : group.legs[0].id)}
               >
                 {/* Date */}
@@ -1258,7 +1262,7 @@ function TradesTab({
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="border-t border-shell-border bg-surface-secondary dark:bg-shell-bg px-4 py-3">
+                <div className="border-t border-shell-border bg-shell-bg px-4 py-3">
                   {group.legs.map((leg, idx) => {
                     const legImpact = leg.shapleyImpact ?? leg.impactRotoPoints;
                     return (
