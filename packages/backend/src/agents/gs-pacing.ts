@@ -62,13 +62,15 @@ export class GsPacingAgent {
     const projectedFinal = Math.round(pacePerWeek * (weeksElapsed + weeksRemaining));
 
     // Determine pace status
+    // Pre-season (no weeks elapsed or no starts used): always "on_track"
     let paceStatus: PaceStatus = "on_track";
-    const paceRatio = targetPacePerWeek > 0 ? pacePerWeek / targetPacePerWeek : 1;
-
-    if (paceRatio > 1.1) {
-      paceStatus = "burning_fast";
-    } else if (paceRatio < 0.9) {
-      paceStatus = "too_slow";
+    if (weeksElapsed > 0 && gsUsed > 0) {
+      const paceRatio = targetPacePerWeek > 0 ? pacePerWeek / targetPacePerWeek : 1;
+      if (paceRatio > 1.1) {
+        paceStatus = "burning_fast";
+      } else if (paceRatio < 0.9) {
+        paceStatus = "too_slow";
+      }
     }
 
     return {
