@@ -86,9 +86,10 @@ None yet.
 | 98 | Dashboard UX overhaul — hero card, status bar, tiered actions | 2026-03-23 | 5ac9ae2 | [98-dashboard-ux-overhaul-hero-card-status-b](./quick/98-dashboard-ux-overhaul-hero-card-status-b/) |
 | 99 | Fix trade ASV filter — load ASV from static JSON | 2026-03-23 | 1dd596d | [99-fix-trade-asv-filter-load-asv-from-tools](./quick/99-fix-trade-asv-filter-load-asv-from-tools/) |
 | 100 | UI audit — Inter/JetBrains Mono consistency + dark mode contrast | 2026-03-23 | 756c5cd | [100-ui-audit-inter-jetbrains-mono-consistenc](./quick/100-ui-audit-inter-jetbrains-mono-consistenc/) |
+| 101 | Fix waiver rank color inversion and trade roster slot validation | 2026-03-24 | fde4071 | [101-fix-waiver-rank-color-inversion-and-trad](./quick/101-fix-waiver-rank-color-inversion-and-trad/) |
 
 ## Session Continuity
 
-Last session: 2026-03-23
-Stopped at: Completed Quick Task 100 (UI Audit: Inter & JetBrains Mono Consistency)
+Last session: 2026-03-24
+Stopped at: Completed Quick Task 101 (Fix Waiver Rank Color Inversion and Trade Roster Validation)
 Resume file: None
