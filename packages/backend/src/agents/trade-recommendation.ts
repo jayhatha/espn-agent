@@ -213,8 +213,14 @@ export class TradeRecommendationAgent {
     const issues: string[] = [];
     const assigned = new Set<number>();
 
-    // Sort slots by specificity (specific positions first, then generic)
-    const slotOrder = ["C", "1B", "2B", "3B", "SS", "OF", "SP", "RP", "P", "UTIL", "BN", "IL"];
+    // Derive slot order dynamically from rosterSlots keys
+    const genericSlots = new Set(["P", "DH", "UTIL", "MI", "CI"]);
+    const overflowSlots = new Set(["BN", "IL"]);
+    const allSlotTypes = Object.keys(rosterSlots);
+    const specificTier = allSlotTypes.filter((s) => !genericSlots.has(s) && !overflowSlots.has(s));
+    const genericTier = allSlotTypes.filter((s) => genericSlots.has(s));
+    const overflowTier = allSlotTypes.filter((s) => overflowSlots.has(s));
+    const slotOrder = [...specificTier, ...genericTier, ...overflowTier];
 
     for (const slotType of slotOrder) {
       const count = rosterSlots[slotType] || 0;
@@ -253,14 +259,24 @@ export class TradeRecommendationAgent {
    * Helper: Check if a player can fill a specific roster slot
    */
   private canFillSlot(playerPositions: string[], slotType: string): boolean {
-    // UTIL, BN, IL accept any position
-    if (slotType === "UTIL" || slotType === "BN" || slotType === "IL") {
+    // UTIL, BN, IL, DH accept any position
+    if (slotType === "UTIL" || slotType === "BN" || slotType === "IL" || slotType === "DH") {
       return true;
     }
 
     // P slot accepts SP or RP
     if (slotType === "P") {
       return playerPositions.some((pos) => pos === "SP" || pos === "RP");
+    }
+
+    // MI (middle infield) accepts 2B or SS
+    if (slotType === "MI") {
+      return playerPositions.some((pos) => pos === "2B" || pos === "SS");
+    }
+
+    // CI (corner infield) accepts 1B or 3B
+    if (slotType === "CI") {
+      return playerPositions.some((pos) => pos === "1B" || pos === "3B");
     }
 
     // Specific slots require exact position match
