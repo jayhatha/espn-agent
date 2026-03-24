@@ -238,25 +238,26 @@ export default function MovesPage() {
       "whitespace-nowrap py-4 px-6 border-b-2 font-medium text-body-sm transition-colors",
       active
         ? "border-accent text-content font-semibold"
-        : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300"
+        : "border-transparent text-content-secondary hover:text-content hover:border-accent/40"
     );
 
   return (
-    <Container size="wide" className="py-8">
-      <PageHeader
-        title="Move Impact"
-        subtitle="See which roster moves helped or hurt your season the most"
-        backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
-      />
+    <Container size="wide" className="py-6 sm:py-8">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-content dark:text-shell-text">Move Impact</h1>
+        <p className="text-body-sm text-content-secondary dark:text-shell-muted">
+          See which roster moves helped or hurt your season
+        </p>
+      </div>
 
       {/* Team Selector */}
-      <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4 mb-6">
+      <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
           <label className="text-body-sm font-medium text-content-secondary">Team:</label>
           <select
             value={selectedTeamId || ""}
             onChange={(e) => handleTeamChange(parseInt(e.target.value, 10))}
-            className="rounded-lg border border-neutral-300 dark:border-shell-border text-body-sm px-3 py-2 bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
+            className="rounded-lg border border-shell-border text-body-sm px-3 py-2 bg-shell-bg dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="">Select a team</option>
             {teams.map((t: Team) => (
@@ -270,7 +271,7 @@ export default function MovesPage() {
           <select
             value={season || ""}
             onChange={(e) => setSeason(parseInt(e.target.value, 10))}
-            className="rounded-lg border border-neutral-300 dark:border-shell-border text-body-sm px-3 py-2 bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
+            className="rounded-lg border border-shell-border text-body-sm px-3 py-2 bg-shell-bg dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {seasonsData?.seasons?.map((s: number) => (
               <option key={s} value={s}>{s}</option>
@@ -291,11 +292,11 @@ export default function MovesPage() {
       {/* Team-specific Summary Cards */}
       {selectedTeamId && summary && activeTab !== "league" && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Moves</div>
             <div className="text-2xl font-bold text-content mt-1">{summary.totalMoves}</div>
           </div>
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Roster Mgmt Value</div>
             <div className="text-2xl font-bold mt-1">
               {summary.netRosterValue !== null && summary.netRosterValue !== undefined ? (
@@ -310,13 +311,13 @@ export default function MovesPage() {
               </div>
             )}
           </div>
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Avg Impact/Move</div>
             <div className="text-2xl font-bold mt-1">
               <ImpactBadge impact={summary.avgImpactPerMove} />
             </div>
           </div>
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Best Move</div>
             <div className="text-body-sm font-semibold text-positive mt-1">
               {summary.bestMove?.playerName || "N/A"}
@@ -325,7 +326,7 @@ export default function MovesPage() {
               <ImpactBadge impact={summary.bestMove.impact} size="sm" />
             )}
           </div>
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-4">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Worst Move</div>
             <div className="text-body-sm font-semibold text-negative mt-1">
               {summary.worstMove?.playerName || "N/A"}
@@ -340,8 +341,8 @@ export default function MovesPage() {
       {(selectedTeamId || activeTab === "league") ? (
         <>
           {/* Tab Navigation */}
-          <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
-            <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
+          <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border mb-6">
+            <nav className="-mb-px flex border-b border-shell-border">
               {(["league", "faab", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
                 const labels: Record<string, string> = {
                   league: "League Summary",
@@ -611,7 +612,7 @@ function LeagueSummaryTab({
     <div className="space-y-8">
       {/* League-wide stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-4">
+        <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-4">
           <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Moves (League)</div>
           <div className="text-2xl font-bold text-content mt-1">{data.totalMovesLeagueWide}</div>
         </div>
@@ -661,7 +662,7 @@ function LeagueSummaryTab({
                 <tr
                   key={team.teamId}
                   className={cn(
-                    "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                    "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                     team.teamId === selectedTeamId && "bg-accent-light"
                   )}
                 >
@@ -752,7 +753,7 @@ function MoveListTable({
             <tr
               key={m.id}
               className={cn(
-                "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                 m.teamId === selectedTeamId && "bg-accent-light"
               )}
             >
@@ -805,7 +806,7 @@ function TradePackageList({
             "border rounded-lg p-4",
             pkg.teamId === selectedTeamId
               ? "border-accent bg-accent-light"
-              : "border-neutral-200 dark:border-shell-border"
+              : "border-shell-border"
           )}
         >
           <div className="flex items-center justify-between mb-2">
@@ -1008,11 +1009,11 @@ function DraftReportTab({
       {/* Draft Summary */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
+          <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Picks</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalPicks}</div>
           </div>
-          <div className="rounded-lg border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
+          <div className="rounded-lg border border-shell-border bg-surface-secondary dark:bg-shell-bg p-3">
             <div className="text-xs font-medium text-content-secondary uppercase tracking-wide">Total Draft Value</div>
             <div className="text-xl font-bold text-content mt-1">{summary.totalDraftValue.toFixed(1)} pts</div>
           </div>
@@ -1058,7 +1059,7 @@ function DraftReportTab({
                 <tr
                   key={pick.playerId}
                   className={cn(
-                    "border-b border-neutral-100 dark:border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                    "border-b border-shell-border hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                     !pick.stillOnTeam && "opacity-60"
                   )}
                 >
@@ -1196,7 +1197,7 @@ function TradesTab({
           return (
             <div
               key={group.key}
-              className="border border-neutral-200 dark:border-shell-border rounded-lg overflow-hidden"
+              className="border border-shell-border rounded-lg overflow-hidden"
             >
               {/* Trade header row */}
               <div
@@ -1257,11 +1258,11 @@ function TradesTab({
 
               {/* Expanded detail */}
               {isExpanded && (
-                <div className="border-t border-neutral-100 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg px-4 py-3">
+                <div className="border-t border-shell-border bg-surface-secondary dark:bg-shell-bg px-4 py-3">
                   {group.legs.map((leg, idx) => {
                     const legImpact = leg.shapleyImpact ?? leg.impactRotoPoints;
                     return (
-                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-neutral-200 dark:border-shell-border" : ""}>
+                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-shell-border" : ""}>
                         {group.isMultiPlayer && (
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-info uppercase">
