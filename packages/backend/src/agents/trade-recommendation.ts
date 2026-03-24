@@ -555,22 +555,19 @@ export class TradeRecommendationAgent {
 
         for (const receivePlayer of partnerRoster) {
           // Filter by ESPN ASV similarity for trade realism
-          const giveAsv = getAsvForPlayer(givePlayer.player_name);
-          const receiveAsv = getAsvForPlayer(receivePlayer.player_name);
+          // Players not in the ASV file default to $1 (minimum value)
+          const giveAsv = getAsvForPlayer(givePlayer.player_name) ?? 1;
+          const receiveAsv = getAsvForPlayer(receivePlayer.player_name) ?? 1;
 
-          // Skip if both players have ASV data and values are too far apart
-          if (giveAsv != null && receiveAsv != null && giveAsv > 0 && receiveAsv > 0) {
-            const asvDiff = Math.abs(giveAsv - receiveAsv);
-            const maxAsv = Math.max(giveAsv, receiveAsv);
-            const pctDiff = asvDiff / maxAsv;
-            // Allow trades within +/-30% OR +/-$5, whichever is more generous
-            const withinPct = pctDiff <= 0.30;
-            const withinAbsolute = asvDiff <= 5;
-            if (!withinPct && !withinAbsolute) {
-              continue; // Skip this pair — ASV too far apart
-            }
+          const asvDiff = Math.abs(giveAsv - receiveAsv);
+          const maxAsv = Math.max(giveAsv, receiveAsv);
+          const pctDiff = maxAsv > 0 ? asvDiff / maxAsv : 0;
+          // Allow trades within +/-30% OR +/-$5, whichever is more generous
+          const withinPct = pctDiff <= 0.30;
+          const withinAbsolute = asvDiff <= 5;
+          if (!withinPct && !withinAbsolute) {
+            continue; // Skip this pair — ASV too far apart
           }
-          // If either player has no ASV data, allow the trade (don't penalize missing data)
 
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
@@ -645,11 +642,9 @@ export class TradeRecommendationAgent {
 
           // Only consider trades that improve the team
           if (impact.deltaOverallPoints > 0.5) {
-            const giveAsv = getAsvForPlayer(givePlayer.player_name);
-            const receiveAsv = getAsvForPlayer(receivePlayer.player_name);
-            const asvNote = giveAsv != null && receiveAsv != null
-              ? ` Similar value ($${Math.round(giveAsv)} vs $${Math.round(receiveAsv)}).`
-              : "";
+            const giveAsvVal = getAsvForPlayer(givePlayer.player_name) ?? 1;
+            const receiveAsvVal = getAsvForPlayer(receivePlayer.player_name) ?? 1;
+            const asvNote = ` Similar value ($${Math.round(giveAsvVal)} vs $${Math.round(receiveAsvVal)}).`;
 
             candidates.push({
               trade,
@@ -666,8 +661,8 @@ export class TradeRecommendationAgent {
                 positionalContext,
               ) + asvNote,
               positionalContext,
-              givePlayerAsv: giveAsv,
-              receivePlayerAsv: receiveAsv,
+              givePlayerAsv: giveAsvVal,
+              receivePlayerAsv: receiveAsvVal,
             });
 
             // OPTIMIZATION 5: Early termination if we have enough good candidates

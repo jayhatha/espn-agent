@@ -91,10 +91,11 @@ None yet.
 | 102 | Fix GS tracker counting roster slots and FAAB budget default | 2026-03-24 | 0f19c72 | [102-fix-gs-tracker-counting-roster-slots-not](./quick/102-fix-gs-tracker-counting-roster-slots-not/) |
 | 103 | Fix standings page readability — remove DM Serif, dark mode contrast | 2026-03-24 | 762a42f | [103-fix-standings-page-readability-redesign-](./quick/103-fix-standings-page-readability-redesign-/) |
 | 104 | Fix snapshot freshness — clear ESPN cache on forceFresh, add scoringPeriodId | 2026-03-24 | 139f644 | [104-fix-snapshot-freshness-clear-espn-cache-](./quick/104-fix-snapshot-freshness-clear-espn-cache-/) |
-| 105 | Fix FAAB — extract remaining budget from ESPN team data | 2026-03-24 | pending | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/) |
+| 105 | Fix FAAB — extract remaining budget from ESPN team data | 2026-03-24 | e7a5ec9 | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/) |
+| 106 | Fix ASV filter — default missing players to $1 instead of skipping | 2026-03-24 | pending | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/) |
 
 ## Session Continuity
 
 Last session: 2026-03-24
-Stopped at: Completed Quick Task 105 (Fix FAAB from ESPN Data)
+Stopped at: Completed Quick Task 106 (Fix ASV Filter)
 Resume file: None
