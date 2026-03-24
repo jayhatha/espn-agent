@@ -531,20 +531,26 @@ export class TradeRecommendationAgent {
         const giveValue = getPlayerValue(givePlayer.player_id);
 
         for (const receivePlayer of partnerRoster) {
-          // Filter by ESPN ASV similarity for trade realism
-          // Players without ASV data default to $1 (minimum value)
+          // ASV-based trade realism filter
+          // Philosophy: it's OK to give up ASV (overpay on paper) for standings improvement.
+          // The other manager is more likely to accept if THEY get more ASV.
+          // So we filter out trades where WE get the higher-ASV player (other side won't accept).
           const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
           const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
 
-          const asvDiff = Math.abs(giveAsv - receiveAsv);
-          const maxAsv = Math.max(giveAsv, receiveAsv);
-          const pctDiff = maxAsv > 0 ? asvDiff / maxAsv : 0;
-          // Allow trades within +/-30% OR +/-$5, whichever is more generous
-          const withinPct = pctDiff <= 0.30;
-          const withinAbsolute = asvDiff <= 5;
-          if (!withinPct && !withinAbsolute) {
-            continue; // Skip this pair — ASV too far apart
+          // Block unrealistic trades: skip if the ASV gap is extreme AND we're getting the better value
+          // (Other manager won't trade away $50 player for a $5 player)
+          if (receiveAsv > giveAsv) {
+            // We're trying to get the more expensive player — other side unlikely to accept
+            const asvDiff = receiveAsv - giveAsv;
+            const pctOverpay = giveAsv > 0 ? asvDiff / receiveAsv : 1;
+            // Block if we'd need to overpay by >50% of the expensive player's value AND >$10
+            if (pctOverpay > 0.50 && asvDiff > 10) {
+              continue;
+            }
           }
+          // We're giving up the more expensive player — other side likely to accept
+          // No filter needed: this is exactly the "give up ASV for standings" scenario
 
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
@@ -556,9 +562,9 @@ export class TradeRecommendationAgent {
             depthMap,
           );
 
-          // Quick filter: only consider if receiving player has higher value OR fills a positional need
-          // (Heuristic: we want positive value trades or trades that fill needs)
-          if (valueDelta > 0 || positionalContext.fillsNeed) {
+          // Include if: projection value improves, fills positional need,
+          // OR we're giving up ASV (other side gets the better "name" — likely accepted)
+          if (valueDelta > 0 || positionalContext.fillsNeed || giveAsv > receiveAsv) {
             tradePairs.push({
               give: givePlayer,
               receive: receivePlayer,
@@ -621,7 +627,11 @@ export class TradeRecommendationAgent {
           if (impact.deltaOverallPoints > 0.5) {
             const giveAsvVal = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
             const receiveAsvVal = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
-            const asvNote = ` Similar value ($${Math.round(giveAsvVal)} vs $${Math.round(receiveAsvVal)}).`;
+            const asvNote = giveAsvVal > receiveAsvVal
+              ? ` You overpay on ASV ($${Math.round(giveAsvVal)} → $${Math.round(receiveAsvVal)}) but gain roto points.`
+              : giveAsvVal === receiveAsvVal
+                ? ` Even ASV ($${Math.round(giveAsvVal)}).`
+                : ` You get more ASV ($${Math.round(receiveAsvVal)} vs $${Math.round(giveAsvVal)}).`;
 
             candidates.push({
               trade,
@@ -630,7 +640,7 @@ export class TradeRecommendationAgent {
               deltaOverallPoints: impact.deltaOverallPoints,
               categoryImpacts: impact.categoryImpacts,
               fairnessScore: impact.fairnessScore,
-              likelihood: this.assessTradeLikelihood(impact.fairnessScore),
+              likelihood: this.assessTradeLikelihood(impact.fairnessScore, giveAsvVal, receiveAsvVal),
               explanation: this.generateTradeExplanation(
                 trade,
                 impact.deltaOverallPoints,
@@ -1086,8 +1096,21 @@ export class TradeRecommendationAgent {
 
   private assessTradeLikelihood(
     fairnessScore: number,
+    giveAsv?: number,
+    receiveAsv?: number,
   ): "high" | "medium" | "low" {
-    // Trades that are too one-sided are less likely to be accepted
+    // If you're giving more ASV than receiving, the other side is getting
+    // the better "name" — they're more likely to accept
+    const youOverpayAsv = giveAsv != null && receiveAsv != null && giveAsv > receiveAsv;
+
+    if (youOverpayAsv) {
+      // You're overpaying on ASV — high likelihood the other side accepts
+      // Only downgrade if the roto gain is extreme (looks suspicious)
+      if (fairnessScore > 0.8) return "medium";
+      return "high";
+    }
+
+    // Standard assessment based on roto fairness
     if (fairnessScore > 0.6 || fairnessScore < -0.3) {
       return "low";
     } else if (fairnessScore > 0.3) {
