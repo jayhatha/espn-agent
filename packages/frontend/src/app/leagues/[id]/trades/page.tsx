@@ -62,6 +62,8 @@ interface TradeCandidate {
   likelihood: "high" | "medium" | "low";
   explanation: string;
   positionalContext?: PositionalContext;
+  givePlayerAsv?: number | null;
+  receivePlayerAsv?: number | null;
 }
 
 interface RosterPlayer {
@@ -806,6 +808,11 @@ export default function TradesPage() {
                             {p.playerName}
                           </div>
                         ))}
+                        {candidate.givePlayerAsv != null && (
+                          <div className="mt-2 pt-2 border-t border-negative-border text-data font-mono text-content-secondary">
+                            ESPN Value: <span className="font-semibold text-content dark:text-shell-text">${Math.round(candidate.givePlayerAsv)}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-center">
@@ -824,6 +831,11 @@ export default function TradesPage() {
                             {p.playerName}
                           </div>
                         ))}
+                        {candidate.receivePlayerAsv != null && (
+                          <div className="mt-2 pt-2 border-t border-positive-border text-data font-mono text-content-secondary">
+                            ESPN Value: <span className="font-semibold text-content dark:text-shell-text">${Math.round(candidate.receivePlayerAsv)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
