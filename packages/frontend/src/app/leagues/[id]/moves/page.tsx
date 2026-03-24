@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   LineChart,
@@ -219,6 +219,22 @@ export default function MovesPage() {
     enabled: !!leagueId && !!season && activeTab === "timeline",
   });
 
+  const queryClient = useQueryClient();
+  const [computeStatus, setComputeStatus] = useState<string | null>(null);
+
+  const computeMutation = useMutation({
+    mutationFn: () => api.computeTransactionImpacts(leagueId, season!),
+    onSuccess: (data: any) => {
+      setComputeStatus(`Done — ${data.totalMoves} moves, ${data.impactsComputed} impacts computed`);
+      queryClient.invalidateQueries({ queryKey: ["transaction-impacts"] });
+      queryClient.invalidateQueries({ queryKey: ["league-impact-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["draft-report"] });
+    },
+    onError: (err: any) => {
+      setComputeStatus(`Error: ${err.message || "Failed to compute impacts"}`);
+    },
+  });
+
   const teams = teamsData?.teams || [];
   const impacts: MoveImpact[] = impactData?.impacts || [];
   const summary = impactData?.summary;
@@ -277,6 +293,25 @@ export default function MovesPage() {
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+
+          <button
+            onClick={() => {
+              setComputeStatus(null);
+              computeMutation.mutate();
+            }}
+            disabled={!season || computeMutation.isPending}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              computeMutation.isPending
+                ? "bg-shell-border text-shell-muted cursor-wait"
+                : "bg-accent text-white hover:bg-accent/80"
+            )}
+          >
+            {computeMutation.isPending ? "Computing..." : "Compute Impacts"}
+          </button>
+          {computeStatus && (
+            <span className="text-xs text-shell-muted ml-2">{computeStatus}</span>
+          )}
 
           {summary && (
             <div className="flex items-center gap-4 ml-auto text-body-sm">
@@ -597,7 +632,7 @@ function LeagueSummaryTab({
   if (!data) {
     return (
       <div className="text-center py-8 text-content-secondary">
-        No league summary data available. Make sure impact computation has been run.
+        No impact data yet. Click "Compute Impacts" above to analyze roster moves. Requires at least 2 daily snapshots.
       </div>
     );
   }
@@ -975,7 +1010,7 @@ function LeaderboardTab({
 
       {impacts.length === 0 && (
         <div className="text-center py-8 text-content-secondary">
-          No moves found. Run impact computation from the admin panel first.
+          No moves found. Click "Compute Impacts" above to derive roster moves and calculate their roto-point impact.
         </div>
       )}
     </div>
@@ -1318,7 +1353,7 @@ function TimelineTab({
   if (!timelineData?.data?.length) {
     return (
       <div className="text-center py-8 text-content-secondary">
-        No timeline data available. View the Trends page for standings over time.
+        No standings timeline data available yet. Take a few daily snapshots to build the timeline.
       </div>
     );
   }
