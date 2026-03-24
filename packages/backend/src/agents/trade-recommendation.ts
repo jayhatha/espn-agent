@@ -528,36 +528,26 @@ export class TradeRecommendationAgent {
       }> = [];
 
       for (const givePlayer of userRoster) {
+        // Skip players with no trade value — $0 players are untradeable
+        const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 0;
+        if (giveAsv < 1) continue;
+
         const giveValue = getPlayerValue(givePlayer.player_id);
 
         for (const receivePlayer of partnerRoster) {
-          // ASV-based trade realism filter
-          // Philosophy: it's OK to give up ASV (overpay on paper) for standings improvement.
-          // The other manager is more likely to accept if THEY get more ASV.
-          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 0;
           const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 0;
 
-          // Block 1: Don't offer our low-value player for their good player.
-          // A $0-$3 player is essentially untradeable for anyone with real value.
-          const MIN_TRADEABLE_ASV = 4;
-          if (giveAsv < MIN_TRADEABLE_ASV && receiveAsv >= MIN_TRADEABLE_ASV * 2) {
-            continue; // Our scrub for their real player — will never be accepted
-          }
-          if (receiveAsv < MIN_TRADEABLE_ASV && giveAsv >= MIN_TRADEABLE_ASV * 2) {
-            continue; // Their scrub for our real player — we'd never propose this
-          }
+          // Skip untradeable receive targets too
+          if (receiveAsv < 1) continue;
 
-          // Block 2: If we're trying to get a much more expensive player, the
-          // other side won't accept unless the gap is reasonable.
-          if (receiveAsv > giveAsv) {
-            const asvDiff = receiveAsv - giveAsv;
-            const pctOverpay = receiveAsv > 0 ? asvDiff / receiveAsv : 1;
-            // Block if gap is >50% of expensive player's value AND >$10
-            if (pctOverpay > 0.50 && asvDiff > 10) {
-              continue;
-            }
+          // ASV realism: the other manager must see this as reasonable.
+          // Rule: the cheaper player must be worth at least 40% of the expensive player.
+          // Examples: $10 for $25 = 40% → OK. $5 for $25 = 20% → blocked. $15 for $20 = 75% → OK.
+          const cheaperAsv = Math.min(giveAsv, receiveAsv);
+          const expensiveAsv = Math.max(giveAsv, receiveAsv);
+          if (expensiveAsv > 0 && cheaperAsv / expensiveAsv < 0.40) {
+            continue; // Too lopsided — won't be accepted
           }
-          // We're giving up the more expensive player — other side likely to accept
 
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
@@ -687,10 +677,26 @@ export class TradeRecommendationAgent {
       "Trade candidate generation complete",
     );
 
-    // Sort by delta overall points and return top candidates
+    // Sort by delta overall points
     candidates.sort((a, b) => b.deltaOverallPoints - a.deltaOverallPoints);
 
-    return candidates.slice(0, maxCandidates);
+    // Diversify: limit each give player to max 2 appearances in final results
+    // so recommendations aren't all "trade Player X for various targets"
+    const MAX_PER_GIVE_PLAYER = 2;
+    const givePlayerCounts = new Map<number, number>();
+    const diversified: TradeCandidate[] = [];
+
+    for (const c of candidates) {
+      const giveId = c.trade.givePlayers[0]?.playerId;
+      if (giveId == null) continue;
+      const count = givePlayerCounts.get(giveId) || 0;
+      if (count >= MAX_PER_GIVE_PLAYER) continue;
+      givePlayerCounts.set(giveId, count + 1);
+      diversified.push(c);
+      if (diversified.length >= maxCandidates) break;
+    }
+
+    return diversified;
   }
 
   private async getCurrentStandings(
