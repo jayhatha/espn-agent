@@ -376,9 +376,10 @@ export class SnapshotOrchestratorAgent {
 
       // 8. Fetch free agents and transactions in parallel (non-blocking)
       // Reuse espnTeamIdToDbId populated during transaction (B-04: no re-querying needed)
-      const [freeAgentResult, transactionResult] = await Promise.allSettled([
+      const [freeAgentResult, transactionResult, _asvResult] = await Promise.allSettled([
         this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate),
         this.fetchAndStoreTransactions(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate, espnTeamIdToDbId),
+        this.fetchAndStoreAuctionValues(league.espn_league_id, league.season, espnAuth),
       ]);
 
       // If free agent fetch failed, mark snapshot as degraded
@@ -1392,5 +1393,49 @@ export class SnapshotOrchestratorAgent {
     );
 
     return newTransactions;
+  }
+
+  /**
+   * Fetch ESPN auction values and store as espn_asv on player table.
+   * Non-blocking: failure does not stop the snapshot pipeline.
+   */
+  private async fetchAndStoreAuctionValues(
+    espnLeagueId: number,
+    season: number,
+    auth: ESPNAuthCookies | undefined,
+  ): Promise<number> {
+    const auctionValues = await this.espnAdapter.fetchPreDraftAuctionValues({
+      leagueId: espnLeagueId,
+      season,
+      auth,
+    });
+
+    if (auctionValues.length === 0) {
+      this.logger?.info("No auction values returned from ESPN");
+      return 0;
+    }
+
+    let updated = 0;
+    for (const av of auctionValues) {
+      if (av.espnAuctionValue > 0) {
+        try {
+          const result = await this.db
+            .updateTable("player")
+            .set({ espn_asv: av.espnAuctionValue })
+            .where("id", "=", av.playerId)
+            .executeTakeFirst();
+          if (result.numUpdatedRows > 0n) updated++;
+        } catch {
+          // Player may not exist in our DB yet — skip silently
+        }
+      }
+    }
+
+    this.logger?.info(
+      { totalValues: auctionValues.length, playersUpdated: updated },
+      "ESPN auction values stored on player.espn_asv",
+    );
+
+    return updated;
   }
 }

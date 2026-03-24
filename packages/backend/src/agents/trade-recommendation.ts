@@ -6,30 +6,7 @@ import {
   type RosterValidationResult,
   type StatComponents,
 } from "../../../shared/dist/index.js";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-// --- Static ASV lookup from tools/espn-predraft-values.json ---
-let asvMapCache: Map<string, number> | null = null;
-
-function loadAsvMap(): Map<string, number> {
-  if (asvMapCache) return asvMapCache;
-  try {
-    const filePath = resolve(process.cwd(), "tools/espn-predraft-values.json");
-    const raw = readFileSync(filePath, "utf-8");
-    const entries: Array<{ name: string; salary: number }> = JSON.parse(raw);
-    asvMapCache = new Map(entries.map((e) => [e.name.toLowerCase(), e.salary]));
-  } catch {
-    // Graceful degradation — file missing or unparseable
-    asvMapCache = new Map();
-  }
-  return asvMapCache;
-}
-
-function getAsvForPlayer(playerName: string): number | null {
-  const map = loadAsvMap();
-  return map.get(playerName.toLowerCase()) ?? null;
-}
+// ASV (Average Season Value) is stored on player.espn_asv, populated by snapshot pipeline
 
 /**
  * Trade Recommendation Agent
@@ -555,9 +532,9 @@ export class TradeRecommendationAgent {
 
         for (const receivePlayer of partnerRoster) {
           // Filter by ESPN ASV similarity for trade realism
-          // Players not in the ASV file default to $1 (minimum value)
-          const giveAsv = getAsvForPlayer(givePlayer.player_name) ?? 1;
-          const receiveAsv = getAsvForPlayer(receivePlayer.player_name) ?? 1;
+          // Players without ASV data default to $1 (minimum value)
+          const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
+          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
 
           const asvDiff = Math.abs(giveAsv - receiveAsv);
           const maxAsv = Math.max(giveAsv, receiveAsv);
@@ -642,8 +619,8 @@ export class TradeRecommendationAgent {
 
           // Only consider trades that improve the team
           if (impact.deltaOverallPoints > 0.5) {
-            const giveAsvVal = getAsvForPlayer(givePlayer.player_name) ?? 1;
-            const receiveAsvVal = getAsvForPlayer(receivePlayer.player_name) ?? 1;
+            const giveAsvVal = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
+            const receiveAsvVal = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
             const asvNote = ` Similar value ($${Math.round(giveAsvVal)} vs $${Math.round(receiveAsvVal)}).`;
 
             candidates.push({
