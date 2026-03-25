@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 72-02-PLAN.md
-last_updated: "2026-03-25T00:52:28.995Z"
+status: Ready to execute
+stopped_at: Completed 73-01-PLAN.md
+last_updated: "2026-03-25T06:54:21.534Z"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 18
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 72 — UI audit fixes — mobile responsive layout, TopBar projected stat, semantic token cleanup, error handling
+**Current focus:** Phase 73 — show-current-and-projected-stats-for-each-player-on-waivers-and-roster-pages
 
 ## Current Position
 
-Phase: 72
-Plan: Not started
+Phase: 73 (show-current-and-projected-stats-for-each-player-on-waivers-and-roster-pages) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Plan: Not started
 | Phase 71 P01 | 3 min | 2 tasks | 2 files |
 | Phase 72-ui-audit-fixes P01 | 12 min | 3 tasks | 5 files |
 | Phase 72-ui-audit-fixes P02 | 12 | 2 tasks | 8 files |
+| Phase 73 P01 | 15 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -81,10 +82,13 @@ Plan: Not started
 - [Phase 72-ui-audit-fixes]: projectedValue useMemo in TopBar computes selected team projected rank from /standings/projected API
 - [Phase 72-02]: All semantic positive/negative/warning states flow through semantic token classes — no raw green/red/amber/emerald in semantic contexts
 - [Phase 72-02]: Snapshot dates formatted with toLocaleDateString in UI — not raw ISO strings
+- [Phase 73]: formatRate() checks denominator before calling formula — avoids 0.00 display when IP=0 or AB=0
+- [Phase 73]: PlayerStatLine returns null when components is null — callers control conditional rendering in Plan 02
 
 ### Roadmap Evolution
 
 - Phase 71 added: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
+- Phase 73 added: Show current and projected stats for each player on waivers and roster pages
 
 ### Blockers/Concerns
 
@@ -120,6 +124,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T00:47:23.877Z
-Stopped at: Completed 72-02-PLAN.md
+Last session: 2026-03-25T06:54:21.530Z
+Stopped at: Completed 73-01-PLAN.md
 Resume file: None

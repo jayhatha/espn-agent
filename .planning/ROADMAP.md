@@ -194,8 +194,8 @@ Plans:
 **Goal:** Managers see position-aware projected RoS stats and YTD stats inline below each player on the waivers page (manual eval) and in a roster stats section on the lineup page
 **Depends on:** Phase 72
 **Requirements:** PSTAT-01, PSTAT-02, PSTAT-03, PSTAT-04, PSTAT-05, PSTAT-06
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 73-01-PLAN.md -- Backend API enrichment (currentStats) + shared PlayerStatLine component
+- [x] 73-01-PLAN.md -- Backend API enrichment (currentStats) + shared PlayerStatLine component
 - [ ] 73-02-PLAN.md -- Wire stat lines into waivers page + roster stats section on lineup page
