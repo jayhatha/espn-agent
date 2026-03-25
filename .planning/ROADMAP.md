@@ -199,3 +199,13 @@ Plans:
 Plans:
 - [x] 73-01-PLAN.md -- Backend API enrichment (currentStats) + shared PlayerStatLine component
 - [ ] 73-02-PLAN.md -- Wire stat lines into waivers page + roster stats section on lineup page
+
+### Phase 74: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
+
+**Goal:** Eliminate redundant projected standings recomputation for completed seasons by adding a season finalization flag that gates the SnapshotOrchestratorAgent's projection step
+**Depends on:** Phase 73
+**Requirements:** CACHE-01, CACHE-02, CACHE-03, CACHE-04
+**Plans:** 1 plan
+
+Plans:
+- [ ] 74-01-PLAN.md — Season metadata table, finalization guard in snapshot orchestrator, auto-finalization in backfill, admin reset endpoint

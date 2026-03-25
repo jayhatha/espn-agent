@@ -68,6 +68,13 @@ Requirements for the In-Season Command Center milestone.
 - [ ] **TREND-04**: Lineup efficiency tracks bench production (missed HR, SB, OPS from benched players)
 - [ ] **TREND-05**: Warning indicator when significant production is being left on the bench
 
+### Season Caching
+
+- [ ] **CACHE-01**: season_metadata table tracks which (league_id, season) pairs are finalized
+- [ ] **CACHE-02**: Finalized seasons skip projected standings recomputation in SnapshotOrchestratorAgent (regardless of forceFresh)
+- [ ] **CACHE-03**: Successful backfill completion auto-finalizes the season
+- [ ] **CACHE-04**: Admin can reset finalization to allow re-runs for data corrections
+
 ## Future Requirements
 
 ### Advanced Analytics
@@ -130,12 +137,16 @@ Requirements for the In-Season Command Center milestone.
 | TREND-03 | Phase 70 | Pending |
 | TREND-04 | Phase 70 | Pending |
 | TREND-05 | Phase 70 | Pending |
+| CACHE-01 | Phase 74 | Pending |
+| CACHE-02 | Phase 74 | Pending |
+| CACHE-03 | Phase 74 | Pending |
+| CACHE-04 | Phase 74 | Pending |
 
 **Coverage:**
-- v6.0 requirements: 35 total
-- Mapped to phases: 35
+- v6.0 requirements: 39 total
+- Mapped to phases: 39
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after roadmap creation — all 35 requirements mapped*
+*Last updated: 2026-03-25 — added CACHE-01 through CACHE-04 for Phase 74*
