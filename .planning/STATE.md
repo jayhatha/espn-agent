@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: completed
-stopped_at: Completed 71-01-PLAN.md
-last_updated: "2026-03-24T22:24:37.308Z"
-last_activity: 2026-03-24 — Completed Phase 71 Plan 01 (Moves Page Data Population)
+status: Phase complete — ready for verification
+stopped_at: Completed 72-02-PLAN.md
+last_updated: "2026-03-25T00:47:23.881Z"
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 17
+  completed_plans: 17
 ---
 
 # Project State
@@ -21,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v6.0 In-Season Command Center — Phase 71: Moves Page Data Population
+**Current focus:** Phase 72 — UI audit fixes — mobile responsive layout, TopBar projected stat, semantic token cleanup, error handling
 
 ## Current Position
 
-Phase: 71 (Moves Page Data Population)
-Plan: 01 complete (1 of 1)
-Status: Phase complete
-Last activity: 2026-03-24 — Completed Phase 71 Plan 01 (Moves Page Data Population)
-
-Progress: [██████████] 100%
+Phase: 72 (UI audit fixes — mobile responsive layout, TopBar projected stat, semantic token cleanup, error handling) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -52,6 +46,8 @@ Progress: [██████████] 100%
 
 *Updated after each plan completion*
 | Phase 71 P01 | 3 min | 2 tasks | 2 files |
+| Phase 72-ui-audit-fixes P01 | 12 min | 3 tasks | 5 files |
+| Phase 72-ui-audit-fixes P02 | 12 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -80,6 +76,11 @@ Progress: [██████████] 100%
 - [Phase 69]: Fairness score numeric removed from UI — likelihood label (high/medium/low) is sufficient
 - [Phase 103]: Replaced font-display (DM Serif Display) with font-extrabold/font-bold for Inter-only typography; dark:text-shell-text/dark:text-shell-muted as standard contrast pairing
 - [Phase 71]: new Date().getFullYear() for API season defaults -- self-updating across seasons with zero maintenance
+- [Phase 72-ui-audit-fixes]: mobileOpen state lives in LeagueNav (not layout) — nav owns its own open/close state
+- [Phase 72-ui-audit-fixes]: isLoadingSignals uses && !!teamId guard — prevents loading state when no team selected
+- [Phase 72-ui-audit-fixes]: projectedValue useMemo in TopBar computes selected team projected rank from /standings/projected API
+- [Phase 72-02]: All semantic positive/negative/warning states flow through semantic token classes — no raw green/red/amber/emerald in semantic contexts
+- [Phase 72-02]: Snapshot dates formatted with toLocaleDateString in UI — not raw ISO strings
 
 ### Roadmap Evolution
 
@@ -119,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T22:24:37.298Z
-Stopped at: Completed 71-01-PLAN.md
+Last session: 2026-03-25T00:47:23.877Z
+Stopped at: Completed 72-02-PLAN.md
 Resume file: None
