@@ -183,7 +183,8 @@ Plans:
 **Goal:** Address all findings from the Phases 65-70 UI audit: fix broken mobile layout, wire TopBar projected stat, replace alert() with inline errors, migrate raw Tailwind colors to semantic tokens, and fix dark mode regressions
 **Depends on:** Phase 71
 **Requirements:** UI-AUDIT-01, UI-AUDIT-02, UI-AUDIT-03, UI-AUDIT-04, UI-AUDIT-05
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-(none yet)
+- [ ] 72-01-PLAN.md — Priority fixes: mobile responsive layout, TopBar projected stat, waivers page error/token fixes
+- [ ] 72-02-PLAN.md — Token migration: semantic color classes, arbitrary text sizes, date formatting
