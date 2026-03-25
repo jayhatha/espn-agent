@@ -37,7 +37,7 @@ export interface SeasonMetadata {
   is_finalized: boolean;
   finalized_at: Date | null;
   snapshot_count: number | null;
-  created_at: Date;
+  created_at: Generated<Date>;
 }
 
 export interface Database {

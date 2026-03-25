@@ -745,6 +745,73 @@ export async function adminRoutes(app: FastifyInstance) {
     },
   );
 
+  // PUT /api/admin/seasons/:leagueId/:season/finalize - Set or reset season finalization
+  app.put(
+    "/api/admin/seasons/:leagueId/:season/finalize",
+    { onRequest: [requireAdmin] },
+    async (request: any, reply: any) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const season = parseInt(request.params.season, 10);
+      const { finalized } = request.body as { finalized: boolean };
+
+      if (isNaN(leagueId) || isNaN(season)) {
+        return reply.status(400).send({ error: "Invalid leagueId or season" });
+      }
+
+      if (typeof finalized !== "boolean") {
+        return reply.status(400).send({ error: "Body must include { finalized: boolean }" });
+      }
+
+      await db
+        .insertInto("season_metadata")
+        .values({
+          league_id: leagueId,
+          season,
+          is_finalized: finalized,
+          finalized_at: finalized ? new Date() : null,
+          snapshot_count: null,
+        })
+        .onConflict((oc) =>
+          oc.columns(["league_id", "season"]).doUpdateSet({
+            is_finalized: finalized,
+            finalized_at: finalized ? new Date() : null,
+          }),
+        )
+        .execute();
+
+      return {
+        league_id: leagueId,
+        season,
+        is_finalized: finalized,
+        message: finalized
+          ? "Season finalized — projection recomputation will be skipped"
+          : "Season un-finalized — projection recomputation will resume",
+      };
+    },
+  );
+
+  // GET /api/admin/seasons/:leagueId - List season metadata for a league
+  app.get(
+    "/api/admin/seasons/:leagueId",
+    { onRequest: [requireAdmin] },
+    async (request: any, reply: any) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+
+      if (isNaN(leagueId)) {
+        return reply.status(400).send({ error: "Invalid leagueId" });
+      }
+
+      const seasons = await db
+        .selectFrom("season_metadata")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .orderBy("season", "desc")
+        .execute();
+
+      return { seasons };
+    },
+  );
+
   // GET /api/admin/leagues/:leagueId/debug/period-stats - Debug endpoint for scoring period roster stats
   app.get(
     "/api/admin/leagues/:leagueId/debug/period-stats",

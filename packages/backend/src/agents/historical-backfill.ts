@@ -447,6 +447,11 @@ export class HistoricalBackfillAgent {
         "Historical backfill completed",
       );
 
+      // Auto-finalize season after successful backfill
+      if (weeksFailed < totalWeeks) {
+        await this.finalizeSeasonIfComplete(leagueId, season, weeksProcessed);
+      }
+
       return {
         success: weeksFailed < totalWeeks,
         weeksProcessed,
@@ -470,6 +475,39 @@ export class HistoricalBackfillAgent {
 
       throw error;
     }
+  }
+
+  /**
+   * Mark a season as finalized after successful backfill completion.
+   * Finalized seasons skip projection recomputation in SnapshotOrchestratorAgent.
+   */
+  private async finalizeSeasonIfComplete(
+    leagueId: number,
+    season: number,
+    snapshotCount: number,
+  ): Promise<void> {
+    await this.db
+      .insertInto("season_metadata")
+      .values({
+        league_id: leagueId,
+        season,
+        is_finalized: true,
+        finalized_at: new Date(),
+        snapshot_count: snapshotCount,
+      })
+      .onConflict((oc) =>
+        oc.columns(["league_id", "season"]).doUpdateSet({
+          is_finalized: true,
+          finalized_at: new Date(),
+          snapshot_count: snapshotCount,
+        }),
+      )
+      .execute();
+
+    this.logger?.info(
+      { leagueId, season, snapshotCount },
+      "Season finalized — future snapshot runs will skip projection recomputation",
+    );
   }
 
   /**
