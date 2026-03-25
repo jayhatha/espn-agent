@@ -41,7 +41,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks (manual eval vs AI picks sections) |
 | 3xl | 64px | Not used in this phase |
 
-Exceptions: Player rows use py-2 (compact) or py-3 (default) — these are 8px / 12px, matching the established PlayerRow component pattern. Stat lines use mt-0.5 (2px) for the sub-name spacing beneath the player name line — already established in RESEARCH.md code examples.
+Exceptions: Player rows use py-2 (compact) or py-3 (default) — these are 8px / 12px, matching the established PlayerRow component pattern. Stat lines use mt-1 (4px) for the sub-name spacing beneath the player name line — minimum grid-aligned gap.
 
 ---
 
@@ -55,9 +55,9 @@ All decisions pre-populated from tailwind.config.js and SHELL-05 requirement.
 | Stat line (numbers) | 13px (0.8125rem) | 400 (regular) | 1.4 | `text-data font-mono` | JetBrains Mono — SHELL-05 |
 | Stat label prefix | 12px (0.75rem) | 400 (regular) | 1.5 | `text-caption` | Inter — "YTD" / "Proj RoS" labels |
 | Column header | 13px (0.8125rem) | 500 (medium) | 1.4 | `text-data font-medium uppercase` | Roster table column headers |
-| Section heading | 18px (1.125rem) | 600 (semibold) | 1.4 | `text-h4 font-semibold` | "Free Agents", "Your Roster" section labels |
+| Section heading | 18px (1.125rem) | 500 (medium) | 1.4 | `text-h4 font-medium` | "Free Agents", "Your Roster" section labels |
 
-Font weight contract: exactly 2 weights used — regular (400) for stat values and muted labels; semibold (600) for section headings. Medium (500) for player names is carried over from the existing PlayerRow component and is not a new addition.
+Font weight contract: exactly 2 weights used — regular (400) for stat values, stat label prefixes, and muted text; medium (500) for player names, column headers, and section headings.
 
 ---
 
@@ -116,7 +116,7 @@ interface PlayerStatLineProps {
 
 **Visual specification:**
 
-- Outer element: `<div className="text-data font-mono text-shell-muted mt-0.5">`
+- Outer element: `<div className="text-data font-mono text-shell-muted mt-1">`
 - Label prefix: `<span className="text-caption text-content-tertiary dark:text-content-tertiary mr-1.5 font-sans not-italic">{label}</span>` — label uses Inter (not mono), forcing `font-sans` since the parent is mono
 - Stat values: inline, space-separated, format: `KEY: VALUE`
 - Missing stat (null or IP=0 for rate stats): render `--`
@@ -173,7 +173,7 @@ The nav item "Roster" maps to `/lineup`. This page currently shows lineup swap r
 
 **Roster stats section layout:**
 
-- Section heading: "Your Roster" (`text-h4 font-semibold text-shell-text mb-3`)
+- Section heading: "Your Roster" (`text-h4 font-medium text-shell-text mb-3`)
 - Rendered as a `StatsTable` with sortable columns (uses existing StatsTable component)
 - Table column order: Player | Pos | Team | [position-specific stat columns]
 - Hitter columns: HR | R | RBI | SB | AVG | OBP | [Proj RoS prefix on column header]
