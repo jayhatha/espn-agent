@@ -23,10 +23,10 @@ export function GsTracker({
 
   const fillColor =
     paceStatus === "on_track"
-      ? "bg-emerald-500"
+      ? "bg-positive"
       : paceStatus === "too_slow"
-        ? "bg-amber-500"
-        : "bg-red-500";
+        ? "bg-warning"
+        : "bg-negative";
 
   const statusLabel =
     paceStatus === "on_track"

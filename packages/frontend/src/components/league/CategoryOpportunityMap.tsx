@@ -17,15 +17,15 @@ const difficultyConfig = {
   },
   medium: {
     label: "Medium",
-    className: "text-amber-400 bg-amber-400/10",
+    className: "text-warning bg-warning/10",
   },
   hard: {
     label: "Hard",
-    className: "text-orange-400 bg-orange-400/10",
+    className: "text-negative bg-negative/10",
   },
   elite: {
     label: "Elite",
-    className: "text-purple-400 bg-purple-400/10",
+    className: "text-shell-accent bg-shell-accent/10",
   },
 } as const;
 

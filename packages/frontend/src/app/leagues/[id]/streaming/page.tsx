@@ -220,12 +220,12 @@ export default function StreamingPitchersPage() {
                       {gsSummary.gsRemaining} starts remaining over {gsSummary.weeksRemaining} weeks = {gsSummary.targetPacePerWeek} starts/week target
                     </p>
                     {gsSummary.paceStatus === "burning_fast" && (
-                      <div className="mt-3 p-3 rounded bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                      <div className="mt-3 p-3 rounded bg-negative/10 border border-negative/20 text-xs text-negative">
                         Pace alert: You'll exceed the {gsSummary.gsCap}-GS cap. Consider sitting low-value SPs.
                       </div>
                     )}
                     {gsSummary.paceStatus === "too_slow" && (
-                      <div className="mt-3 p-3 rounded bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400">
+                      <div className="mt-3 p-3 rounded bg-warning/10 border border-warning/20 text-xs text-warning">
                         You have {gsSummary.gsRemaining} unused starts available — consider streaming.
                       </div>
                     )}
@@ -281,8 +281,8 @@ export default function StreamingPitchersPage() {
                   <div className={cn(
                     "p-3 rounded text-xs",
                     startPlan.paceStatus === "burning_fast"
-                      ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                      : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
+                      ? "bg-negative/10 border border-negative/20 text-negative"
+                      : "bg-warning/10 border border-warning/20 text-warning"
                   )}>
                     {startPlan.alert}
                   </div>

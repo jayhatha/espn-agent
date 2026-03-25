@@ -113,16 +113,16 @@ type ViewMode = "overall" | "category" | "projected" | "values" | "hotcold" | "e
 function TrendBadge({ trend, drivingStat }: { trend: string; drivingStat: string | null }) {
   if (trend === "hot") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
-        <span className="text-green-400">&#9650;</span> HOT
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive border border-positive/20">
+        <span className="text-positive">&#9650;</span> HOT
         {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
       </span>
     );
   }
   if (trend === "cold") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-        <span className="text-red-400">&#9660;</span> COLD
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-negative/10 text-negative border border-negative/20">
+        <span className="text-negative">&#9660;</span> COLD
         {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
       </span>
     );
@@ -670,15 +670,15 @@ export default function TrendsPage() {
                         <td className="py-3 px-3 text-right font-mono text-xs">
                           {player.playerType === "hitter" ? (
                             <span className={cn(
-                              (player.ratios.opsRatio as number ?? 1) > 1.1 && "text-green-400",
-                              (player.ratios.opsRatio as number ?? 1) < 0.9 && "text-red-400",
+                              (player.ratios.opsRatio as number ?? 1) > 1.1 && "text-positive",
+                              (player.ratios.opsRatio as number ?? 1) < 0.9 && "text-negative",
                             )}>
                               {formatPct(player.ratios.opsRatio as number | null)}
                             </span>
                           ) : (
                             <span className={cn(
-                              (player.ratios.eraRatio as number ?? 1) < 0.9 && "text-green-400",
-                              (player.ratios.eraRatio as number ?? 1) > 1.1 && "text-red-400",
+                              (player.ratios.eraRatio as number ?? 1) < 0.9 && "text-positive",
+                              (player.ratios.eraRatio as number ?? 1) > 1.1 && "text-negative",
                             )}>
                               {player.ratios.eraRatio != null
                                 ? formatPct(player.ratios.eraRatio as number | null)
@@ -740,11 +740,11 @@ export default function TrendsPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {hasWarnings ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
                               {day.warnings.length} warning{day.warnings.length !== 1 ? "s" : ""}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive border border-positive/20">
                               No issues
                             </span>
                           )}
@@ -761,9 +761,9 @@ export default function TrendsPage() {
                               {day.warnings.map((w, idx) => (
                                 <div
                                   key={idx}
-                                  className="p-3 rounded-md bg-amber-500/5 border border-amber-500/20 text-body-sm"
+                                  className="p-3 rounded-md bg-warning/5 border border-warning/20 text-body-sm"
                                 >
-                                  <span className="text-amber-400 font-medium">
+                                  <span className="text-warning font-medium">
                                     {w.benchPlayerName}
                                   </span>
                                   <span className="text-content-secondary"> (bench) outperformed </span>
@@ -771,12 +771,12 @@ export default function TrendsPage() {
                                     {w.starterName}
                                   </span>
                                   <span className="text-content-secondary"> ({w.position}): </span>
-                                  <span className="font-mono text-amber-400 text-xs">{w.reason}</span>
+                                  <span className="font-mono text-warning text-xs">{w.reason}</span>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <p className="mt-3 text-body-sm text-green-400">
+                            <p className="mt-3 text-body-sm text-positive">
                               No lineup inefficiencies
                             </p>
                           )}

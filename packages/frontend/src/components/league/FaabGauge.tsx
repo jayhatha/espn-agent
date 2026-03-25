@@ -15,17 +15,17 @@ export function FaabGauge({ spent, total, leagueAvg }: FaabGaugeProps) {
   // Color based on remaining percentage
   const fillColor =
     pct > 50
-      ? "bg-emerald-500"
+      ? "bg-positive"
       : pct > 25
-        ? "bg-amber-500"
-        : "bg-red-500";
+        ? "bg-warning"
+        : "bg-negative";
 
   const textColor =
     pct > 50
-      ? "text-emerald-400"
+      ? "text-positive"
       : pct > 25
-        ? "text-amber-400"
-        : "text-red-400";
+        ? "text-warning"
+        : "text-negative";
 
   return (
     <div className="space-y-3">
