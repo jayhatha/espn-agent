@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 73-01-PLAN.md
-last_updated: "2026-03-25T06:54:21.534Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 74-01-PLAN.md
+last_updated: "2026-03-25T20:39:17.034Z"
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 19
-  completed_plans: 18
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 73 — show-current-and-projected-stats-for-each-player-on-waivers-and-roster-pages
+**Current focus:** Phase 74 — cache-and-materialize-derived-data-from-previous-seasons
 
 ## Current Position
 
-Phase: 73 (show-current-and-projected-stats-for-each-player-on-waivers-and-roster-pages) — EXECUTING
-Plan: 2 of 2
+Phase: 74 (cache-and-materialize-derived-data-from-previous-seasons) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ Plan: 2 of 2
 | Phase 72-ui-audit-fixes P01 | 12 min | 3 tasks | 5 files |
 | Phase 72-ui-audit-fixes P02 | 12 | 2 tasks | 8 files |
 | Phase 73 P01 | 15 | 2 tasks | 2 files |
+| Phase 73 P02 | 10 | 2 tasks | 2 files |
+| Phase 74 P01 | 2 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -84,11 +86,17 @@ Plan: 2 of 2
 - [Phase 72-02]: Snapshot dates formatted with toLocaleDateString in UI — not raw ISO strings
 - [Phase 73]: formatRate() checks denominator before calling formula — avoids 0.00 display when IP=0 or AB=0
 - [Phase 73]: PlayerStatLine returns null when components is null — callers control conditional rendering in Plan 02
+- [Phase 73]: PlayerStatLine placed inside flex-1 div so padding aligns with PlayerRow content in waivers page
+- [Phase 73]: Roster query in lineup page uses enabled: !!selectedTeamId without viewMode guard — roster stats always visible when team is selected
+- [Phase 74]: SeasonMetadata.created_at uses Generated<Date> to match DB DEFAULT NOW() — required for Kysely insert type safety
+- [Phase 74]: Finalization guard placed before computeProjectedStandings(), outside all forceFresh branches — independent of forceFresh flag
+- [Phase 74]: finalizeSeasonIfComplete uses INSERT...ON CONFLICT DO UPDATE for idempotent upsert — safe across multiple backfill runs
 
 ### Roadmap Evolution
 
 - Phase 71 added: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 - Phase 73 added: Show current and projected stats for each player on waivers and roster pages
+- Phase 74 added: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
 
 ### Blockers/Concerns
 
@@ -124,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T06:54:21.530Z
-Stopped at: Completed 73-01-PLAN.md
+Last session: 2026-03-25T20:39:17.028Z
+Stopped at: Completed 74-01-PLAN.md
 Resume file: None

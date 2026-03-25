@@ -70,10 +70,10 @@ Requirements for the In-Season Command Center milestone.
 
 ### Season Caching
 
-- [ ] **CACHE-01**: season_metadata table tracks which (league_id, season) pairs are finalized
-- [ ] **CACHE-02**: Finalized seasons skip projected standings recomputation in SnapshotOrchestratorAgent (regardless of forceFresh)
-- [ ] **CACHE-03**: Successful backfill completion auto-finalizes the season
-- [ ] **CACHE-04**: Admin can reset finalization to allow re-runs for data corrections
+- [x] **CACHE-01**: season_metadata table tracks which (league_id, season) pairs are finalized
+- [x] **CACHE-02**: Finalized seasons skip projected standings recomputation in SnapshotOrchestratorAgent (regardless of forceFresh)
+- [x] **CACHE-03**: Successful backfill completion auto-finalizes the season
+- [x] **CACHE-04**: Admin can reset finalization to allow re-runs for data corrections
 
 ## Future Requirements
 
@@ -137,10 +137,10 @@ Requirements for the In-Season Command Center milestone.
 | TREND-03 | Phase 70 | Pending |
 | TREND-04 | Phase 70 | Pending |
 | TREND-05 | Phase 70 | Pending |
-| CACHE-01 | Phase 74 | Pending |
-| CACHE-02 | Phase 74 | Pending |
-| CACHE-03 | Phase 74 | Pending |
-| CACHE-04 | Phase 74 | Pending |
+| CACHE-01 | Phase 74 | Complete |
+| CACHE-02 | Phase 74 | Complete |
+| CACHE-03 | Phase 74 | Complete |
+| CACHE-04 | Phase 74 | Complete |
 
 **Coverage:**
 - v6.0 requirements: 39 total

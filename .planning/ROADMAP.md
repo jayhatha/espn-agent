@@ -205,7 +205,7 @@ Plans:
 **Goal:** Eliminate redundant projected standings recomputation for completed seasons by adding a season finalization flag that gates the SnapshotOrchestratorAgent's projection step
 **Depends on:** Phase 73
 **Requirements:** CACHE-01, CACHE-02, CACHE-03, CACHE-04
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 74-01-PLAN.md — Season metadata table, finalization guard in snapshot orchestrator, auto-finalization in backfill, admin reset endpoint
+- [x] 74-01-PLAN.md — Season metadata table, finalization guard in snapshot orchestrator, auto-finalization in backfill, admin reset endpoint
