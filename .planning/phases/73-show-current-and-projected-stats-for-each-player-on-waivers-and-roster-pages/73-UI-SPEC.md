@@ -117,7 +117,7 @@ interface PlayerStatLineProps {
 **Visual specification:**
 
 - Outer element: `<div className="text-data font-mono text-shell-muted mt-1">`
-- Label prefix: `<span className="text-caption text-content-tertiary dark:text-content-tertiary mr-1.5 font-sans not-italic">{label}</span>` — label uses Inter (not mono), forcing `font-sans` since the parent is mono
+- Label prefix: `<span className="text-caption text-content-tertiary dark:text-content-tertiary mr-1 font-sans not-italic">{label}</span>` — label uses Inter (not mono), forcing `font-sans` since the parent is mono
 - Stat values: inline, space-separated, format: `KEY: VALUE`
 - Missing stat (null or IP=0 for rate stats): render `--`
 - No wrapping — single line, truncates on overflow
