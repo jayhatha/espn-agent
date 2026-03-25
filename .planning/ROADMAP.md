@@ -177,3 +177,13 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 
 Plans:
 - [x] 71-01-PLAN.md — Fix season defaults, add Compute Impacts button, improve empty states
+
+### Phase 72: UI audit fixes — mobile responsive layout, TopBar projected stat, semantic token cleanup, error handling
+
+**Goal:** Address all findings from the Phases 65-70 UI audit: fix broken mobile layout, wire TopBar projected stat, replace alert() with inline errors, migrate raw Tailwind colors to semantic tokens, and fix dark mode regressions
+**Depends on:** Phase 71
+**Requirements:** UI-AUDIT-01, UI-AUDIT-02, UI-AUDIT-03, UI-AUDIT-04, UI-AUDIT-05
+**Plans:** 0 plans
+
+Plans:
+(none yet)
