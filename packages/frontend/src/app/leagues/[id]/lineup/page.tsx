@@ -2,8 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import { PlayerStatLine } from "@/components/league/PlayerStatLine";
+import { calculateAVG, calculateOBP, calculateERA, calculateWHIP } from "@espn-fantasy/shared";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
@@ -41,10 +43,52 @@ interface LineupData {
   generatedAt: string;
 }
 
+interface RosterPlayer {
+  playerId: number;
+  espnPlayerId: number;
+  playerName: string;
+  mlbTeam: string | null;
+  positions: string[];
+  rosterStatus: string;
+  rosterSlot: string;
+  projections: Record<string, number> | null;
+  currentStats: Record<string, number> | null;
+}
+
+function isPitcher(positions: string[]): boolean {
+  return positions.some((p) => ["SP", "RP", "P"].includes(p));
+}
+
+function formatStat(value: number | null | undefined, decimals = 0): string {
+  if (value == null || isNaN(value)) return "--";
+  return decimals === 0 ? String(Math.round(value)) : value.toFixed(decimals);
+}
+
+function formatRate(
+  value: number | null | undefined,
+  decimals: number,
+  denominatorKey: string,
+  components: Record<string, number>,
+): string {
+  const denom = components[denominatorKey] ?? 0;
+  if (denom === 0) return "--";
+  if (value == null || isNaN(value)) return "--";
+  return value.toFixed(decimals);
+}
+
 export default function LineupOptimizerPage() {
   const params = useParams();
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+
+  // Load selected team from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(`league_${leagueId}_team`);
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) setSelectedTeamId(parsed);
+    }
+  }, [leagueId]);
 
   // Fetch teams
   const {
@@ -77,6 +121,19 @@ export default function LineupOptimizerPage() {
         parseInt(leagueId, 10),
         selectedTeamId
       ) as Promise<LineupData>;
+    },
+    enabled: !!selectedTeamId,
+  });
+
+  // Fetch roster for stats section
+  const { data: rosterData } = useQuery({
+    queryKey: ["roster", leagueId, selectedTeamId],
+    queryFn: async () => {
+      if (!selectedTeamId) throw new Error("No team selected");
+      return api.getTeamRoster(
+        parseInt(leagueId, 10),
+        selectedTeamId,
+      ) as Promise<{ roster: RosterPlayer[]; snapshotDate: string }>;
     },
     enabled: !!selectedTeamId,
   });
@@ -266,6 +323,156 @@ export default function LineupOptimizerPage() {
           </div>
         </div>
       ) : null}
+
+      {/* Roster Stats Section */}
+      {selectedTeamId && rosterData?.roster && rosterData.roster.length > 0 && (
+        <div className="mt-8 space-y-6">
+          <h2 className="text-h4 font-medium dark:text-shell-text text-content">Your Roster</h2>
+
+          {/* Hitters Table */}
+          {(() => {
+            const hitters = rosterData.roster.filter((p) => !isPitcher(p.positions));
+            if (hitters.length === 0) return null;
+            return (
+              <Card>
+                <CardContent>
+                  <h3 className="text-data font-medium uppercase dark:text-shell-text text-content mb-3">
+                    Hitters — Proj RoS
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                      <thead>
+                        <tr>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Player</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Pos</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Team</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">HR</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">R</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">RBI</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">SB</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">AVG</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">OBP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                        {hitters.map((player) => {
+                          const proj = player.projections;
+                          return (
+                            <tr key={player.playerId}>
+                              <td className="px-3 py-2 text-body-sm font-medium dark:text-shell-text text-content whitespace-nowrap">
+                                {player.playerName}
+                                {player.currentStats && (
+                                  <div className="mt-0.5">
+                                    <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                                {player.positions.join(", ")}
+                              </td>
+                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                                {player.mlbTeam || "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.HR) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.R) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.RBI) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.SB) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatRate(calculateAVG(proj), 3, "AB", proj) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatRate(calculateOBP(proj), 3, "AB", proj) : "--"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Pitchers Table */}
+          {(() => {
+            const pitchers = rosterData.roster.filter((p) => isPitcher(p.positions));
+            if (pitchers.length === 0) return null;
+            return (
+              <Card>
+                <CardContent>
+                  <h3 className="text-data font-medium uppercase dark:text-shell-text text-content mb-3">
+                    Pitchers — Proj RoS
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                      <thead>
+                        <tr>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Player</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Pos</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Team</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">W</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">SV</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">K</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">ERA</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">WHIP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                        {pitchers.map((player) => {
+                          const proj = player.projections;
+                          const ip = proj?.IP ?? 0;
+                          return (
+                            <tr key={player.playerId}>
+                              <td className="px-3 py-2 text-body-sm font-medium dark:text-shell-text text-content whitespace-nowrap">
+                                {player.playerName}
+                                {player.currentStats && (
+                                  <div className="mt-0.5">
+                                    <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                                {player.positions.join(", ")}
+                              </td>
+                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                                {player.mlbTeam || "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.W) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.SV) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj ? formatStat(proj.K) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj && ip > 0 ? calculateERA(proj).toFixed(2) : "--"}
+                              </td>
+                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                                {proj && ip > 0 ? calculateWHIP(proj).toFixed(3) : "--"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+        </div>
+      )}
     </Container>
   );
 }
