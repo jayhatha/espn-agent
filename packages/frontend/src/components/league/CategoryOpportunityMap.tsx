@@ -101,7 +101,7 @@ export function CategoryOpportunityMap({
                       </span>
                     ) : (
                       <span className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-caption font-semibold uppercase tracking-wide",
                         "text-positive bg-positive/10",
                       )}>
                         Leading
@@ -111,7 +111,7 @@ export function CategoryOpportunityMap({
                   <td className="px-3 py-2.5 text-center">
                     <span
                       className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-caption font-semibold uppercase tracking-wide",
                         diff.className,
                       )}
                     >

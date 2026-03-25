@@ -500,10 +500,10 @@ export default function StandingsPage() {
 
       {data?.snapshotDate && (
         <p className="mt-1 mb-6 text-body-sm text-content-secondary dark:text-shell-muted">
-          As of snapshot: {data.snapshotDate}
+          As of snapshot: {new Date(data.snapshotDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           {data.previousSnapshotDate && viewMode === "projected" && (
             <span className="text-content-tertiary ml-2">
-              (change since {data.previousSnapshotDate})
+              (change since {new Date(data.previousSnapshotDate!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})
             </span>
           )}
         </p>
@@ -640,7 +640,7 @@ export default function StandingsPage() {
                               <div className="flex items-center gap-3">
                                 <span
                                   className={cn(
-                                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                    "inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium",
                                     getRankColor(
                                       gain.currentRank,
                                       data?.overallStandings?.length ?? 13,
@@ -661,7 +661,7 @@ export default function StandingsPage() {
                                     cat?.stat_key ?? "",
                                   )}
                                 </span>
-                                <span className="text-content-tertiary text-[10px]">
+                                <span className="text-content-tertiary text-caption">
                                   gap to #{gain.currentRank - 1}
                                 </span>
                               </div>

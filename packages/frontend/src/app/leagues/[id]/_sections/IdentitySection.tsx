@@ -182,7 +182,7 @@ export function IdentitySection({
                       Overall Rank
                     </p>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-[28px] font-bold font-mono text-content dark:text-shell-text leading-none">
+                      <p className="text-h2 font-bold font-mono text-content dark:text-shell-text leading-none">
                         {teamOverview.overall.overall_rank}
                       </p>
                       <span className="text-base font-sans font-normal text-content-tertiary">
@@ -217,7 +217,7 @@ export function IdentitySection({
                       Total Points
                     </p>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-[28px] font-bold font-mono text-content dark:text-shell-text leading-none">
+                      <p className="text-h2 font-bold font-mono text-content dark:text-shell-text leading-none">
                         {Number(teamOverview.overall.overall_points)}
                       </p>
                       {deltaPoints !== null && (

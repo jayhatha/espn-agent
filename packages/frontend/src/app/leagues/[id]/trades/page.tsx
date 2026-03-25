@@ -777,7 +777,7 @@ export default function TradesPage() {
                     {/* Trade Details */}
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
                       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-                        <div className="text-[11px] font-semibold text-negative uppercase tracking-wider mb-1.5">
+                        <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">
                           You Give
                         </div>
                         {candidate.trade.givePlayers.map((p, i) => (
@@ -800,7 +800,7 @@ export default function TradesPage() {
                       </div>
 
                       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-                        <div className="text-[11px] font-semibold text-positive uppercase tracking-wider mb-1.5">
+                        <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">
                           You Get
                         </div>
                         {candidate.trade.receivePlayers.map((p, i) => (
