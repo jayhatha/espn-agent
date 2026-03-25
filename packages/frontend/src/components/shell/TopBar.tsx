@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -23,6 +23,14 @@ interface LeagueStatus {
     degraded_reasons: string[];
   } | null;
   snapshotCount: number;
+}
+
+interface ProjectedStandingsResponse {
+  overallStandings: Array<{
+    team_id: number;
+    projected_overall_rank: number;
+    projected_overall_points: number;
+  }>;
 }
 
 interface FaabSummaryResponse {
@@ -114,6 +122,20 @@ export function TopBar() {
     staleTime: 5 * 60_000,
   });
 
+  // Projected standings for selected team rank
+  const { data: standingsData } = useQuery<ProjectedStandingsResponse>({
+    queryKey: ["topbar-projected", leagueId],
+    queryFn: () => api.getProjectedStandings(leagueId) as Promise<ProjectedStandingsResponse>,
+    enabled: !!id && !!teamId,
+    staleTime: 5 * 60_000,
+  });
+
+  const projectedValue = useMemo(() => {
+    if (!standingsData?.overallStandings || !teamId) return "--";
+    const myTeam = standingsData.overallStandings.find(t => t.team_id === teamId);
+    return myTeam ? `#${myTeam.projected_overall_rank}` : "--";
+  }, [standingsData, teamId]);
+
   const leagueName = data?.league?.name ?? "--";
   const season = data?.league?.season;
   const weekLabel = season ? `${season}` : "--";
@@ -150,7 +172,7 @@ export function TopBar() {
         />
         <StatItem
           label="Projected"
-          value="--"
+          value={projectedValue}
           icon={TrendingUp}
           href={id ? `/leagues/${id}/standings` : undefined}
         />

@@ -105,7 +105,7 @@ export function SignalsPanel() {
     }
   }, [id]);
 
-  const { data: waiverData } = useQuery({
+  const { data: waiverData, isLoading: waiverLoading } = useQuery({
     queryKey: ["signals-waivers", id, teamId],
     queryFn: () =>
       api.getWaiverRecommendations(parseInt(id, 10), teamId!, {
@@ -115,12 +115,14 @@ export function SignalsPanel() {
     staleTime: 5 * 60_000,
   });
 
-  const { data: tradeData } = useQuery({
+  const { data: tradeData, isLoading: tradeLoading } = useQuery({
     queryKey: ["signals-trades", id, teamId],
     queryFn: () => api.getTradeRecommendations(parseInt(id, 10), teamId!),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
   });
+
+  const isLoadingSignals = (waiverLoading || tradeLoading) && !!teamId;
 
   // Build action items list
   const allSignals: ActionItem[] = useMemo(() => {
@@ -248,7 +250,7 @@ export function SignalsPanel() {
         ) : allSignals.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
-              Loading signals...
+              {isLoadingSignals ? "Loading signals..." : "No signals at the moment"}
             </p>
           </div>
         ) : filteredSignals.visible.length === 0 ? (
