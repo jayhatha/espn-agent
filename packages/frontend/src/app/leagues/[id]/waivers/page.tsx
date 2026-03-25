@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { PlayerRow } from "@/components/league/PlayerRow";
+import { PlayerStatLine } from "@/components/league/PlayerStatLine";
 import { getESPNFreeAgentsUrl } from "@/lib/espn-links";
 import { cn } from "@/lib/cn";
 import { Term } from "@/components/ui/Term";
@@ -45,6 +46,9 @@ interface FreeAgent {
   projections: {
     [key: string]: number;
   } | null;
+  currentStats: {
+    [key: string]: number;
+  } | null;
   pctOwned: number;
 }
 
@@ -57,6 +61,9 @@ interface RosterPlayer {
   rosterStatus: string;
   rosterSlot: string;
   projections: {
+    [key: string]: number;
+  } | null;
+  currentStats: {
     [key: string]: number;
   } | null;
 }
@@ -646,6 +653,18 @@ export default function WaiversPage() {
                                     </span>
                                   }
                                 />
+                                <div className="px-3 pb-2">
+                                  <PlayerStatLine
+                                    components={player.projections}
+                                    label="Proj RoS"
+                                    positions={player.positions}
+                                  />
+                                  <PlayerStatLine
+                                    components={player.currentStats}
+                                    label="YTD"
+                                    positions={player.positions}
+                                  />
+                                </div>
                               </div>
                             </label>
                           ))}
@@ -699,6 +718,18 @@ export default function WaiversPage() {
                                     selectedRosterPlayerId === player.playerId
                                   }
                                 />
+                                <div className="px-3 pb-2">
+                                  <PlayerStatLine
+                                    components={player.projections}
+                                    label="Proj RoS"
+                                    positions={player.positions}
+                                  />
+                                  <PlayerStatLine
+                                    components={player.currentStats}
+                                    label="YTD"
+                                    positions={player.positions}
+                                  />
+                                </div>
                               </div>
                             </label>
                           ))}
