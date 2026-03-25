@@ -31,6 +31,15 @@ type WithGeneratedId<T extends { id: unknown }> = Omit<T, "id"> & {
   id: Generated<T["id"]>;
 };
 
+export interface SeasonMetadata {
+  league_id: number;
+  season: number;
+  is_finalized: boolean;
+  finalized_at: Date | null;
+  snapshot_count: number | null;
+  created_at: Date;
+}
+
 export interface Database {
   league: WithGeneratedId<League>;
   league_settings_version: LeagueSettingsVersion;
@@ -66,6 +75,8 @@ export interface Database {
   slack_message_ref: SlackMessageRef;
   // Injury tracking
   injury_event: WithGeneratedId<InjuryEvent>;
+  // Season finalization (Phase 74)
+  season_metadata: SeasonMetadata;
 }
 
 export interface LeagueSettingsVersion {

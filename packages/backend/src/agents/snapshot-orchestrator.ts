@@ -344,8 +344,24 @@ export class SnapshotOrchestratorAgent {
       throw error; // Fatal - can't continue if database writes fail
     }
 
+    // 6b. Check season finalization — skip projection recomputation for completed seasons
+    const snapshotYear = parseInt(snapshotDate.substring(0, 4), 10);
+    const seasonMeta = await this.db
+      .selectFrom("season_metadata")
+      .select("is_finalized")
+      .where("league_id", "=", leagueId)
+      .where("season", "=", snapshotYear)
+      .executeTakeFirst();
+
+    if (seasonMeta?.is_finalized) {
+      this.logger?.info(
+        { leagueId, snapshotDate, season: snapshotYear },
+        "Season finalized — skipping projected standings recomputation",
+      );
+    }
+
     // 7. Compute projected standings (with error boundary)
-    if (projectionsRun) {
+    else if (projectionsRun) {
       try {
         await this.standingsAgent.computeProjectedStandings(
           leagueId,
