@@ -142,6 +142,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
                 "p.name as player_name",
                 "p.mlb_team",
                 "p.positions",
+                "p.current_season_stats_json",
               ])
               .where("p.id", "in", espnPlayerIds)
               .execute()
@@ -181,6 +182,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             mlbTeam: fa.mlb_team,
             positions: fa.positions,
             projections: projMap.get(fa.player_id) || null,
+            currentStats: fa.current_season_stats_json || null,
             pctOwned: ownership?.pctOwned ?? 0,
           };
         });
@@ -261,6 +263,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             "player.positions",
             "roster.roster_status",
             "roster.roster_slot",
+            "player.current_season_stats_json",
           ])
           .where("roster.league_id", "=", leagueId)
           .where("roster.team_id", "=", teamId)
@@ -306,6 +309,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           rosterStatus: player.roster_status,
           rosterSlot: player.roster_slot,
           projections: projectionMap.get(player.player_id) || null,
+          currentStats: player.current_season_stats_json || null,
         }));
 
         return { roster: enrichedRoster, snapshotDate: date };
