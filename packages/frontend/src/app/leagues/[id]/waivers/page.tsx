@@ -139,6 +139,7 @@ export default function WaiversPage() {
   const [evaluationResult, setEvaluationResult] =
     useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>("pct_owned");
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
 
@@ -226,6 +227,7 @@ export default function WaiversPage() {
 
     setIsEvaluating(true);
     setEvaluationResult(null);
+    setEvaluationError(null);
 
     try {
       const result = (await api.evaluateWaiver(
@@ -239,7 +241,7 @@ export default function WaiversPage() {
       setEvaluationResult(result);
     } catch (error) {
       console.error("Evaluation error:", error);
-      alert("Failed to evaluate add/drop. Please try again.");
+      setEvaluationError("Failed to evaluate add/drop. Please try again.");
     } finally {
       setIsEvaluating(false);
     }
@@ -334,14 +336,14 @@ export default function WaiversPage() {
   );
 
   const renderLegalityWarning = (issues: string[]) => (
-    <div className="mt-3 bg-warning-light border border-warning-border rounded-lg p-3">
+    <div className="mt-3 bg-warning-light dark:bg-amber-900/20 border border-warning-border dark:border-amber-800 rounded-lg p-3">
       <div className="flex">
         <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
         <div className="ml-3 flex-1">
-          <h4 className="text-body-sm font-medium text-warning">
+          <h4 className="text-body-sm font-medium text-warning dark:text-amber-400">
             Roster Constraints
           </h4>
-          <ul className="mt-1 text-data text-warning list-disc list-inside space-y-1">
+          <ul className="mt-1 text-data text-warning dark:text-amber-400 list-disc list-inside space-y-1">
             {issues.map((issue, i) => (
               <li key={i}>{issue}</li>
             ))}
@@ -359,7 +361,7 @@ export default function WaiversPage() {
   ) => (
     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-        <div className="text-[11px] font-semibold text-negative uppercase tracking-wider mb-1.5">
+        <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">
           Drop
         </div>
         <div className="text-sm font-medium text-content dark:text-shell-text truncate">
@@ -377,7 +379,7 @@ export default function WaiversPage() {
       </div>
 
       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-        <div className="text-[11px] font-semibold text-positive uppercase tracking-wider mb-1.5">
+        <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">
           Add
         </div>
         <div className="text-sm font-medium text-content dark:text-shell-text truncate">
@@ -409,7 +411,7 @@ export default function WaiversPage() {
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 viewMode === "ai"
-                  ? "bg-accent text-white"
+                  ? "bg-shell-accent text-white"
                   : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
               )}
             >
@@ -420,7 +422,7 @@ export default function WaiversPage() {
               className={cn(
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 viewMode === "manual"
-                  ? "bg-accent text-white"
+                  ? "bg-shell-accent text-white"
                   : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
               )}
             >
@@ -725,6 +727,13 @@ export default function WaiversPage() {
                   {isEvaluating ? "Evaluating..." : "Evaluate Impact"}
                 </Button>
               </div>
+              {evaluationError && (
+                <ErrorAlert
+                  message={evaluationError}
+                  variant="error"
+                  onRetry={() => { setEvaluationError(null); handleEvaluate(); }}
+                />
+              )}
             </CardContent>
           </Card>
 
