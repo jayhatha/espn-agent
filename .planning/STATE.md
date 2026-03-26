@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Phase complete — ready for verification
-stopped_at: Completed 74-01-PLAN.md
-last_updated: "2026-03-25T20:39:17.034Z"
+status: Ready to execute
+stopped_at: Completed 75-01-PLAN.md
+last_updated: "2026-03-26T19:05:42.663Z"
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
-  total_plans: 20
-  completed_plans: 20
+  total_plans: 22
+  completed_plans: 21
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 74 — cache-and-materialize-derived-data-from-previous-seasons
+**Current focus:** Phase 75 — active-stats-show-each-player-s-stat-contribution-to-a-specific-team-based-on-roster-tenure-not-full-season-totals
 
 ## Current Position
 
-Phase: 74 (cache-and-materialize-derived-data-from-previous-seasons) — EXECUTING
-Plan: 1 of 1
+Phase: 75 (active-stats-show-each-player-s-stat-contribution-to-a-specific-team-based-on-roster-tenure-not-full-season-totals) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: 1 of 1
 | Phase 73 P01 | 15 | 2 tasks | 2 files |
 | Phase 73 P02 | 10 | 2 tasks | 2 files |
 | Phase 74 P01 | 2 min | 2 tasks | 5 files |
+| Phase 75-active-stats P01 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -91,12 +92,16 @@ Plan: 1 of 1
 - [Phase 74]: SeasonMetadata.created_at uses Generated<Date> to match DB DEFAULT NOW() — required for Kysely insert type safety
 - [Phase 74]: Finalization guard placed before computeProjectedStandings(), outside all forceFresh branches — independent of forceFresh flag
 - [Phase 74]: finalizeSeasonIfComplete uses INSERT...ON CONFLICT DO UPDATE for idempotent upsert — safe across multiple backfill runs
+- [Phase 75]: player_period_stats PK is (league_id, scoring_period, player_id) — upserts overwrite team_id when player is traded mid-season
+- [Phase 75]: Tenure stats are raw component sums — frontend computes rate stats from components using existing formula functions
+- [Phase 75]: player.espn_player_id (not player.id) used for ESPN-to-DB player ID lookup — player.id is a DB surrogate key
 
 ### Roadmap Evolution
 
 - Phase 71 added: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 - Phase 73 added: Show current and projected stats for each player on waivers and roster pages
 - Phase 74 added: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
+- Phase 75 added: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
 
 ### Blockers/Concerns
 
@@ -132,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:39:17.028Z
-Stopped at: Completed 74-01-PLAN.md
+Last session: 2026-03-26T19:05:42.658Z
+Stopped at: Completed 75-01-PLAN.md
 Resume file: None
