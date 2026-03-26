@@ -289,7 +289,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .where("league_id", "=", leagueId)
         .execute();
 
-      const teamMap = new Map(teams.map((t) => [t.id, t]));
+      const teamMap = new Map<any, typeof teams[0]>(teams.map((t) => [t.id, t]));
 
       // Get projected category standings
       const categoryStandings = await db
@@ -309,6 +309,29 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .where("snapshot_date", "=", targetDate)
         .orderBy("projected_overall_rank", "asc")
         .execute();
+
+      // Find previous snapshot for delta computation
+      const previousSnapshot = await db
+        .selectFrom("league_daily_snapshot")
+        .select("snapshot_date")
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "<", targetDate)
+        .orderBy("snapshot_date", "desc")
+        .executeTakeFirst();
+
+      // Fetch previous projected overall if a previous snapshot exists
+      let previousOverallMap = new Map<number, number>();
+      if (previousSnapshot) {
+        const previousOverall = await db
+          .selectFrom("team_daily_projected_overall")
+          .select(["team_id", "projected_overall_points"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", previousSnapshot.snapshot_date)
+          .execute();
+        previousOverallMap = new Map(
+          previousOverall.map((po) => [po.team_id, po.projected_overall_points]),
+        );
+      }
 
       // Get current category totals and ranks
       const currentCategoryTotals = await db
@@ -375,19 +398,27 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       return {
         snapshotDate: targetDate,
+        previousSnapshotDate: previousSnapshot?.snapshot_date ?? null,
         categories,
         categoryStandings: categoryStandings.map((cs) => ({
           ...cs,
           teamName: teamMap.get(cs.team_id)?.name || `Team ${cs.team_id}`,
         })),
-        overallStandings: overallStandings.map((os) => ({
-          ...os,
-          teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
-        })),
+        overallStandings: overallStandings.map((os) => {
+          const prevPoints = previousOverallMap.get(os.team_id);
+          return {
+            ...os,
+            teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
+            previousProjectedPoints: prevPoints ?? null,
+            pointsDelta: prevPoints != null
+              ? os.projected_overall_points - prevPoints
+              : null,
+          };
+        }),
         currentCategoryStandings,
         currentOverallStandings: currentOverallStandings.map((os) => ({
           ...os,
-          teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
+          teamName: teamMap.get(os.team_id as any)?.name || `Team ${os.team_id}`,
         })),
       };
     },
@@ -501,11 +532,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         const teams = await db
           .selectFrom("team")
           .select(["id", "name"])
-          .where("id", "in", Array.from(teamIds_set))
+          .where("id", "in", Array.from(teamIds_set) as any)
           .execute();
 
         teams.forEach((t) => {
-          teamMap.set(t.id, t.name);
+          teamMap.set(t.id as any, t.name);
         });
       }
 

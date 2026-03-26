@@ -65,11 +65,11 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
       const sortBy = request.query.sortBy || "impact";
 
-      const startDate = `${season}-04-01`;
-      const endDate = `${season}-10-31`;
+      const startDate = `${season}-01-01`;
+      const endDate = `${season}-12-31`;
 
       // Get impacts with player names
-      const impacts = await db
+      const impacts: any[] = await db
         .selectFrom("transaction_impact as ti")
         .leftJoin("player as pg", "pg.id", "ti.player_gained_id")
         .leftJoin("player as pl", "pl.id", "ti.player_lost_id")
@@ -94,14 +94,14 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           "pg.positions as gained_player_positions",
           "pl.name as lost_player_name",
           "pl.positions as lost_player_positions",
-        ])
+        ] as any)
         .where("ti.league_id", "=", leagueId)
         .where("ti.team_id", "=", teamId)
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
         .orderBy(
           sortBy === "impact"
-            ? (qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points")
+            ? (qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points")
             : "ti.effective_date",
           sortBy === "date" ? "asc" : "desc",
         )
@@ -177,11 +177,11 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
       const limit = request.query.limit ? parseInt(request.query.limit, 10) : 10;
 
-      const startDate = `${season}-04-01`;
-      const endDate = `${season}-10-31`;
+      const startDate = `${season}-01-01`;
+      const endDate = `${season}-12-31`;
 
       // All impacts across every team, sorted by impact desc
-      const allImpacts = await db
+      const allImpacts: any[] = await db
         .selectFrom("transaction_impact as ti")
         .innerJoin("team as t", (join) =>
           join.onRef("t.id", "=", "ti.team_id").on("t.league_id", "=", leagueId),
@@ -206,13 +206,13 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           "pg.positions as gained_player_positions",
           "pl.name as lost_player_name",
           "pl.positions as lost_player_positions",
-        ])
+        ] as any)
         .where("ti.league_id", "=", leagueId)
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
         .where("ti.move_type", "!=", "draft")
         .orderBy(
-          (qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
+          (qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
           "desc",
         )
         .execute();
@@ -341,11 +341,11 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
       const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
 
-      const startDate = `${season}-04-01`;
-      const endDate = `${season}-10-31`;
+      const startDate = `${season}-01-01`;
+      const endDate = `${season}-12-31`;
 
       // Get draft pick impacts
-      const draftPicks = await db
+      const draftPicks: any[] = await db
         .selectFrom("transaction_impact as ti")
         .leftJoin("player as pg", "pg.id", "ti.player_gained_id")
         .select([
@@ -365,13 +365,13 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           "ti.player_gained_id",
           "pg.name as player_name",
           "pg.positions as positions",
-        ])
+        ] as any)
         .where("ti.league_id", "=", leagueId)
         .where("ti.team_id", "=", teamId)
         .where("ti.move_type", "=", "draft")
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
-        .orderBy((qb) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"), "desc")
+        .orderBy((qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"), "desc")
         .execute();
 
       // Check if each draft pick is still on the team (final roster snapshot)

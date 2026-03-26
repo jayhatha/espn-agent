@@ -441,13 +441,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const espnAdapter = new ESPNAdapter(request.log);
-      const standingsAgent = new StandingsProjectionAgent(db, request.log);
+      const espnAdapter = new ESPNAdapter(request.log as any);
+      const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
       const waiverAgent = new WaiverRecommendationAgent(
         db,
         standingsAgent,
         espnAdapter,
-        request.log,
+        request.log as any,
       );
 
       const recommendations = await waiverAgent.getRecommendations(
@@ -503,7 +503,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
 
       try {
         const analysis = await tradeAgent.analyzeTradeImpact(
@@ -556,7 +556,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
 
       try {
         const candidates = await tradeAgent.generateTradeCandidates(
@@ -621,13 +621,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .selectFrom("team")
             .selectAll()
             .where("league_id", "=", leagueId)
-            .where("id", "=", teamId)
+            .where("id", "=", teamId as any)
             .executeTakeFirst(),
           db
             .selectFrom("team")
             .selectAll()
             .where("league_id", "=", leagueId)
-            .where("id", "=", partnerTeamId)
+            .where("id", "=", partnerTeamId as any)
             .executeTakeFirst(),
         ]);
 
@@ -769,7 +769,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .selectFrom("team")
           .select(["id", "name", "espn_team_id"])
           .where("league_id", "=", leagueId)
-          .where("id", "!=", teamId)
+          .where("id", "!=", teamId as any)
           .orderBy("name", "asc")
           .execute();
 
@@ -787,7 +787,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   // Draft recommendations (placeholder)
   app.get(
     "/api/leagues/:leagueId/draft/recommendations",
-    async (request, reply) => {
+    async (_request, _reply) => {
       return { message: "Draft recommendations - to be implemented" };
     },
   );

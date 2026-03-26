@@ -245,9 +245,43 @@ export interface PlayerIdentityMap {
 // Enables tenure-based stats: stats accumulated while on a specific team
 export interface PlayerPeriodStats {
   league_id: number;
+  snapshot_date: string;
   scoring_period: number;
   player_id: number;
   team_id: number;
   lineup_slot_id: number | null;
   components_json: StatComponents;
+}
+
+export interface RosterMove {
+  id: number;
+  league_id: number;
+  team_id: number;
+  move_type: string;
+  player_id: number;
+  effective_date: string;
+  paired_move_id: number | null;
+}
+
+export interface TransactionImpact {
+  id: number;
+  league_id: number;
+  team_id: number;
+  move_type: string;
+  player_gained_id: number | null;
+  player_lost_id: number | null;
+  effective_date: string;
+  gained_components: Record<string, number> | null;
+  lost_components: Record<string, number> | null;
+  impact_roto_points: number;
+  category_impacts: Record<string, unknown>;
+  is_incomplete: boolean;
+  computed_at: Date;
+  shapley_impact: number | null;
+  ci_low: number | null;
+  ci_high: number | null;
+  is_uncertain: boolean;
+  sgp_category_impacts: Record<string, unknown> | null;
+  replacement_level_impact: number | null;
+  replacement_level_components: Record<string, number> | null;
 }

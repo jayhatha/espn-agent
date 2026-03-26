@@ -40,7 +40,7 @@ export async function streamingRoutes(app: FastifyInstance) {
       const league = await db
         .selectFrom("league")
         .select("id")
-        .where("id", "=", leagueId)
+        .where("id", "=", leagueId as any)
         .executeTakeFirst();
 
       if (!league) {
@@ -59,10 +59,28 @@ export async function streamingRoutes(app: FastifyInstance) {
           limit,
         });
 
+        // Map agent field names to the shape expected by the frontend.
+        // StreamingPitcherAgent uses: opponent, ownership, scoreBreakdown.opponentScore
+        // Frontend expects: matchupOpponent, ownershipPct, matchupScore
+        const candidates = result.candidates.map((c) => ({
+          playerId: c.playerId,
+          playerName: c.playerName,
+          mlbTeam: c.mlbTeam,
+          matchupOpponent: c.opponent,
+          isHome: c.isHome,
+          gameDate: c.gameDate,
+          compositeScore: c.compositeScore,
+          projectionScore: c.scoreBreakdown.projectionScore,
+          matchupScore: c.scoreBreakdown.opponentScore,
+          multiStartBonus: c.scoreBreakdown.multiStartBonus,
+          weekStarts: c.weekStarts,
+          ownershipPct: c.ownership,
+        }));
+
         return {
-          candidates: result.candidates,
+          candidates,
           dateRange: result.dateRange,
-          totalCandidates: result.candidates.length,
+          totalCandidates: candidates.length,
           generatedAt: new Date().toISOString(),
         };
       } catch (error) {
