@@ -384,25 +384,39 @@ export class GsPacingAgent {
   /**
    * Count GS used this season for this team.
    *
-   * We count the number of distinct (player, snapshot_date) pairs where
-   * an SP-eligible pitcher was in an active SP or P slot. Each snapshot
-   * date represents one MLB game day, and each SP in an active starting
-   * slot on a game day counts as one game start for cap purposes.
+   * Uses player_period_stats (tenure stats) to count only GS accumulated
+   * while the pitcher was on THIS team's roster. Starts made for other
+   * teams before a trade do not count against our GS cap.
    *
-   * To avoid overcounting (a pitcher is in your SP slot all week but
-   * only starts once every 5 days), we divide each pitcher's rostered
-   * days by 5 (standard rotation) and round. This gives a reasonable
-   * estimate without needing real-time box score data.
-   *
-   * If actual GS data is available in current_season_stats_json, we use
-   * the MINIMUM of (estimated GS from roster, total player GS) to avoid
-   * counting starts made for other teams before a trade.
+   * Falls back to roster-day estimation if tenure stats aren't populated.
    */
   private async countGsFromRosterAndStats(
     leagueId: number,
     teamId: number,
   ): Promise<number> {
-    // Get the league's season year
+    // Try tenure stats first — these are already scoped to our team
+    const tenureRows = await this.db
+      .selectFrom("player_period_stats")
+      .select(["player_id", "components_json"])
+      .where("league_id", "=", leagueId)
+      .where("team_id", "=", teamId)
+      .execute();
+
+    if (tenureRows.length > 0) {
+      // Sum GS from tenure-scoped period stats
+      let totalGS = 0;
+      for (const row of tenureRows) {
+        const components = row.components_json as Record<string, number> | null;
+        const gs = components?.GS;
+        if (typeof gs === "number" && gs > 0) {
+          totalGS += gs;
+        }
+      }
+      // Only use tenure data if we actually found GS values
+      if (totalGS > 0) return totalGS;
+    }
+
+    // Fallback: estimate from roster days (pre-Phase 75 data)
     const league = await this.db
       .selectFrom("league")
       .select("season")
@@ -411,7 +425,6 @@ export class GsPacingAgent {
 
     if (!league) return 0;
 
-    // Count rostered days per SP-eligible pitcher (current season only)
     const seasonStart = `${league.season}-01-01`;
     const seasonEnd = `${league.season}-12-31`;
 
@@ -421,7 +434,6 @@ export class GsPacingAgent {
       .select([
         "trs.player_id",
         (eb) => eb.fn.count<number>("trs.snapshot_date").as("days_rostered"),
-        "p.current_season_stats_json",
       ])
       .where("trs.league_id", "=", leagueId)
       .where("trs.team_id", "=", teamId)
@@ -430,25 +442,13 @@ export class GsPacingAgent {
       .where("trs.roster_status", "=", "active")
       .where("trs.roster_slot", "in", SP_ROSTER_SLOTS)
       .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
-      .groupBy(["trs.player_id", "p.current_season_stats_json"])
+      .groupBy(["trs.player_id"])
       .execute();
 
     let totalGS = 0;
     for (const row of pitcherDays) {
       const daysRostered = Number(row.days_rostered);
-      // Estimate: SPs start once every 5 days
-      const estimatedGS = Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
-
-      // If we have actual GS from ESPN stats, use the minimum
-      // (player's total GS might include starts for other teams)
-      const stats = row.current_season_stats_json as Record<string, number> | null;
-      const actualGS = stats?.GS;
-
-      if (typeof actualGS === "number" && actualGS >= 0) {
-        totalGS += Math.min(estimatedGS, actualGS);
-      } else {
-        totalGS += estimatedGS;
-      }
+      totalGS += Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
     }
 
     return totalGS;
