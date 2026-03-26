@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 75-02-PLAN.md
-last_updated: "2026-03-26T19:17:23.160Z"
+status: Ready to execute
+stopped_at: Completed 76-01-PLAN.md
+last_updated: "2026-03-26T20:36:54.697Z"
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 11
-  total_plans: 22
-  completed_plans: 22
+  total_plans: 24
+  completed_plans: 23
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 75 — active-stats-show-each-player-s-stat-contribution-to-a-specific-team-based-on-roster-tenure-not-full-season-totals
+**Current focus:** Phase 76 — api-hardening
 
 ## Current Position
 
-Phase: 75
-Plan: Not started
+Phase: 76 (api-hardening) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Plan: Not started
 | Phase 74 P01 | 2 min | 2 tasks | 5 files |
 | Phase 75-active-stats P01 | 3 | 2 tasks | 6 files |
 | Phase 75-active-stats P02 | 2 | 1 tasks | 3 files |
+| Phase 76-api-hardening P01 | 2 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Plan: Not started
 - [Phase 75]: player.espn_player_id (not player.id) used for ESPN-to-DB player ID lookup — player.id is a DB surrogate key
 - [Phase 75-02]: On Team label uses cyan-400 to create a distinct visual tier between accent projection and muted YTD labels
 - [Phase 75-02]: tenureStats render above YTD in lineup page — contribution-since-acquired shown before full-season view
+- [Phase 76-api-hardening]: assertEspnCriticalShape is a TypeScript assertion function that throws on missing teams array — hard fail for structural ESPN API breakage
+- [Phase 76-api-hardening]: logUnexpectedFields only logs at INFO — never throws — preserving graceful degradation for ESPN schema drift detection
 
 ### Roadmap Evolution
 
@@ -141,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:10:53.216Z
-Stopped at: Completed 75-02-PLAN.md
+Last session: 2026-03-26T20:36:54.692Z
+Stopped at: Completed 76-01-PLAN.md
 Resume file: None

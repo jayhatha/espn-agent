@@ -226,8 +226,8 @@ Plans:
 **Goal:** Harden the ESPN adapter with strengthened Zod schemas covering nested fields normalization relies on, critical-field assertions that throw on structurally broken responses, schema drift logging, and validation wired into all fetch methods
 **Requirements**: HARD-01, HARD-02, HARD-03, HARD-04, HARD-05, HARD-06, HARD-07
 **Depends on:** Phase 75
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
-- [ ] 76-01-PLAN.md — Strengthen Zod schemas (roster entries, scoringItems), add assertEspnCriticalShape + logUnexpectedFields with unit tests
+- [x] 76-01-PLAN.md — Strengthen Zod schemas (roster entries, scoringItems), add assertEspnCriticalShape + logUnexpectedFields with unit tests
 - [ ] 76-02-PLAN.md — Wire validation into adapter fetch methods, remove duplicate 429 handler, clean up CLAUDE.md Known Issue #8
