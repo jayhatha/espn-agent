@@ -384,17 +384,50 @@ export class GsPacingAgent {
   /**
    * Count GS used this season for this team.
    *
-   * Uses player_period_stats (tenure stats) to count only GS accumulated
-   * while the pitcher was on THIS team's roster. Starts made for other
-   * teams before a trade do not count against our GS cap.
+   * Primary source: ESPN team statValues[33] (GS) from the latest raw
+   * payload — this is the same number shown on ESPN's standings page and
+   * already accounts for roster tenure (ESPN only counts starts made
+   * while the pitcher was on your team).
    *
-   * Falls back to roster-day estimation if tenure stats aren't populated.
+   * Fallback: sum GS from player_period_stats (tenure-scoped).
+   * Last resort: estimate from roster days.
    */
   private async countGsFromRosterAndStats(
     leagueId: number,
     teamId: number,
   ): Promise<number> {
-    // Try tenure stats first — these are already scoped to our team
+    // 1. Try ESPN raw payload — team.valuesByStat[33] is GS
+    const team = await this.db
+      .selectFrom("team")
+      .select(["espn_team_id"])
+      .where("id", "=", teamId)
+      .executeTakeFirst();
+
+    if (team) {
+      const latestPayload = await this.db
+        .selectFrom("league_raw_payload")
+        .select(["response_json"])
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst();
+
+      if (latestPayload) {
+        const raw = latestPayload.response_json as any;
+        const espnTeam = raw?.teams?.find(
+          (t: any) => t.id === team.espn_team_id,
+        );
+        const gsFromEspn = espnTeam?.valuesByStat?.[33];
+        if (typeof gsFromEspn === "number" && gsFromEspn >= 0) {
+          this.logger?.info(
+            { teamId, gsFromEspn },
+            "GS count from ESPN statValues[33]",
+          );
+          return gsFromEspn;
+        }
+      }
+    }
+
+    // 2. Fallback: sum GS from tenure-scoped player_period_stats
     const tenureRows = await this.db
       .selectFrom("player_period_stats")
       .select(["player_id", "components_json"])
@@ -403,7 +436,6 @@ export class GsPacingAgent {
       .execute();
 
     if (tenureRows.length > 0) {
-      // Sum GS from tenure-scoped period stats
       let totalGS = 0;
       for (const row of tenureRows) {
         const components = row.components_json as Record<string, number> | null;
@@ -412,11 +444,13 @@ export class GsPacingAgent {
           totalGS += gs;
         }
       }
-      // Only use tenure data if we actually found GS values
-      if (totalGS > 0) return totalGS;
+      if (totalGS > 0) {
+        this.logger?.info({ teamId, totalGS }, "GS count from tenure stats");
+        return totalGS;
+      }
     }
 
-    // Fallback: estimate from roster days (pre-Phase 75 data)
+    // 3. Last resort: estimate from roster days
     const league = await this.db
       .selectFrom("league")
       .select("season")
@@ -451,6 +485,7 @@ export class GsPacingAgent {
       totalGS += Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
     }
 
+    this.logger?.info({ teamId, totalGS, source: "roster-estimate" }, "GS count estimated from roster days");
     return totalGS;
   }
 
