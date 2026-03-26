@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 75-01-PLAN.md
-last_updated: "2026-03-26T19:05:42.663Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 75-02-PLAN.md
+last_updated: "2026-03-26T19:10:53.222Z"
 progress:
   total_phases: 11
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 22
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Project State
@@ -52,6 +52,7 @@ Plan: 2 of 2
 | Phase 73 P02 | 10 | 2 tasks | 2 files |
 | Phase 74 P01 | 2 min | 2 tasks | 5 files |
 | Phase 75-active-stats P01 | 3 | 2 tasks | 6 files |
+| Phase 75-active-stats P02 | 2 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Plan: 2 of 2
 - [Phase 75]: player_period_stats PK is (league_id, scoring_period, player_id) — upserts overwrite team_id when player is traded mid-season
 - [Phase 75]: Tenure stats are raw component sums — frontend computes rate stats from components using existing formula functions
 - [Phase 75]: player.espn_player_id (not player.id) used for ESPN-to-DB player ID lookup — player.id is a DB surrogate key
+- [Phase 75-02]: On Team label uses cyan-400 to create a distinct visual tier between accent projection and muted YTD labels
+- [Phase 75-02]: tenureStats render above YTD in lineup page — contribution-since-acquired shown before full-season view
 
 ### Roadmap Evolution
 
@@ -137,6 +140,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:05:42.658Z
-Stopped at: Completed 75-01-PLAN.md
+Last session: 2026-03-26T19:10:53.216Z
+Stopped at: Completed 75-02-PLAN.md
 Resume file: None
