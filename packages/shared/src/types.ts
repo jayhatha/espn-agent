@@ -37,6 +37,13 @@ export interface Category {
   formula_id?: string;
 }
 
+export interface DraftConfiguration {
+  categories: Category[];
+  rosterSlots: Record<string, number>;
+  totalTeams: number;
+  budget: number;
+}
+
 // League settings
 export interface LeagueSettings {
   scoring_format: ScoringFormat;
