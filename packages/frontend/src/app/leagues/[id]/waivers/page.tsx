@@ -581,17 +581,11 @@ export default function WaiversPage() {
                           <option value="name">Name A-Z</option>
                         </select>
                         <select
-                          multiple
-                          value={positionFilter}
+                          value={positionFilter.length > 0 ? positionFilter[0] : ""}
                           onChange={(e) => {
-                            const selected = Array.from(
-                              e.target.selectedOptions,
-                            ).map((opt) => opt.value);
-                            setPositionFilter(selected);
+                            setPositionFilter(e.target.value ? [e.target.value] : []);
                           }}
-                          className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 max-h-8 text-content dark:text-shell-text dark:bg-shell-bg"
-                          size={1}
-                          title="Hold Ctrl/Cmd to select multiple positions"
+                          className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 text-content dark:text-shell-text dark:bg-shell-bg"
                         >
                           <option value="">All Positions</option>
                           {["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"].map(

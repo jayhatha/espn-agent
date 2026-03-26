@@ -2,7 +2,7 @@
 
 import {
   calculateAVG,
-  calculateOBP,
+  calculateOPS,
   calculateERA,
   calculateWHIP,
 } from "@espn-fantasy/shared";
@@ -72,7 +72,7 @@ export function PlayerStatLine({
   const { HR = 0, R = 0, RBI = 0, SB = 0 } = components;
   const ab = components.AB ?? 0;
   const avg = ab > 0 ? calculateAVG(components) : null;
-  const obp = ab > 0 ? calculateOBP(components) : null;
+  const ops = ab > 0 ? calculateOPS(components) : null;
 
   return (
     <div className="text-data font-mono text-content-secondary dark:text-shell-muted mt-1 truncate">
@@ -80,8 +80,8 @@ export function PlayerStatLine({
         {label}
       </span>
       HR: {formatStat(HR)} R: {formatStat(R)} RBI: {formatStat(RBI)} SB:{" "}
-      {formatStat(SB)} AVG: {formatRate(avg, 3, "AB", components)} OBP:{" "}
-      {formatRate(obp, 3, "AB", components)}
+      {formatStat(SB)} AVG: {formatRate(avg, 3, "AB", components)} OPS:{" "}
+      {formatRate(ops, 3, "AB", components)}
     </div>
   );
 }
