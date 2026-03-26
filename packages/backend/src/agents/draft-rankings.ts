@@ -83,6 +83,7 @@ export class DraftRankingsAgent {
       categories,
       rosterSlots,
       totalTeams: teams.length,
+      budget: 260,
     };
 
     // Delegate to config-based method
@@ -358,7 +359,7 @@ export class DraftRankingsAgent {
     );
 
     // Calculate VBD for each player (max across all eligible positions)
-    const rankedPlayers: DraftRanking[] = playersWithSGP.map((player) => {
+    const rankedPlayers: DraftRanking[] = (playersWithSGP as any[]).map((player): any => {
       let maxVBD = 0;
       let primaryPosition = player.positions[0] || "UTIL";
 
@@ -397,7 +398,7 @@ export class DraftRankingsAgent {
     });
 
     // Sort by VBD descending
-    rankedPlayers.sort((a, b) => b.vbdScore - a.vbdScore);
+    rankedPlayers.sort((a, b) => (b as any).vbdScore - (a as any).vbdScore);
 
     // Assign tiers
     const totalPlayers = rankedPlayers.length;
@@ -421,7 +422,7 @@ export class DraftRankingsAgent {
     let filteredPlayers = rankedPlayers;
     if (position) {
       filteredPlayers = rankedPlayers.filter((p) =>
-        p.positions.includes(position),
+        (p as any).positions.includes(position),
       );
     }
 

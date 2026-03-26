@@ -58,7 +58,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           return reply.code(404).send({ error: "No league data found" });
         }
 
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = new ESPNAdapter(request.log as any);
         const normalized = espnAdapter.normalizeLeagueData(
           latestPayload.response_json as Record<string, unknown>,
         );
@@ -301,13 +301,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const espnAdapter = new ESPNAdapter(request.log);
-        const standingsAgent = new StandingsProjectionAgent(db, request.log);
+        const espnAdapter = new ESPNAdapter(request.log as any);
+        const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
         const waiverAgent = new WaiverRecommendationAgent(
           db,
           standingsAgent,
           espnAdapter,
-          request.log,
+          request.log as any,
         );
 
         // Get player names

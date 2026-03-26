@@ -3,6 +3,7 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { calculateFinalRate, combineComponents } from "../../../shared/dist/index.js";
+import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
  * Standings Projection Agent
@@ -171,7 +172,7 @@ export class StandingsProjectionAgent {
           return sum + (components[category.stat_key] || 0);
         }, 0);
 
-        const finalValue = (currentTotal?.value || 0) + projectedSum;
+        const finalValue = Number(currentTotal?.value || 0) + projectedSum;
 
         categoryProjections.set(category.category_id, {
           value: finalValue,
@@ -211,7 +212,7 @@ export class StandingsProjectionAgent {
           );
 
           categoryProjections.set(category.category_id, {
-            value: currentTotal?.value || 0,
+            value: Number(currentTotal?.value || 0),
             components: currentComponents,
             isDegraded: true,
           });
@@ -267,14 +268,19 @@ export class StandingsProjectionAgent {
         }
       });
 
-      // Assign ranks and roto points
+      // Assign ranks and roto points with tie handling
       const numTeams = values.length;
+      const sorted = values.map((v) => ({ teamId: v.teamId, value: v.value }));
+      const ranked = assignRanksWithTies(sorted, numTeams);
+
+      // Build a lookup from teamId to rank info
+      const rankMap = new Map(ranked.map((r) => [r.teamId, r]));
 
       // Build array for batch insert
       const categoryRows = [];
       for (let i = 0; i < values.length; i++) {
-        const rank = i + 1;
-        const rotoPoints = numTeams - rank + 1;
+        const rankInfo = rankMap.get(values[i].teamId)!;
+        const { rank, rotoPoints } = rankInfo;
 
         const currentPoints = teamOverallPoints.get(values[i].teamId) || 0;
         teamOverallPoints.set(values[i].teamId, currentPoints + rotoPoints);

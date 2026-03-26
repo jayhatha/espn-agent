@@ -222,7 +222,7 @@ export class SnapshotOrchestratorAgent {
         );
 
         // Write free agent players
-        await this.writeFreeAgentPlayers(trx, normalized.freeAgents);
+        await this.writeFreeAgentPlayers(trx, normalized.freeAgents as any);
 
         // Write current category totals, ranks, and overall
         const categories = normalized.settings.categories;
@@ -300,7 +300,7 @@ export class SnapshotOrchestratorAgent {
             mlb_team: entry.mlbTeam,
             positions: entry.positions,
             created_at: new Date(),
-          })
+          } as any)
           .onConflict((oc) =>
             oc.column("espn_player_id").doUpdateSet({
               name: entry.name,
@@ -450,7 +450,7 @@ export class SnapshotOrchestratorAgent {
     settings: any,
   ): Promise<number> {
     // Check if settings changed
-    const latest = await this.db
+    void await this.db
       .selectFrom("league_settings_version")
       .selectAll()
       .where("league_id", "=", leagueId)
@@ -534,7 +534,7 @@ export class SnapshotOrchestratorAgent {
           mlb_team: null,
           positions: fa.positions, // Use parsed positions instead of empty array
           created_at: new Date(),
-        })
+        } as any)
         .onConflict((oc) =>
           oc.column("espn_player_id").doUpdateSet({
             name: fa.name,
@@ -562,7 +562,7 @@ export class SnapshotOrchestratorAgent {
   private async writePlayerPeriodStats(
     trx: Kysely<Database>,
     leagueId: number,
-    _snapshotDate: string,
+    snapshotDate: string,
     rawTeams: any[],
     espnTeamIdToDbId: Map<number, number>,
     scoringPeriodId: number,
@@ -641,6 +641,7 @@ export class SnapshotOrchestratorAgent {
           .insertInto("player_period_stats")
           .values({
             league_id: leagueId,
+            snapshot_date: snapshotDate,
             scoring_period: scoringPeriodId,
             player_id: dbPlayerId,
             team_id: dbTeamId,
@@ -649,6 +650,7 @@ export class SnapshotOrchestratorAgent {
           })
           .onConflict((oc) =>
             oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
+              snapshot_date: snapshotDate,
               team_id: dbTeamId,
               lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
               components_json: components as any,

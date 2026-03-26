@@ -305,6 +305,9 @@ export class TradeRecommendationAgent {
     }
 
     // Get projections for all involved players
+    // Use the snapshot's projections_run_id to ensure consistency with team-level projections.
+    // This guarantees the same run that populated team_daily_projected_category is used
+    // for individual player delta calculations.
     const allPlayerIds = [
       ...trade.givePlayers.map((p) => p.playerId),
       ...trade.receivePlayers.map((p) => p.playerId),
@@ -312,6 +315,7 @@ export class TradeRecommendationAgent {
     const projections = await this.getPlayerProjections(
       allPlayerIds,
       snapshotDate,
+      snapshot.projections_run_id ?? undefined,
     );
 
     // Calculate projected standings after trade
@@ -795,29 +799,48 @@ export class TradeRecommendationAgent {
   private async getPlayerProjections(
     playerIds: number[],
     asOfDate: string,
+    projectionsRunId?: number,
   ): Promise<Map<number, any>> {
     /**
-     * Fetch rest-of-season projections for players
-     * These are the projected stats for the REMAINDER of the season,
-     * not full-season projections.
+     * Fetch rest-of-season projections for players.
+     *
+     * When projectionsRunId is provided (from league_daily_snapshot.projections_run_id),
+     * we filter to that specific run — the same run used to compute
+     * team_daily_projected_category. This guarantees give/receive player deltas
+     * are consistent with the team-level projections they're applied against.
+     *
+     * Falls back to the most-recent run <= asOfDate when no run ID is available
+     * (e.g., legacy snapshots without a linked projections run).
      */
     if (playerIds.length === 0) {
       return new Map();
     }
 
-    const projections = await this.db
-      .selectFrom("player_projection as proj")
-      .innerJoin("projections_run as run", "run.id", "proj.projections_run_id")
-      .innerJoin("player", "player.id", "proj.player_id")
-      .selectAll("proj")
-      .where("run.as_of_date", "<=", asOfDate)
-      .where(
-        "proj.player_id",
-        "in",
-        playerIds.filter((id) => id != null),
-      )
-      .orderBy("run.as_of_date", "desc")
-      .execute();
+    const filteredIds = playerIds.filter((id) => id != null);
+
+    let projections: any[];
+    if (projectionsRunId != null) {
+      // Primary path: use the exact same run linked to the snapshot
+      projections = await this.db
+        .selectFrom("player_projection as proj")
+        .innerJoin("player", "player.id", "proj.player_id")
+        .selectAll("proj")
+        .where("proj.projections_run_id", "=", projectionsRunId)
+        .where("proj.player_id", "in", filteredIds)
+        .execute();
+    } else {
+      // Fallback path: most recent run <= asOfDate (legacy snapshots)
+      const allRows = await this.db
+        .selectFrom("player_projection as proj")
+        .innerJoin("projections_run as run", "run.id", "proj.projections_run_id")
+        .innerJoin("player", "player.id", "proj.player_id")
+        .selectAll("proj")
+        .where("run.as_of_date", "<=", asOfDate)
+        .where("proj.player_id", "in", filteredIds)
+        .orderBy("run.as_of_date", "desc")
+        .execute();
+      projections = allRows;
+    }
 
     const projMap = new Map();
     for (const proj of projections) {

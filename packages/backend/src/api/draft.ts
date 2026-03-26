@@ -70,6 +70,7 @@ function validateDraftConfig(params: any): {
       categories,
       rosterSlots,
       totalTeams: numTeams,
+      budget: 260,
     },
   };
 }

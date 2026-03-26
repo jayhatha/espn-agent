@@ -1,7 +1,5 @@
 // Core type definitions for ESPN Fantasy Baseball Assistant
 
-import type { Generated } from "kysely";
-
 export type Provider = "espn";
 
 export type ScoringFormat = "roto" | "h2h_category" | "points";
@@ -42,6 +40,7 @@ export interface DraftConfiguration {
   rosterSlots: Record<string, number>;
   totalTeams: number;
   budget: number;
+  minBid?: number;
 }
 
 // League settings
@@ -82,27 +81,34 @@ export interface StatComponents {
 
 // Player
 export interface Player {
-  id: Generated<number>;
-  espn_player_id: number;
+  id: number;
   name: string;
   mlb_team: string | null;
   positions: string[];
   bats_throws: string | null;
   created_at: Date;
+  // Added by migrations 007, 016, 018
+  espn_player_id: number;
+  pct_owned: number | null;
+  current_season_stats_json: Record<string, number> | null;
+  last_synced_at: Date | null;
+  espn_asv: number | null;
 }
 
 // Team
 export interface Team {
-  id: Generated<number>;
+  id: number;
   league_id: number;
   espn_team_id: number;
   name: string;
   created_at: Date;
+  user_id: number | null;
+  faab_spent: number | null;
 }
 
 // League
 export interface League {
-  id: Generated<number>;
+  id: number;
   provider: Provider;
   espn_league_id: number;
   season: number;
@@ -110,6 +116,8 @@ export interface League {
   timezone: string;
   espn_swid: string | null;
   espn_s2: string | null;
+  espn_swid_encrypted: Buffer | string | null;
+  espn_s2_encrypted: Buffer | string | null;
   user_team_id: number | null;
   created_at: Date;
 }
@@ -127,7 +135,7 @@ export interface LeagueDailySnapshot {
 
 // Projections run
 export interface ProjectionsRun {
-  id: Generated<number>;
+  id: number;
   source: string;
   system: string;
   as_of_date: string; // DATE in ISO format
@@ -284,4 +292,91 @@ export interface TransactionImpact {
   sgp_category_impacts: Record<string, unknown> | null;
   replacement_level_impact: number | null;
   replacement_level_components: Record<string, number> | null;
+}
+
+// Move type for transaction tracking
+export type MoveType = "add" | "drop" | "trade_in" | "trade_out" | "draft" | "unknown";
+
+// Draft types
+export interface AuctionValue {
+  playerId: number;
+  playerName: string;
+  dollarValue: number;
+  position: string;
+  [key: string]: unknown;
+}
+
+export interface DraftRanking {
+  playerId: number;
+  playerName: string;
+  rank: number;
+  dollarValue: number;
+  position: string;
+  [key: string]: unknown;
+}
+
+// FAAB types
+export interface FaabSummary {
+  remainingBudget: number;
+  totalBudget: number;
+  spentAmount: number;
+  leagueAvgRemaining: number;
+  weeksRemaining: number;
+  weeklyBurnRate: number;
+  projectedRunout: string | null;
+  [key: string]: unknown;
+}
+
+export interface FaabBidEntry {
+  playerId: number;
+  playerName: string;
+  bidAmount: number;
+  won: boolean;
+  date: string;
+  [key: string]: unknown;
+}
+
+export interface FaabSuggestedBid {
+  playerId: number;
+  playerName: string;
+  suggestedBid: number;
+  [key: string]: unknown;
+}
+
+// GS Pacing types
+export type PaceStatus = "on_pace" | "burning_fast" | "too_slow" | "leaving_starts" | "unknown";
+
+export interface GsSeasonSummary {
+  gsUsed: number;
+  gsCap: number;
+  gsRemaining: number;
+  paceStatus: PaceStatus;
+  projectedTotal: number;
+  [key: string]: unknown;
+}
+
+export interface GsWeeklySummary {
+  weekNumber: number;
+  gsUsed: number;
+  gsAvailable: number;
+  [key: string]: unknown;
+}
+
+export interface GsStartPlan {
+  recommendations: GsStartRecommendation[];
+  [key: string]: unknown;
+}
+
+export interface GsStartRecommendation {
+  playerId: number;
+  playerName: string;
+  action: "start" | "sit";
+  reason: string;
+  [key: string]: unknown;
+}
+
+// Trade types
+export interface RosterValidationResult {
+  isLegal: boolean;
+  issues: string[];
 }

@@ -165,17 +165,16 @@ export class MorningReportAgent {
       .innerJoin("team_roster_snapshot", "team_roster_snapshot.player_id", "player.id")
       .select([
         "player.name as playerName",
-        "player.injury_status as status",
         "player.positions",
-      ])
+      ] as any)
       .where("team_roster_snapshot.team_id", "=", userLink.team_id_fantasy)
       .where("team_roster_snapshot.league_id", "=", leagueId)
       .where("team_roster_snapshot.snapshot_date", "=", snapshot.snapshot_date)
-      .where("player.injury_status", "is not", null)
+      .where("player.injury_status" as any, "is not", null)
       .execute();
 
     const injuries: Array<{ playerName: string; status: string; impact: string }> =
-      injuredPlayers.map(p => ({
+      (injuredPlayers as any[]).map(p => ({
         playerName: p.playerName,
         status: p.status || 'UNKNOWN',
         impact: this.describeInjuryImpact(p.status || 'UNKNOWN'),

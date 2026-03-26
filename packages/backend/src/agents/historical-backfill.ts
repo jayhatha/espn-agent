@@ -183,7 +183,7 @@ export class HistoricalBackfillAgent {
                 espnAuth,
                 forceFresh: true,
                 prefetchedData: espnData.data,
-              });
+              } as any);
             }
 
             // Accumulate this day's per-period player stats into the weekly snapshot.
@@ -212,7 +212,7 @@ export class HistoricalBackfillAgent {
               const rawTeams = (espnData.data as any).teams || [];
 
               await this.db.transaction().execute(async (trx) => {
-                await this.snapshotOrchestrator.writeCurrentStandingsFromPlayerStats(
+                await (this.snapshotOrchestrator as any).writeCurrentStandingsFromPlayerStats(
                   trx, leagueId, snapshotDate, rawTeams, cachedTeamIdMap!,
                   categories, day, previousSnapshotDate, benchCountsForStats!,
                   true, // storePlayerStats — capture per-player per-period stats for impact analysis

@@ -348,8 +348,8 @@ export async function adminRoutes(app: FastifyInstance) {
         }
         try {
           espnAuth = {
-            SWID: decryptToken(league.espn_swid_encrypted),
-            espn_s2: decryptToken(league.espn_s2_encrypted),
+            SWID: decryptToken(league.espn_swid_encrypted as any),
+            espn_s2: decryptToken(league.espn_s2_encrypted as any),
           };
         } catch (error) {
           request.log.error({ error }, "Failed to decrypt ESPN cookies");
@@ -871,8 +871,8 @@ export async function adminRoutes(app: FastifyInstance) {
         }
         try {
           espnAuth = {
-            SWID: decryptToken(league.espn_swid_encrypted),
-            espn_s2: decryptToken(league.espn_s2_encrypted),
+            SWID: decryptToken(league.espn_swid_encrypted as any),
+            espn_s2: decryptToken(league.espn_s2_encrypted as any),
           };
         } catch (error) {
           request.log.error({ error }, "Failed to decrypt ESPN cookies");

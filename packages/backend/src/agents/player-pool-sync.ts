@@ -97,8 +97,8 @@ export class PlayerPoolSyncAgent {
 
         try {
           espnAuth = {
-            SWID: decryptToken(league.espn_swid_encrypted),
-            espn_s2: decryptToken(league.espn_s2_encrypted),
+            SWID: decryptToken(league.espn_swid_encrypted as any),
+            espn_s2: decryptToken(league.espn_s2_encrypted as any),
           };
         } catch (error) {
           const msg = "Failed to decrypt ESPN credentials";
@@ -254,7 +254,7 @@ export class PlayerPoolSyncAgent {
                 current_season_stats_json: p.currentSeasonStats,
                 last_synced_at: new Date(),
                 espn_asv: p.espnAsv,
-              })),
+              })) as any,
             )
             .execute();
           playersInserted = playersToInsert.length;

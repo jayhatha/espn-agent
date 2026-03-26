@@ -87,7 +87,7 @@ export class AuctionValuationAgent {
       categories,
       rosterSlots,
       totalTeams: teams.length,
-      budget: options?.budget,
+      budget: options?.budget || 260,
       minBid: options?.minBid,
     };
 
@@ -155,7 +155,7 @@ export class AuctionValuationAgent {
     const rosteredRankings = rankings.slice(0, rosteredCount);
 
     // Calculate total VBD from rostered players only
-    const totalVBD = rosteredRankings.reduce((sum, r) => r.vbdScore > 0 ? sum + r.vbdScore : sum, 0);
+    const totalVBD = rosteredRankings.reduce((sum, r) => (r as any).vbdScore > 0 ? sum + (r as any).vbdScore : sum, 0);
 
     // DIAGNOSTIC: Log intermediate calculations for debugging
     this.logger?.info(
@@ -167,7 +167,7 @@ export class AuctionValuationAgent {
         minBid,
         spendingPool,
         totalVBD,
-        playersAboveReplacement: rosteredRankings.filter((r) => r.vbdScore > 0).length,
+        playersAboveReplacement: rosteredRankings.filter((r) => (r as any).vbdScore > 0).length,
         totalRankings: rankings.length,
       },
       "Calculated auction parameters",
@@ -182,8 +182,8 @@ export class AuctionValuationAgent {
             playerId: r.playerId,
             playerName: r.playerName,
             primaryPosition: r.primaryPosition,
-            sgpTotal: r.sgpTotal.toFixed(2),
-            vbdScore: r.vbdScore.toFixed(2),
+            sgpTotal: (r as any).sgpTotal.toFixed(2),
+            vbdScore: (r as any).vbdScore.toFixed(2),
           })),
         },
         "Top 10 players by VBD",
@@ -191,7 +191,7 @@ export class AuctionValuationAgent {
     }
 
     // Convert VBD to dollar values for rostered players
-    const rosteredValuations: AuctionValue[] = rosteredRankings.map((ranking) => {
+    const rosteredValuations: AuctionValue[] = (rosteredRankings as any[]).map((ranking): any => {
       let dollarValue: number;
 
       if (ranking.vbdScore > 0) {
@@ -220,7 +220,7 @@ export class AuctionValuationAgent {
 
     // Add non-rostered players at minimum bid (free agents)
     const freeAgentRankings = rankings.slice(rosteredCount);
-    const freeAgentValuations: AuctionValue[] = freeAgentRankings.map((ranking) => ({
+    const freeAgentValuations: AuctionValue[] = (freeAgentRankings as any[]).map((ranking): any => ({
       playerId: ranking.playerId,
       playerName: ranking.playerName,
       positions: ranking.positions,
@@ -264,7 +264,7 @@ export class AuctionValuationAgent {
     let filteredValuations = valuations;
     if (position) {
       filteredValuations = valuations.filter((v) =>
-        v.positions.includes(position),
+        (v as any).positions.includes(position),
       );
     }
 
@@ -280,8 +280,8 @@ export class AuctionValuationAgent {
             playerName: v.playerName,
             primaryPosition: v.primaryPosition,
             dollarValue: v.dollarValue,
-            vbdScore: v.vbdScore.toFixed(2),
-            sgpTotal: v.sgpTotal.toFixed(2),
+            vbdScore: (v as any).vbdScore.toFixed(2),
+            sgpTotal: (v as any).sgpTotal.toFixed(2),
           })),
         },
         "Top 10 players by dollar value",

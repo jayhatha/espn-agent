@@ -35,8 +35,8 @@ export class TransactionImpactAgent {
     this.logger?.info({ leagueId, season }, "Deriving roster moves from snapshot diffs");
 
     // Get all snapshot dates for this league/season, ordered chronologically
-    const startDate = `${season}-04-01`;
-    const endDate = `${season}-10-31`;
+    const startDate = `${season}-01-01`;
+    const endDate = `${season}-12-31`;
 
     const snapshotDates = await this.db
       .selectFrom("team_roster_snapshot")
@@ -69,27 +69,37 @@ export class TransactionImpactAgent {
       const currentRoster = await this.getRosterByTeam(leagueId, currentDate);
 
       if (i === 0) {
-        // Week 1: all players are draft picks
+        // Week 1: all players are draft picks — batch insert
+        const draftRows: Array<{
+          league_id: number;
+          team_id: number;
+          move_type: MoveType;
+          player_id: number;
+          effective_date: string;
+        }> = [];
         for (const [teamId, playerIds] of currentRoster) {
           for (const playerId of playerIds) {
-            await this.db
-              .insertInto("roster_move")
-              .values({
-                league_id: leagueId,
-                team_id: teamId,
-                move_type: "draft",
-                player_id: playerId,
-                effective_date: currentDate,
-              })
-              .onConflict((oc) =>
-                oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
-              )
-              .execute();
-            totalMoves++;
+            draftRows.push({
+              league_id: leagueId,
+              team_id: teamId,
+              move_type: "draft",
+              player_id: playerId,
+              effective_date: currentDate,
+            });
           }
         }
+        for (let k = 0; k < draftRows.length; k += 100) {
+          await this.db
+            .insertInto("roster_move")
+            .values(draftRows.slice(k, k + 100))
+            .onConflict((oc) =>
+              oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
+            )
+            .execute();
+        }
+        totalMoves += draftRows.length;
         this.logger?.info(
-          { leagueId, date: currentDate, draftPicks: totalMoves },
+          { leagueId, date: currentDate, draftPicks: draftRows.length },
           "Draft picks recorded",
         );
         continue;
@@ -153,44 +163,53 @@ export class TransactionImpactAgent {
         }
       }
 
-      // Insert moves
-      for (const g of gained) {
+      // Batch insert gained moves
+      const gainedRows = gained.map((g) => {
         const key = `${g.teamId}-${g.playerId}`;
         const moveType: MoveType = tradeGains.has(key) ? "trade_in" : "add";
+        return {
+          league_id: leagueId,
+          team_id: g.teamId,
+          move_type: moveType,
+          player_id: g.playerId,
+          effective_date: currentDate,
+        };
+      });
+
+      for (let k = 0; k < gainedRows.length; k += 100) {
         await this.db
           .insertInto("roster_move")
-          .values({
-            league_id: leagueId,
-            team_id: g.teamId,
-            move_type: moveType,
-            player_id: g.playerId,
-            effective_date: currentDate,
-          })
+          .values(gainedRows.slice(k, k + 100))
           .onConflict((oc) =>
             oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
           )
           .execute();
-        totalMoves++;
       }
+      totalMoves += gainedRows.length;
 
-      for (const l of lost) {
+      // Batch insert lost moves
+      const lostRows = lost.map((l) => {
         const key = `${l.teamId}-${l.playerId}`;
         const moveType: MoveType = tradeLosses.has(key) ? "trade_out" : "drop";
+        return {
+          league_id: leagueId,
+          team_id: l.teamId,
+          move_type: moveType,
+          player_id: l.playerId,
+          effective_date: currentDate,
+        };
+      });
+
+      for (let k = 0; k < lostRows.length; k += 100) {
         await this.db
           .insertInto("roster_move")
-          .values({
-            league_id: leagueId,
-            team_id: l.teamId,
-            move_type: moveType,
-            player_id: l.playerId,
-            effective_date: currentDate,
-          })
+          .values(lostRows.slice(k, k + 100))
           .onConflict((oc) =>
             oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
           )
           .execute();
-        totalMoves++;
       }
+      totalMoves += lostRows.length;
 
       // Pair add↔drop moves on same team/date
       await this.pairMoves(leagueId, currentDate);
@@ -310,8 +329,8 @@ export class TransactionImpactAgent {
       .selectFrom("team_daily_category_totals")
       .select("snapshot_date")
       .where("league_id", "=", leagueId)
-      .where("snapshot_date", ">=", `${season}-04-01`)
-      .where("snapshot_date", "<=", `${season}-10-31`)
+      .where("snapshot_date", ">=", `${season}-01-01`)
+      .where("snapshot_date", "<=", `${season}-12-31`)
       .orderBy("snapshot_date", "desc")
       .executeTakeFirst();
     return row?.snapshot_date ?? null;
@@ -726,7 +745,7 @@ export class TransactionImpactAgent {
     const totalRostered = slotsPerTeam * numTeams;
 
     // Get all players at this position from player_period_stats
-    const startDate = `${season}-04-01`;
+    const startDate = `${season}-01-01`;
 
     const playerTotals = await this.db
       .selectFrom("player_period_stats as pps")
@@ -833,8 +852,8 @@ export class TransactionImpactAgent {
     const sgpFactors = this.computeSGPFactors(teamFinalComponents, categories);
 
     // Get all roster moves
-    const startDate = `${season}-04-01`;
-    const endDate = `${season}-10-31`;
+    const startDate = `${season}-01-01`;
+    const endDate = `${season}-12-31`;
 
     const moves = await this.db
       .selectFrom("roster_move")
@@ -1388,7 +1407,7 @@ export class TransactionImpactAgent {
     }
 
     // 6. Sum each draft pick's full-season contribution (on any team)
-    const startDate = `${season}-04-01`;
+    const startDate = `${season}-01-01`;
     const draftOnlyComponents: Record<string, number> = {};
 
     for (const pick of draftPicks) {

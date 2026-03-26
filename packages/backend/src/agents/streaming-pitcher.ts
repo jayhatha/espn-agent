@@ -300,8 +300,8 @@ export class StreamingPitcherAgent {
 
     // WHIP bonus: approximated from components
     if (categories.some(c => c.stat_key === "WHIP")) {
-      const perStartH = (components.H || 0) / 30;
-      const perStartBB = (components.BB || 0) / 30;
+      const perStartH = (components.HA || 0) / 30;
+      const perStartBB = (components.BBA || 0) / 30;
       const whip = perStartIP > 0 ? (perStartH + perStartBB) / perStartIP : 2.0;
       if (whip < 2.0) {
         score += (2.0 - whip) * 10;

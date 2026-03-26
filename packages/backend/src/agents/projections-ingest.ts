@@ -12,6 +12,41 @@ import { PlayerIdentityResolutionAgent } from "./player-identity.js";
  * Ingest FanGraphs Depth Charts RoS projections via CSV uploads
  */
 
+interface ProjectionRow {
+  projections_run_id: number;
+  player_id: number;
+  stat_components_json: StatComponents;
+}
+
+/** Replace NaN/Infinity with 0 in stat components — Postgres JSONB rejects non-finite numbers. */
+function sanitizeStats(stats: StatComponents): StatComponents {
+  const clean = { ...stats };
+  for (const key of Object.keys(clean) as Array<keyof StatComponents>) {
+    const v = clean[key];
+    if (typeof v === "number" && !Number.isFinite(v)) {
+      (clean as Record<string, number>)[key] = 0;
+    }
+  }
+  return clean;
+}
+
+/** Deduplicate projection rows by player_id, merging stat components for duplicates. */
+function deduplicateProjectionRows(rows: ProjectionRow[]): ProjectionRow[] {
+  const map = new Map<number, ProjectionRow>();
+  for (const row of rows) {
+    const existing = map.get(row.player_id);
+    if (existing) {
+      existing.stat_components_json = { ...existing.stat_components_json, ...row.stat_components_json };
+    } else {
+      map.set(row.player_id, { ...row });
+    }
+  }
+  return Array.from(map.values()).map((row) => ({
+    ...row,
+    stat_components_json: sanitizeStats(row.stat_components_json),
+  }));
+}
+
 export interface ProjectionCSVRow {
   Name: string;
   Team: string;
@@ -409,18 +444,22 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
-      // Collect projection row for batch insert
+      // Collect projection row for batch insert (sanitize NaN/Infinity from parsed CSV values)
       projectionRows.push({
         projections_run_id: projectionsRunId,
         player_id: matchResult.playerId,
-        stat_components_json: components,
+        stat_components_json: sanitizeStats(components),
       });
     }
 
+    // Deduplicate by player_id — CSV may list a player twice (e.g., team change).
+    // Merge stat components for duplicates so no data is lost.
+    const deduped = deduplicateProjectionRows(projectionRows);
+
     // Batch insert all projection rows in chunks of 500 to stay under PostgreSQL parameter limits
     const CHUNK_SIZE = 500;
-    for (let i = 0; i < projectionRows.length; i += CHUNK_SIZE) {
-      const chunk = projectionRows.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < deduped.length; i += CHUNK_SIZE) {
+      const chunk = deduped.slice(i, i + CHUNK_SIZE);
       await this.db
         .insertInto("player_projection")
         .values(chunk)
@@ -542,18 +581,22 @@ export class ProjectionsIngestAgent {
           .execute();
       }
 
-      // Collect projection row for batch insert
+      // Collect projection row for batch insert (sanitize NaN/Infinity from parsed CSV values)
       projectionRows.push({
         projections_run_id: projectionsRunId,
         player_id: matchResult.playerId,
-        stat_components_json: components,
+        stat_components_json: sanitizeStats(components),
       });
     }
 
+    // Deduplicate by player_id — CSV may list a player twice (e.g., team change).
+    // Merge stat components for duplicates so no data is lost.
+    const deduped = deduplicateProjectionRows(projectionRows);
+
     // Batch insert all projection rows in chunks of 500 to stay under PostgreSQL parameter limits
     const CHUNK_SIZE = 500;
-    for (let i = 0; i < projectionRows.length; i += CHUNK_SIZE) {
-      const chunk = projectionRows.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < deduped.length; i += CHUNK_SIZE) {
+      const chunk = deduped.slice(i, i + CHUNK_SIZE);
       await this.db
         .insertInto("player_projection")
         .values(chunk)

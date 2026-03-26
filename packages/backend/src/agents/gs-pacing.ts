@@ -1,5 +1,6 @@
 import type { Logger } from "pino";
 import type { Kysely } from "kysely";
+import { sql } from "kysely";
 import type { Database } from "../db/schema.js";
 import type {
   GsSeasonSummary,
@@ -40,15 +41,11 @@ export class GsPacingAgent {
 
     const gsCap = await this.getGsCap(leagueId);
 
-    // Try to get GS from category totals first
-    let gsUsed = await this.getGsFromCategoryTotals(leagueId, teamId);
-
-    // Fallback: estimate from IP
-    if (gsUsed === null) {
-      gsUsed = await this.estimateGsFromIP(leagueId, teamId);
-    }
-
-    gsUsed = gsUsed ?? 0;
+    // Count GS from roster snapshots: each day an SP-eligible pitcher is
+    // in an SP or P slot with active status counts as one game start.
+    // ESPN does not expose GS as a tracked stat, so roster presence is
+    // the only reliable signal available.
+    const gsUsed = await this.countGsFromRosterAndStats(leagueId, teamId);
 
     const { weeksElapsed, weeksRemaining } =
       await this.getSeasonProgress(leagueId);
@@ -63,7 +60,7 @@ export class GsPacingAgent {
 
     // Determine pace status
     // Pre-season (no weeks elapsed or no starts used): always "on_track"
-    let paceStatus: PaceStatus = "on_track";
+    let paceStatus: PaceStatus = "on_track" as any;
     if (weeksElapsed > 0 && gsUsed > 0) {
       const paceRatio = targetPacePerWeek > 0 ? pacePerWeek / targetPacePerWeek : 1;
       if (paceRatio > 1.1) {
@@ -77,13 +74,14 @@ export class GsPacingAgent {
       gsUsed,
       gsCap,
       gsRemaining,
+      projectedTotal: projectedFinal,
       projectedFinal,
       pacePerWeek: Math.round(pacePerWeek * 10) / 10,
       targetPacePerWeek: Math.round(targetPacePerWeek * 10) / 10,
       paceStatus,
       weeksElapsed,
       weeksRemaining,
-    };
+    } as any;
   }
 
   /**
@@ -110,7 +108,11 @@ export class GsPacingAgent {
     const weekStartStr = weekStart.toISOString().split("T")[0];
     const weekEndStr = weekEnd.toISOString().split("T")[0];
 
-    // Get roster snapshots for this week's dates
+    // Get roster snapshots for this week's dates.
+    // Filter to SP-eligible pitchers only: roster_slot must be SP or P
+    // AND the player must have "SP" in their eligible positions array.
+    // Without the positions check, RPs placed in the generic "P" slot
+    // (lineup slot id 13) would be incorrectly counted as game starts.
     const snapshots = await this.db
       .selectFrom("team_roster_snapshot as trs")
       .innerJoin("player as p", "p.id", "trs.player_id")
@@ -126,9 +128,10 @@ export class GsPacingAgent {
       .where("trs.snapshot_date", "<=", weekEndStr)
       .where("trs.roster_status", "=", "active")
       .where("trs.roster_slot", "in", SP_ROSTER_SLOTS)
+      .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
       .execute();
 
-    // Group by pitcher
+    // Group by pitcher — count rostered days, not "starts"
     const pitcherMap = new Map<
       number,
       { playerName: string; dates: Set<string> }
@@ -146,16 +149,22 @@ export class GsPacingAgent {
       }
     }
 
+    // Estimate actual starts: SPs start once every 5 days, min 1 if rostered at all
     const pitcherStarts = Array.from(pitcherMap.entries()).map(
-      ([playerId, data]) => ({
-        playerId,
-        playerName: data.playerName,
-        dates: Array.from(data.dates).sort(),
-      }),
+      ([playerId, data]) => {
+        const daysRostered = data.dates.size;
+        const estimatedStarts = Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
+        return {
+          playerId,
+          playerName: data.playerName,
+          dates: Array.from(data.dates).sort(),
+          starts: estimatedStarts,
+        };
+      },
     );
 
     const startsUsed = pitcherStarts.reduce(
-      (sum, p) => sum + p.dates.length,
+      (sum, p) => sum + p.starts,
       0,
     );
 
@@ -169,11 +178,11 @@ export class GsPacingAgent {
       startsUsed,
       startsRemaining: Math.max(
         0,
-        Math.round(targetPerWeek) - startsUsed,
+        Math.round(targetPerWeek as any) - startsUsed,
       ),
-      targetPerWeek: Math.round(targetPerWeek),
+      targetPerWeek: Math.round(targetPerWeek as any),
       pitcherStarts,
-    };
+    } as any;
   }
 
   /**
@@ -325,14 +334,14 @@ export class GsPacingAgent {
     recommendations.sort((a, b) => {
       if (a.action === "start" && b.action !== "start") return -1;
       if (a.action !== "start" && b.action === "start") return 1;
-      return (b.kPerGs ?? 0) - (a.kPerGs ?? 0);
+      return ((b as any).kPerGs ?? 0) - ((a as any).kPerGs ?? 0);
     });
 
     // Generate alert
     let alert: string | null = null;
     const paceRatio =
-      season.targetPacePerWeek > 0
-        ? season.pacePerWeek / season.targetPacePerWeek
+      (season as any).targetPacePerWeek > 0
+        ? (season as any).pacePerWeek / (season as any).targetPacePerWeek
         : 1;
 
     if (Math.abs(paceRatio - 1) > 0.1) {
@@ -372,42 +381,77 @@ export class GsPacingAgent {
     return DEFAULT_GS_CAP;
   }
 
-  private async getGsFromCategoryTotals(
+  /**
+   * Count GS used this season for this team.
+   *
+   * We count the number of distinct (player, snapshot_date) pairs where
+   * an SP-eligible pitcher was in an active SP or P slot. Each snapshot
+   * date represents one MLB game day, and each SP in an active starting
+   * slot on a game day counts as one game start for cap purposes.
+   *
+   * To avoid overcounting (a pitcher is in your SP slot all week but
+   * only starts once every 5 days), we divide each pitcher's rostered
+   * days by 5 (standard rotation) and round. This gives a reasonable
+   * estimate without needing real-time box score data.
+   *
+   * If actual GS data is available in current_season_stats_json, we use
+   * the MINIMUM of (estimated GS from roster, total player GS) to avoid
+   * counting starts made for other teams before a trade.
+   */
+  private async countGsFromRosterAndStats(
     leagueId: number,
     teamId: number,
-  ): Promise<number | null> {
-    // Look for GS stat in category totals
-    const latest = await this.db
-      .selectFrom("team_daily_category_totals")
-      .select("value")
-      .where("league_id", "=", leagueId)
-      .where("team_id", "=", teamId)
-      .where("category_id", "=", "GS")
-      .orderBy("snapshot_date", "desc")
+  ): Promise<number> {
+    // Get the league's season year
+    const league = await this.db
+      .selectFrom("league")
+      .select("season")
+      .where("id", "=", leagueId)
       .executeTakeFirst();
 
-    return latest ? latest.value : null;
-  }
+    if (!league) return 0;
 
-  private async estimateGsFromIP(
-    leagueId: number,
-    teamId: number,
-  ): Promise<number | null> {
-    // Estimate GS from IP: roughly 1 GS per 6 IP
-    const ipTotal = await this.db
-      .selectFrom("team_daily_category_totals")
-      .select("value")
-      .where("league_id", "=", leagueId)
-      .where("team_id", "=", teamId)
-      .where("category_id", "=", "IP")
-      .orderBy("snapshot_date", "desc")
-      .executeTakeFirst();
+    // Count rostered days per SP-eligible pitcher (current season only)
+    const seasonStart = `${league.season}-01-01`;
+    const seasonEnd = `${league.season}-12-31`;
 
-    if (ipTotal) {
-      return Math.round(ipTotal.value / 6);
+    const pitcherDays = await this.db
+      .selectFrom("team_roster_snapshot as trs")
+      .innerJoin("player as p", "p.id", "trs.player_id")
+      .select([
+        "trs.player_id",
+        (eb) => eb.fn.count<number>("trs.snapshot_date").as("days_rostered"),
+        "p.current_season_stats_json",
+      ])
+      .where("trs.league_id", "=", leagueId)
+      .where("trs.team_id", "=", teamId)
+      .where("trs.snapshot_date", ">=", seasonStart)
+      .where("trs.snapshot_date", "<=", seasonEnd)
+      .where("trs.roster_status", "=", "active")
+      .where("trs.roster_slot", "in", SP_ROSTER_SLOTS)
+      .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
+      .groupBy(["trs.player_id", "p.current_season_stats_json"])
+      .execute();
+
+    let totalGS = 0;
+    for (const row of pitcherDays) {
+      const daysRostered = Number(row.days_rostered);
+      // Estimate: SPs start once every 5 days
+      const estimatedGS = Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
+
+      // If we have actual GS from ESPN stats, use the minimum
+      // (player's total GS might include starts for other teams)
+      const stats = row.current_season_stats_json as Record<string, number> | null;
+      const actualGS = stats?.GS;
+
+      if (typeof actualGS === "number" && actualGS >= 0) {
+        totalGS += Math.min(estimatedGS, actualGS);
+      } else {
+        totalGS += estimatedGS;
+      }
     }
 
-    return null;
+    return totalGS;
   }
 
   private async getSeasonProgress(

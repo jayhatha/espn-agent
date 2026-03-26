@@ -35,8 +35,6 @@ class CircuitBreaker {
   }
 }
 
-const circuitBreaker = new CircuitBreaker();
-
 /**
  * Create an axios instance with retry logic
  *
@@ -45,6 +43,7 @@ const circuitBreaker = new CircuitBreaker();
  * Circuit breaker opens after 5 consecutive failures, preventing retries for 60s
  */
 export function createRetryableAxios(logger?: Logger): AxiosInstance {
+  const circuitBreaker = new CircuitBreaker();
   const instance = axios.create();
 
   axiosRetry(instance, {

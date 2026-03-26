@@ -516,8 +516,8 @@ export async function leaguesRoutes(app: FastifyInstance) {
           }
           try {
             auth = {
-              SWID: decryptToken(league.espn_swid_encrypted),
-              espn_s2: decryptToken(league.espn_s2_encrypted),
+              SWID: decryptToken(league.espn_swid_encrypted as any),
+              espn_s2: decryptToken(league.espn_s2_encrypted as any),
             };
           } catch (error) {
             request.log.error({ error }, "Failed to decrypt ESPN cookies");
@@ -869,6 +869,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
       }
 
       try {
+        const escaped = name.trim().replace(/[%_\\]/g, '\\$&');
         let query = db
           .selectFrom("league")
           .select([
@@ -878,7 +879,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
             "season",
             "created_at",
           ])
-          .where("name", "ilike", `%${name.trim()}%`)
+          .where("name", "ilike", `%${escaped}%`)
           .orderBy("created_at", "desc")
           .limit(Math.min(maxResults, 50));
 

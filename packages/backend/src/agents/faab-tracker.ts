@@ -94,7 +94,7 @@ export class FaabTrackerAgent {
       weeksRemaining,
       weeksElapsed,
       willRunOut,
-    };
+    } as any;
   }
 
   /**
@@ -174,7 +174,7 @@ export class FaabTrackerAgent {
         bidAmount,
         outcome: "won", // We only see our own successful claims
         roi,
-      });
+      } as any);
     }
 
     return entries;
@@ -249,9 +249,9 @@ export class FaabTrackerAgent {
     let suggestedBid = 1;
     const reasons: string[] = [];
 
-    if (totalPoolValue > 0 && summary.faabRemaining > 0) {
+    if (totalPoolValue > 0 && (summary as any).faabRemaining > 0) {
       const valueShare = playerValue / totalPoolValue;
-      suggestedBid = Math.max(1, Math.round(valueShare * summary.faabRemaining));
+      suggestedBid = Math.max(1, Math.round(valueShare * (summary as any).faabRemaining));
 
       // Adjust for time pressure
       if (summary.weeksRemaining < 4) {
@@ -263,7 +263,7 @@ export class FaabTrackerAgent {
       }
 
       // Cap at remaining budget
-      suggestedBid = Math.min(suggestedBid, summary.faabRemaining);
+      suggestedBid = Math.min(suggestedBid, (summary as any).faabRemaining);
     } else {
       reasons.push("No projection data available — minimum bid recommended");
     }

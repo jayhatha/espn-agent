@@ -25,7 +25,7 @@ export function createMockDb() {
   } as any;
 }
 
-export function createMockLogger() {
+export function createMockLogger(): any {
   return {
     info: vi.fn(),
     warn: vi.fn(),

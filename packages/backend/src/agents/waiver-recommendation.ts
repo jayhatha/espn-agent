@@ -206,19 +206,76 @@ export class WaiverRecommendationAgent {
       return [];
     }
 
-    // Pre-fetch all player data in batch (free agents + roster players)
+    // Pre-fetch all invariant data for simulation (hoisted from simulateSwap to avoid O(n*m) queries)
+    const snapshot = await this.db
+      .selectFrom("league_daily_snapshot")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    if (!snapshot || !snapshot.projections_run_id) {
+      this.logger?.warn({ leagueId, snapshotDate }, "No snapshot or projections run found");
+      return [];
+    }
+
+    const settings = await this.db
+      .selectFrom("league_settings_version")
+      .selectAll()
+      .where("id", "=", snapshot.settings_version_id)
+      .executeTakeFirst();
+
+    if (!settings) {
+      this.logger?.warn({ leagueId }, "No settings version found");
+      return [];
+    }
+
+    const categories = (settings.settings_json as any).categories as Category[];
+
+    // Pre-fetch current team projections for all categories
+    const currentProjections = await this.db
+      .selectFrom("team_daily_projected_category")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .where("team_id", "=", teamId)
+      .execute();
+
+    // Pre-fetch all teams' projections for re-ranking
+    const allTeamsProjections = await this.db
+      .selectFrom("team_daily_projected_category")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+
+    const numTeams = new Set(allTeamsProjections.map((p) => p.team_id)).size;
+
+    // Pre-fetch all player projections in a single batch query
     const allPlayerIds = [...freeAgents, ...roster.map((r) => r.player_id)];
     const playerMap = new Map<number, { id: number; name: string; positions: string[] }>();
+    const projectionMap = new Map<number, any>();
 
     if (allPlayerIds.length > 0) {
-      const players = await this.db
-        .selectFrom("player")
-        .select(["id", "name", "positions"])
-        .where("id", "in", allPlayerIds)
-        .execute();
+      const [players, projections] = await Promise.all([
+        this.db
+          .selectFrom("player")
+          .select(["id", "name", "positions"])
+          .where("id", "in", allPlayerIds)
+          .execute(),
+        this.db
+          .selectFrom("player_projection")
+          .selectAll()
+          .where("projections_run_id", "=", snapshot.projections_run_id)
+          .where("player_id", "in", allPlayerIds)
+          .execute(),
+      ]);
 
       for (const player of players) {
         playerMap.set(player.id, player);
+      }
+      for (const proj of projections) {
+        projectionMap.set(proj.player_id, proj);
       }
     }
 
@@ -233,13 +290,16 @@ export class WaiverRecommendationAgent {
         if (addPlayerId === dropPlayerId) continue;
 
         // Simulate swap and compute delta
-        const delta = await this.simulateSwap(
-          leagueId,
-          teamId,
-          snapshotDate,
+        const delta = this.simulateSwapFromCache(
           addPlayerId,
           dropPlayerId,
           baseline.projected_overall_points,
+          categories,
+          currentProjections,
+          allTeamsProjections,
+          numTeams,
+          teamId,
+          projectionMap,
         );
 
         if (delta && delta.deltaOverallPoints > 0) {
@@ -296,14 +356,21 @@ export class WaiverRecommendationAgent {
     return legalRecommendations.slice(0, maxRecommendations);
   }
 
-  private async simulateSwap(
-    leagueId: number,
-    teamId: number,
-    snapshotDate: string,
+  /**
+   * Simulate a swap using pre-fetched data (no DB queries).
+   * All invariant data is fetched once in getRecommendations and passed in.
+   */
+  private simulateSwapFromCache(
     addPlayerId: number,
     dropPlayerId: number,
     _baselinePoints: number,
-  ): Promise<{
+    categories: Category[],
+    currentProjections: any[],
+    allTeamsProjections: any[],
+    numTeams: number,
+    teamId: number,
+    projectionMap: Map<number, any>,
+  ): {
     deltaOverallPoints: number;
     categoryImpacts: Array<{
       categoryId: string;
@@ -311,46 +378,9 @@ export class WaiverRecommendationAgent {
       deltaRank: number;
       deltaPoints: number;
     }>;
-  } | null> {
-    // Get snapshot and settings
-    const snapshot = await this.db
-      .selectFrom("league_daily_snapshot")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .executeTakeFirst();
-
-    if (!snapshot || !snapshot.projections_run_id) {
-      return null;
-    }
-
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .selectAll()
-      .where("id", "=", snapshot.settings_version_id)
-      .executeTakeFirst();
-
-    if (!settings) {
-      return null;
-    }
-
-    const categories = (settings.settings_json as any).categories as Category[];
-
-    // Get projections for add/drop players
-    const [addProjection, dropProjection] = await Promise.all([
-      this.db
-        .selectFrom("player_projection")
-        .selectAll()
-        .where("projections_run_id", "=", snapshot.projections_run_id)
-        .where("player_id", "=", addPlayerId)
-        .executeTakeFirst(),
-      this.db
-        .selectFrom("player_projection")
-        .selectAll()
-        .where("projections_run_id", "=", snapshot.projections_run_id)
-        .where("player_id", "=", dropPlayerId)
-        .executeTakeFirst(),
-    ]);
+  } | null {
+    const addProjection = projectionMap.get(addPlayerId);
+    const dropProjection = projectionMap.get(dropPlayerId);
 
     if (!addProjection || !dropProjection) {
       return null;
@@ -363,25 +393,6 @@ export class WaiverRecommendationAgent {
     // Detect player types
     const addIsPitcher = isPitcherProjection(addComponents);
     const dropIsPitcher = isPitcherProjection(dropComponents);
-
-    // Get current team projections for all categories
-    const currentProjections = await this.db
-      .selectFrom("team_daily_projected_category")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .where("team_id", "=", teamId)
-      .execute();
-
-    // Get all teams' projections for re-ranking
-    const allTeamsProjections = await this.db
-      .selectFrom("team_daily_projected_category")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-
-    const numTeams = new Set(allTeamsProjections.map((p) => p.team_id)).size;
 
     // Simulate new values per category
     const categoryImpacts: Array<{
