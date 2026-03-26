@@ -1,11 +1,44 @@
 import type { Logger } from "pino";
-import { type Kysely, sql } from "kysely";
+import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import type { RosterStatus } from "../../../shared/dist/index.js";
-import crypto from "crypto";
-import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory, ESPN_STAT_MAP } from "../adapters/espn.js";
+import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
-import { calculateFinalRate } from "../../../shared/dist/index.js";
+
+/**
+ * ESPN stat ID → component key mapping for player period stats extraction.
+ * Only COUNTING stats are stored in components_json — RATE stats are computed
+ * from components at read time.
+ */
+const ESPN_PERIOD_STAT_MAP: Record<number, string> = {
+  // Batting counting stats
+  0: "AB",
+  1: "H",
+  3: "2B",
+  4: "3B",
+  5: "HR",
+  8: "TB",
+  10: "BB",
+  12: "HBP",
+  13: "SF",
+  20: "R",
+  21: "RBI",
+  23: "SB",
+  24: "CS",
+  27: "SO",
+  // Pitching counting stats (OUTS converted to IP on ingestion)
+  34: "OUTS", // will be converted to IP via / 3
+  37: "HA",
+  39: "BBA",
+  45: "ER",
+  46: "HRA",
+  48: "K",
+  53: "W",
+  54: "L",
+  57: "SV",
+  58: "BLSV",
+  60: "HLD",
+  63: "QS",
+};
 
 /**
  * Snapshot Orchestrator Agent
@@ -20,7 +53,6 @@ export interface SnapshotJobOptions {
   snapshotDate: string; // DATE in ISO format
   espnAuth?: ESPNAuthCookies;
   forceFresh?: boolean;
-  prefetchedData?: any; // Pre-fetched ESPN response data (used by backfill to avoid re-fetching)
 }
 
 export class SnapshotOrchestratorAgent {
@@ -36,30 +68,10 @@ export class SnapshotOrchestratorAgent {
   }
 
   /**
-   * Normalize ESPN injury status to simplified format
-   */
-  private normalizeInjuryStatus(espnStatus: string | null | undefined): string | null {
-    if (!espnStatus) return null;
-
-    const status = espnStatus.toUpperCase();
-    if (status.includes('INJURY_RESERVE') || status.includes('IL') || status.includes('INJURED_LIST')) {
-      return 'IL';
-    }
-    if (status.includes('DAY_TO_DAY') || status.includes('DTD') || status.includes('QUESTIONABLE')) {
-      return 'DTD';
-    }
-    if (status.includes('OUT') || status.includes('SUSPENDED')) {
-      return 'OUT';
-    }
-    // If healthy or unknown status, return null
-    return null;
-  }
-
-  /**
    * Execute daily snapshot job
    */
   async executeSnapshot(options: SnapshotJobOptions): Promise<void> {
-    const { leagueId, snapshotDate, espnAuth, forceFresh, prefetchedData } = options;
+    const { leagueId, snapshotDate, espnAuth, forceFresh } = options;
 
     this.logger?.info({ leagueId, snapshotDate }, "Starting snapshot job");
 
@@ -81,45 +93,42 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Track degradation reasons across all steps
-    const degradedReasons: string[] = [];
-    let isDegraded = false;
-
-    // 1. Fetch league info
-    let league: any;
     try {
-      league = await this.db
+      // 1. Fetch league info
+      const league = await this.db
         .selectFrom("league")
         .selectAll()
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate },
-        "Failed to fetch league info from database",
-      );
-      throw error; // Fatal error - can't proceed without league info
-    }
 
-    // 2. Fetch ESPN data (with error boundary)
-    let rawData: any;
-    try {
-      if (prefetchedData) {
-        rawData = prefetchedData;
-        this.logger?.info({ leagueId, snapshotDate }, "Using pre-fetched ESPN data");
-      } else {
-        // Clear adapter cache on forceFresh to ensure we get live ESPN data
-        if (forceFresh) {
-          this.espnAdapter.clearCache();
-        }
+      // 2. Fetch ESPN data (including kona_player_info for free agents)
+      const espnData = await this.espnAdapter.fetchLeague({
+        leagueId: league.espn_league_id,
+        season: league.season,
+        auth: espnAuth,
+        views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+        xFantasyFilter: {
+          players: {
+            limit: 1500,
+            sortDraftRanks: {
+              sortPriority: 100,
+              sortAsc: true,
+              value: "STANDARD",
+            },
+          },
+        },
+      });
 
-        const espnData = await this.espnAdapter.fetchLeague({
-          leagueId: league.espn_league_id,
-          season: league.season,
-          auth: espnAuth,
+      // Archive raw payload
+      await this.db
+        .insertInto("league_raw_payload")
+        .values({
+          league_id: leagueId,
+          fetched_at: espnData.fetchedAt,
+          endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
           views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
-          scoringPeriodId: 1,
-          xFantasyFilter: {
+          scoring_period_id: null,
+          x_fantasy_filter: {
             players: {
               limit: 1500,
               sortDraftRanks: {
@@ -128,145 +137,40 @@ export class SnapshotOrchestratorAgent {
                 value: "STANDARD",
               },
             },
-          },
-        });
-        rawData = espnData.data;
+          } as any,
+          response_json: espnData.data as any,
+          schema_fingerprint: espnData.schemaFingerprint,
+        })
+        .execute();
 
-        // Archive raw payload (only for fresh fetches, not backfill)
-        await this.db
-          .insertInto("league_raw_payload")
-          .values({
-            league_id: leagueId,
-            fetched_at: espnData.fetchedAt,
-            endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
-            views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
-            scoring_period_id: null,
-            x_fantasy_filter: {
-              players: {
-                limit: 1500,
-                sortDraftRanks: {
-                  sortPriority: 100,
-                  sortAsc: true,
-                  value: "STANDARD",
-                },
-              },
-            } as any,
-            response_json: espnData.data as any,
-            schema_fingerprint: espnData.schemaFingerprint,
-          })
-          .execute();
-      }
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate, step: "espn_fetch" },
-        "ESPN fetch failed, marking snapshot as degraded",
-      );
-      isDegraded = true;
-      degradedReasons.push("espn_fetch_failed");
+      // 3. Normalize data
+      const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
 
-      // Check if prior successful snapshot exists - don't overwrite it
-      const priorSnapshot = await this.db
-        .selectFrom("league_daily_snapshot")
-        .selectAll()
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "<", snapshotDate)
-        .where("is_degraded", "=", false)
-        .orderBy("snapshot_date", "desc")
-        .executeTakeFirst();
-
-      if (priorSnapshot) {
-        this.logger?.info(
-          { leagueId, priorSnapshotDate: priorSnapshot.snapshot_date },
-          "Prior successful snapshot exists, not overwriting with degraded data",
-        );
-        // Write degraded snapshot marker but don't proceed with data writes
-        await this.db
-          .insertInto("league_daily_snapshot")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            created_at: new Date(),
-            settings_version_id: priorSnapshot.settings_version_id,
-            projections_run_id: priorSnapshot.projections_run_id,
-            is_degraded: true,
-            degraded_reasons: ["espn_fetch_failed"],
-          })
-          .onConflict((oc) =>
-            oc.columns(["league_id", "snapshot_date"]).doUpdateSet({
-              is_degraded: true,
-              degraded_reasons: ["espn_fetch_failed"],
-            }),
-          )
-          .execute();
-        return;
-      }
-
-      // No prior snapshot, can't proceed
-      throw error;
-    }
-
-    // 3. Normalize data (with error boundary)
-    let normalized: any;
-    try {
-      normalized = this.espnAdapter.normalizeLeagueData(rawData);
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate, step: "normalize" },
-        "Failed to normalize ESPN data",
-      );
-      isDegraded = true;
-      degradedReasons.push("normalize_failed");
-      throw error; // Can't proceed without normalized data
-    }
-
-    // 4. Determine settings version
-    let settingsVersionId: number;
-    try {
-      settingsVersionId = await this.getOrCreateSettingsVersion(
+      // 4. Determine settings version
+      const settingsVersionId = await this.getOrCreateSettingsVersion(
         leagueId,
         snapshotDate,
         normalized.settings,
       );
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate, step: "settings_version" },
-        "Failed to determine settings version",
-      );
-      throw error; // Fatal - can't write snapshot without settings version
-    }
 
-    // 5. Select projections run
-    let projectionsRun: any;
-    try {
-      projectionsRun = await this.db
+      // 5. Select projections run
+      const projectionsRun = await this.db
         .selectFrom("projections_run")
         .selectAll()
         .where("as_of_date", "<=", snapshotDate)
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 
-      if (!projectionsRun || projectionsRun.as_of_date !== snapshotDate) {
-        isDegraded = true;
-        if (projectionsRun) {
-          degradedReasons.push("projections_stale");
-        } else {
-          degradedReasons.push("projections_missing");
-        }
+      const isDegraded =
+        !projectionsRun || projectionsRun.as_of_date !== snapshotDate;
+      const degradedReasons: string[] = [];
+      if (isDegraded && projectionsRun) {
+        degradedReasons.push("projections_stale");
+      } else if (!projectionsRun) {
+        degradedReasons.push("projections_missing");
       }
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate, step: "projections_check" },
-        "Failed to check projections, marking as degraded",
-      );
-      isDegraded = true;
-      degradedReasons.push("projections_check_failed");
-      projectionsRun = null; // Continue without projections
-    }
 
-    // 6. Begin transaction and write snapshot (with error boundary)
-    // Declare map outside transaction so it can be reused at step 8 without re-querying
-    const espnTeamIdToDbId = new Map<number, number>();
-    try {
+      // 6. Begin transaction and write snapshot
       await this.db.transaction().execute(async (trx) => {
         // Write snapshot
         await trx
@@ -292,12 +196,8 @@ export class SnapshotOrchestratorAgent {
           .execute();
 
         // Write teams and collect DB team IDs
+        const espnTeamIdToDbId = new Map<number, number>();
         for (const team of normalized.teams) {
-          const updateSet: Record<string, unknown> = { name: team.name };
-          if (team.faabSpent !== undefined) {
-            updateSet.faab_spent = team.faabSpent;
-          }
-
           const result = await trx
             .insertInto("team")
             .values({
@@ -305,10 +205,11 @@ export class SnapshotOrchestratorAgent {
               espn_team_id: team.id,
               name: team.name,
               created_at: new Date(),
-              ...(team.faabSpent !== undefined ? { faab_spent: team.faabSpent } : {}),
             })
             .onConflict((oc) =>
-              oc.columns(["league_id", "espn_team_id"]).doUpdateSet(updateSet),
+              oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
+                name: team.name,
+              }),
             )
             .returning("id")
             .executeTakeFirstOrThrow();
@@ -321,7 +222,7 @@ export class SnapshotOrchestratorAgent {
         );
 
         // Write free agent players
-        await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
+        await this.writeFreeAgentPlayers(trx, normalized.freeAgents);
 
         // Write current category totals, ranks, and overall
         const categories = normalized.settings.categories;
@@ -332,115 +233,43 @@ export class SnapshotOrchestratorAgent {
           );
         }
 
+        // Store per-player period stats for tenure tracking
+        // Extract scoringPeriodId from raw ESPN data
+        const rawTeams = (espnData.data as any)?.teams;
+        const snapshotScoringPeriodId =
+          (espnData.data as any)?.scoringPeriodId ??
+          (espnData.data as any)?.status?.currentScoringPeriod?.id ??
+          1;
+        if (rawTeams && Array.isArray(rawTeams)) {
+          await this.writePlayerPeriodStats(
+            trx, leagueId, snapshotDate, rawTeams,
+            espnTeamIdToDbId, snapshotScoringPeriodId,
+          );
+        }
+
         this.logger?.info({ leagueId, snapshotDate }, "Snapshot data written");
       });
-    } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate, step: "database_write" },
-        "Failed to write snapshot data to database",
-      );
-      isDegraded = true;
-      degradedReasons.push("database_write_failed");
-      throw error; // Fatal - can't continue if database writes fail
-    }
 
-    // 6b. Check season finalization — skip projection recomputation for completed seasons
-    const snapshotYear = parseInt(snapshotDate.substring(0, 4), 10);
-    const seasonMeta = await this.db
-      .selectFrom("season_metadata")
-      .select("is_finalized")
-      .where("league_id", "=", leagueId)
-      .where("season", "=", snapshotYear)
-      .executeTakeFirst();
-
-    if (seasonMeta?.is_finalized) {
-      this.logger?.info(
-        { leagueId, snapshotDate, season: snapshotYear },
-        "Season finalized — skipping projected standings recomputation",
-      );
-    }
-
-    // 7. Compute projected standings (with error boundary)
-    else if (projectionsRun) {
-      try {
+      // 7. Compute projected standings
+      if (projectionsRun) {
         await this.standingsAgent.computeProjectedStandings(
           leagueId,
           snapshotDate,
           projectionsRun.id,
         );
-      } catch (error) {
-        this.logger?.error(
-          { error, leagueId, snapshotDate, step: "projection_compute" },
-          "Failed to compute projected standings, marking as degraded",
-        );
-        isDegraded = true;
-        degradedReasons.push("projection_compute_failed");
-
-        // Update snapshot to mark as degraded
-        await this.db
-          .updateTable("league_daily_snapshot")
-          .set({
-            is_degraded: true,
-            degraded_reasons: degradedReasons,
-          })
-          .where("league_id", "=", leagueId)
-          .where("snapshot_date", "=", snapshotDate)
-          .execute();
-        // Continue to enrichment steps - projections are optional
       }
+
+      this.logger?.info(
+        { leagueId, snapshotDate },
+        "Snapshot job completed successfully",
+      );
+    } catch (error) {
+      this.logger?.error(
+        { error, leagueId, snapshotDate },
+        "Snapshot job failed",
+      );
+      throw error;
     }
-
-      // 8. Fetch free agents and transactions in parallel (non-blocking)
-      // Reuse espnTeamIdToDbId populated during transaction (B-04: no re-querying needed)
-      const [freeAgentResult, transactionResult, _asvResult] = await Promise.allSettled([
-        this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate),
-        this.fetchAndStoreTransactions(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate, espnTeamIdToDbId),
-        this.fetchAndStoreAuctionValues(league.espn_league_id, league.season, espnAuth),
-      ]);
-
-      // If free agent fetch failed, mark snapshot as degraded
-      if (freeAgentResult.status === "rejected") {
-        this.logger?.warn(
-          { error: freeAgentResult.reason, leagueId },
-          "Free agent fetch failed, marking snapshot as degraded",
-        );
-        const currentReasons = [...degradedReasons, "free_agents_failed"];
-        await this.db
-          .updateTable("league_daily_snapshot")
-          .set({
-            is_degraded: true,
-            degraded_reasons: currentReasons,
-          })
-          .where("league_id", "=", leagueId)
-          .where("snapshot_date", "=", snapshotDate)
-          .execute();
-      }
-
-      // Track transaction count in snapshot metadata
-      let transactionCount = 0;
-      if (transactionResult.status === "fulfilled") {
-        transactionCount = transactionResult.value || 0;
-      } else {
-        this.logger?.warn(
-          { error: transactionResult.reason, leagueId },
-          "Transaction fetch failed, marking snapshot degraded",
-        );
-        const currentReasons = [...degradedReasons, "transactions_failed"];
-        await this.db
-          .updateTable("league_daily_snapshot")
-          .set({
-            is_degraded: true,
-            degraded_reasons: currentReasons,
-          })
-          .where("league_id", "=", leagueId)
-          .where("snapshot_date", "=", snapshotDate)
-          .execute();
-      }
-
-    this.logger?.info(
-      { leagueId, snapshotDate, transactionCount, isDegraded, degradedReasons },
-      "Snapshot job completed successfully",
-    );
   }
 
   private async writePlayersAndRosters(
@@ -457,124 +286,45 @@ export class SnapshotOrchestratorAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
-    // Step 1: Pre-fetch ALL existing players in a single query
-    const allPlayerIds = teams.flatMap(t => t.roster.map(e => e.espnPlayerId));
-    const existingPlayers = allPlayerIds.length > 0
-      ? await trx.selectFrom("player").select(["id", "injury_status"]).where("id", "in", allPlayerIds).execute()
-      : [];
-    const existingPlayerMap = new Map(existingPlayers.map(p => [p.id, p.injury_status]));
-
-    // Step 2: Collect all rows into arrays instead of inserting per-player
-    const playerRows: Array<{
-      id: number;
-      name: string;
-      mlb_team: string | null;
-      positions: string[];
-      injury_status: string | null;
-      injury_updated_at: Date | undefined;
-      created_at: Date;
-      espn_asv: number | null;
-    }> = [];
-
-    const injuryEventRows: Array<{
-      player_id: number;
-      event_date: string;
-      injury_status: string;
-      notes: string;
-      created_at: Date;
-    }> = [];
-
-    const rosterSnapshotRows: Array<{
-      league_id: number;
-      snapshot_date: string;
-      team_id: number;
-      player_id: number;
-      roster_status: RosterStatus;
-      roster_slot: string;
-      acquisition_type: string | null;
-    }> = [];
-
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
       for (const entry of team.roster) {
-        // Normalize injury status from ESPN
-        const injuryStatus = this.normalizeInjuryStatus(entry.injuryStatus);
-        const previousInjuryStatus = existingPlayerMap.get(entry.espnPlayerId);
-        const isNewPlayer = !existingPlayerMap.has(entry.espnPlayerId);
-
-        // Collect player row
-        playerRows.push({
-          id: entry.espnPlayerId,
-          name: entry.name,
-          mlb_team: entry.mlbTeam,
-          positions: entry.positions,
-          injury_status: injuryStatus,
-          injury_updated_at: injuryStatus ? new Date() : undefined,
-          created_at: new Date(),
-          espn_asv: null, // ASV is populated by player-pool-sync, not snapshot orchestrator
-        });
-
-        // Collect injury event if status changed or new player with injury
-        if (!isNewPlayer && previousInjuryStatus !== injuryStatus) {
-          injuryEventRows.push({
-            player_id: entry.espnPlayerId,
-            event_date: snapshotDate,
-            injury_status: injuryStatus || 'HEALTHY',
-            notes: `Status changed from ${previousInjuryStatus || 'HEALTHY'} to ${injuryStatus || 'HEALTHY'}`,
+        // Upsert player
+        const playerResult = await trx
+          .insertInto("player")
+          .values({
+            espn_player_id: entry.espnPlayerId,
+            name: entry.name,
+            mlb_team: entry.mlbTeam,
+            positions: entry.positions,
             created_at: new Date(),
-          });
+          })
+          .onConflict((oc) =>
+            oc.column("espn_player_id").doUpdateSet({
+              name: entry.name,
+              mlb_team: entry.mlbTeam,
+              positions: entry.positions,
+            }),
+          )
+          .returning("id")
+          .executeTakeFirstOrThrow();
 
-          this.logger?.debug(
-            { playerId: entry.espnPlayerId, playerName: entry.name, oldStatus: previousInjuryStatus, newStatus: injuryStatus },
-            "Injury status changed"
-          );
-        } else if (isNewPlayer && injuryStatus) {
-          injuryEventRows.push({
-            player_id: entry.espnPlayerId,
-            event_date: snapshotDate,
-            injury_status: injuryStatus,
-            notes: `Initial injury status: ${injuryStatus}`,
-            created_at: new Date(),
-          });
-        }
-
-        // Collect roster snapshot row
-        rosterSnapshotRows.push({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: dbTeamId,
-          player_id: entry.espnPlayerId,
-          roster_status: entry.rosterStatus,
-          roster_slot: entry.rosterSlot,
-          acquisition_type: entry.acquisitionType,
-        });
+        // Write roster snapshot
+        await trx
+          .insertInto("team_roster_snapshot")
+          .values({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: dbTeamId,
+            player_id: playerResult.id,
+            roster_status: entry.rosterStatus,
+            roster_slot: entry.rosterSlot,
+            acquisition_type: entry.acquisitionType,
+          })
+          .execute();
       }
-    }
-
-    // Step 3: Batch insert all rows
-    // Players (batch upsert with ON CONFLICT)
-    if (playerRows.length > 0) {
-      await trx.insertInto("player").values(playerRows)
-        .onConflict(oc => oc.column("id").doUpdateSet({
-          name: sql`excluded.name`,
-          mlb_team: sql`excluded.mlb_team`,
-          positions: sql`excluded.positions`,
-          injury_status: sql`excluded.injury_status`,
-          injury_updated_at: sql`excluded.injury_updated_at`,
-        }))
-        .execute();
-    }
-
-    // Injury events (simple batch insert, no conflict)
-    if (injuryEventRows.length > 0) {
-      await trx.insertInto("injury_event").values(injuryEventRows).execute();
-    }
-
-    // Roster snapshots (batch insert)
-    if (rosterSnapshotRows.length > 0) {
-      await trx.insertInto("team_roster_snapshot").values(rosterSnapshotRows).execute();
     }
 
     const totalPlayers = teams.reduce((sum, t) => sum + t.roster.length, 0);
@@ -607,34 +357,27 @@ export class SnapshotOrchestratorAgent {
       .execute();
 
     // Write category totals for each team
-    // Build array for batch insert of category totals
-    const categoryTotalsRows = [];
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
       for (const cat of categories) {
         const value = team.statValues[cat.espnStatId] ?? 0;
-        categoryTotalsRows.push({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: dbTeamId,
-          category_id: cat.statKey,
-          value,
-          components_json: null,
-        });
+        await trx
+          .insertInto("team_daily_category_totals")
+          .values({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: dbTeamId,
+            category_id: cat.statKey,
+            value,
+            components_json: null,
+          })
+          .execute();
       }
     }
 
-    // Batch insert category totals
-    if (categoryTotalsRows.length > 0) {
-      await trx
-        .insertInto("team_daily_category_totals")
-        .values(categoryTotalsRows)
-        .execute();
-    }
-
-    // Rank teams per category and compute roto points (with tie handling)
+    // Rank teams per category and compute roto points
     const numTeams = teams.length;
     const teamOverallPoints = new Map<number, number>();
 
@@ -653,394 +396,11 @@ export class SnapshotOrchestratorAgent {
           : b.value - a.value,
       );
 
-      // Assign ranks and roto points with tie handling:
-      // Tied teams share the average of the positions they occupy.
-      const ranked = this.assignRanksWithTies(teamValues, numTeams);
+      for (let i = 0; i < teamValues.length; i++) {
+        const rank = i + 1;
+        const rotoPoints = numTeams - rank + 1;
+        const { dbTeamId } = teamValues[i];
 
-      // Build array for batch insert
-      const categoryRanksRows = [];
-      for (const { dbTeamId, rank, rotoPoints } of ranked) {
-        teamOverallPoints.set(
-          dbTeamId,
-          (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
-        );
-
-        categoryRanksRows.push({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: dbTeamId,
-          category_id: cat.statKey,
-          rank,
-          roto_points: rotoPoints,
-        });
-      }
-
-      // Batch insert category ranks
-      if (categoryRanksRows.length > 0) {
-        await trx
-          .insertInto("team_daily_category_ranks")
-          .values(categoryRanksRows)
-          .execute();
-      }
-    }
-
-    // Write overall standings (with tie handling for overall rank)
-    const overallRankings = Array.from(teamOverallPoints.entries())
-      .map(([teamId, points]) => ({ teamId, points }))
-      .sort((a, b) => b.points - a.points);
-
-    // Build array for batch insert
-    const overallRows = [];
-    for (let i = 0; i < overallRankings.length; i++) {
-      // Compute overall rank with ties
-      let rank = i + 1;
-      if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
-        // Find the first team with this point total to get the tied rank
-        let j = i;
-        while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
-        rank = j + 1;
-      }
-
-      overallRows.push({
-        league_id: leagueId,
-        snapshot_date: snapshotDate,
-        team_id: overallRankings[i].teamId,
-        overall_points: overallRankings[i].points,
-        overall_rank: rank,
-      });
-    }
-
-    // Batch insert overall standings
-    if (overallRows.length > 0) {
-      await trx
-        .insertInto("team_daily_overall")
-        .values(overallRows)
-        .execute();
-    }
-
-    this.logger?.info(
-      { leagueId, numCategories: categories.length, numTeams },
-      "Current standings written",
-    );
-  }
-
-  /**
-   * Write current standings by accumulating per-period player stats
-   * Used by historical backfill to produce accurate week-by-week standings
-   *
-   * Extracts statSplitTypeId=5 (per-period) player stats from all rostered players
-   * (excluding IL/NA), aggregates to team-level, and computes rate stats via component math
-   */
-  async writeCurrentStandingsFromPlayerStats(
-    trx: Kysely<Database>,
-    leagueId: number,
-    snapshotDate: string,
-    rawTeamsData: any[],
-    espnTeamIdToDbId: Map<number, number>,
-    categories: ESPNScoringCategory[],
-    scoringPeriodId: number,
-    previousSnapshotDate?: string,
-    benchCountsForStats: boolean = true,
-    storePlayerStats: boolean = false,
-  ): Promise<void> {
-    // Fetch previous snapshot's cumulative totals BEFORE deleting current snapshot.
-    // When accumulating within the same week (previousSnapshotDate === snapshotDate),
-    // we must read the prior data before it gets deleted.
-    const priorComponentsMap = new Map<number, Record<string, number>>();
-
-    if (previousSnapshotDate) {
-      const priorRows = await trx
-        .selectFrom("team_daily_category_totals")
-        .selectAll()
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", previousSnapshotDate)
-        .execute();
-
-      // Store prior components per team (components_json is the same for all categories of a team)
-      for (const row of priorRows) {
-        if (!priorComponentsMap.has(row.team_id) && row.components_json) {
-          priorComponentsMap.set(
-            row.team_id,
-            row.components_json as Record<string, number>,
-          );
-        }
-      }
-
-      this.logger?.debug(
-        { leagueId, previousSnapshotDate, teamsWithPrior: priorComponentsMap.size },
-        "Fetched prior cumulative components for accumulation",
-      );
-    }
-
-    // Delete existing standings for this snapshot (after reading prior data)
-    await trx
-      .deleteFrom("team_daily_category_totals")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-    await trx
-      .deleteFrom("team_daily_category_ranks")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-    await trx
-      .deleteFrom("team_daily_overall")
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
-
-    // Process each team
-    const teamCategoryValues: Array<{
-      dbTeamId: number;
-      categoryValues: Map<string, number>;
-      components: Record<string, number>;
-    }> = [];
-
-    for (const team of rawTeamsData) {
-      const dbTeamId = espnTeamIdToDbId.get(team.id);
-      if (!dbTeamId) continue;
-
-      // Get counting roster entries — exclude IL (17) and NA (19) always.
-      // For leagues with daily lineups (lineupLocktimeType=INDIVIDUAL_GAME),
-      // also exclude bench (16) since only active lineup stats count.
-      const rosterEntries = team.roster?.entries || [];
-      const maxSlotId = benchCountsForStats ? 16 : 15;
-      const countingRoster = rosterEntries.filter(
-        (entry: any) => entry.lineupSlotId !== undefined && entry.lineupSlotId <= maxSlotId
-      );
-
-      // Accumulate this week's components from all counting players
-      const weekComponents: Record<string, number> = {};
-
-      for (const entry of countingRoster) {
-        // Find per-period stats (statSplitTypeId=5)
-        const playerStats = entry.playerPoolEntry?.player?.stats || [];
-        const periodStats = playerStats.find(
-          (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
-        );
-
-        if (!periodStats || !periodStats.stats) {
-          continue;
-        }
-
-        for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
-          const espnStatId = parseInt(espnStatIdStr, 10);
-          const statInfo = ESPN_STAT_MAP[espnStatId];
-
-          if (!statInfo) continue;
-
-          // Only accumulate COUNTING stats as components — skip RATE stats
-          // (AVG, OBP, SLG, OPS, ERA, WHIP, K9, WPCT) which ESPN includes
-          // in per-period stats but should not be summed across players/weeks
-          if (statInfo.type !== "COUNTING") continue;
-
-          const statKey = statInfo.key;
-          const statValue = typeof value === "number" ? value : 0;
-
-          if (statKey === "OUTS") {
-            const ip = statValue / 3;
-            weekComponents.IP = (weekComponents.IP || 0) + ip;
-          } else {
-            weekComponents[statKey] = (weekComponents[statKey] || 0) + statValue;
-          }
-        }
-      }
-
-      // Debug logging for week components
-      this.logger?.debug(
-        { teamId: team.id, scoringPeriodId, rosterCount: countingRoster.length, weekComponentKeys: Object.keys(weekComponents), sampleStats: { R: weekComponents.R, HR: weekComponents.HR, RBI: weekComponents.RBI } },
-        "Week components computed for team",
-      );
-
-      // Build cumulative components: prior + this week
-      const priorComponents = priorComponentsMap.get(dbTeamId) || {};
-      const cumulativeComponents: Record<string, number> = {};
-      const allKeys = new Set([...Object.keys(priorComponents), ...Object.keys(weekComponents)]);
-      for (const key of allKeys) {
-        cumulativeComponents[key] = (priorComponents[key] || 0) + (weekComponents[key] || 0);
-      }
-
-      // Compute category values from cumulative components
-      const categoryValues = new Map<string, number>();
-
-      for (const cat of categories) {
-        let value = 0;
-
-        if (cat.type === "COUNTING") {
-          value = cumulativeComponents[cat.statKey] || 0;
-        } else if (cat.type === "RATE" && cat.formulaId) {
-          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
-
-          if (isPitchingRate) {
-            const pitchingRateComponents = {
-              H: cumulativeComponents.HA || 0,
-              BB: cumulativeComponents.BBA || 0,
-              IP: cumulativeComponents.IP || 0,
-              ER: cumulativeComponents.ER || 0,
-              K: cumulativeComponents.K || 0,
-            };
-            if (pitchingRateComponents.IP > 0) {
-              value = calculateFinalRate(cat.formulaId, {}, pitchingRateComponents);
-            }
-          } else {
-            value = calculateFinalRate(cat.formulaId, {}, cumulativeComponents);
-          }
-        }
-
-        categoryValues.set(cat.statKey, value);
-      }
-
-      teamCategoryValues.push({ dbTeamId, categoryValues, components: cumulativeComponents });
-    }
-
-    // Store per-player per-period stats for transaction impact analysis
-    if (storePlayerStats) {
-      // Build espnPlayerId → dbPlayerId lookup from all roster entries
-      const allEspnPlayerIds: number[] = [];
-      for (const team of rawTeamsData) {
-        const entries = team.roster?.entries || [];
-        for (const entry of entries) {
-          const espnPlayerId = entry.playerPoolEntry?.playerId ?? entry.playerId;
-          if (espnPlayerId) allEspnPlayerIds.push(espnPlayerId);
-        }
-      }
-
-      const espnPlayerIdToDbId = new Map<number, number>();
-      if (allEspnPlayerIds.length > 0) {
-        const playerRows = await trx
-          .selectFrom("player")
-          .select(["id"])
-          .where("id", "in", allEspnPlayerIds)
-          .execute();
-        for (const row of playerRows) {
-          espnPlayerIdToDbId.set(row.id, row.id);
-        }
-      }
-
-      // Collect per-player stats from ALL roster entries (including bench for counterfactual)
-      // Exclude only IL (17) and NA (19)
-      const playerRows: Array<{
-        league_id: number;
-        snapshot_date: string;
-        scoring_period: number;
-        player_id: number;
-        team_id: number;
-        lineup_slot_id: number | null;
-        components_json: Record<string, number>;
-      }> = [];
-
-      for (const team of rawTeamsData) {
-        const dbTeamId = espnTeamIdToDbId.get(team.id);
-        if (!dbTeamId) continue;
-
-        const entries = team.roster?.entries || [];
-        for (const entry of entries) {
-          // Skip IL (17) and NA (19) — they don't have meaningful stats
-          if (entry.lineupSlotId === 17 || entry.lineupSlotId === 19) continue;
-
-          const espnPlayerId = entry.playerPoolEntry?.playerId ?? entry.playerId;
-          const dbPlayerId = espnPlayerIdToDbId.get(espnPlayerId);
-          if (!dbPlayerId) continue;
-
-          const playerStats = entry.playerPoolEntry?.player?.stats || [];
-          const periodStats = playerStats.find(
-            (s: any) => s.scoringPeriodId === scoringPeriodId && s.statSplitTypeId === 5
-          );
-
-          if (!periodStats || !periodStats.stats) continue;
-
-          const components: Record<string, number> = {};
-          for (const [espnStatIdStr, value] of Object.entries(periodStats.stats)) {
-            const espnStatId = parseInt(espnStatIdStr, 10);
-            const statInfo = ESPN_STAT_MAP[espnStatId];
-            if (!statInfo || statInfo.type !== "COUNTING") continue;
-
-            const statValue = typeof value === "number" ? value : 0;
-            if (statInfo.key === "OUTS") {
-              components.IP = (components.IP || 0) + statValue / 3;
-            } else {
-              components[statInfo.key] = (components[statInfo.key] || 0) + statValue;
-            }
-          }
-
-          // Only store if the player had any stats this period
-          if (Object.keys(components).length > 0) {
-            playerRows.push({
-              league_id: leagueId,
-              snapshot_date: snapshotDate,
-              scoring_period: scoringPeriodId,
-              player_id: dbPlayerId,
-              team_id: dbTeamId,
-              lineup_slot_id: entry.lineupSlotId ?? null,
-              components_json: components,
-            });
-          }
-        }
-      }
-
-      // Batch upsert per-player stats
-      if (playerRows.length > 0) {
-        for (const row of playerRows) {
-          await trx
-            .insertInto("player_period_stats")
-            .values(row as any)
-            .onConflict((oc) =>
-              oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
-                snapshot_date: row.snapshot_date,
-                team_id: row.team_id,
-                lineup_slot_id: row.lineup_slot_id,
-                components_json: row.components_json as any,
-              }),
-            )
-            .execute();
-        }
-
-        this.logger?.debug(
-          { leagueId, scoringPeriodId, playerStatsStored: playerRows.length },
-          "Per-player period stats stored",
-        );
-      }
-    }
-
-    // Write category totals for each team
-    for (const { dbTeamId, categoryValues, components } of teamCategoryValues) {
-      for (const cat of categories) {
-        const value = categoryValues.get(cat.statKey) || 0;
-        await trx
-          .insertInto("team_daily_category_totals")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            category_id: cat.statKey,
-            value,
-            components_json: components as any,
-          })
-          .execute();
-      }
-    }
-
-    // Rank teams per category and compute roto points (with tie handling)
-    const numTeams = teamCategoryValues.length;
-    const teamOverallPoints = new Map<number, number>();
-
-    for (const cat of categories) {
-      const teamValues = teamCategoryValues.map((tv) => ({
-        dbTeamId: tv.dbTeamId,
-        value: tv.categoryValues.get(cat.statKey) || 0,
-      }));
-
-      // Sort by direction
-      teamValues.sort((a, b) =>
-        cat.direction === "LOWER_BETTER"
-          ? a.value - b.value
-          : b.value - a.value,
-      );
-
-      // Assign ranks and roto points with tie handling
-      const ranked = this.assignRanksWithTies(teamValues, numTeams);
-
-      for (const { dbTeamId, rank, rotoPoints } of ranked) {
         teamOverallPoints.set(
           dbTeamId,
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
@@ -1060,19 +420,12 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Write overall standings (with tie handling for overall rank)
+    // Write overall standings
     const overallRankings = Array.from(teamOverallPoints.entries())
       .map(([teamId, points]) => ({ teamId, points }))
       .sort((a, b) => b.points - a.points);
 
     for (let i = 0; i < overallRankings.length; i++) {
-      let rank = i + 1;
-      if (i > 0 && overallRankings[i].points === overallRankings[i - 1].points) {
-        let j = i;
-        while (j > 0 && overallRankings[j - 1].points === overallRankings[i].points) j--;
-        rank = j + 1;
-      }
-
       await trx
         .insertInto("team_daily_overall")
         .values({
@@ -1080,51 +433,15 @@ export class SnapshotOrchestratorAgent {
           snapshot_date: snapshotDate,
           team_id: overallRankings[i].teamId,
           overall_points: overallRankings[i].points,
-          overall_rank: rank,
+          overall_rank: i + 1,
         })
         .execute();
     }
 
     this.logger?.info(
-      { leagueId, scoringPeriodId, numCategories: categories.length, numTeams },
-      "Per-period standings written from player stats",
+      { leagueId, numCategories: categories.length, numTeams },
+      "Current standings written",
     );
-  }
-
-  /**
-   * Assign ranks and roto points with tie handling.
-   * Tied teams (same value) share the average of the positions they occupy.
-   * e.g. Two teams tied for 1st in a 10-team league: each gets (10+9)/2 = 9.5 points.
-   * Input must already be sorted in the desired ranking order.
-   */
-  private assignRanksWithTies(
-    sorted: Array<{ dbTeamId: number; value: number }>,
-    numTeams: number,
-  ): Array<{ dbTeamId: number; rank: number; rotoPoints: number }> {
-    const result: Array<{ dbTeamId: number; rank: number; rotoPoints: number }> = [];
-    let i = 0;
-    while (i < sorted.length) {
-      // Find the group of teams tied at this value
-      let j = i;
-      while (j < sorted.length && sorted[j].value === sorted[i].value) {
-        j++;
-      }
-      // Positions i..j-1 are tied. Rank = i+1 (first position in the group).
-      // Roto points = average of (numTeams - pos) for pos = i..j-1
-      const tiedCount = j - i;
-      let totalPoints = 0;
-      for (let k = i; k < j; k++) {
-        totalPoints += numTeams - k; // numTeams - rank + 1 where rank = k+1
-      }
-      const sharedPoints = totalPoints / tiedCount;
-      const rank = i + 1;
-
-      for (let k = i; k < j; k++) {
-        result.push({ dbTeamId: sorted[k].dbTeamId, rank, rotoPoints: sharedPoints });
-      }
-      i = j;
-    }
-    return result;
   }
 
   private async getOrCreateSettingsVersion(
@@ -1132,6 +449,14 @@ export class SnapshotOrchestratorAgent {
     effectiveDate: string,
     settings: any,
   ): Promise<number> {
+    // Check if settings changed
+    const latest = await this.db
+      .selectFrom("league_settings_version")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .orderBy("effective_date", "desc")
+      .executeTakeFirst();
+
     // Convert ESPN categories to shared Category format
     const categories = (settings.categories || []).map((cat: ESPNScoringCategory) => ({
       category_id: cat.statKey,
@@ -1204,14 +529,14 @@ export class SnapshotOrchestratorAgent {
       await trx
         .insertInto("player")
         .values({
-          id: fa.playerId,
+          espn_player_id: fa.playerId,
           name: fa.name,
           mlb_team: null,
           positions: fa.positions, // Use parsed positions instead of empty array
           created_at: new Date(),
         })
         .onConflict((oc) =>
-          oc.column("id").doUpdateSet({
+          oc.column("espn_player_id").doUpdateSet({
             name: fa.name,
             positions: fa.positions, // Update positions on conflict
           }),
@@ -1223,272 +548,121 @@ export class SnapshotOrchestratorAgent {
   }
 
   /**
-   * Fetch free agents from ESPN and store in player table with ownership data
-   * Non-blocking: failure does not stop the snapshot pipeline
+   * Write per-player period stats from raw ESPN team data.
+   *
+   * Queries the player table using espn_player_id (NOT player.id which is a
+   * DB surrogate key), then upserts into player_period_stats for tenure tracking.
+   *
+   * Only COUNTING stats are stored; rate stats (AVG, ERA, WHIP) are computed
+   * from components at read time.
+   *
+   * Skips IL (lineupSlotId=17) and NA (lineupSlotId=19) players.
+   * Uses statSplitTypeId=5 for current scoring period stats.
    */
-  private async fetchAndStoreFreeAgents(
-    espnLeagueId: number,
-    season: number,
-    auth: ESPNAuthCookies | undefined,
+  private async writePlayerPeriodStats(
+    trx: Kysely<Database>,
     leagueId: number,
-    snapshotDate: string,
-  ): Promise<void> {
-    const freeAgents = await this.espnAdapter.fetchFreeAgents({
-      leagueId: espnLeagueId,
-      season,
-      auth,
-      limit: 300,
-    });
-
-    // Store free agent players in the player table and track in snapshot
-    for (const fa of freeAgents) {
-      // Upsert player
-      const playerResult = await this.db
-        .insertInto("player")
-        .values({
-          id: fa.playerId,
-          name: fa.name,
-          mlb_team: fa.mlbTeam,
-          positions: fa.positions,
-          created_at: new Date(),
-        })
-        .onConflict((oc) =>
-          oc.column("id").doUpdateSet({
-            name: fa.name,
-            mlb_team: fa.mlbTeam,
-            positions: fa.positions,
-          }),
-        )
-        .returning("id")
-        .executeTakeFirstOrThrow();
-
-      // Store in free agent snapshot table
-      await this.db
-        .insertInto("league_free_agent_snapshot")
-        .values({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          player_id: playerResult.id,
-          ownership_pct: fa.pctOwned,
-          started_pct: fa.pctStarted,
-          created_at: new Date(),
-        })
-        .onConflict((oc) =>
-          oc.columns(["league_id", "snapshot_date", "player_id"]).doUpdateSet({
-            ownership_pct: fa.pctOwned,
-            started_pct: fa.pctStarted,
-          }),
-        )
-        .execute();
-    }
-
-    this.logger?.info(
-      { leagueId, snapshotDate, freeAgentCount: freeAgents.length },
-      "Free agents fetched and stored in snapshot",
-    );
-  }
-
-  /**
-   * Fetch transactions from ESPN and upsert into league_transaction_event
-   * Non-blocking: failure does not stop the snapshot pipeline
-   * Returns the count of new transactions ingested
-   */
-  private async fetchAndStoreTransactions(
-    espnLeagueId: number,
-    season: number,
-    auth: ESPNAuthCookies | undefined,
-    leagueId: number,
-    snapshotDate: string,
+    _snapshotDate: string,
+    rawTeams: any[],
     espnTeamIdToDbId: Map<number, number>,
-  ): Promise<number> {
-    const transactions = await this.espnAdapter.fetchTransactions({
-      leagueId: espnLeagueId,
-      season,
-      auth,
-    });
-
-    if (transactions.length === 0) {
-      this.logger?.info({ leagueId }, "No transactions to ingest");
-      return 0;
+    scoringPeriodId: number,
+  ): Promise<void> {
+    // Collect all ESPN player IDs from all teams' rosters (excluding IL/NA)
+    const espnPlayerIds: number[] = [];
+    for (const rawTeam of rawTeams) {
+      const entries = rawTeam.roster?.entries || [];
+      for (const entry of entries) {
+        const lineupSlotId = entry.lineupSlotId ?? -1;
+        // Skip IL (17) and NA (19)
+        if (lineupSlotId === 17 || lineupSlotId === 19) continue;
+        const playerId = entry.playerId ?? entry.playerPoolEntry?.player?.id;
+        if (playerId) espnPlayerIds.push(playerId);
+      }
     }
 
-    let newTransactions = 0;
+    if (espnPlayerIds.length === 0) return;
 
-    for (const txn of transactions) {
-      // Determine primary team from first item's toTeamId or fromTeamId
-      const primaryItem = txn.items[0];
-      if (!primaryItem) continue;
+    // Build ESPN player ID -> DB player ID lookup
+    // player.espn_player_id is the ESPN ID; player.id is the DB surrogate key
+    const playerRows = await trx
+      .selectFrom("player")
+      .select(["id", "espn_player_id"])
+      .where("espn_player_id", "in", espnPlayerIds)
+      .execute();
 
-      const primaryEspnTeamId = primaryItem.toTeamId ?? primaryItem.fromTeamId;
-      if (primaryEspnTeamId === null) continue;
+    const espnPlayerIdToDbId = new Map<number, number>(
+      playerRows.map((row) => [row.espn_player_id, row.id]),
+    );
 
-      const dbTeamId = espnTeamIdToDbId.get(primaryEspnTeamId);
-      if (!dbTeamId) {
-        this.logger?.debug(
-          { espnTeamId: primaryEspnTeamId, transactionId: txn.transactionId },
-          "Skipping transaction: team not found in league",
+    let storedCount = 0;
+
+    for (const rawTeam of rawTeams) {
+      const espnTeamId = rawTeam.id as number;
+      const dbTeamId = espnTeamIdToDbId.get(espnTeamId);
+      if (!dbTeamId) continue;
+
+      const entries = rawTeam.roster?.entries || [];
+      for (const entry of entries) {
+        const lineupSlotId = entry.lineupSlotId ?? -1;
+        // Skip IL (17) and NA (19)
+        if (lineupSlotId === 17 || lineupSlotId === 19) continue;
+
+        const espnPlayerId = entry.playerId ?? entry.playerPoolEntry?.player?.id;
+        if (!espnPlayerId) continue;
+
+        const dbPlayerId = espnPlayerIdToDbId.get(espnPlayerId);
+        if (!dbPlayerId) continue;
+
+        // Extract player stats for current scoring period (statSplitTypeId=5)
+        const playerStats = entry.playerPoolEntry?.player?.stats || [];
+        const periodStats = playerStats.find(
+          (s: any) => s.statSplitTypeId === 5 && s.scoringPeriodId === scoringPeriodId,
         );
-        continue;
-      }
 
-      // Map event type to schema format
-      const eventType = txn.type.toLowerCase() as "add" | "drop" | "trade" | "waiver" | "other";
+        if (!periodStats?.stats) continue;
 
-      // Determine counterparty for trades
-      let counterpartyDbTeamId: number | null = null;
-      if (txn.type === "TRADE") {
-        for (const item of txn.items) {
-          const otherTeamId: number | null = item.fromTeamId !== primaryEspnTeamId
-            ? item.fromTeamId
-            : item.toTeamId;
-          if (otherTeamId !== null && otherTeamId !== primaryEspnTeamId) {
-            counterpartyDbTeamId = espnTeamIdToDbId.get(otherTeamId) ?? null;
-            break;
+        // Map ESPN stat IDs to component keys
+        const components: Record<string, number> = {};
+        for (const [statIdStr, value] of Object.entries(periodStats.stats as Record<string, number>)) {
+          const statId = parseInt(statIdStr, 10);
+          const componentKey = ESPN_PERIOD_STAT_MAP[statId];
+          if (!componentKey || typeof value !== "number" || value === 0) continue;
+
+          if (componentKey === "OUTS") {
+            // Convert outs to innings pitched
+            components["IP"] = (components["IP"] || 0) + value / 3;
+          } else {
+            components[componentKey] = (components[componentKey] || 0) + value;
           }
         }
-      }
 
-      // Collect player IDs for added/dropped
-      const playersAdded = txn.items
-        .filter((i) => i.action === "ADD" || i.action === "TRADE_IN")
-        .map((i) => i.playerId);
-      const playersDropped = txn.items
-        .filter((i) => i.action === "DROP" || i.action === "TRADE_OUT")
-        .map((i) => i.playerId);
-
-      const eventTime = new Date(txn.timestamp);
-      const eventDate = eventTime.toISOString().split("T")[0];
-      const rawEventJson = {
-        transactionId: txn.transactionId,
-        type: txn.type,
-        items: txn.items,
-        bidAmount: txn.bidAmount,
-      };
-      const payloadHash = crypto
-        .createHash("sha256")
-        .update(JSON.stringify(rawEventJson))
-        .digest("hex")
-        .substring(0, 16);
-
-      try {
-        await this.db
-          .insertInto("league_transaction_event")
+        // Upsert into player_period_stats
+        await trx
+          .insertInto("player_period_stats")
           .values({
             league_id: leagueId,
-            event_time: eventTime,
-            event_date: eventDate,
-            event_type: eventType,
+            scoring_period: scoringPeriodId,
+            player_id: dbPlayerId,
             team_id: dbTeamId,
-            counterparty_team_id: counterpartyDbTeamId,
-            players_added: playersAdded,
-            players_dropped: playersDropped,
-            espn_event_id: txn.transactionId,
-            payload_hash: payloadHash,
-            raw_event_json: rawEventJson as any,
+            lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
+            components_json: components as any,
           })
           .onConflict((oc) =>
-            oc
-              .columns(["league_id", "event_time", "team_id", "payload_hash"])
-              .doNothing(),
+            oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
+              team_id: dbTeamId,
+              lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
+              components_json: components as any,
+            }),
           )
           .execute();
 
-        newTransactions++;
-      } catch (err) {
-        // Log individual transaction insert failures but continue
-        this.logger?.debug(
-          { err, transactionId: txn.transactionId },
-          "Failed to insert transaction (may already exist)",
-        );
+        storedCount++;
       }
     }
 
     this.logger?.info(
-      { leagueId, snapshotDate, totalTransactions: transactions.length, newTransactions },
-      "Transactions ingested",
+      { leagueId, scoringPeriodId, storedCount },
+      "Player period stats written",
     );
-
-    return newTransactions;
-  }
-
-  /**
-   * Fetch ESPN live draft avg salary (auctionValueAverage from ownership data)
-   * and store as espn_asv on player table.
-   * Non-blocking: failure does not stop the snapshot pipeline.
-   */
-  private async fetchAndStoreAuctionValues(
-    _espnLeagueId: number,
-    season: number,
-    _auth: ESPNAuthCookies | undefined,
-  ): Promise<number> {
-    // Use the leaguedefaults endpoint (no auth needed) to get live draft trends
-    // This is the same data as https://fantasy.espn.com/baseball/livedraftresults
-    try {
-      const batchSize = 500;
-      const allPlayers: Array<{ id: number; asv: number }> = [];
-
-      for (let offset = 0; offset < 2000; offset += batchSize) {
-        const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb/seasons/${season}/segments/0/leaguedefaults/1?view=kona_player_info`;
-        const filter = JSON.stringify({
-          players: {
-            filterSlotIds: { value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15] },
-            sortPercOwned: { sortAsc: false, sortPriority: 1 },
-            limit: batchSize,
-            offset,
-          },
-        });
-
-        const { default: axios } = await import("axios");
-        const response = await axios.get(url, {
-          headers: {
-            "x-fantasy-filter": filter,
-            Accept: "application/json",
-          },
-          timeout: 30000,
-        });
-
-        const players = response.data?.players || [];
-        for (const p of players) {
-          const asv = p.player?.ownership?.auctionValueAverage;
-          if (asv != null && asv > 0) {
-            allPlayers.push({ id: p.id, asv });
-          }
-        }
-
-        if (players.length < batchSize) break;
-      }
-
-      if (allPlayers.length === 0) {
-        this.logger?.info("No live draft ASV data returned from ESPN");
-        return 0;
-      }
-
-      let updated = 0;
-      for (const av of allPlayers) {
-        try {
-          const result = await this.db
-            .updateTable("player")
-            .set({ espn_asv: av.asv })
-            .where("id", "=", av.id)
-            .executeTakeFirst();
-          if (result.numUpdatedRows > 0n) updated++;
-        } catch {
-          // Player may not exist in our DB yet — skip silently
-        }
-      }
-
-      this.logger?.info(
-        { totalFetched: allPlayers.length, playersUpdated: updated },
-        "ESPN live draft ASV (auctionValueAverage) stored on player.espn_asv",
-      );
-
-      return updated;
-    } catch (error) {
-      this.logger?.warn(
-        { error },
-        "Failed to fetch ESPN live draft ASV — non-blocking",
-      );
-      return 0;
-    }
   }
 }

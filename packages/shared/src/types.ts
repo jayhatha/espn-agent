@@ -1,5 +1,7 @@
 // Core type definitions for ESPN Fantasy Baseball Assistant
 
+import type { Generated } from "kysely";
+
 export type Provider = "espn";
 
 export type ScoringFormat = "roto" | "h2h_category" | "points";
@@ -47,15 +49,6 @@ export interface LeagueSettings {
   };
 }
 
-// Draft configuration for generic draft endpoints
-export interface DraftConfiguration {
-  categories: Category[];
-  rosterSlots: Record<string, number>;
-  totalTeams: number;
-  budget?: number;      // Auction only (default: 260)
-  minBid?: number;      // Auction only (default: 1)
-}
-
 // Component stats for rate calculation
 export interface StatComponents {
   // Hitter components
@@ -82,34 +75,27 @@ export interface StatComponents {
 
 // Player
 export interface Player {
-  id: number; // ESPN player ID (primary key)
+  id: Generated<number>;
+  espn_player_id: number;
   name: string;
   mlb_team: string | null;
   positions: string[];
   bats_throws: string | null;
-  created_at?: Date; // Has DEFAULT NOW() in database
-  pct_owned?: number | null; // Player pool sync columns
-  current_season_stats_json?: Record<string, number> | null;
-  last_synced_at?: Date | null;
-  injury_status?: string | null; // 'IL', 'DTD', 'OUT', 'HEALTHY', or NULL
-  injury_updated_at?: Date | null;
-  espn_asv?: number | null; // ESPN Average Season Value (auction dollar value)
+  created_at: Date;
 }
 
 // Team
 export interface Team {
-  id: number;
+  id: Generated<number>;
   league_id: number;
   espn_team_id: number;
   name: string;
-  user_id: number | null;
   created_at: Date;
-  faab_spent: number | null;
 }
 
 // League
 export interface League {
-  id: number;
+  id: Generated<number>;
   provider: Provider;
   espn_league_id: number;
   season: number;
@@ -117,8 +103,6 @@ export interface League {
   timezone: string;
   espn_swid: string | null;
   espn_s2: string | null;
-  espn_swid_encrypted: Buffer | null;
-  espn_s2_encrypted: Buffer | null;
   user_team_id: number | null;
   created_at: Date;
 }
@@ -136,7 +120,7 @@ export interface LeagueDailySnapshot {
 
 // Projections run
 export interface ProjectionsRun {
-  id: number;
+  id: Generated<number>;
   source: string;
   system: string;
   as_of_date: string; // DATE in ISO format
@@ -250,242 +234,13 @@ export interface PlayerIdentityMap {
   updated_at: Date;
 }
 
-// Authentication & User types
-export interface User {
-  id: number;
-  email: string;
-  role: "user" | "admin";
-  displayName: string | null;
-  avatarUrl: string | null;
-  createdAt: Date;
-}
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface SignupRequest {
-  email: string;
-  password: string;
-  displayName?: string;
-}
-
-export interface AuthResponse {
-  user: Omit<User, "createdAt">;
-}
-
-// Draft and auction types
-export interface DraftRanking {
-  playerId: number;
-  playerName: string;
-  positions: string[];
-  primaryPosition: string;
-  vbdScore: number;
-  sgpTotal: number;
-  categorySGPs: Record<string, number>;
-  projectedStats: StatComponents;
-  tier: number; // Players grouped into value tiers
-  adp?: number; // Average draft position for comparison
-  tierName?: string;       // External tier name (e.g., "STUD", "Elite")
-  externalRank?: number;   // External ranking number
-  rankSource?: string;     // Source of external rank ("PL" = PitcherList, "CM" = CloserMonkey)
-  espnAuctionValue?: number; // ESPN pre-draft auction dollar value
-}
-
-export interface AuctionValue {
-  playerId: number;
-  playerName: string;
-  positions: string[];
-  primaryPosition: string;
-  dollarValue: number;
-  vbdScore: number;
-  sgpTotal: number;
-  projectedStats?: StatComponents;
-  inflationAdjustedValue?: number;
-}
-
-export interface DraftContext {
-  totalTeams: number;
-  rosterSlots: Record<string, number>;
-  categories: Category[];
-  budget?: number; // For auction (default 260)
-  minBid?: number; // For auction (default 1)
-}
-
-// Transaction Impact Analysis (Roto WPA) types
-
-export type MoveType = "draft" | "add" | "drop" | "trade_in" | "trade_out";
-
+// Per-player, per-period stats with team association
+// Enables tenure-based stats: stats accumulated while on a specific team
 export interface PlayerPeriodStats {
   league_id: number;
-  snapshot_date: string;
   scoring_period: number;
   player_id: number;
   team_id: number;
   lineup_slot_id: number | null;
-  components_json: Record<string, number>;
-}
-
-export interface RosterMove {
-  id: number;
-  league_id: number;
-  team_id: number;
-  move_type: MoveType;
-  player_id: number;
-  effective_date: string;
-  paired_move_id: number | null;
-}
-
-export interface TransactionImpact {
-  id: number;
-  league_id: number;
-  team_id: number;
-  move_type: string;
-  player_gained_id: number | null;
-  player_lost_id: number | null;
-  effective_date: string;
-  gained_components: Record<string, number> | null;
-  lost_components: Record<string, number> | null;
-  impact_roto_points: number;
-  category_impacts: Array<{
-    categoryId: string;
-    actualValue: number;
-    counterfactualValue: number;
-    deltaRotoPoints: number;
-  }>;
-  is_incomplete: boolean;
-  computed_at: Date;
-  shapley_impact: number | null;
-  ci_low: number | null;
-  ci_high: number | null;
-  is_uncertain: boolean;
-  sgp_category_impacts: Array<{
-    categoryId: string;
-    sgpDelta: number;
-    rawDelta: number;
-    sgpFactor: number;
-  }> | null;
-  replacement_level_components: Record<string, number> | null;
-  replacement_level_impact: number | null;
-}
-
-// Trade validation types
-export interface RosterValidationResult {
-  isLegal: boolean;
-  issues: string[];
-}
-
-export interface TradeValidationRequest {
-  givePlayers: number[];
-  receivePlayers: number[];
-}
-
-export interface TradeValidationResponse {
-  isLegal: boolean;
-  issues: string[];
-  giveCount: number;
-  receiveCount: number;
-}
-
-// FAAB Tracking types
-
-export interface FaabSummary {
-  teamId: number;
-  faabTotal: number;
-  faabSpent: number;
-  faabRemaining: number;
-  leagueAvgRemaining: number;
-  spendRate: number; // $ per week
-  projectedRunoutWeek: number | null;
-  weeksRemaining: number;
-  weeksElapsed: number;
-  willRunOut: boolean;
-}
-
-export interface FaabBidEntry {
-  date: string;
-  playerName: string;
-  playerId: number;
-  bidAmount: number;
-  outcome: "won" | "lost";
-  roi: number | null; // projected value / bid amount
-}
-
-export interface FaabSuggestedBid {
-  playerId: number;
-  playerName: string;
-  suggestedBid: number;
-  faabRemaining: number;
-  rationale: string;
-}
-
-// GS Pacing types
-
-export type PaceStatus = "on_track" | "burning_fast" | "too_slow";
-
-export interface GsSeasonSummary {
-  gsUsed: number;
-  gsCap: number;
-  gsRemaining: number;
-  projectedFinal: number;
-  pacePerWeek: number;
-  targetPacePerWeek: number;
-  paceStatus: PaceStatus;
-  weeksElapsed: number;
-  weeksRemaining: number;
-}
-
-export interface GsWeeklySummary {
-  weekStart: string;
-  weekEnd: string;
-  startsUsed: number;
-  startsRemaining: number;
-  targetPerWeek: number;
-  pitcherStarts: Array<{
-    playerName: string;
-    playerId: number;
-    dates: string[];
-  }>;
-}
-
-export type StartAction = "start" | "sit" | "stream";
-
-export interface GsStartRecommendation {
-  playerId: number;
-  playerName: string;
-  action: StartAction;
-  reason: string;
-  projectedK: number | null;
-  projectedIP: number | null;
-  kPerGs: number | null;
-}
-
-export interface GsStartPlan {
-  paceStatus: PaceStatus;
-  recommendations: GsStartRecommendation[];
-  alert: string | null;
-}
-
-// Chrome Extension Draft Assistant Types
-
-export interface DraftPick {
-  playerId: number;
-  playerName: string;
-  teamId: string;
-  teamName: string;
-  pickNumber: number;
-  timestamp: number;
-  cost?: number; // Auction only
-  positions: string[];
-  adp?: number; // Average draft position for context
-}
-
-export interface DraftedPlayer {
-  playerId: number;
-  playerName: string;
-  positions: string[];
-  pickNumber: number;
-  cost?: number; // Auction only
-  projectedStats: StatComponents;
+  components_json: StatComponents;
 }
