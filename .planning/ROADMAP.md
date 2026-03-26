@@ -220,3 +220,13 @@ Plans:
 Plans:
 - [x] 75-01-PLAN.md — Backend: enable daily player_period_stats population + extend roster API with tenure stats
 - [x] 75-02-PLAN.md — Frontend: add "On Team" label to PlayerStatLine, wire tenure stats into lineup and waivers pages
+
+### Phase 76: API hardening — validate ESPN response shapes, add runtime type guards, log unexpected fields/missing data, add retry with backoff
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 75
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 76 to break down)

@@ -105,6 +105,7 @@ Plan: Not started
 - Phase 73 added: Show current and projected stats for each player on waivers and roster pages
 - Phase 74 added: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
 - Phase 75 added: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
+- Phase 76 added: API hardening — validate ESPN response shapes, add runtime type guards, log unexpected fields/missing data, add retry with backoff
 
 ### Blockers/Concerns
 
