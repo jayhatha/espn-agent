@@ -8,7 +8,9 @@ import {
   ESPNLeagueResponseSchema,
   ESPNFreeAgentsResponseSchema,
   ESPNTransactionsResponseSchema,
-  validateEspnResponse
+  validateEspnResponse,
+  assertEspnCriticalShape,
+  logUnexpectedFields
 } from "../utils/espn-schemas.js";
 
 /**
@@ -184,6 +186,7 @@ export const ESPN_STAT_MAP: Record<number, { key: string; name: string; type: "C
   24: { key: "CS", name: "Caught Stealing", type: "COUNTING" },
   27: { key: "SO", name: "Strikeouts", type: "COUNTING" },
   // Pitching
+  33: { key: "GS", name: "Games Started", type: "COUNTING" },
   34: { key: "OUTS", name: "Outs", type: "COUNTING" },
   37: { key: "HA", name: "Hits Allowed", type: "COUNTING" },
   39: { key: "BBA", name: "Walks Allowed", type: "COUNTING" },
@@ -313,8 +316,13 @@ export class ESPNAdapter {
   async getFinalScoringPeriod(season: number): Promise<number | undefined> {
     try {
       const response = await this.client.get(`/seasons/${season}`);
-      if (response.status === 200 && response.data?.currentScoringPeriod?.id) {
-        return response.data.currentScoringPeriod.id as number;
+      const data = response.data;
+      if (
+        response.status === 200 &&
+        typeof data === "object" && data !== null &&
+        typeof (data as any).currentScoringPeriod?.id === "number"
+      ) {
+        return (data as any).currentScoringPeriod.id;
       }
       return undefined;
     } catch (error) {
@@ -381,19 +389,8 @@ export class ESPNAdapter {
 
       this.lastRequestTime = Date.now();
 
-      let response;
-      try {
-        response = await this.client.get(url, {
-          params,
-          headers,
-        });
-      } catch (error: any) {
-        if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after'] || 60;
-          this.logger?.warn({ scoringPeriodId, retryAfter }, "ESPN rate limit hit - backing off");
-        }
-        throw error;
-      }
+      // axios-retry (via createRetryableAxios) handles 429 with Retry-After backoff
+      const response = await this.client.get(url, { params, headers });
 
       // Check if ESPN returned HTML instead of JSON (auth issue)
       if (
@@ -426,6 +423,8 @@ export class ESPNAdapter {
         `fetchHistoricalWeek(${leagueId}, ${season}, ${scoringPeriodId})`,
         this.logger
       );
+
+      assertEspnCriticalShape(validatedData, `fetchHistoricalWeek(period=${scoringPeriodId})`, this.logger);
 
       const schemaFingerprint = this.computeSchemaFingerprint(validatedData);
       const result: ESPNRawResponse = {
@@ -535,6 +534,14 @@ export class ESPNAdapter {
         ESPNLeagueResponseSchema,
         response.data,
         `fetchLeague(${leagueId}, ${season})`,
+        this.logger
+      );
+
+      assertEspnCriticalShape(validatedData, `fetchLeague(${options.leagueId})`, this.logger);
+      logUnexpectedFields(
+        validatedData as Record<string, unknown>,
+        ["id", "settings", "teams", "schedule", "scoringPeriodId", "seasonId", "segmentId", "status", "members", "draftDetail"],
+        `fetchLeague(${options.leagueId})`,
         this.logger
       );
 
@@ -1060,10 +1067,15 @@ export class ESPNAdapter {
           throw new Error(`ESPN API returned status ${response.status}`);
         }
 
-        const data = response.data as any;
-        const batch = (data?.players as any[]) || [];
+        const validated = validateEspnResponse(
+          ESPNFreeAgentsResponseSchema,
+          response.data,
+          `fetchGlobalDraftData(batch=${i + 1})`,
+          this.logger
+        );
+        const batch = validated.players || [];
 
-        for (const entry of batch) {
+        for (const entry of batch as any[]) {
           const player = entry.player;
           if (!player) continue;
 
