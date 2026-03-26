@@ -196,7 +196,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           playerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.run_id", "run.id")
+                .innerJoin("projections_run as run", "proj.projections_run_id", "run.id")
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",
@@ -216,7 +216,33 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           }
         }
 
-        // Enrich roster with projection data
+        // Compute tenure stats: sum components_json from player_period_stats
+        // WHERE team_id = teamId (stats accumulated while on this team)
+        const tenureRows =
+          playerIds.length > 0
+            ? await db
+                .selectFrom("player_period_stats")
+                .select(["player_id", "components_json"])
+                .where("league_id", "=", leagueId)
+                .where("team_id", "=", teamId)
+                .where("player_id", "in", playerIds)
+                .execute()
+            : [];
+
+        // Aggregate components across all scoring periods per player
+        const tenureMap = new Map<number, Record<string, number>>();
+        for (const row of tenureRows) {
+          const existing = tenureMap.get(row.player_id) ?? {};
+          const components = row.components_json as Record<string, number>;
+          for (const [key, value] of Object.entries(components)) {
+            if (typeof value === "number") {
+              existing[key] = (existing[key] ?? 0) + value;
+            }
+          }
+          tenureMap.set(row.player_id, existing);
+        }
+
+        // Enrich roster with projection and tenure data
         const enrichedRoster = roster.map((player) => ({
           playerId: player.player_id,
           espnPlayerId: player.espn_player_id,
@@ -226,6 +252,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           rosterStatus: player.roster_status,
           rosterSlot: player.roster_slot,
           projections: projectionMap.get(player.player_id) || null,
+          tenureStats: tenureMap.get(player.player_id) || null,
         }));
 
         return { roster: enrichedRoster, snapshotDate: date };
