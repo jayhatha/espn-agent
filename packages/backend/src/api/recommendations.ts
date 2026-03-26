@@ -181,6 +181,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             "player.positions",
             "roster.roster_status",
             "roster.roster_slot",
+            "player.current_season_stats_json",
           ])
           .where("roster.league_id", "=", leagueId)
           .where("roster.team_id", "=", teamId)
@@ -252,6 +253,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           rosterStatus: player.roster_status,
           rosterSlot: player.roster_slot,
           projections: projectionMap.get(player.player_id) || null,
+          currentStats: (player as any).current_season_stats_json || null,
           tenureStats: tenureMap.get(player.player_id) || null,
         }));
 
@@ -683,7 +685,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           allPlayerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.run_id", "run.id")
+                .innerJoin("projections_run as run", "proj.projections_run_id", "run.id")
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",
