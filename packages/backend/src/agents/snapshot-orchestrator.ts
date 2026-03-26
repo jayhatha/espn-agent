@@ -1,6 +1,7 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
+import type { LeagueSettings, StatComponents } from "../../../shared/dist/index.js";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 
@@ -61,7 +62,7 @@ export class SnapshotOrchestratorAgent {
 
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {
     this.espnAdapter = new ESPNAdapter(logger);
     this.standingsAgent = new StandingsProjectionAgent(db, logger);
@@ -137,8 +138,8 @@ export class SnapshotOrchestratorAgent {
                 value: "STANDARD",
               },
             },
-          } as any,
-          response_json: espnData.data as any,
+          },
+          response_json: espnData.data,
           schema_fingerprint: espnData.schemaFingerprint,
         })
         .execute();
@@ -222,7 +223,7 @@ export class SnapshotOrchestratorAgent {
         );
 
         // Write free agent players
-        await this.writeFreeAgentPlayers(trx, normalized.freeAgents as any);
+        await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
 
         // Write current category totals, ranks, and overall
         const categories = normalized.settings.categories;
@@ -235,10 +236,11 @@ export class SnapshotOrchestratorAgent {
 
         // Store per-player period stats for tenure tracking
         // Extract scoringPeriodId from raw ESPN data
-        const rawTeams = (espnData.data as any)?.teams;
+        const rawData = espnData.data as Record<string, any>;
+        const rawTeams = rawData?.teams;
         const snapshotScoringPeriodId =
-          (espnData.data as any)?.scoringPeriodId ??
-          (espnData.data as any)?.status?.currentScoringPeriod?.id ??
+          rawData?.scoringPeriodId ??
+          rawData?.status?.currentScoringPeriod?.id ??
           1;
         if (rawTeams && Array.isArray(rawTeams)) {
           await this.writePlayerPeriodStats(
@@ -468,7 +470,7 @@ export class SnapshotOrchestratorAgent {
       required_components: cat.requiredComponents,
     }));
 
-    const settingsJson: any = {
+    const settingsJson: LeagueSettings = {
       scoring_format: settings.scoringFormat || "unknown",
       categories,
       roster_slots: settings.rosterSlots || {},
@@ -492,7 +494,7 @@ export class SnapshotOrchestratorAgent {
         await this.db
           .updateTable("league_settings_version")
           .set({
-            settings_json: settingsJson as any,
+            settings_json: settingsJson,
           })
           .where("id", "=", existingForDate.id)
           .execute();
@@ -506,7 +508,7 @@ export class SnapshotOrchestratorAgent {
       .values({
         league_id: leagueId,
         effective_date: effectiveDate,
-        settings_json: settingsJson as any,
+        settings_json: settingsJson,
         created_at: new Date(),
       })
       .returning("id")
@@ -646,14 +648,14 @@ export class SnapshotOrchestratorAgent {
             player_id: dbPlayerId,
             team_id: dbTeamId,
             lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
-            components_json: components as any,
+            components_json: components as StatComponents,
           })
           .onConflict((oc) =>
             oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
               snapshot_date: snapshotDate,
               team_id: dbTeamId,
               lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
-              components_json: components as any,
+              components_json: components as StatComponents,
             }),
           )
           .execute();

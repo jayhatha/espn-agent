@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type {
@@ -20,7 +20,7 @@ const MLB_SEASON_WEEKS = 26;
 export class FaabTrackerAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**

@@ -1,6 +1,6 @@
 import { parse } from "csv-parse/sync";
 import type { StatComponents } from "../../../shared/dist/index.js";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import { type Kysely, sql } from "kysely";
 import type { Database } from "../db/schema.js";
 import { PlayerIdentityResolutionAgent } from "./player-identity.js";
@@ -87,7 +87,7 @@ export class ProjectionsIngestAgent {
 
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {
     this.identityAgent = new PlayerIdentityResolutionAgent(db, logger);
   }
@@ -318,7 +318,7 @@ export class ProjectionsIngestAgent {
       .updateTable("projections_run")
       .set({
         staleness,
-        artifacts_json: artifacts as any,
+        artifacts_json: artifacts as Record<string, unknown>,
       })
       .where("id", "=", projectionsRun.id)
       .execute();

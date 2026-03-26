@@ -125,7 +125,7 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Instantiate agent
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
 
         // Get rankings
         const rankings = await draftAgent.getRankings(leagueId, {
@@ -220,11 +220,11 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Instantiate agents
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
-          request.log as any,
+          request.log,
         );
 
         // Get valuations
@@ -294,7 +294,7 @@ export async function draftRoutes(app: FastifyInstance) {
       const maxPlayers = limit ? parseInt(limit, 10) : 300;
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
 
         const rankings = await draftAgent.getRankingsWithConfig(config, {
           projectionsRunId: projectionsRunId
@@ -374,11 +374,11 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
-          request.log as any,
+          request.log,
         );
 
         const valuations = await auctionAgent.getValuationsWithConfig(
@@ -478,13 +478,13 @@ export async function draftRoutes(app: FastifyInstance) {
           });
         }
 
-        const settings = latestSettings.settings_json as any;
-        const acquisitionRules = settings.acquisition_rules || {};
-        const budget = acquisitionRules.auction_budget || 260; // Default ESPN auction budget
+        const settings = latestSettings.settings_json;
+        const acquisitionRules = settings.acquisition_rules || {} as Record<string, unknown>;
+        const budget = (acquisitionRules as Record<string, unknown>).auction_budget as number || 260; // Default ESPN auction budget
 
         // Fetch ESPN's global draft data (auction values + ADP)
         const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
         const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: league.season,
         });
@@ -499,11 +499,11 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Fetch our VBD auction values
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
-          request.log as any,
+          request.log,
         );
 
         const ourValuations = await auctionAgent.getValuations(leagueId, {
@@ -742,7 +742,7 @@ export async function draftRoutes(app: FastifyInstance) {
       try {
         // Fetch ESPN's global draft data (auction values + ADP)
         const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
 
         const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: espnSeasonNum,
@@ -758,11 +758,11 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Fetch our VBD auction values using generic config
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
-          request.log as any,
+          request.log,
         );
 
         const ourValuations = await auctionAgent.getValuationsWithConfig(
@@ -1000,7 +1000,7 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log as any);
+        const draftAgent = new DraftRankingsAgent(db, request.log);
 
         const result = await draftAgent.calculateProjectedStandings(
           config,
@@ -1051,7 +1051,7 @@ export async function draftRoutes(app: FastifyInstance) {
       // Instantiate per-request so the constructor's OPENAI_API_KEY check is
       // caught here and converted to a 503 instead of crashing the server.
       try {
-        const narrator = new DraftNarratorAgent(request.log as any);
+        const narrator = new DraftNarratorAgent(request.log);
         const narration = await narrator.narrate(payload);
         return { narration, generatedAt: new Date().toISOString() };
       } catch (error) {
@@ -1092,7 +1092,7 @@ export async function draftRoutes(app: FastifyInstance) {
 
       try {
         const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
 
         const draftData = await espnAdapter.fetchGlobalDraftData({
           season,

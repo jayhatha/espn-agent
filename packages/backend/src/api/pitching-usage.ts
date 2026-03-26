@@ -26,7 +26,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new GsPacingAgent(db, request.log as any);
+        const agent = new GsPacingAgent(db, request.log);
         const summary = await agent.getSeasonSummary(leagueId, teamId);
         return summary;
       } catch (error) {
@@ -52,7 +52,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const weekStart = request.query.weekStart;
 
       try {
-        const agent = new GsPacingAgent(db, request.log as any);
+        const agent = new GsPacingAgent(db, request.log);
         const weekly = await agent.getWeeklySummary(leagueId, teamId, weekStart);
         return weekly;
       } catch (error) {
@@ -76,7 +76,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new GsPacingAgent(db, request.log as any);
+        const agent = new GsPacingAgent(db, request.log);
         const plan = await agent.getStartPlan(leagueId, teamId);
         return plan;
       } catch (error) {

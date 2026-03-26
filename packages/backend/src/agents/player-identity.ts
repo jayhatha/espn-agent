@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { ResolutionMethod } from "../../../shared/dist/index.js";
@@ -34,7 +34,7 @@ function levenshteinDistance(a: string, b: string): number {
 export class PlayerIdentityResolutionAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**

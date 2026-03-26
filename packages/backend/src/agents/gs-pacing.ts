@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import type { Database } from "../db/schema.js";
@@ -27,7 +27,7 @@ const SP_ROSTER_SLOTS = ["SP", "P"];
 export class GsPacingAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -170,7 +170,7 @@ export class GsPacingAgent {
 
     // Get target pace
     const season = await this.getSeasonSummary(leagueId, teamId);
-    const targetPerWeek = season.targetPacePerWeek;
+    const targetPerWeek = season.targetPacePerWeek as number;
 
     return {
       weekStart: weekStartStr,
@@ -178,9 +178,9 @@ export class GsPacingAgent {
       startsUsed,
       startsRemaining: Math.max(
         0,
-        Math.round(targetPerWeek as any) - startsUsed,
+        Math.round(targetPerWeek) - startsUsed,
       ),
-      targetPerWeek: Math.round(targetPerWeek as any),
+      targetPerWeek: Math.round(targetPerWeek),
       pitcherStarts,
     } as any;
   }

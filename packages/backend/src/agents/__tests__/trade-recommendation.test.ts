@@ -389,6 +389,45 @@ describe("TradeRecommendationAgent - Rate Stat Component Math", () => {
     });
   });
 
+  describe("SV counting stat — closer traded for starter", () => {
+    it("should subtract saves from traded-away closer and show negative SV delta", async () => {
+      // Team projected SV: 30 (has a closer)
+      // Trade: give closer (RP, SV=25, IP=55, ER=18) for starter (SP, SV=0, IP=180, ER=65)
+      // Expected: new team SV = 30 - 25 = 5
+      // Team drops in SV rank → deltaPoints < 0
+
+      const leagueId = 8;
+      const teamId = 8;
+      const snapshotDate = "2026-02-19";
+
+      setupMockForSVTest(mockDb, leagueId, teamId, snapshotDate);
+
+      const trade = {
+        givePlayers: [{ playerId: 801, playerName: "Closer Being Traded Away" }],
+        receivePlayers: [{ playerId: 802, playerName: "Starter Being Acquired" }],
+      };
+
+      const result = await agent.analyzeTradeImpact(
+        leagueId,
+        teamId,
+        snapshotDate,
+        trade,
+      );
+
+      const svImpact = result.categoryImpacts.find(
+        (c) => c.categoryId === "SV",
+      );
+
+      expect(svImpact).toBeDefined();
+      // Projected SV must decrease: 30 - 25 = 5
+      expect(svImpact!.projectedValue).toBe(5);
+      // Team rank in SV must worsen (higher rank number = worse)
+      expect(svImpact!.deltaRank).toBeGreaterThan(0);
+      // Net roto points for SV must be negative
+      expect(svImpact!.deltaPoints).toBeLessThan(0);
+    });
+  });
+
   describe("Multi-player trade (2-for-2) with mixed counting and rate stats", () => {
     it("should correctly calculate both counting stats (HR) and rate stats (AVG)", async () => {
       // Team projected: { H: 1500, AB: 5000, HR: 200 } → AVG = 0.300, HR = 200
@@ -503,7 +542,7 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "AVG", statKey: "AVG", name: "Batting Average", type: "RATE" },
+        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
       ],
     },
   });
@@ -543,25 +582,22 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 101, player_name: "Traded Away Player", positions: ["OF"], roster_status: "active" },
   ]);
 
-  // Player projections - note: complex query with multiple joins
-  // The query uses selectFrom("player_projection as proj").innerJoin("projections_run").innerJoin("player")
-  // Mock key includes all tables: player_projection_projections_run_player_list
+  // Player projections - when projections_run_id is set, the primary path runs:
+  //   selectFrom("player_projection as proj").innerJoin("player", ...)
+  // Mock key: player_projection_player_list
+  // stat_components_json must be a plain object (Postgres JSONB auto-parses in production)
   // Player 101 (traded away): H=50, AB=200
   // Player 102 (acquired): H=70, AB=200
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 101,
       projections_run_id: 1,
-      stat_components_json: JSON.stringify({ H: 50, AB: 200 }),
-      h: 50,
-      ab: 200,
+      stat_components_json: { H: 50, AB: 200 },
     },
     {
       player_id: 102,
       projections_run_id: 1,
-      stat_components_json: JSON.stringify({ H: 70, AB: 200 }),
-      h: 70,
-      ab: 200,
+      stat_components_json: { H: 70, AB: 200 },
     },
   ]);
 }
@@ -576,7 +612,7 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "ERA", statKey: "ERA", name: "Earned Run Average", type: "RATE" },
+        { category_id: "ERA", stat_key: "ERA", name: "Earned Run Average", type: "RATE", formula_id: "era", direction: "LOWER_BETTER" },
       ],
     },
   });
@@ -610,20 +646,16 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 201, player_name: "Traded Pitcher", positions: ["SP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 201,
       projections_run_id: 2,
-      stat_components_json: JSON.stringify({ IP: 150, ER: 60 }),
-      ip: 150,
-      er: 60,
+      stat_components_json: { IP: 150, ER: 60 },
     },
     {
       player_id: 202,
       projections_run_id: 2,
-      stat_components_json: JSON.stringify({ IP: 150, ER: 45 }),
-      ip: 150,
-      er: 45,
+      stat_components_json: { IP: 150, ER: 45 },
     },
   ]);
 }
@@ -638,7 +670,7 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "OBP", statKey: "OBP", name: "On-Base Percentage", type: "RATE" },
+        { category_id: "OBP", stat_key: "OBP", name: "On-Base Percentage", type: "RATE", formula_id: "obp", direction: "HIGHER_BETTER" },
       ],
     },
   });
@@ -672,26 +704,16 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 301, player_name: "Player Out", positions: ["1B"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 301,
       projections_run_id: 3,
-      stat_components_json: JSON.stringify({ H: 30, BB: 20, HBP: 2, AB: 150, SF: 5 }),
-      h: 30,
-      bb: 20,
-      hbp: 2,
-      ab: 150,
-      sf: 5,
+      stat_components_json: { H: 30, BB: 20, HBP: 2, AB: 150, SF: 5 },
     },
     {
       player_id: 302,
       projections_run_id: 3,
-      stat_components_json: JSON.stringify({ H: 45, BB: 10, HBP: 1, AB: 150, SF: 3 }),
-      h: 45,
-      bb: 10,
-      hbp: 1,
-      ab: 150,
-      sf: 3,
+      stat_components_json: { H: 45, BB: 10, HBP: 1, AB: 150, SF: 3 },
     },
   ]);
 }
@@ -706,7 +728,7 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "WHIP", statKey: "WHIP", name: "Walks + Hits / IP", type: "RATE" },
+        { category_id: "WHIP", stat_key: "WHIP", name: "Walks + Hits / IP", type: "RATE", formula_id: "whip", direction: "LOWER_BETTER" },
       ],
     },
   });
@@ -739,22 +761,16 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
     { player_id: 401, player_name: "Pitcher Out", positions: ["RP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 401,
       projections_run_id: 4,
-      stat_components_json: JSON.stringify({ IP: 100, H: 95, BB: 35 }),
-      ip: 100,
-      h: 95,
-      bb: 35,
+      stat_components_json: { IP: 100, H: 95, BB: 35 },
     },
     {
       player_id: 402,
       projections_run_id: 4,
-      stat_components_json: JSON.stringify({ IP: 100, H: 80, BB: 25 }),
-      ip: 100,
-      h: 80,
-      bb: 25,
+      stat_components_json: { IP: 100, H: 80, BB: 25 },
     },
   ]);
 }
@@ -769,7 +785,7 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "AVG", statKey: "AVG", name: "Batting Average", type: "RATE" },
+        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
       ],
     },
   });
@@ -801,13 +817,11 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
     { player_id: 501, player_name: "Same Player", positions: ["OF"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 501,
       projections_run_id: 5,
-      stat_components_json: JSON.stringify({ H: 50, AB: 200 }),
-      h: 50,
-      ab: 200,
+      stat_components_json: { H: 50, AB: 200 },
     },
   ]);
 }
@@ -816,13 +830,13 @@ function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamI
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
-    projections_run_id: null, // No projections run
+    projections_run_id: null, // No projections run — uses fallback date-based path
   });
 
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "AVG", statKey: "AVG", name: "Batting Average", type: "RATE" },
+        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
       ],
     },
   });
@@ -868,8 +882,8 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
   mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
     settings_json: {
       categories: [
-        { category_id: "AVG", statKey: "AVG", name: "Batting Average", type: "RATE" },
-        { category_id: "HR", statKey: "HR", name: "Home Runs", type: "COUNTING" },
+        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
+        { category_id: "HR", stat_key: "HR", name: "Home Runs", type: "COUNTING", direction: "HIGHER_BETTER" },
       ],
     },
   });
@@ -920,38 +934,91 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     { player_id: 702, player_name: "Player B", positions: ["1B"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_projections_run_player_list", [
+  mockDb._setMockResult("player_projection_player_list", [
     {
       player_id: 701,
       projections_run_id: 7,
-      stat_components_json: JSON.stringify({ H: 50, AB: 200, HR: 10 }),
-      h: 50,
-      ab: 200,
-      hr: 10,
+      stat_components_json: { H: 50, AB: 200, HR: 10 },
     },
     {
       player_id: 702,
       projections_run_id: 7,
-      stat_components_json: JSON.stringify({ H: 40, AB: 150, HR: 15 }),
-      h: 40,
-      ab: 150,
-      hr: 15,
+      stat_components_json: { H: 40, AB: 150, HR: 15 },
     },
     {
       player_id: 703,
       projections_run_id: 7,
-      stat_components_json: JSON.stringify({ H: 70, AB: 200, HR: 20 }),
-      h: 70,
-      ab: 200,
-      hr: 20,
+      stat_components_json: { H: 70, AB: 200, HR: 20 },
     },
     {
       player_id: 704,
       projections_run_id: 7,
-      stat_components_json: JSON.stringify({ H: 60, AB: 180, HR: 12 }),
-      h: 60,
-      ab: 180,
-      hr: 12,
+      stat_components_json: { H: 60, AB: 180, HR: 12 },
+    },
+  ]);
+}
+
+function setupMockForSVTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+  mockDb._setMockResult("league_daily_snapshot_single", {
+    league_id: leagueId,
+    snapshot_date: snapshotDate,
+    projections_run_id: 8,
+  });
+
+  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
+    settings_json: {
+      categories: [
+        { category_id: "SV", stat_key: "SV", name: "Saves", type: "COUNTING", direction: "HIGHER_BETTER" },
+      ],
+    },
+  });
+
+  mockDb._setMockResult("team_daily_projected_overall_single", {
+    projected_overall_points: 6,
+  });
+
+  // Team's current projected SV = 30 (has a closer rostered)
+  mockDb._setMockResult("team_daily_projected_category_list", [
+    {
+      category_id: "SV",
+      projected_value: 30,
+      projected_rank: 3,
+      projected_roto_points: 6,
+      projected_components_json: {},
+    },
+  ]);
+
+  // All teams' projected SV for re-ranking after trade.
+  // projected_rank is included on the user team entry so getCurrentStandings returns
+  // the correct pre-trade rank (3rd with 30 saves).
+  mockDb._setMockResult("team_daily_projected_category_list", [
+    { team_id: teamId, category_id: "SV", projected_value: 30, projected_rank: 3, projected_roto_points: 6, projected_components_json: {} },
+    { team_id: 80, category_id: "SV", projected_value: 40, projected_rank: 1, projected_roto_points: 8, projected_components_json: {} },
+    { team_id: 81, category_id: "SV", projected_value: 35, projected_rank: 2, projected_roto_points: 7, projected_components_json: {} },
+    { team_id: 82, category_id: "SV", projected_value: 22, projected_rank: 4, projected_roto_points: 5, projected_components_json: {} },
+    { team_id: 83, category_id: "SV", projected_value: 18, projected_rank: 5, projected_roto_points: 4, projected_components_json: {} },
+    { team_id: 84, category_id: "SV", projected_value: 12, projected_rank: 6, projected_roto_points: 3, projected_components_json: {} },
+    { team_id: 85, category_id: "SV", projected_value: 8, projected_rank: 7, projected_roto_points: 2, projected_components_json: {} },
+    { team_id: 86, category_id: "SV", projected_value: 5, projected_rank: 8, projected_roto_points: 1, projected_components_json: {} },
+  ]);
+
+  mockDb._setMockResult("team_roster_snapshot_player_list", [
+    { player_id: 801, player_name: "Closer Being Traded Away", positions: ["RP"], roster_status: "active" },
+  ]);
+
+  // Closer (player 801): 25 projected saves, 55 IP
+  // SP (player 802): 0 projected saves, 180 IP
+  // When projections_run_id is set, primary path uses player_projection_player_list
+  mockDb._setMockResult("player_projection_player_list", [
+    {
+      player_id: 801,
+      projections_run_id: 8,
+      stat_components_json: { IP: 55, ER: 18, HA: 40, BBA: 15, K: 65, W: 3, SV: 25 },
+    },
+    {
+      player_id: 802,
+      projections_run_id: 8,
+      stat_components_json: { IP: 180, ER: 65, HA: 160, BBA: 55, K: 185, W: 13, SV: 0 },
     },
   ]);
 }

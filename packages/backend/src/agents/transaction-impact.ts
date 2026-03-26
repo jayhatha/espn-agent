@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import { type Kysely, sql } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { MoveType } from "../../../shared/dist/index.js";
@@ -23,7 +23,7 @@ interface CategoryConfig {
 export class TransactionImpactAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -314,8 +314,7 @@ export class TransactionImpactAgent {
 
     if (!settings) return [];
 
-    const json = settings.settings_json as any;
-    const cats = json?.categories || [];
+    const cats = settings.settings_json?.categories || [];
     return cats.map((c: any) => ({
       statKey: c.stat_key || c.statKey,
       type: c.type,
@@ -732,8 +731,7 @@ export class TransactionImpactAgent {
 
     if (!settings) return {};
 
-    const json = settings.settings_json as any;
-    const rosterSlots = json?.roster_slots || {};
+    const rosterSlots = settings.settings_json?.roster_slots || {};
     const numTeams = await this.db
       .selectFrom("team")
       .where("league_id", "=", leagueId)

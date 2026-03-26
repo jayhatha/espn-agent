@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { decryptToken } from "./encryption.js";
@@ -26,7 +26,7 @@ export interface SlackMessageResult {
 export class SlackGateway {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -211,7 +211,7 @@ export class SlackGateway {
           last_error: {
             error: errorData?.error || "unknown",
             timestamp: new Date().toISOString(),
-          } as any,
+          },
         })
         .where("team_id", "=", teamId)
         .execute();
@@ -223,7 +223,7 @@ export class SlackGateway {
           last_error: {
             error: errorData?.error || error.message || "unknown",
             timestamp: new Date().toISOString(),
-          } as any,
+          },
         })
         .where("team_id", "=", teamId)
         .execute();

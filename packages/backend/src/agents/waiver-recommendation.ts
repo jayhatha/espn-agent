@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
@@ -51,7 +51,7 @@ export class WaiverRecommendationAgent {
     // @ts-expect-error reserved for future standings-based scoring
     private standingsAgent: StandingsProjectionAgent,
     private espnAdapter: ESPNAdapter,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -230,7 +230,7 @@ export class WaiverRecommendationAgent {
       return [];
     }
 
-    const categories = (settings.settings_json as any).categories as Category[];
+    const categories = settings.settings_json.categories as Category[];
 
     // Pre-fetch current team projections for all categories
     const currentProjections = await this.db

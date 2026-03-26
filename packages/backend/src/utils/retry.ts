@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
 import axiosRetry from "axios-retry";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 
 /**
  * Circuit breaker state tracker
@@ -42,7 +42,7 @@ class CircuitBreaker {
  * (1s, 2s, 4s with jitter)
  * Circuit breaker opens after 5 consecutive failures, preventing retries for 60s
  */
-export function createRetryableAxios(logger?: Logger): AxiosInstance {
+export function createRetryableAxios(logger?: BaseLogger): AxiosInstance {
   const circuitBreaker = new CircuitBreaker();
   const instance = axios.create();
 

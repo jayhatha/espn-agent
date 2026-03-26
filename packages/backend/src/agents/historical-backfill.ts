@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import crypto from "crypto";
@@ -36,7 +36,7 @@ export class HistoricalBackfillAgent {
 
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {
     this.espnAdapter = new ESPNAdapter(logger);
     this.snapshotOrchestrator = new SnapshotOrchestratorAgent(db, logger);
@@ -580,7 +580,7 @@ export class HistoricalBackfillAgent {
             espn_event_id: canonical.transactionId,
             raw_event_json: txn,
             payload_hash: payloadHash,
-          } as any) // Type assertion: DB auto-generates id (BIGSERIAL)
+          })
           .onConflict((oc) =>
             oc.columns(["league_id", "event_time", "team_id", "payload_hash"]).doNothing(),
           )

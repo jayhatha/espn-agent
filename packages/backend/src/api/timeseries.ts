@@ -392,7 +392,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .executeTakeFirst();
 
         if (settings) {
-          categories = (settings.settings_json as any).categories || [];
+          categories = settings.settings_json.categories || [];
         }
       }
 
@@ -418,7 +418,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         currentCategoryStandings,
         currentOverallStandings: currentOverallStandings.map((os) => ({
           ...os,
-          teamName: teamMap.get(os.team_id as any)?.name || `Team ${os.team_id}`,
+          teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
         })),
       };
     },
@@ -451,7 +451,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       const categories =
-        (settingsVersion.settings_json as any).categories || [];
+        settingsVersion.settings_json.categories || [];
       return { categories };
     },
   );
@@ -532,11 +532,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         const teams = await db
           .selectFrom("team")
           .select(["id", "name"])
-          .where("id", "in", Array.from(teamIds_set) as any)
+          .where("id", "in", Array.from(teamIds_set))
           .execute();
 
         teams.forEach((t) => {
-          teamMap.set(t.id as any, t.name);
+          teamMap.set(t.id, t.name);
         });
       }
 

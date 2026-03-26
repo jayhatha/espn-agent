@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type {
@@ -39,7 +39,7 @@ interface PlayerWithProjection {
 export class DraftRankingsAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -68,7 +68,7 @@ export class DraftRankingsAgent {
       return [];
     }
 
-    const settings = latestSettings.settings_json as any;
+    const settings = latestSettings.settings_json;
     const categories = settings.categories as Category[];
     const rosterSlots = settings.roster_slots as Record<string, number>;
 

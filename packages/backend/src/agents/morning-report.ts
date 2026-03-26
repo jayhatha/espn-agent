@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { WaiverRecommendationAgent } from "./waiver-recommendation.js";
@@ -46,7 +46,7 @@ export class MorningReportAgent {
 
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {
     const espnAdapter = new ESPNAdapter(logger);
     const standingsAgent = new StandingsProjectionAgent(db, logger);
@@ -228,7 +228,7 @@ export class MorningReportAgent {
         report_date: reportDate,
         kind: "morning",
         summary_markdown: summaryMarkdown,
-        data_json: reportData as any,
+        data_json: reportData,
         created_at: new Date(),
       })
       .execute();
@@ -253,11 +253,11 @@ export class MorningReportAgent {
             addPlayerName: rec.addPlayerName,
             dropPlayerId: rec.dropPlayerId,
             dropPlayerName: rec.dropPlayerName,
-          } as any,
+          },
           expected_impact_json: {
             deltaPoints: rec.deltaOverallPoints,
             categoryImpacts: rec.categoryImpacts,
-          } as any,
+          },
           risk_flags_json: null,
           evidence_json: null,
           status: "proposed",

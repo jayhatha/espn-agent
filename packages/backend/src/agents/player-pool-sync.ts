@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { ESPNAdapter, ESPN_STAT_MAP } from "../adapters/espn.js";
@@ -34,7 +34,7 @@ export class PlayerPoolSyncAgent {
   constructor(
     private db: Kysely<Database>,
     private espnAdapter: ESPNAdapter,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**

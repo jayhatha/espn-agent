@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
@@ -51,7 +51,7 @@ export class LineupOptimizerAgent {
   constructor(
     private db: Kysely<Database>,
     private mlbAdapter: MLBStatsAPIAdapter,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   async getRecommendations(

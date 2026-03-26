@@ -46,8 +46,8 @@ export async function lineupRoutes(app: FastifyInstance) {
 
       try {
         // Instantiate adapter and agent
-        const mlbAdapter = new MLBStatsAPIAdapter(request.log as any);
-        const lineupAgent = new LineupOptimizerAgent(db, mlbAdapter, request.log as any);
+        const mlbAdapter = new MLBStatsAPIAdapter(request.log);
+        const lineupAgent = new LineupOptimizerAgent(db, mlbAdapter, request.log);
 
         // Get recommendations
         const result = await lineupAgent.getRecommendations(leagueId, teamId, date);

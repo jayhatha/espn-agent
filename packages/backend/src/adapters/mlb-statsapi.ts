@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { AxiosInstance } from "axios";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 
 /**
  * MLB StatsAPI Adapter
@@ -48,7 +48,7 @@ export interface ProbablePitcherInfo {
 export class MLBStatsAPIAdapter {
   private client: AxiosInstance;
 
-  constructor(private logger?: Logger) {
+  constructor(private logger?: BaseLogger) {
     this.client = axios.create({
       baseURL: "https://statsapi.mlb.com/api/v1",
       timeout: 10000,

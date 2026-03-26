@@ -129,7 +129,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         const buffer = await data.toBuffer();
         const csvContent = buffer.toString("utf-8");
 
-        const agent = new ProjectionsIngestAgent(db, request.log as any);
+        const agent = new ProjectionsIngestAgent(db, request.log);
 
         const today = new Date().toISOString().split("T")[0];
 

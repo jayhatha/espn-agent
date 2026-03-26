@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 
 // ESPN Roster Entry Schema — replaces z.unknown() in teams.roster.entries
 export const ESPNRosterEntrySchema = z.object({
@@ -101,7 +101,7 @@ export function validateEspnResponse<T>(
   schema: z.ZodSchema<T>,
   data: unknown,
   context: string,
-  logger?: any
+  logger?: BaseLogger
 ): T {
   const result = schema.safeParse(data);
 
@@ -129,7 +129,7 @@ export function validateEspnResponse<T>(
 export function assertEspnCriticalShape(
   data: unknown,
   context: string,
-  logger?: Logger
+  logger?: BaseLogger
 ): asserts data is Record<string, unknown> {
   if (typeof data !== "object" || data === null) {
     const msg = `ESPN returned non-object for ${context}`;
@@ -152,7 +152,7 @@ export function logUnexpectedFields(
   data: Record<string, unknown>,
   knownFields: string[],
   context: string,
-  logger?: Logger
+  logger?: BaseLogger
 ): void {
   const unexpected = Object.keys(data).filter(k => !knownFields.includes(k));
   if (unexpected.length > 0) {

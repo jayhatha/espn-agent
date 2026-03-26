@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import {
@@ -96,7 +96,7 @@ export interface TradeCandidate {
 export class TradeRecommendationAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -162,7 +162,7 @@ export class TradeRecommendationAgent {
       };
     }
 
-    const rosterSlots = (settingsVersion.settings_json as any).roster_slots || {};
+    const rosterSlots = settingsVersion.settings_json.roster_slots || {};
 
     // Build post-trade roster: remove givePlayers, add receivePlayers
     const givePlayerIds = trade.givePlayers.map((p) => p.playerId);
@@ -460,8 +460,8 @@ export class TradeRecommendationAgent {
       .executeTakeFirst();
 
     const rosterSlots =
-      settingsVersion && (settingsVersion.settings_json as any).roster_slots
-        ? (settingsVersion.settings_json as any).roster_slots
+      settingsVersion && settingsVersion.settings_json.roster_slots
+        ? settingsVersion.settings_json.roster_slots
         : {};
 
     // Analyze roster depth for positional scoring
@@ -751,7 +751,7 @@ export class TradeRecommendationAgent {
       .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
       .executeTakeFirstOrThrow();
 
-    const categories = (settingsVersion.settings_json as any).categories || [];
+    const categories = settingsVersion.settings_json.categories || [];
 
     const categoryImpacts: CategoryImpact[] = projectedCategories.map((proj) => {
       const category = categories.find(
@@ -882,7 +882,7 @@ export class TradeRecommendationAgent {
       .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
       .executeTakeFirstOrThrow();
 
-    const categories = (settingsVersion.settings_json as any).categories || [];
+    const categories = settingsVersion.settings_json.categories || [];
 
     // Get all teams' PROJECTED category totals (not current actuals)
     const allTeamProjections = await this.db

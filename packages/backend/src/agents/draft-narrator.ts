@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 
 /**
  * Structured payload sent by the extension when a narration trigger fires.
@@ -115,9 +115,9 @@ Rules:
  */
 export class DraftNarratorAgent {
   private client: OpenAI;
-  private logger?: Logger;
+  private logger?: BaseLogger;
 
-  constructor(logger?: Logger) {
+  constructor(logger?: BaseLogger) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(

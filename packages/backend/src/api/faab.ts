@@ -26,7 +26,7 @@ export async function faabRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new FaabTrackerAgent(db, request.log as any);
+        const agent = new FaabTrackerAgent(db, request.log);
         const summary = await agent.getSummary(leagueId, teamId);
         return summary;
       } catch (error) {
@@ -50,7 +50,7 @@ export async function faabRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new FaabTrackerAgent(db, request.log as any);
+        const agent = new FaabTrackerAgent(db, request.log);
         const history = await agent.getBidHistory(leagueId, teamId);
         return { bids: history };
       } catch (error) {
@@ -75,7 +75,7 @@ export async function faabRoutes(app: FastifyInstance) {
       const playerId = parseInt(request.params.playerId, 10);
 
       try {
-        const agent = new FaabTrackerAgent(db, request.log as any);
+        const agent = new FaabTrackerAgent(db, request.log);
         const suggestion = await agent.getSuggestedBid(leagueId, teamId, playerId);
         return suggestion;
       } catch (error) {

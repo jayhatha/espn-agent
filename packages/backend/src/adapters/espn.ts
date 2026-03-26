@@ -1,6 +1,6 @@
 import { type AxiosInstance } from "axios";
 import crypto from "crypto";
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import { LRUCache } from "lru-cache";
 import pLimit from "p-limit";
 import { createRetryableAxios } from "../utils/retry.js";
@@ -269,11 +269,11 @@ const ESPN_TRANSACTION_TYPE_MAP: Record<number, ESPNTransaction["type"]> = {
 
 export class ESPNAdapter {
   private client: AxiosInstance;
-  private logger?: Logger;
+  private logger?: BaseLogger;
   private cache: LRUCache<string, { data: unknown; expiresAt: number }>;
   private lastRequestTime: number = 0;
 
-  constructor(logger?: Logger) {
+  constructor(logger?: BaseLogger) {
     this.client = createRetryableAxios(logger);
     // Configure ESPN-specific settings
     this.client.defaults.baseURL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/flb";
@@ -320,9 +320,9 @@ export class ESPNAdapter {
       if (
         response.status === 200 &&
         typeof data === "object" && data !== null &&
-        typeof (data as any).currentScoringPeriod?.id === "number"
+        typeof data.currentScoringPeriod?.id === "number"
       ) {
-        return (data as any).currentScoringPeriod.id;
+        return data.currentScoringPeriod.id;
       }
       return undefined;
     } catch (error) {
@@ -1169,7 +1169,7 @@ export class ESPNAdapter {
    * Normalize ESPN response to canonical league data
    */
   normalizeLeagueData(raw: Record<string, unknown>): ESPNLeagueData {
-    const settings = raw.settings as any;
+    const settings = raw.settings as Record<string, any>;
     const teams = (raw.teams as any[]) || [];
     const schedule = (raw.schedule as any[]) || [];
 
@@ -1319,7 +1319,7 @@ export class ESPNAdapter {
     if (typeof obj === "object") {
       const result: Record<string, unknown> = {};
       for (const key of Object.keys(obj)) {
-        result[key] = this.extractStructure((obj as any)[key], depth + 1);
+        result[key] = this.extractStructure((obj as Record<string, unknown>)[key], depth + 1);
       }
       return result;
     }

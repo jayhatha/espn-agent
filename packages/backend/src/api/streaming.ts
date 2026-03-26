@@ -40,7 +40,7 @@ export async function streamingRoutes(app: FastifyInstance) {
       const league = await db
         .selectFrom("league")
         .select("id")
-        .where("id", "=", leagueId as any)
+        .where("id", "=", leagueId)
         .executeTakeFirst();
 
       if (!league) {
@@ -49,8 +49,8 @@ export async function streamingRoutes(app: FastifyInstance) {
 
       try {
         // Instantiate adapter and agent
-        const mlbAdapter = new MLBStatsAPIAdapter(request.log as any);
-        const streamingAgent = new StreamingPitcherAgent(db, mlbAdapter, request.log as any);
+        const mlbAdapter = new MLBStatsAPIAdapter(request.log);
+        const streamingAgent = new StreamingPitcherAgent(db, mlbAdapter, request.log);
 
         // Get recommendations
         const result = await streamingAgent.getRecommendations(leagueId, teamId, {

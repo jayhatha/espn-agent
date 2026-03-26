@@ -1,4 +1,4 @@
-import type { Logger } from "pino";
+import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
@@ -42,7 +42,7 @@ function isPitcherProjection(components: StatComponents): boolean {
 export class StandingsProjectionAgent {
   constructor(
     private db: Kysely<Database>,
-    private logger?: Logger,
+    private logger?: BaseLogger,
   ) {}
 
   /**
@@ -72,7 +72,7 @@ export class StandingsProjectionAgent {
       .where("id", "=", snapshot.settings_version_id)
       .executeTakeFirstOrThrow();
 
-    const categories = (settings.settings_json as any).categories as Category[];
+    const categories = settings.settings_json.categories as Category[];
 
     // Get all teams
     const teams = await this.db

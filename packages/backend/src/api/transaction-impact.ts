@@ -29,7 +29,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const leagueId = parseInt(request.params.leagueId, 10);
       const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
 
-      const agent = new TransactionImpactAgent(db, request.log as any);
+      const agent = new TransactionImpactAgent(db, request.log);
 
       // Step 1: Derive roster moves
       const totalMoves = await agent.deriveRosterMoves(leagueId, season);
@@ -117,7 +117,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const worstMove = impacts.length > 0 ? impacts[impacts.length - 1] : null;
 
       // Compute Net Roster Management Value
-      const agent = new TransactionImpactAgent(db, request.log as any);
+      const agent = new TransactionImpactAgent(db, request.log);
       const netResult = await agent.computeNetRosterValue(leagueId, season, teamId);
 
       return {
@@ -255,7 +255,7 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       }
 
       // Compute net roster value for each team
-      const agent = new TransactionImpactAgent(db, request.log as any);
+      const agent = new TransactionImpactAgent(db, request.log);
       const teamRankings: Array<{
         teamId: number;
         teamName: string;

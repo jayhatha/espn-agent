@@ -58,7 +58,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           return reply.code(404).send({ error: "No league data found" });
         }
 
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
         const normalized = espnAdapter.normalizeLeagueData(
           latestPayload.response_json as Record<string, unknown>,
         );
@@ -301,13 +301,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const espnAdapter = new ESPNAdapter(request.log as any);
-        const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
+        const standingsAgent = new StandingsProjectionAgent(db, request.log);
         const waiverAgent = new WaiverRecommendationAgent(
           db,
           standingsAgent,
           espnAdapter,
-          request.log as any,
+          request.log,
         );
 
         // Get player names
@@ -441,13 +441,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const espnAdapter = new ESPNAdapter(request.log as any);
-      const standingsAgent = new StandingsProjectionAgent(db, request.log as any);
+      const espnAdapter = new ESPNAdapter(request.log);
+      const standingsAgent = new StandingsProjectionAgent(db, request.log);
       const waiverAgent = new WaiverRecommendationAgent(
         db,
         standingsAgent,
         espnAdapter,
-        request.log as any,
+        request.log,
       );
 
       const recommendations = await waiverAgent.getRecommendations(
@@ -503,7 +503,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log);
 
       try {
         const analysis = await tradeAgent.analyzeTradeImpact(
@@ -556,7 +556,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log as any);
+      const tradeAgent = new TradeRecommendationAgent(db, request.log);
 
       try {
         const candidates = await tradeAgent.generateTradeCandidates(
@@ -621,13 +621,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .selectFrom("team")
             .selectAll()
             .where("league_id", "=", leagueId)
-            .where("id", "=", teamId as any)
+            .where("id", "=", teamId)
             .executeTakeFirst(),
           db
             .selectFrom("team")
             .selectAll()
             .where("league_id", "=", leagueId)
-            .where("id", "=", partnerTeamId as any)
+            .where("id", "=", partnerTeamId)
             .executeTakeFirst(),
         ]);
 
@@ -769,7 +769,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .selectFrom("team")
           .select(["id", "name", "espn_team_id"])
           .where("league_id", "=", leagueId)
-          .where("id", "!=", teamId as any)
+          .where("id", "!=", teamId)
           .orderBy("name", "asc")
           .execute();
 

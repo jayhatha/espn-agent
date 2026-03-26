@@ -62,7 +62,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Fetch league data to validate and find user's team
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
         const espnData = await espnAdapter.fetchLeague({
           leagueId: espnLeagueId,
           season,
@@ -250,7 +250,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         // Trigger initial snapshot for newly connected league
         try {
           request.log.info({ leagueId: league.id }, "Triggering initial snapshot for new league");
-          const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+          const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
           const today = new Date().toISOString().split("T")[0];
 
           // Run snapshot in background (don't await)
@@ -501,7 +501,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         const { SnapshotOrchestratorAgent } = await import(
           "../agents/snapshot-orchestrator.js"
         );
-        const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
 
         const today = new Date().toISOString().split("T")[0];
 
@@ -671,7 +671,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
           .executeTakeFirst();
 
         if (settings) {
-          categoryMeta = (settings.settings_json as any).categories || [];
+          categoryMeta = settings.settings_json.categories || [];
         }
       }
 
@@ -746,7 +746,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Fetch league data from ESPN to get name + teams
-        const espnAdapter = new ESPNAdapter(request.log as any);
+        const espnAdapter = new ESPNAdapter(request.log);
         const espnData = await espnAdapter.fetchLeague({
           leagueId: DEFAULT_ESPN_LEAGUE_ID,
           season,
@@ -804,7 +804,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Trigger initial snapshot in background
-        const orchestrator = new SnapshotOrchestratorAgent(db, request.log as any);
+        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
         const today = new Date().toISOString().split("T")[0];
         orchestrator
           .executeSnapshot({
