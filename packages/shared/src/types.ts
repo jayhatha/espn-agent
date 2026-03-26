@@ -233,3 +233,14 @@ export interface PlayerIdentityMap {
   resolution_method: ResolutionMethod;
   updated_at: Date;
 }
+
+// Per-player, per-period stats with team association
+// Enables tenure-based stats: stats accumulated while on a specific team
+export interface PlayerPeriodStats {
+  league_id: number;
+  scoring_period: number;
+  player_id: number;
+  team_id: number;
+  lineup_slot_id: number | null;
+  components_json: StatComponents;
+}

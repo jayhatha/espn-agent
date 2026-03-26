@@ -15,6 +15,7 @@ import type {
   ProjectionsRun,
   PlayerProjection,
   PlayerIdentityMap,
+  PlayerPeriodStats,
 } from "../../../shared/dist/index.js";
 
 /**
@@ -39,6 +40,7 @@ export interface Database {
   league_transaction_event: LeagueTransactionEvent;
   projections_run: ProjectionsRun;
   player_projection: PlayerProjection;
+  player_period_stats: PlayerPeriodStats;
   // Slack integration tables
   slack_installation: SlackInstallation;
   slack_user_link: SlackUserLink;
