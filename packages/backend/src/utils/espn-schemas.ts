@@ -1,4 +1,25 @@
 import { z } from "zod";
+import type { Logger } from "pino";
+
+// ESPN Roster Entry Schema — replaces z.unknown() in teams.roster.entries
+export const ESPNRosterEntrySchema = z.object({
+  playerId: z.number(),
+  lineupSlotId: z.number().optional(),
+  playerPoolEntry: z.object({
+    player: z.object({
+      fullName: z.string().optional(),
+      proTeamId: z.number().optional(),
+      eligibleSlots: z.array(z.number()).optional(),
+      stats: z.array(z.unknown()).optional(),
+    }).passthrough()
+  }).passthrough().optional()
+}).passthrough();
+
+// ESPN Scoring Item Schema — replaces z.unknown() in scoringSettings.scoringItems
+const ESPNScoringItemSchema = z.object({
+  statId: z.number(),
+  isReverseItem: z.boolean().optional(),
+}).passthrough();
 
 // ESPN League Response Schema
 export const ESPNLeagueResponseSchema = z.object({
@@ -7,8 +28,11 @@ export const ESPNLeagueResponseSchema = z.object({
     name: z.string(),
     scoringPeriodId: z.number(),
     scoringSettings: z.object({
-      scoringItems: z.array(z.unknown())
-    }).passthrough()
+      scoringItems: z.array(ESPNScoringItemSchema)
+    }).passthrough(),
+    rosterSettings: z.object({
+      lineupSlotCounts: z.record(z.string(), z.number())
+    }).passthrough().optional()
   }).passthrough(),
   teams: z.array(z.object({
     id: z.number(),
@@ -16,8 +40,9 @@ export const ESPNLeagueResponseSchema = z.object({
     location: z.string().optional(),
     nickname: z.string().optional(),
     abbrev: z.string().optional(),
+    valuesByStat: z.record(z.string(), z.number()).optional(),
     roster: z.object({
-      entries: z.array(z.unknown())
+      entries: z.array(ESPNRosterEntrySchema)
     }).passthrough().optional()
   }).passthrough()),
   schedule: z.array(z.unknown()).optional()
@@ -93,4 +118,44 @@ export function validateEspnResponse<T>(
   }
 
   return result.data;
+}
+
+/**
+ * Asserts that the ESPN response contains the critical structure required
+ * for normalization. Throws if the response is null, non-object, or missing
+ * the `teams` array. This is a hard failure — normalization cannot proceed
+ * without these fields.
+ */
+export function assertEspnCriticalShape(
+  data: unknown,
+  context: string,
+  logger?: Logger
+): asserts data is Record<string, unknown> {
+  if (typeof data !== "object" || data === null) {
+    const msg = `ESPN returned non-object for ${context}`;
+    logger?.error({ context, dataType: typeof data }, msg);
+    throw new Error(msg);
+  }
+  const raw = data as Record<string, unknown>;
+  if (!Array.isArray(raw.teams)) {
+    const msg = `ESPN response missing 'teams' array for ${context}`;
+    logger?.error({ context, keys: Object.keys(raw).slice(0, 10) }, msg);
+    throw new Error(msg);
+  }
+}
+
+/**
+ * Logs any keys present in `data` that are not in `knownFields` at INFO level.
+ * Used to detect ESPN API schema drift without blocking normalization.
+ */
+export function logUnexpectedFields(
+  data: Record<string, unknown>,
+  knownFields: string[],
+  context: string,
+  logger?: Logger
+): void {
+  const unexpected = Object.keys(data).filter(k => !knownFields.includes(k));
+  if (unexpected.length > 0) {
+    logger?.info({ context, unexpectedFields: unexpected }, "ESPN response contains new unknown fields");
+  }
 }
