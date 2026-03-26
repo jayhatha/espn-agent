@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 76-01-PLAN.md
-last_updated: "2026-03-26T20:36:54.697Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 76-02-PLAN.md
+last_updated: "2026-03-26T20:43:36.720Z"
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Project State
@@ -54,6 +54,7 @@ Plan: 2 of 2
 | Phase 75-active-stats P01 | 3 | 2 tasks | 6 files |
 | Phase 75-active-stats P02 | 2 | 1 tasks | 3 files |
 | Phase 76-api-hardening P01 | 2 | 1 tasks | 2 files |
+| Phase 76-api-hardening P02 | 6 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Plan: 2 of 2
 - [Phase 75-02]: tenureStats render above YTD in lineup page — contribution-since-acquired shown before full-season view
 - [Phase 76-api-hardening]: assertEspnCriticalShape is a TypeScript assertion function that throws on missing teams array — hard fail for structural ESPN API breakage
 - [Phase 76-api-hardening]: logUnexpectedFields only logs at INFO — never throws — preserving graceful degradation for ESPN schema drift detection
+- [Phase 76-02]: assertEspnCriticalShape called in fetchLeague and fetchHistoricalWeek before normalization — hard fail on missing teams array
+- [Phase 76-02]: fetchGlobalDraftData uses validateEspnResponse with ESPNFreeAgentsResponseSchema instead of raw as-any cast
 
 ### Roadmap Evolution
 
@@ -144,6 +147,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T20:36:54.692Z
-Stopped at: Completed 76-01-PLAN.md
+Last session: 2026-03-26T20:43:36.714Z
+Stopped at: Completed 76-02-PLAN.md
 Resume file: None
