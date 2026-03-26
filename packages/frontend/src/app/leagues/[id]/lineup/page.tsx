@@ -15,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import { CheckCircle, AlertTriangle, ArrowLeftRight, TrendingUp } from "lucide-react";
+import { Term } from "@/components/ui/Term";
 
 interface Team {
   id: number;
@@ -53,6 +54,7 @@ interface RosterPlayer {
   rosterSlot: string;
   projections: Record<string, number> | null;
   currentStats: Record<string, number> | null;
+  tenureStats: Record<string, number> | null;
 }
 
 function isPitcher(positions: string[]): boolean {
@@ -178,7 +180,7 @@ export default function LineupOptimizerPage() {
             error={true}
           />
         ) : (
-          <div className="text-body-sm text-content-secondary">
+          <div className="text-body-sm text-content-secondary dark:text-shell-muted">
             No teams found. Create a snapshot to sync league data from ESPN.
           </div>
         )}
@@ -217,7 +219,7 @@ export default function LineupOptimizerPage() {
                     <h2 className="text-h3 font-semibold text-content dark:text-shell-text">
                       Your Lineup is Optimal!
                     </h2>
-                    <p className="text-body-sm text-content-secondary mt-1">
+                    <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
                       No recommended changes for today's schedule.
                     </p>
                   </div>
@@ -235,8 +237,8 @@ export default function LineupOptimizerPage() {
                         {data.recommendations.length} Recommended Swap
                         {data.recommendations.length !== 1 ? "s" : ""}
                       </h2>
-                      <p className="text-body-sm text-content-secondary mt-1">
-                        Projected gain: +{data.totalProjectedGain.toFixed(2)} SGP
+                      <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
+                        Projected gain: +{data.totalProjectedGain.toFixed(2)} <Term id="sgp">SGP</Term>
                       </p>
                     </div>
                   </div>
@@ -270,7 +272,7 @@ export default function LineupOptimizerPage() {
                         <div className="font-bold text-lg text-content dark:text-shell-text mb-1">
                           {rec.benchPlayerName}
                         </div>
-                        <div className="text-body-sm text-content-secondary mb-2">
+                        <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-2">
                           {rec.benchPlayerPositions.join(", ")}
                         </div>
                         <div className="text-2xl font-bold font-mono text-positive">
@@ -280,7 +282,7 @@ export default function LineupOptimizerPage() {
 
                       {/* Arrow */}
                       <div className="flex justify-center">
-                        <ArrowLeftRight className="w-8 h-8 text-content-tertiary rotate-90 md:rotate-0" />
+                        <ArrowLeftRight className="w-8 h-8 text-content-tertiary dark:text-shell-muted rotate-90 md:rotate-0" />
                       </div>
 
                       {/* Starter Player (Sit) */}
@@ -293,10 +295,10 @@ export default function LineupOptimizerPage() {
                         <div className="font-bold text-lg text-content dark:text-shell-text mb-1">
                           {rec.starterPlayerName}
                         </div>
-                        <div className="text-body-sm text-content-secondary mb-2">
+                        <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-2">
                           {rec.starterPlayerPositions.join(", ")}
                         </div>
-                        <div className="text-2xl font-medium font-mono text-content-secondary">
+                        <div className="text-2xl font-medium font-mono text-content-secondary dark:text-shell-muted">
                           {rec.starterPlayerProjectedValue.toFixed(2)}
                         </div>
                       </div>
@@ -304,10 +306,10 @@ export default function LineupOptimizerPage() {
 
                     {/* Reason and Gain */}
                     <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-shell-border">
-                      <p className="text-body-sm text-content-secondary mb-2">{rec.reason}</p>
+                      <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-2">{rec.reason}</p>
                       <div className="inline-flex items-center px-3 py-1 rounded-full bg-positive-light border border-positive-border text-body-sm font-semibold text-positive">
                         <TrendingUp className="w-4 h-4 mr-1" />
-                        +{rec.projectedGain.toFixed(2)} SGP
+                        +{rec.projectedGain.toFixed(2)} <Term id="sgp">SGP</Term>
                       </div>
                     </div>
                   </CardContent>
@@ -317,7 +319,7 @@ export default function LineupOptimizerPage() {
           )}
 
           {/* Note */}
-          <div className="text-body-sm text-content-tertiary text-center mt-6">
+          <div className="text-body-sm text-content-tertiary dark:text-shell-muted text-center mt-6">
             Recommendations based on today's MLB schedule and rest-of-season
             projections. Snapshot date: {data.snapshotDate}
           </div>
@@ -327,7 +329,7 @@ export default function LineupOptimizerPage() {
       {/* Roster Stats Section */}
       {selectedTeamId && rosterData?.roster && rosterData.roster.length > 0 && (
         <div className="mt-8 space-y-6">
-          <h2 className="text-h4 font-medium dark:text-shell-text text-content">Your Roster</h2>
+          <h2 className="text-h4 font-medium text-content dark:text-shell-text">Your Roster</h2>
 
           {/* Hitters Table */}
           {(() => {
@@ -336,22 +338,22 @@ export default function LineupOptimizerPage() {
             return (
               <Card>
                 <CardContent>
-                  <h3 className="text-data font-medium uppercase dark:text-shell-text text-content mb-3">
-                    Hitters — Proj RoS
+                  <h3 className="text-data font-medium uppercase text-content dark:text-shell-text mb-3">
+                    Hitters — <Term id="proj-ros">Proj RoS</Term>
                   </h3>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Pos</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Team</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">HR</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">R</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">RBI</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">SB</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">AVG</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">OBP</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Pos</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">HR</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">R</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">RBI</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">SB</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">AVG</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">OBP</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -359,36 +361,41 @@ export default function LineupOptimizerPage() {
                           const proj = player.projections;
                           return (
                             <tr key={player.playerId}>
-                              <td className="px-3 py-2 text-body-sm font-medium dark:text-shell-text text-content whitespace-nowrap">
+                              <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
                                 {player.playerName}
+                                {player.tenureStats && (
+                                  <div className="mt-0.5">
+                                    <PlayerStatLine components={player.tenureStats} label="On Team" positions={player.positions} />
+                                  </div>
+                                )}
                                 {player.currentStats && (
                                   <div className="mt-0.5">
                                     <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
                                   </div>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.positions.join(", ")}
                               </td>
-                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.mlbTeam || "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.HR) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.R) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.RBI) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.SB) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatRate(calculateAVG(proj), 3, "AB", proj) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatRate(calculateOBP(proj), 3, "AB", proj) : "--"}
                               </td>
                             </tr>
@@ -409,21 +416,21 @@ export default function LineupOptimizerPage() {
             return (
               <Card>
                 <CardContent>
-                  <h3 className="text-data font-medium uppercase dark:text-shell-text text-content mb-3">
-                    Pitchers — Proj RoS
+                  <h3 className="text-data font-medium uppercase text-content dark:text-shell-text mb-3">
+                    Pitchers — <Term id="proj-ros">Proj RoS</Term>
                   </h3>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Pos</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">Team</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">W</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">SV</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">K</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">ERA</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">WHIP</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Pos</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">W</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">SV</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">K</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">ERA</th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">WHIP</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -432,33 +439,38 @@ export default function LineupOptimizerPage() {
                           const ip = proj?.IP ?? 0;
                           return (
                             <tr key={player.playerId}>
-                              <td className="px-3 py-2 text-body-sm font-medium dark:text-shell-text text-content whitespace-nowrap">
+                              <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
                                 {player.playerName}
+                                {player.tenureStats && (
+                                  <div className="mt-0.5">
+                                    <PlayerStatLine components={player.tenureStats} label="On Team" positions={player.positions} />
+                                  </div>
+                                )}
                                 {player.currentStats && (
                                   <div className="mt-0.5">
                                     <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
                                   </div>
                                 )}
                               </td>
-                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.positions.join(", ")}
                               </td>
-                              <td className="px-3 py-2 text-data dark:text-shell-muted text-content-secondary whitespace-nowrap">
+                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.mlbTeam || "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.W) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.SV) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj ? formatStat(proj.K) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj && ip > 0 ? calculateERA(proj).toFixed(2) : "--"}
                               </td>
-                              <td className="px-3 py-2 text-right text-data font-mono dark:text-shell-muted text-content-secondary">
+                              <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
                                 {proj && ip > 0 ? calculateWHIP(proj).toFixed(3) : "--"}
                               </td>
                             </tr>

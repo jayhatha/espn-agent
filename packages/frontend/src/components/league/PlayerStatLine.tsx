@@ -9,7 +9,7 @@ import {
 
 interface PlayerStatLineProps {
   components: Record<string, number> | null;
-  label: "YTD" | "Proj RoS";
+  label: "YTD" | "Proj RoS" | "On Team";
   positions: string[];
 }
 
@@ -44,7 +44,11 @@ export function PlayerStatLine({
 
   const pitcher = isPitcher(positions);
   const labelColorClass =
-    label === "Proj RoS" ? "text-shell-accent" : "text-content-tertiary";
+    label === "Proj RoS"
+      ? "text-shell-accent"
+      : label === "On Team"
+        ? "text-cyan-400"
+        : "text-content-tertiary dark:text-shell-muted";
 
   if (pitcher) {
     const { W = 0, SV = 0, K = 0 } = components;
@@ -53,7 +57,7 @@ export function PlayerStatLine({
     const whip = ip > 0 ? calculateWHIP(components) : null;
 
     return (
-      <div className="text-data font-mono dark:text-shell-muted text-content-secondary mt-1 truncate">
+      <div className="text-data font-mono text-content-secondary dark:text-shell-muted mt-1 truncate">
         <span className={`text-caption font-sans mr-1 ${labelColorClass}`}>
           {label}
         </span>
@@ -71,7 +75,7 @@ export function PlayerStatLine({
   const obp = ab > 0 ? calculateOBP(components) : null;
 
   return (
-    <div className="text-data font-mono dark:text-shell-muted text-content-secondary mt-1 truncate">
+    <div className="text-data font-mono text-content-secondary dark:text-shell-muted mt-1 truncate">
       <span className={`text-caption font-sans mr-1 ${labelColorClass}`}>
         {label}
       </span>

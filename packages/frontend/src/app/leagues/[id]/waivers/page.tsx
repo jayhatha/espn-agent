@@ -66,6 +66,9 @@ interface RosterPlayer {
   currentStats: {
     [key: string]: number;
   } | null;
+  tenureStats: {
+    [key: string]: number;
+  } | null;
 }
 
 interface EvaluationResult {
@@ -262,7 +265,7 @@ export default function WaiversPage() {
           ? "text-positive"
           : value < 0
             ? "text-negative"
-            : "text-content-secondary",
+            : "text-content-secondary dark:text-shell-muted",
       )}
     >
       {value > 0 ? "+" : ""}
@@ -279,7 +282,7 @@ export default function WaiversPage() {
           ? "text-positive"
           : value > 0
             ? "text-negative"
-            : "text-content-secondary",
+            : "text-content-secondary dark:text-shell-muted",
       )}
     >
       {value === 0
@@ -302,13 +305,13 @@ export default function WaiversPage() {
       <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
         <thead>
           <tr>
-            <th className="px-2 sm:px-3 py-2 text-left text-data font-medium text-content-secondary uppercase">
+            <th className="px-2 sm:px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
               Category
             </th>
-            <th className="px-2 sm:px-3 py-2 text-center text-data font-medium text-content-secondary uppercase">
+            <th className="px-2 sm:px-3 py-2 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
               Rank Change
             </th>
-            <th className="px-2 sm:px-3 py-2 text-right text-data font-medium text-content-secondary uppercase">
+            <th className="px-2 sm:px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
               Points
             </th>
           </tr>
@@ -320,7 +323,7 @@ export default function WaiversPage() {
             )
             .map((impact) => (
               <tr key={impact.categoryId} className={impact.deltaPoints === 0 ? "opacity-40" : ""}>
-                <td className={cn("px-2 sm:px-3 py-2 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary" : "text-content dark:text-shell-text")}>
+                <td className={cn("px-2 sm:px-3 py-2 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary dark:text-shell-muted" : "text-content dark:text-shell-text")}>
                   {impact.categoryName}
                 </td>
                 <td className="px-2 sm:px-3 py-2 text-data text-center whitespace-nowrap">
@@ -332,7 +335,7 @@ export default function WaiversPage() {
                       {impact.deltaPoints > 0 ? "+" : ""}{impact.deltaPoints.toFixed(1)}
                     </span>
                   ) : (
-                    <span className="text-content-tertiary text-data">{"\u2014"}</span>
+                    <span className="text-content-tertiary dark:text-shell-muted text-data">{"\u2014"}</span>
                   )}
                 </td>
               </tr>
@@ -343,14 +346,14 @@ export default function WaiversPage() {
   );
 
   const renderLegalityWarning = (issues: string[]) => (
-    <div className="mt-3 bg-warning-light dark:bg-amber-900/20 border border-warning-border dark:border-amber-800 rounded-lg p-3">
+    <div className="mt-3 bg-warning-light dark:bg-warning-dark-bg/20 border border-warning-border dark:border-warning-dark-border rounded-lg p-3">
       <div className="flex">
         <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
         <div className="ml-3 flex-1">
-          <h4 className="text-body-sm font-medium text-warning dark:text-amber-400">
+          <h4 className="text-body-sm font-medium text-warning dark:text-warning-dark">
             Roster Constraints
           </h4>
-          <ul className="mt-1 text-data text-warning dark:text-amber-400 list-disc list-inside space-y-1">
+          <ul className="mt-1 text-data text-warning dark:text-warning-dark list-disc list-inside space-y-1">
             {issues.map((issue, i) => (
               <li key={i}>{issue}</li>
             ))}
@@ -464,7 +467,7 @@ export default function WaiversPage() {
                 <div key={group.category} className="mb-2">
                   <h3 className="text-h4 font-semibold text-content dark:text-shell-text mb-3 flex items-center gap-2">
                     {group.category}
-                    <span className="text-caption text-content-secondary font-normal">
+                    <span className="text-caption text-content-secondary dark:text-shell-muted font-normal">
                       ({group.recs.length} {group.recs.length === 1 ? "recommendation" : "recommendations"})
                     </span>
                   </h3>
@@ -479,7 +482,7 @@ export default function WaiversPage() {
                           {/* Compact header: delta + marginal label + ESPN link */}
                           <div className="flex items-center gap-3 mb-3">
                             <div className="px-2.5 py-1 rounded-md font-bold text-base font-mono bg-positive/10 text-positive">
-                              +{rec.deltaOverallPoints.toFixed(1)}
+                              <Term id="impact">+{rec.deltaOverallPoints.toFixed(1)}</Term>
                             </div>
                             <div className="flex-1 min-w-0">
                               {(() => {
@@ -543,8 +546,8 @@ export default function WaiversPage() {
             <CardContent className="py-8">
               <ErrorAlert
                 variant="info"
-                message="No waiver recommendations available. Upload FanGraphs projections to generate personalized recommendations."
-                action={{ label: "Upload Projections", href: "/admin" }}
+                message="No waiver recommendations available. Recommendations require a daily snapshot and uploaded FanGraphs projections. Upload projections from the league dashboard to get started."
+                action={{ label: "Go to Dashboard", href: `/leagues/${leagueId}` }}
               />
             </CardContent>
           )}
@@ -602,7 +605,7 @@ export default function WaiversPage() {
                       </div>
                     </div>
                     {positionFilter.length > 0 && (
-                      <div className="text-data text-content-secondary mb-2">
+                      <div className="text-data text-content-secondary dark:text-shell-muted mb-2">
                         Filtering: {positionFilter.join(", ")}
                         <button
                           onClick={() => setPositionFilter([])}
@@ -670,7 +673,7 @@ export default function WaiversPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="p-6 text-center text-body-sm text-content-secondary">
+                        <div className="p-6 text-center text-body-sm text-content-secondary dark:text-shell-muted">
                           No free agents available
                         </div>
                       )}
@@ -679,7 +682,7 @@ export default function WaiversPage() {
 
                   {/* Roster Column */}
                   <div>
-                    <label className="block text-body-sm font-medium text-content mb-3">
+                    <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
                       Drop from Your Roster
                     </label>
                     <div className="border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel rounded-lg max-h-96 overflow-y-auto">
@@ -725,6 +728,11 @@ export default function WaiversPage() {
                                     positions={player.positions}
                                   />
                                   <PlayerStatLine
+                                    components={player.tenureStats}
+                                    label="On Team"
+                                    positions={player.positions}
+                                  />
+                                  <PlayerStatLine
                                     components={player.currentStats}
                                     label="YTD"
                                     positions={player.positions}
@@ -735,7 +743,7 @@ export default function WaiversPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="p-6 text-center text-body-sm text-content-secondary">
+                        <div className="p-6 text-center text-body-sm text-content-secondary dark:text-shell-muted">
                           No roster players available
                         </div>
                       )}
@@ -784,8 +792,8 @@ export default function WaiversPage() {
 
                 {/* Impact Summary */}
                 <div className="mb-4">
-                  <div className="text-body-sm font-medium text-content-secondary mb-1">
-                    Projected Impact
+                  <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-1">
+                    <Term id="impact">Projected Impact</Term>
                   </div>
                   <div
                     className={cn(
@@ -794,7 +802,7 @@ export default function WaiversPage() {
                         ? "text-positive"
                         : evaluationResult.deltaOverallPoints < 0
                           ? "text-negative"
-                          : "text-content-secondary",
+                          : "text-content-secondary dark:text-shell-muted",
                     )}
                   >
                     {evaluationResult.deltaOverallPoints > 0 ? "+" : ""}
@@ -803,7 +811,7 @@ export default function WaiversPage() {
                 </div>
 
                 {/* Explanation */}
-                <p className="text-body-sm text-content-secondary mb-4 leading-relaxed">
+                <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-4 leading-relaxed">
                   {evaluationResult.explanation}
                 </p>
 
