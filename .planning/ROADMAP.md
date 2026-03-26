@@ -209,3 +209,14 @@ Plans:
 
 Plans:
 - [x] 74-01-PLAN.md — Season metadata table, finalization guard in snapshot orchestrator, auto-finalization in backfill, admin reset endpoint
+
+### Phase 75: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
+
+**Goal:** Show each player's stat contribution based on roster tenure — populate player_period_stats during daily snapshots, expose tenure-based stats via API, and display "On Team" stats alongside YTD and Proj RoS on lineup and waivers pages
+**Depends on:** Phase 74
+**Requirements:** ACTIVE-01, ACTIVE-02, ACTIVE-03, ACTIVE-04, ACTIVE-05, ACTIVE-06
+**Plans:** 2 plans
+
+Plans:
+- [ ] 75-01-PLAN.md — Backend: enable daily player_period_stats population + extend roster API with tenure stats
+- [ ] 75-02-PLAN.md — Frontend: add "On Team" label to PlayerStatLine, wire tenure stats into lineup and waivers pages
