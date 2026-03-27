@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 78-01-PLAN.md
-last_updated: "2026-03-27T19:09:07.730Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 78-02-PLAN.md
+last_updated: "2026-03-27T19:13:26.282Z"
 progress:
   total_phases: 14
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 28
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -58,6 +58,7 @@ Plan: 2 of 2
 | Phase 77-sp-sit-start P01 | 16 min | 2 tasks | 9 files |
 | Phase 77-sp-sit-start P02 | 3 min | 2 tasks | 2 files |
 | Phase 78-streaming-picks P01 | 2 | 2 tasks | 2 files |
+| Phase 78-streaming-picks P02 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,7 @@ Plan: 2 of 2
 - [Phase 77-sp-sit-start]: Sit/Start tab inserted between Start Plan and Streaming Picks — logical flow from planning to execution
 - [Phase 77-sp-sit-start]: Verdict table uses inline helper functions rather than separate component — consistent with existing page pattern
 - [Phase 78-streaming-picks]: Pickup deadline uses Tue/Fri (days 2 and 5) hardcoded; graceful degradation skips verdict filter when Rotoballer returns empty; normalizeName reused from sit-start-advisor.ts replacing inline normalize()
+- [Phase 78-streaming-picks]: Reused existing getVerdictBadgeVariant and formatVerdict — no new copies per D-06; verdict badge + claim-by date placed inline in player info line; Rotoballer source attribution above candidate list
 
 ### Roadmap Evolution
 
@@ -158,6 +160,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T19:09:07.727Z
-Stopped at: Completed 78-01-PLAN.md
+Last session: 2026-03-27T19:13:26.279Z
+Stopped at: Completed 78-02-PLAN.md
 Resume file: None
