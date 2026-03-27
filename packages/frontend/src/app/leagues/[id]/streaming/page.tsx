@@ -134,7 +134,7 @@ export default function StreamingPitchersPage() {
     cn(
       "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
       isActive
-        ? "border-accent text-accent"
+        ? "border-accent text-shell-text"
         : "border-transparent text-shell-muted hover:text-shell-text hover:border-shell-border"
     );
 

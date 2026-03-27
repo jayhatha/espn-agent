@@ -9,6 +9,7 @@ import type {
   GsStartRecommendation,
   PaceStatus,
 } from "../../../shared/dist/index.js";
+import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
 
 /**
  * GS Pacing Agent
@@ -85,7 +86,10 @@ export class GsPacingAgent {
   }
 
   /**
-   * Get weekly GS breakdown
+   * Get weekly GS breakdown using MLB StatsAPI probable pitchers.
+   *
+   * Fetches the week's probable starters from MLB, matches them to
+   * the team's rostered SPs, and shows projected start dates.
    */
   async getWeeklySummary(
     leagueId: number,
@@ -97,7 +101,7 @@ export class GsPacingAgent {
       "Computing weekly GS summary",
     );
 
-    // Determine week boundaries
+    // Determine week boundaries (ESPN scoring weeks are Mon-Sun)
     const now = new Date();
     const weekStart = weekStartDate
       ? new Date(weekStartDate)
@@ -108,65 +112,102 @@ export class GsPacingAgent {
     const weekStartStr = weekStart.toISOString().split("T")[0];
     const weekEndStr = weekEnd.toISOString().split("T")[0];
 
-    // Get roster snapshots for this week's dates.
-    // Filter to SP-eligible pitchers only: roster_slot must be SP or P
-    // AND the player must have "SP" in their eligible positions array.
-    // Without the positions check, RPs placed in the generic "P" slot
-    // (lineup slot id 13) would be incorrectly counted as game starts.
-    const snapshots = await this.db
+    // Get team's rostered SPs
+    const latestSnapshot = await this.db
+      .selectFrom("league_daily_snapshot")
+      .select("snapshot_date")
+      .where("league_id", "=", leagueId)
+      .orderBy("snapshot_date", "desc")
+      .executeTakeFirst();
+
+    const snapshotDate = latestSnapshot?.snapshot_date ?? weekStartStr;
+
+    const rosterSPs = await this.db
       .selectFrom("team_roster_snapshot as trs")
       .innerJoin("player as p", "p.id", "trs.player_id")
       .select([
-        "trs.snapshot_date",
         "trs.player_id",
         "p.name as player_name",
+        "p.mlb_team",
+        "trs.roster_status",
         "trs.roster_slot",
       ])
       .where("trs.league_id", "=", leagueId)
       .where("trs.team_id", "=", teamId)
-      .where("trs.snapshot_date", ">=", weekStartStr)
-      .where("trs.snapshot_date", "<=", weekEndStr)
-      .where("trs.roster_status", "=", "active")
-      .where("trs.roster_slot", "in", SP_ROSTER_SLOTS)
+      .where("trs.snapshot_date", "=", snapshotDate)
       .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
       .execute();
 
-    // Group by pitcher — count rostered days, not "starts"
-    const pitcherMap = new Map<
-      number,
-      { playerName: string; dates: Set<string> }
-    >();
+    // Fetch probable pitchers for the week from MLB StatsAPI
+    const mlbAdapter = new MLBStatsAPIAdapter(this.logger);
+    const probables = await mlbAdapter.getSchedule(weekStartStr, weekEndStr);
 
-    for (const snap of snapshots) {
-      const existing = pitcherMap.get(snap.player_id);
-      if (existing) {
-        existing.dates.add(snap.snapshot_date);
-      } else {
-        pitcherMap.set(snap.player_id, {
-          playerName: snap.player_name,
-          dates: new Set([snap.snapshot_date]),
+    // Build a map of MLB team -> probable pitcher name -> game dates
+    const probableByTeamAndName = new Map<string, Map<string, string[]>>();
+    for (const game of probables) {
+      for (const side of ["away", "home"] as const) {
+        const teamData = game.teams[side];
+        const pitcher = teamData.probablePitcher;
+        if (!pitcher) continue;
+
+        const teamName = teamData.team.abbreviation || teamData.team.name;
+        if (!probableByTeamAndName.has(teamName)) {
+          probableByTeamAndName.set(teamName, new Map());
+        }
+        const pitcherMap = probableByTeamAndName.get(teamName)!;
+        const gameDate = game.gameDate.split("T")[0];
+        const nameKey = pitcher.fullName.toLowerCase();
+        if (!pitcherMap.has(nameKey)) {
+          pitcherMap.set(nameKey, []);
+        }
+        pitcherMap.get(nameKey)!.push(gameDate);
+      }
+    }
+
+    // Match roster SPs to probable pitcher schedule
+    const pitcherStarts: Array<{
+      playerId: number;
+      playerName: string;
+      dates: string[];
+      starts: number;
+    }> = [];
+
+    for (const sp of rosterSPs) {
+      const mlbTeam = sp.mlb_team;
+      const nameKey = sp.player_name.toLowerCase();
+
+      // Try matching by name within the player's MLB team
+      let matchedDates: string[] = [];
+      if (mlbTeam) {
+        const teamPitchers = probableByTeamAndName.get(mlbTeam);
+        if (teamPitchers) {
+          // Exact name match first
+          matchedDates = teamPitchers.get(nameKey) || [];
+
+          // Fuzzy: try last name match if exact fails
+          if (matchedDates.length === 0) {
+            const lastName = nameKey.split(" ").pop() || "";
+            for (const [probName, dates] of teamPitchers) {
+              if (probName.includes(lastName) && lastName.length > 2) {
+                matchedDates = dates;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (matchedDates.length > 0) {
+        pitcherStarts.push({
+          playerId: sp.player_id,
+          playerName: sp.player_name,
+          dates: matchedDates.sort(),
+          starts: matchedDates.length,
         });
       }
     }
 
-    // Estimate actual starts: SPs start once every 5 days, min 1 if rostered at all
-    const pitcherStarts = Array.from(pitcherMap.entries()).map(
-      ([playerId, data]) => {
-        const daysRostered = data.dates.size;
-        const estimatedStarts = Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
-        return {
-          playerId,
-          playerName: data.playerName,
-          dates: Array.from(data.dates).sort(),
-          starts: estimatedStarts,
-        };
-      },
-    );
-
-    const startsUsed = pitcherStarts.reduce(
-      (sum, p) => sum + p.starts,
-      0,
-    );
+    const startsUsed = pitcherStarts.reduce((sum, p) => sum + p.starts, 0);
 
     // Get target pace
     const season = await this.getSeasonSummary(leagueId, teamId);
@@ -176,10 +217,7 @@ export class GsPacingAgent {
       weekStart: weekStartStr,
       weekEnd: weekEndStr,
       startsUsed,
-      startsRemaining: Math.max(
-        0,
-        Math.round(targetPerWeek) - startsUsed,
-      ),
+      startsRemaining: Math.max(0, Math.round(targetPerWeek) - startsUsed),
       targetPerWeek: Math.round(targetPerWeek),
       pitcherStarts,
     } as any;
@@ -492,25 +530,36 @@ export class GsPacingAgent {
   private async getSeasonProgress(
     leagueId: number,
   ): Promise<{ weeksElapsed: number; weeksRemaining: number }> {
-    const firstSnapshot = await this.db
-      .selectFrom("league_daily_snapshot")
-      .select("snapshot_date")
-      .where("league_id", "=", leagueId)
-      .orderBy("snapshot_date", "asc")
+    // Use the league's season year to determine the current season window
+    const league = await this.db
+      .selectFrom("league")
+      .select("season")
+      .where("id", "=", leagueId)
       .executeTakeFirst();
 
-    if (!firstSnapshot) {
+    if (!league) {
       return { weeksElapsed: 0, weeksRemaining: MLB_SEASON_WEEKS };
     }
 
-    const seasonStart = new Date(firstSnapshot.snapshot_date);
+    // MLB season typically runs late March through late September
+    const seasonOpeningDay = new Date(`${league.season}-03-27`);
+    const seasonEnd = new Date(`${league.season}-09-28`);
     const now = new Date();
+
+    // If before opening day, season hasn't started
+    if (now < seasonOpeningDay) {
+      return { weeksElapsed: 0, weeksRemaining: MLB_SEASON_WEEKS };
+    }
+
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
     const weeksElapsed = Math.max(
       1,
-      Math.floor((now.getTime() - seasonStart.getTime()) / msPerWeek),
+      Math.floor((now.getTime() - seasonOpeningDay.getTime()) / msPerWeek),
     );
-    const weeksRemaining = Math.max(0, MLB_SEASON_WEEKS - weeksElapsed);
+    const totalSeasonWeeks = Math.ceil(
+      (seasonEnd.getTime() - seasonOpeningDay.getTime()) / msPerWeek,
+    );
+    const weeksRemaining = Math.max(0, totalSeasonWeeks - weeksElapsed);
 
     return { weeksElapsed, weeksRemaining };
   }
