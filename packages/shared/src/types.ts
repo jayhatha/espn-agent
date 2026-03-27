@@ -87,8 +87,7 @@ export interface Player {
   positions: string[];
   bats_throws: string | null;
   created_at: Date;
-  // Added by migrations 007, 016, 018
-  espn_player_id: number;
+  // Added by migrations 007, 018 (espn_player_id merged into id by migration 016)
   pct_owned: number | null;
   current_season_stats_json: Record<string, number> | null;
   last_synced_at: Date | null;

@@ -293,18 +293,18 @@ export class SnapshotOrchestratorAgent {
       if (!dbTeamId) continue;
 
       for (const entry of team.roster) {
-        // Upsert player
+        // Upsert player (player.id IS the ESPN player ID after migration 016)
         const playerResult = await trx
           .insertInto("player")
           .values({
-            espn_player_id: entry.espnPlayerId,
+            id: entry.espnPlayerId,
             name: entry.name,
             mlb_team: entry.mlbTeam,
             positions: entry.positions,
             created_at: new Date(),
           } as any)
           .onConflict((oc) =>
-            oc.column("espn_player_id").doUpdateSet({
+            oc.column("id").doUpdateSet({
               name: entry.name,
               mlb_team: entry.mlbTeam,
               positions: entry.positions,
@@ -527,20 +527,20 @@ export class SnapshotOrchestratorAgent {
     }
 
     for (const fa of freeAgents) {
-      // Upsert free agent player
+      // Upsert free agent player (player.id IS the ESPN player ID after migration 016)
       await trx
         .insertInto("player")
         .values({
-          espn_player_id: fa.playerId,
+          id: fa.playerId,
           name: fa.name,
           mlb_team: null,
-          positions: fa.positions, // Use parsed positions instead of empty array
+          positions: fa.positions,
           created_at: new Date(),
         } as any)
         .onConflict((oc) =>
-          oc.column("espn_player_id").doUpdateSet({
+          oc.column("id").doUpdateSet({
             name: fa.name,
-            positions: fa.positions, // Update positions on conflict
+            positions: fa.positions,
           }),
         )
         .execute();
@@ -552,8 +552,8 @@ export class SnapshotOrchestratorAgent {
   /**
    * Write per-player period stats from raw ESPN team data.
    *
-   * Queries the player table using espn_player_id (NOT player.id which is a
-   * DB surrogate key), then upserts into player_period_stats for tenure tracking.
+   * Queries the player table by id (which IS the ESPN player ID after migration 016),
+   * then upserts into player_period_stats for tenure tracking.
    *
    * Only COUNTING stats are stored; rate stats (AVG, ERA, WHIP) are computed
    * from components at read time.
@@ -585,15 +585,15 @@ export class SnapshotOrchestratorAgent {
     if (espnPlayerIds.length === 0) return;
 
     // Build ESPN player ID -> DB player ID lookup
-    // player.espn_player_id is the ESPN ID; player.id is the DB surrogate key
+    // After migration 016, player.id IS the ESPN player ID (no separate column)
     const playerRows = await trx
       .selectFrom("player")
-      .select(["id", "espn_player_id"])
-      .where("espn_player_id", "in", espnPlayerIds)
+      .select(["id"])
+      .where("id", "in", espnPlayerIds)
       .execute();
 
     const espnPlayerIdToDbId = new Map<number, number>(
-      playerRows.map((row) => [row.espn_player_id, row.id]),
+      playerRows.map((row) => [row.id, row.id]),
     );
 
     let storedCount = 0;

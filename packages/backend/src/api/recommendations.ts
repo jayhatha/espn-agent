@@ -81,12 +81,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .selectFrom("player as p")
           .select([
             "p.id as player_id",
-            "p.espn_player_id",
             "p.name as player_name",
             "p.mlb_team",
             "p.positions",
           ])
-          .where("p.espn_player_id", "in", espnPlayerIds.slice(0, maxPlayers))
+          .where("p.id", "in", espnPlayerIds.slice(0, maxPlayers))
           .orderBy("p.name", "asc")
           .execute();
 
@@ -106,7 +105,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
           const enriched = freeAgents.map((fa) => ({
             playerId: fa.player_id,
-            espnPlayerId: fa.espn_player_id,
+            espnPlayerId: fa.player_id,
             playerName: fa.player_name,
             mlbTeam: fa.mlb_team,
             positions: fa.positions,
@@ -118,7 +117,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         const enriched = freeAgents.map((fa) => ({
           playerId: fa.player_id,
-          espnPlayerId: fa.espn_player_id,
+          espnPlayerId: fa.player_id,
           playerName: fa.player_name,
           mlbTeam: fa.mlb_team,
           positions: fa.positions,
@@ -176,7 +175,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           .select([
             "roster.player_id",
             "player.name as player_name",
-            "player.espn_player_id",
             "player.mlb_team",
             "player.positions",
             "roster.roster_status",
@@ -243,10 +241,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           tenureMap.set(row.player_id, existing);
         }
 
-        // Enrich roster with projection and tenure data
+        // Enrich roster with projection and tenure data (player.id IS ESPN ID after migration 016)
         const enrichedRoster = roster.map((player) => ({
           playerId: player.player_id,
-          espnPlayerId: player.espn_player_id,
+          espnPlayerId: player.player_id,
           playerName: player.player_name,
           mlbTeam: player.mlb_team,
           positions: player.positions,
@@ -643,7 +641,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .select([
               "roster.player_id",
               "player.name as player_name",
-              "player.espn_player_id",
               "player.mlb_team",
               "player.positions",
               "roster.roster_status",
@@ -661,7 +658,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .select([
               "roster.player_id",
               "player.name as player_name",
-              "player.espn_player_id",
               "player.mlb_team",
               "player.positions",
               "roster.roster_status",
@@ -708,7 +704,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         // Enrich rosters with projection data
         const enrichedUserRoster = userRoster.map((player) => ({
           playerId: player.player_id,
-          espnPlayerId: player.espn_player_id,
+          espnPlayerId: player.player_id,
           playerName: player.player_name,
           mlbTeam: player.mlb_team,
           positions: player.positions,
@@ -719,7 +715,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         const enrichedPartnerRoster = partnerRoster.map((player) => ({
           playerId: player.player_id,
-          espnPlayerId: player.espn_player_id,
+          espnPlayerId: player.player_id,
           playerName: player.player_name,
           mlbTeam: player.mlb_team,
           positions: player.positions,
