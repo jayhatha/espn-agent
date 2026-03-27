@@ -35,6 +35,10 @@ interface StreamingCandidate {
   multiStartBonus: number;
   weekStarts: number;
   ownershipPct: number | null;
+  rotoballerVerdict: "start" | "lean_start" | "neutral" | "lean_sit" | "sit" | null;
+  rotoballerGrade: number | null;
+  rotoballerSourceUrl: string | null;
+  pickupDeadline: string | null;
 }
 
 interface StreamingData {
@@ -42,6 +46,11 @@ interface StreamingData {
   dateRange: { start: string; end: string };
   totalCandidates: number;
   generatedAt: string;
+  rotoballerSource: {
+    articleTitle: string;
+    articleUrl: string;
+    scrapedAt: string;
+  } | null;
 }
 
 interface SitStartRecommendation {
@@ -541,6 +550,18 @@ export default function StreamingPitchersPage() {
         </Card>
       ) : data && data.candidates.length > 0 ? (
         <div className="space-y-4">
+          {data.rotoballerSource && (
+            <div className="mb-4 flex items-center gap-2">
+              <a
+                href={data.rotoballerSource.articleUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent hover:underline"
+              >
+                Rotoballer: {data.rotoballerSource.articleTitle}
+              </a>
+            </div>
+          )}
           {data.candidates.map((candidate, idx) => (
             <Card
               key={candidate.playerId}
@@ -571,6 +592,25 @@ export default function StreamingPitchersPage() {
                           </span>
                           <span className="text-content-tertiary">•</span>
                           <span>{formatDate(candidate.gameDate)}</span>
+                          {candidate.rotoballerVerdict && (
+                            <>
+                              <span className="text-content-tertiary">|</span>
+                              <Badge variant={getVerdictBadgeVariant(candidate.rotoballerVerdict)}>
+                                {formatVerdict(candidate.rotoballerVerdict)}
+                                {candidate.rotoballerGrade != null && (
+                                  <span className="ml-1 font-mono">({candidate.rotoballerGrade})</span>
+                                )}
+                              </Badge>
+                            </>
+                          )}
+                          {candidate.pickupDeadline && (
+                            <>
+                              <span className="text-content-tertiary">|</span>
+                              <span className="text-xs text-shell-muted">
+                                Claim by {formatDate(candidate.pickupDeadline)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
