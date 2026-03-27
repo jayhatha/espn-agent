@@ -16,6 +16,7 @@ function cleanParams(params: Record<string, any>): Record<string, string> {
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const res = await fetch(`${API_URL}${endpoint}`, {
+    credentials: 'include',
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -408,6 +409,10 @@ export const api = {
 
   async getStartPlan(leagueId: number, teamId: number) {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/start-plan`);
+  },
+
+  async getSitStart(leagueId: number, teamId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/sit-start`);
   },
 
   // Auction value validation

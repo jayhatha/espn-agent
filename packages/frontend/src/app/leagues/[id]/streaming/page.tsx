@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import { FileText } from "lucide-react";
 import { GsTracker } from "@/components/league/GsTracker";
 
-type PitchingTab = "gs-pacing" | "start-plan" | "streaming";
+type PitchingTab = "gs-pacing" | "start-plan" | "sit-start" | "streaming";
 
 interface Team {
   id: number;
@@ -42,6 +42,25 @@ interface StreamingData {
   dateRange: { start: string; end: string };
   totalCandidates: number;
   generatedAt: string;
+}
+
+interface SitStartRecommendation {
+  playerId: number;
+  playerName: string;
+  pitcherlistVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  rotoballerVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  rotoballerGrade?: number;
+  pitcherlistTier?: string;
+  sourceUrl: { pitcherlist?: string; rotoballer?: string };
+  consensus?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+}
+
+interface SitStartData {
+  recommendations: SitStartRecommendation[];
+  sources: {
+    pitcherlist?: { articleTitle: string; articleUrl: string; scrapedAt: string };
+    rotoballer?: { articleTitle: string; articleUrl: string; scrapedAt: string; status: string };
+  };
 }
 
 export default function StreamingPitchersPage() {
@@ -130,6 +149,35 @@ export default function StreamingPitchersPage() {
     staleTime: 5 * 60_000,
   });
 
+  const { data: sitStartData, isLoading: sitStartLoading } = useQuery({
+    queryKey: ["sit-start", leagueId, selectedTeamId],
+    queryFn: () => api.getSitStart(parseInt(leagueId, 10), selectedTeamId!) as Promise<SitStartData>,
+    enabled: !!selectedTeamId && activeTab === "sit-start",
+    staleTime: 5 * 60_000,
+  });
+
+  const getVerdictBadgeVariant = (verdict: string): "positive" | "negative" | "warning" | "info" | "default" => {
+    switch (verdict) {
+      case "start": return "positive";
+      case "lean_start": return "info";
+      case "neutral": return "default";
+      case "lean_sit": return "warning";
+      case "sit": return "negative";
+      default: return "default";
+    }
+  };
+
+  const formatVerdict = (verdict: string): string => {
+    switch (verdict) {
+      case "start": return "Start";
+      case "lean_start": return "Lean Start";
+      case "neutral": return "Toss-Up";
+      case "lean_sit": return "Lean Sit";
+      case "sit": return "Sit";
+      default: return verdict;
+    }
+  };
+
   const tabClass = (isActive: boolean) =>
     cn(
       "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
@@ -184,10 +232,11 @@ export default function StreamingPitchersPage() {
       {selectedTeamId && (
         <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
           <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
-            {(["gs-pacing", "start-plan", "streaming"] as const).map((tab) => {
+            {(["gs-pacing", "start-plan", "sit-start", "streaming"] as const).map((tab) => {
               const labels: Record<string, string> = {
                 "gs-pacing": "GS Pacing",
                 "start-plan": "Start Plan",
+                "sit-start": "Sit/Start",
                 streaming: "Streaming Picks",
               };
               return (
@@ -320,6 +369,111 @@ export default function StreamingPitchersPage() {
                 ) : (
                   <div className="text-center py-8 text-shell-muted text-sm">
                     No SP start plan available. Ensure roster snapshots exist.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sit/Start Tab */}
+            {activeTab === "sit-start" && (
+              <div className="space-y-4">
+                {/* Source attribution header */}
+                {sitStartData?.sources && (
+                  <div className="flex flex-wrap gap-3 mb-2">
+                    {sitStartData.sources.pitcherlist && (
+                      <a
+                        href={sitStartData.sources.pitcherlist.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Pitcherlist: {sitStartData.sources.pitcherlist.articleTitle}
+                      </a>
+                    )}
+                    {sitStartData.sources.rotoballer && (
+                      <a
+                        href={sitStartData.sources.rotoballer.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Rotoballer: {sitStartData.sources.rotoballer.articleTitle}
+                        {sitStartData.sources.rotoballer.status === "degraded" && (
+                          <Badge variant="warning" className="ml-1 text-[10px]">partial</Badge>
+                        )}
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {sitStartLoading ? (
+                  <LoadingSkeleton lines={6} />
+                ) : sitStartData && sitStartData.recommendations.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-shell-border text-left">
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Pitcher</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-center">Consensus</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-center">Pitcherlist</th>
+                        <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-center">Rotoballer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sitStartData.recommendations.map((rec) => (
+                        <tr key={rec.playerId} className="border-b border-shell-border/50">
+                          <td className="py-2 pr-4 text-shell-text">{rec.playerName}</td>
+                          <td className="py-2 pr-4 text-center">
+                            {rec.consensus ? (
+                              <Badge variant={getVerdictBadgeVariant(rec.consensus)}>
+                                {formatVerdict(rec.consensus)}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-shell-muted">--</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-4 text-center">
+                            {rec.pitcherlistVerdict ? (
+                              rec.sourceUrl.pitcherlist ? (
+                                <a href={rec.sourceUrl.pitcherlist} target="_blank" rel="noopener noreferrer">
+                                  <Badge variant={getVerdictBadgeVariant(rec.pitcherlistVerdict)} className="cursor-pointer hover:opacity-80">
+                                    {rec.pitcherlistTier || formatVerdict(rec.pitcherlistVerdict)}
+                                  </Badge>
+                                </a>
+                              ) : (
+                                <Badge variant={getVerdictBadgeVariant(rec.pitcherlistVerdict)}>
+                                  {rec.pitcherlistTier || formatVerdict(rec.pitcherlistVerdict)}
+                                </Badge>
+                              )
+                            ) : (
+                              <span className="text-xs text-shell-muted">--</span>
+                            )}
+                          </td>
+                          <td className="py-2 text-center">
+                            {rec.rotoballerVerdict ? (
+                              rec.sourceUrl.rotoballer ? (
+                                <a href={rec.sourceUrl.rotoballer} target="_blank" rel="noopener noreferrer">
+                                  <Badge variant={getVerdictBadgeVariant(rec.rotoballerVerdict)} className="cursor-pointer hover:opacity-80">
+                                    {formatVerdict(rec.rotoballerVerdict)}
+                                    {rec.rotoballerGrade != null && <span className="ml-1 font-mono">({rec.rotoballerGrade})</span>}
+                                  </Badge>
+                                </a>
+                              ) : (
+                                <Badge variant={getVerdictBadgeVariant(rec.rotoballerVerdict)}>
+                                  {formatVerdict(rec.rotoballerVerdict)}
+                                  {rec.rotoballerGrade != null && <span className="ml-1 font-mono">({rec.rotoballerGrade})</span>}
+                                </Badge>
+                              )
+                            ) : (
+                              <span className="text-xs text-shell-muted">--</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-shell-muted text-sm">
+                    No external SP rankings available. Rankings are scraped from Pitcherlist and Rotoballer when published.
                   </div>
                 )}
               </div>
