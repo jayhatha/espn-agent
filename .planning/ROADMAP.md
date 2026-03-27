@@ -242,3 +242,13 @@ Plans:
 Plans:
 - [x] 77-01-PLAN.md — Backend: cheerio install, Pitcherlist + Rotoballer adapters, SitStartAdvisor agent, API endpoint with tests
 - [x] 77-02-PLAN.md — Frontend: Sit/Start tab on Pitching Usage page with verdict badges, source links, and empty state
+
+### Phase 78: Streaming picks: merge Rotoballer verdicts and waiver pickup timing into streaming tab
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 77
+**Plans:** 1/2 plans executed
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 78 to break down)

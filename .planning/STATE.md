@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Phase complete — ready for verification
-stopped_at: Completed 77-02-PLAN.md
-last_updated: "2026-03-27T06:00:05.520Z"
+status: Ready to execute
+stopped_at: Completed 78-01-PLAN.md
+last_updated: "2026-03-27T19:09:07.730Z"
 progress:
-  total_phases: 13
+  total_phases: 14
   completed_phases: 13
-  total_plans: 26
-  completed_plans: 26
+  total_plans: 28
+  completed_plans: 27
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 77 — sp-sit-start-recommendations
+**Current focus:** Phase 78 — streaming-picks-merge-rotoballer-verdicts-and-waiver-pickup-timing-into-streaming-tab
 
 ## Current Position
 
-Phase: 77 (sp-sit-start-recommendations) — EXECUTING
+Phase: 78 (streaming-picks-merge-rotoballer-verdicts-and-waiver-pickup-timing-into-streaming-tab) — EXECUTING
 Plan: 2 of 2
 
 ## Performance Metrics
@@ -57,6 +57,7 @@ Plan: 2 of 2
 | Phase 76-api-hardening P02 | 6 | 2 tasks | 2 files |
 | Phase 77-sp-sit-start P01 | 16 min | 2 tasks | 9 files |
 | Phase 77-sp-sit-start P02 | 3 min | 2 tasks | 2 files |
+| Phase 78-streaming-picks P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,7 @@ Plan: 2 of 2
 - [Phase 77-sp-sit-start]: Verdict merging: numeric average (start=5..sit=1) rounds to nearest integer, maps back to verdict string
 - [Phase 77-sp-sit-start]: Sit/Start tab inserted between Start Plan and Streaming Picks — logical flow from planning to execution
 - [Phase 77-sp-sit-start]: Verdict table uses inline helper functions rather than separate component — consistent with existing page pattern
+- [Phase 78-streaming-picks]: Pickup deadline uses Tue/Fri (days 2 and 5) hardcoded; graceful degradation skips verdict filter when Rotoballer returns empty; normalizeName reused from sit-start-advisor.ts replacing inline normalize()
 
 ### Roadmap Evolution
 
@@ -120,6 +122,7 @@ Plan: 2 of 2
 - Phase 75 added: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
 - Phase 76 added: API hardening — validate ESPN response shapes, add runtime type guards, log unexpected fields/missing data, add retry with backoff
 - Phase 77 added: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
+- Phase 78 added: Streaming picks — merge Rotoballer verdicts and waiver pickup timing into streaming tab
 
 ### Blockers/Concerns
 
@@ -155,6 +158,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T06:00:05.515Z
-Stopped at: Completed 77-02-PLAN.md
+Last session: 2026-03-27T19:09:07.727Z
+Stopped at: Completed 78-01-PLAN.md
 Resume file: None
