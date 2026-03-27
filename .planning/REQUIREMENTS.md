@@ -81,7 +81,7 @@ Requirements for the In-Season Command Center milestone.
 - [x] **SITSTART-02**: Rotoballer adapter returns empty array gracefully when JS-rendered content cannot be parsed (degraded mode)
 - [x] **SITSTART-03**: SitStartAdvisor agent matches external rankings against rostered SPs using diacritic-aware normalized name comparison
 - [x] **SITSTART-04**: API endpoint returns sit/start recommendations per team at GET /api/leagues/:leagueId/teams/:teamId/pitching/sit-start
-- [ ] **SITSTART-05**: Frontend Sit/Start tab on Pitching Usage page displays verdict badges with source links and empty state
+- [x] **SITSTART-05**: Frontend Sit/Start tab on Pitching Usage page displays verdict badges with source links and empty state
 
 ## Future Requirements
 
@@ -153,7 +153,7 @@ Requirements for the In-Season Command Center milestone.
 | SITSTART-02 | Phase 77 | Complete |
 | SITSTART-03 | Phase 77 | Complete |
 | SITSTART-04 | Phase 77 | Complete |
-| SITSTART-05 | Phase 77 | Pending |
+| SITSTART-05 | Phase 77 | Complete |
 
 **Coverage:**
 - v6.0 requirements: 44 total

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 77-01-PLAN.md
-last_updated: "2026-03-27T05:46:18.397Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 77-02-PLAN.md
+last_updated: "2026-03-27T06:00:05.520Z"
 progress:
   total_phases: 13
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 26
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -56,6 +56,7 @@ Plan: 2 of 2
 | Phase 76-api-hardening P01 | 2 | 1 tasks | 2 files |
 | Phase 76-api-hardening P02 | 6 | 2 tasks | 2 files |
 | Phase 77-sp-sit-start P01 | 16 min | 2 tasks | 9 files |
+| Phase 77-sp-sit-start P02 | 3 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,8 @@ Plan: 2 of 2
 - [Phase 77-sp-sit-start]: Rotoballer accepts graceful degradation — returns empty array when JS-rendered content blocks parsing, Pitcherlist is primary source
 - [Phase 77-sp-sit-start]: normalizeName uses NFD decomposition to strip diacritics for name matching (Sanchez/Sánchez)
 - [Phase 77-sp-sit-start]: Verdict merging: numeric average (start=5..sit=1) rounds to nearest integer, maps back to verdict string
+- [Phase 77-sp-sit-start]: Sit/Start tab inserted between Start Plan and Streaming Picks — logical flow from planning to execution
+- [Phase 77-sp-sit-start]: Verdict table uses inline helper functions rather than separate component — consistent with existing page pattern
 
 ### Roadmap Evolution
 
@@ -152,6 +155,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T05:46:18.391Z
-Stopped at: Completed 77-01-PLAN.md
+Last session: 2026-03-27T06:00:05.515Z
+Stopped at: Completed 77-02-PLAN.md
 Resume file: None
