@@ -380,3 +380,15 @@ export interface RosterValidationResult {
   isLegal: boolean;
   issues: string[];
 }
+
+// External SP rankings (Pitcherlist, Rotoballer)
+export interface ExternalRankingEntry {
+  playerName: string;
+  source: "pitcherlist" | "rotoballer";
+  verdict: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  tier?: string;
+  grade?: number;
+  sourceUrl: string;
+  articleTitle: string;
+  scrapedAt: string;
+}
