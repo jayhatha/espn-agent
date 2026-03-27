@@ -20,6 +20,19 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   const db = getDb();
   const { sql } = await import("kysely");
 
+  /**
+   * When no season/from/to filters are provided, default to the league's
+   * current season so historical backfill data doesn't pollute graphs.
+   */
+  async function getDefaultSeason(leagueId: number): Promise<string | null> {
+    const league = await db
+      .selectFrom("league")
+      .select("season")
+      .where("id", "=", leagueId)
+      .executeTakeFirst();
+    return league ? String(league.season) : null;
+  }
+
   // Available seasons for a league
   app.get<{
     Params: { leagueId: string };
@@ -70,7 +83,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, season, limit } = request.query;
+      const { from, to, teamIds, limit } = request.query;
+      // Default to current season if no date filters provided
+      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       let query = db
         .selectFrom("team_daily_overall")
@@ -114,7 +129,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, categoryId, season, limit } = request.query;
+      const { from, to, teamIds, categoryId, limit } = request.query;
+      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -163,7 +179,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, categoryId, season, limit } = request.query;
+      const { from, to, teamIds, categoryId, limit } = request.query;
+      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -218,7 +235,8 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const { from, to, teamIds, season, limit } = request.query;
+      const { from, to, teamIds, limit } = request.query;
+      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       let query = db
         .selectFrom("team_daily_projected_overall")
