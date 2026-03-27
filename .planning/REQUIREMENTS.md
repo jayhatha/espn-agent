@@ -77,10 +77,10 @@ Requirements for the In-Season Command Center milestone.
 
 ### SP Sit/Start Recommendations
 
-- [ ] **SITSTART-01**: Pitcherlist adapter scrapes weekly SP Streamer Ranks article and extracts tier-grouped pitcher names into normalized entries
-- [ ] **SITSTART-02**: Rotoballer adapter returns empty array gracefully when JS-rendered content cannot be parsed (degraded mode)
-- [ ] **SITSTART-03**: SitStartAdvisor agent matches external rankings against rostered SPs using diacritic-aware normalized name comparison
-- [ ] **SITSTART-04**: API endpoint returns sit/start recommendations per team at GET /api/leagues/:leagueId/teams/:teamId/pitching/sit-start
+- [x] **SITSTART-01**: Pitcherlist adapter scrapes weekly SP Streamer Ranks article and extracts tier-grouped pitcher names into normalized entries
+- [x] **SITSTART-02**: Rotoballer adapter returns empty array gracefully when JS-rendered content cannot be parsed (degraded mode)
+- [x] **SITSTART-03**: SitStartAdvisor agent matches external rankings against rostered SPs using diacritic-aware normalized name comparison
+- [x] **SITSTART-04**: API endpoint returns sit/start recommendations per team at GET /api/leagues/:leagueId/teams/:teamId/pitching/sit-start
 - [ ] **SITSTART-05**: Frontend Sit/Start tab on Pitching Usage page displays verdict badges with source links and empty state
 
 ## Future Requirements
@@ -149,10 +149,10 @@ Requirements for the In-Season Command Center milestone.
 | CACHE-02 | Phase 74 | Complete |
 | CACHE-03 | Phase 74 | Complete |
 | CACHE-04 | Phase 74 | Complete |
-| SITSTART-01 | Phase 77 | Pending |
-| SITSTART-02 | Phase 77 | Pending |
-| SITSTART-03 | Phase 77 | Pending |
-| SITSTART-04 | Phase 77 | Pending |
+| SITSTART-01 | Phase 77 | Complete |
+| SITSTART-02 | Phase 77 | Complete |
+| SITSTART-03 | Phase 77 | Complete |
+| SITSTART-04 | Phase 77 | Complete |
 | SITSTART-05 | Phase 77 | Pending |
 
 **Coverage:**

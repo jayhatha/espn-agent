@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 76-02-PLAN.md
-last_updated: "2026-03-26T20:44:09.447Z"
+status: Ready to execute
+stopped_at: Completed 77-01-PLAN.md
+last_updated: "2026-03-27T05:46:18.397Z"
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 12
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 26
+  completed_plans: 25
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 76 — api-hardening
+**Current focus:** Phase 77 — sp-sit-start-recommendations
 
 ## Current Position
 
-Phase: 76
-Plan: Not started
+Phase: 77 (sp-sit-start-recommendations) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Plan: Not started
 | Phase 75-active-stats P02 | 2 | 1 tasks | 3 files |
 | Phase 76-api-hardening P01 | 2 | 1 tasks | 2 files |
 | Phase 76-api-hardening P02 | 6 | 2 tasks | 2 files |
+| Phase 77-sp-sit-start P01 | 16 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,9 @@ Plan: Not started
 - [Phase 76-api-hardening]: logUnexpectedFields only logs at INFO — never throws — preserving graceful degradation for ESPN schema drift detection
 - [Phase 76-02]: assertEspnCriticalShape called in fetchLeague and fetchHistoricalWeek before normalization — hard fail on missing teams array
 - [Phase 76-02]: fetchGlobalDraftData uses validateEspnResponse with ESPNFreeAgentsResponseSchema instead of raw as-any cast
+- [Phase 77-sp-sit-start]: Rotoballer accepts graceful degradation — returns empty array when JS-rendered content blocks parsing, Pitcherlist is primary source
+- [Phase 77-sp-sit-start]: normalizeName uses NFD decomposition to strip diacritics for name matching (Sanchez/Sánchez)
+- [Phase 77-sp-sit-start]: Verdict merging: numeric average (start=5..sit=1) rounds to nearest integer, maps back to verdict string
 
 ### Roadmap Evolution
 
@@ -148,6 +152,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T20:43:36.714Z
-Stopped at: Completed 76-02-PLAN.md
+Last session: 2026-03-27T05:46:18.391Z
+Stopped at: Completed 77-01-PLAN.md
 Resume file: None
