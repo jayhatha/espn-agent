@@ -112,6 +112,7 @@ Plan: Not started
 - Phase 74 added: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
 - Phase 75 added: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
 - Phase 76 added: API hardening — validate ESPN response shapes, add runtime type guards, log unexpected fields/missing data, add retry with backoff
+- Phase 77 added: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
 
 ### Blockers/Concerns
 

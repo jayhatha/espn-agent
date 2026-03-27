@@ -231,3 +231,13 @@ Plans:
 Plans:
 - [x] 76-01-PLAN.md — Strengthen Zod schemas (roster entries, scoringItems), add assertEspnCriticalShape + logUnexpectedFields with unit tests
 - [x] 76-02-PLAN.md — Wire validation into adapter fetch methods, remove duplicate 429 handler, clean up CLAUDE.md Known Issue #8
+
+### Phase 77: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 76
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 77 to break down)
