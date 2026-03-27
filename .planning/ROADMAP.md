@@ -234,10 +234,11 @@ Plans:
 
 ### Phase 77: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Scrape SP rankings from Pitcherlist (static HTML) and Rotoballer (graceful degradation for JS-rendered content), match rankings against rostered SPs using fuzzy name matching, and display start/sit verdicts with source links on a new Sit/Start tab in the Pitching Usage page
+**Requirements**: SITSTART-01, SITSTART-02, SITSTART-03, SITSTART-04, SITSTART-05
 **Depends on:** Phase 76
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 77 to break down)
+- [ ] 77-01-PLAN.md — Backend: cheerio install, Pitcherlist + Rotoballer adapters, SitStartAdvisor agent, API endpoint with tests
+- [ ] 77-02-PLAN.md — Frontend: Sit/Start tab on Pitching Usage page with verdict badges, source links, and empty state

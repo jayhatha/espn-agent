@@ -75,6 +75,14 @@ Requirements for the In-Season Command Center milestone.
 - [x] **CACHE-03**: Successful backfill completion auto-finalizes the season
 - [x] **CACHE-04**: Admin can reset finalization to allow re-runs for data corrections
 
+### SP Sit/Start Recommendations
+
+- [ ] **SITSTART-01**: Pitcherlist adapter scrapes weekly SP Streamer Ranks article and extracts tier-grouped pitcher names into normalized entries
+- [ ] **SITSTART-02**: Rotoballer adapter returns empty array gracefully when JS-rendered content cannot be parsed (degraded mode)
+- [ ] **SITSTART-03**: SitStartAdvisor agent matches external rankings against rostered SPs using diacritic-aware normalized name comparison
+- [ ] **SITSTART-04**: API endpoint returns sit/start recommendations per team at GET /api/leagues/:leagueId/teams/:teamId/pitching/sit-start
+- [ ] **SITSTART-05**: Frontend Sit/Start tab on Pitching Usage page displays verdict badges with source links and empty state
+
 ## Future Requirements
 
 ### Advanced Analytics
@@ -141,12 +149,17 @@ Requirements for the In-Season Command Center milestone.
 | CACHE-02 | Phase 74 | Complete |
 | CACHE-03 | Phase 74 | Complete |
 | CACHE-04 | Phase 74 | Complete |
+| SITSTART-01 | Phase 77 | Pending |
+| SITSTART-02 | Phase 77 | Pending |
+| SITSTART-03 | Phase 77 | Pending |
+| SITSTART-04 | Phase 77 | Pending |
+| SITSTART-05 | Phase 77 | Pending |
 
 **Coverage:**
-- v6.0 requirements: 39 total
-- Mapped to phases: 39
+- v6.0 requirements: 44 total
+- Mapped to phases: 44
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-25 — added CACHE-01 through CACHE-04 for Phase 74*
+*Last updated: 2026-03-26 — added SITSTART-01 through SITSTART-05 for Phase 77*
