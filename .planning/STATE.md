@@ -157,9 +157,10 @@ None yet.
 | 104 | Fix snapshot freshness — clear ESPN cache on forceFresh, add scoringPeriodId | 2026-03-24 | 139f644 | [104-fix-snapshot-freshness-clear-espn-cache-](./quick/104-fix-snapshot-freshness-clear-espn-cache-/) |
 | 105 | Fix FAAB — extract remaining budget from ESPN team data | 2026-03-24 | e7a5ec9 | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/) |
 | 106 | Fix ASV filter — default missing players to $1 instead of skipping | 2026-03-24 | 6192346 | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/) |
+| 260327-h2i | Include scheduled start date in Sit/Start tab (gameDate + opponent from MLB Stats API) | 2026-03-27 | d2244e9 | [260327-h2i-include-the-date-of-the-scheduled-start-](./quick/260327-h2i-include-the-date-of-the-scheduled-start-/) |
 
 ## Session Continuity
 
-Last session: 2026-03-27T19:13:26.279Z
-Stopped at: Completed 78-02-PLAN.md
+Last session: 2026-03-27T19:45:27Z
+Stopped at: Completed quick task 260327-h2i
 Resume file: None
