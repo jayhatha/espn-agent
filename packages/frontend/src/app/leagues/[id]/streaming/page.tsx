@@ -58,10 +58,14 @@ interface SitStartRecommendation {
   playerName: string;
   pitcherlistVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
   rotoballerVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  fangraphsVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
   rotoballerGrade?: number;
   pitcherlistTier?: string;
-  sourceUrl: { pitcherlist?: string; rotoballer?: string };
+  fangraphsTier?: string;
+  sourceUrl: { pitcherlist?: string; rotoballer?: string; fangraphs?: string };
   consensus?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  gameDate?: string;
+  opponent?: string;
 }
 
 interface SitStartData {
@@ -69,6 +73,7 @@ interface SitStartData {
   sources: {
     pitcherlist?: { articleTitle: string; articleUrl: string; scrapedAt: string };
     rotoballer?: { articleTitle: string; articleUrl: string; scrapedAt: string; status: string };
+    fangraphs?: { articleTitle: string; articleUrl: string; scrapedAt: string };
   };
 }
 
@@ -399,6 +404,16 @@ export default function StreamingPitchersPage() {
                         Pitcherlist: {sitStartData.sources.pitcherlist.articleTitle}
                       </a>
                     )}
+                    {sitStartData.sources.fangraphs && (
+                      <a
+                        href={sitStartData.sources.fangraphs.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        FanGraphs: {sitStartData.sources.fangraphs.articleTitle}
+                      </a>
+                    )}
                     {sitStartData.sources.rotoballer && (
                       <a
                         href={sitStartData.sources.rotoballer.articleUrl}
@@ -422,8 +437,10 @@ export default function StreamingPitchersPage() {
                     <thead>
                       <tr className="border-b border-shell-border text-left">
                         <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Pitcher</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Next Start</th>
                         <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-center">Consensus</th>
                         <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-center">Pitcherlist</th>
+                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-center">FanGraphs</th>
                         <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-center">Rotoballer</th>
                       </tr>
                     </thead>
@@ -431,6 +448,18 @@ export default function StreamingPitchersPage() {
                       {sitStartData.recommendations.map((rec) => (
                         <tr key={rec.playerId} className="border-b border-shell-border/50">
                           <td className="py-2 pr-4 text-shell-text">{rec.playerName}</td>
+                          <td className="py-2 pr-4 text-sm">
+                            {rec.gameDate ? (
+                              <div>
+                                <span className="font-mono">{formatDate(rec.gameDate)}</span>
+                                {rec.opponent && (
+                                  <span className="ml-1 text-shell-muted text-xs">vs {rec.opponent}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-shell-muted text-xs">No start</span>
+                            )}
+                          </td>
                           <td className="py-2 pr-4 text-center">
                             {rec.consensus ? (
                               <Badge variant={getVerdictBadgeVariant(rec.consensus)}>
@@ -451,6 +480,23 @@ export default function StreamingPitchersPage() {
                               ) : (
                                 <Badge variant={getVerdictBadgeVariant(rec.pitcherlistVerdict)}>
                                   {rec.pitcherlistTier || formatVerdict(rec.pitcherlistVerdict)}
+                                </Badge>
+                              )
+                            ) : (
+                              <span className="text-xs text-shell-muted">--</span>
+                            )}
+                          </td>
+                          <td className="py-2 pr-4 text-center">
+                            {rec.fangraphsVerdict ? (
+                              rec.sourceUrl.fangraphs ? (
+                                <a href={rec.sourceUrl.fangraphs} target="_blank" rel="noopener noreferrer">
+                                  <Badge variant={getVerdictBadgeVariant(rec.fangraphsVerdict)} className="cursor-pointer hover:opacity-80">
+                                    {rec.fangraphsTier || formatVerdict(rec.fangraphsVerdict)}
+                                  </Badge>
+                                </a>
+                              ) : (
+                                <Badge variant={getVerdictBadgeVariant(rec.fangraphsVerdict)}>
+                                  {rec.fangraphsTier || formatVerdict(rec.fangraphsVerdict)}
                                 </Badge>
                               )
                             ) : (
@@ -482,7 +528,7 @@ export default function StreamingPitchersPage() {
                   </table>
                 ) : (
                   <div className="text-center py-8 text-shell-muted text-sm">
-                    No external SP rankings available. Rankings are scraped from Pitcherlist and Rotoballer when published.
+                    No external SP rankings available. Rankings are scraped from Pitcherlist, FanGraphs, and Rotoballer when published.
                   </div>
                 )}
               </div>
