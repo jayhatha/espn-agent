@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { normalizeName } from "../sit-start-advisor.js";
 import type { ExternalRankingEntry } from "../../../../shared/dist/index.js";
 
@@ -134,7 +134,7 @@ describe("SitStartAdvisor verdict merging", () => {
       where: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       execute: vi.fn().mockResolvedValue([
-        { player_id: 42, name: "Unknown Pitcher", espn_player_id: 9999 },
+        { player_id: 42, name: "Unknown Pitcher" },
       ]),
       orderBy: vi.fn().mockReturnThis(),
     };

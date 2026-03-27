@@ -36,7 +36,6 @@ describe("RotoballerAdapter", () => {
 
     // Spy on the internal axios client to simulate a network error
     // Access private field via index notation
-    const client = (adapter as any).cache;
     // Directly override the internal fetch by spying on axios
     // We use a different approach: verify the return type contract
     // If a real network error occurs (e.g., rotoballer unreachable), result must be []

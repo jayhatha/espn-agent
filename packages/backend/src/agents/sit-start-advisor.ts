@@ -1,7 +1,6 @@
 import type { Kysely } from "kysely";
 import type { BaseLogger } from "pino";
 import type { Database } from "../db/schema.js";
-import type { ExternalRankingEntry } from "../../../shared/dist/index.js";
 import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
 import { RotoballerAdapter } from "../adapters/rotoballer.js";
 
@@ -67,7 +66,6 @@ function mergeVerdicts(verdicts: Verdict[]): Verdict | undefined {
 interface RosteredSP {
   player_id: number;
   name: string;
-  espn_player_id: number;
 }
 
 export interface SitStartRecommendation {
@@ -182,7 +180,7 @@ export class SitStartAdvisor {
         if (rbMatch) verdicts.push(rbMatch.verdict);
 
         const recommendation: SitStartRecommendation = {
-          playerId: sp.espn_player_id,
+          playerId: sp.player_id,
           playerName: sp.name,
           sourceUrl: {},
         };
@@ -241,14 +239,12 @@ export class SitStartAdvisor {
       .select([
         "team_roster_snapshot.player_id",
         "player.name",
-        "player.espn_player_id",
       ])
       .execute();
 
     return rows.map((row) => ({
       player_id: row.player_id,
       name: row.name,
-      espn_player_id: row.espn_player_id,
     }));
   }
 }
