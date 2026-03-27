@@ -1,8 +1,11 @@
 import type { Kysely } from "kysely";
+import { sql } from "kysely";
 import type { BaseLogger } from "pino";
 import type { Database } from "../db/schema.js";
 import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
 import { RotoballerAdapter } from "../adapters/rotoballer.js";
+import { FangraphsAdapter } from "../adapters/fangraphs.js";
+import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
 
 /**
  * Sit/Start Advisor Agent
@@ -74,34 +77,40 @@ export interface SitStartRecommendation {
   pitcherlistVerdict?: Verdict;
   rotoballerVerdict?: Verdict;
   rotoballerGrade?: number;
+  fangraphsVerdict?: Verdict;
+  fangraphsTier?: string;
   pitcherlistTier?: string;
   sourceUrl: {
     pitcherlist?: string;
     rotoballer?: string;
+    fangraphs?: string;
   };
   consensus?: Verdict;
+  gameDate?: string;
+  opponent?: string;
+}
+
+interface SourceMeta {
+  articleTitle: string;
+  articleUrl: string;
+  scrapedAt: string;
+  status?: "ok" | "degraded";
 }
 
 export interface SitStartResult {
   recommendations: SitStartRecommendation[];
   sources: {
-    pitcherlist?: {
-      articleTitle: string;
-      articleUrl: string;
-      scrapedAt: string;
-    };
-    rotoballer?: {
-      articleTitle: string;
-      articleUrl: string;
-      scrapedAt: string;
-      status: "ok" | "degraded";
-    };
+    pitcherlist?: SourceMeta;
+    rotoballer?: SourceMeta;
+    fangraphs?: SourceMeta;
   };
 }
 
 export class SitStartAdvisor {
   private pitcherlistAdapter: PitcherlistAdapter;
   private rotoballerAdapter: RotoballerAdapter;
+  private fangraphsAdapter: FangraphsAdapter;
+  private mlbAdapter: MLBStatsAPIAdapter;
 
   constructor(
     private db: Kysely<Database>,
@@ -109,6 +118,8 @@ export class SitStartAdvisor {
   ) {
     this.pitcherlistAdapter = new PitcherlistAdapter(logger);
     this.rotoballerAdapter = new RotoballerAdapter(logger);
+    this.fangraphsAdapter = new FangraphsAdapter(logger);
+    this.mlbAdapter = new MLBStatsAPIAdapter(logger);
   }
 
   async getRecommendations(
@@ -118,11 +129,61 @@ export class SitStartAdvisor {
     // Step 1: Fetch rostered SPs for this team from the latest snapshot
     const rosteredSPs = await this.fetchRosteredSPs(leagueId, teamId);
 
-    // Step 2: Fetch external rankings from both sources (in parallel)
-    const [pitcherlistRankings, rotoballerRankings] = await Promise.all([
-      this.pitcherlistAdapter.getRankings(),
-      this.rotoballerAdapter.getRankings(),
-    ]);
+    // Step 2: Fetch external rankings from all sources (in parallel)
+    const [pitcherlistRankings, rotoballerRankings, fangraphsRankings] =
+      await Promise.all([
+        this.pitcherlistAdapter.getRankings(),
+        this.rotoballerAdapter.getRankings(),
+        this.fangraphsAdapter.getRankings(),
+      ]);
+
+    // Step 2b: Fetch probable pitchers for the next 7 days from MLB Stats API.
+    // Use a single getSchedule() call for the date range (more efficient than 7 separate calls).
+    // Graceful degradation: if the MLB API fails, scheduledStartMap stays empty and sit/start
+    // verdicts still display without dates.
+    const scheduledStartMap = new Map<string, { gameDate: string; opponent: string }>();
+    try {
+      const today = new Date();
+      const startDate = today.toISOString().slice(0, 10);
+      const endDate7 = new Date(today);
+      endDate7.setDate(today.getDate() + 6);
+      const endDate = endDate7.toISOString().slice(0, 10);
+
+      const schedule = await this.mlbAdapter.getSchedule(startDate, endDate);
+
+      for (const game of schedule) {
+        // Away probable pitcher
+        if (game.teams.away.probablePitcher) {
+          const key = normalizeName(game.teams.away.probablePitcher.fullName);
+          if (!scheduledStartMap.has(key)) {
+            scheduledStartMap.set(key, {
+              gameDate: game.gameDate,
+              opponent: game.teams.home.team.name,
+            });
+          }
+        }
+        // Home probable pitcher
+        if (game.teams.home.probablePitcher) {
+          const key = normalizeName(game.teams.home.probablePitcher.fullName);
+          if (!scheduledStartMap.has(key)) {
+            scheduledStartMap.set(key, {
+              gameDate: game.gameDate,
+              opponent: game.teams.away.team.name,
+            });
+          }
+        }
+      }
+
+      this.logger?.debug(
+        { startDate, endDate, scheduledCount: scheduledStartMap.size },
+        "SitStartAdvisor: fetched scheduled starts from MLB Stats API",
+      );
+    } catch (err: any) {
+      this.logger?.warn(
+        { error: err?.message },
+        "SitStartAdvisor: failed to fetch probable pitchers from MLB Stats API — continuing without game dates",
+      );
+    }
 
     this.logger?.debug(
       {
@@ -131,6 +192,7 @@ export class SitStartAdvisor {
         rosteredSPCount: rosteredSPs.length,
         pitcherlistCount: pitcherlistRankings.length,
         rotoballerCount: rotoballerRankings.length,
+        fangraphsCount: fangraphsRankings.length,
       },
       "SitStartAdvisor: matching rostered SPs to external rankings",
     );
@@ -155,8 +217,15 @@ export class SitStartAdvisor {
         scrapedAt: rotoballerEntry.scrapedAt,
         status: "ok",
       };
-    } else if (pitcherlistRankings.length === 0 && rotoballerRankings.length === 0) {
-      // Both sources degraded — no sources metadata
+    }
+
+    const fangraphsEntry = fangraphsRankings[0];
+    if (fangraphsEntry) {
+      sources.fangraphs = {
+        articleTitle: fangraphsEntry.articleTitle,
+        articleUrl: fangraphsEntry.sourceUrl,
+        scrapedAt: fangraphsEntry.scrapedAt,
+      };
     }
 
     // Step 4: Match each rostered SP to external rankings
@@ -164,13 +233,13 @@ export class SitStartAdvisor {
       (sp) => {
         const normalizedSpName = normalizeName(sp.name);
 
-        // Find matching Pitcherlist entry
         const plMatch = pitcherlistRankings.find(
           (e) => normalizeName(e.playerName) === normalizedSpName,
         );
-
-        // Find matching Rotoballer entry
         const rbMatch = rotoballerRankings.find(
+          (e) => normalizeName(e.playerName) === normalizedSpName,
+        );
+        const fgMatch = fangraphsRankings.find(
           (e) => normalizeName(e.playerName) === normalizedSpName,
         );
 
@@ -178,6 +247,7 @@ export class SitStartAdvisor {
         const verdicts: Verdict[] = [];
         if (plMatch) verdicts.push(plMatch.verdict);
         if (rbMatch) verdicts.push(rbMatch.verdict);
+        if (fgMatch) verdicts.push(fgMatch.verdict);
 
         const recommendation: SitStartRecommendation = {
           playerId: sp.player_id,
@@ -197,9 +267,21 @@ export class SitStartAdvisor {
           recommendation.sourceUrl.rotoballer = rbMatch.sourceUrl;
         }
 
+        if (fgMatch) {
+          recommendation.fangraphsVerdict = fgMatch.verdict;
+          recommendation.fangraphsTier = fgMatch.tier;
+          recommendation.sourceUrl.fangraphs = fgMatch.sourceUrl;
+        }
+
         const consensus = mergeVerdicts(verdicts);
         if (consensus !== undefined) {
           recommendation.consensus = consensus;
+        }
+
+        const scheduled = scheduledStartMap.get(normalizedSpName);
+        if (scheduled) {
+          recommendation.gameDate = scheduled.gameDate;
+          recommendation.opponent = scheduled.opponent;
         }
 
         return recommendation;
@@ -228,14 +310,18 @@ export class SitStartAdvisor {
 
     const latestDate = latestSnapshotRow[0].snapshot_date;
 
-    // Fetch rostered SP/P players at the latest snapshot date
+    // Fetch rostered SP-eligible players at the latest snapshot date.
+    // Include SP and P (generic pitcher) slots, but exclude RP slots.
+    // Additionally filter by player.positions containing "SP" so that
+    // relievers slotted into a generic P slot are excluded.
     const rows = await this.db
       .selectFrom("team_roster_snapshot")
       .innerJoin("player", "player.id", "team_roster_snapshot.player_id")
       .where("team_roster_snapshot.league_id", "=", leagueId)
       .where("team_roster_snapshot.team_id", "=", teamId)
       .where("team_roster_snapshot.snapshot_date", "=", latestDate)
-      .where("team_roster_snapshot.roster_slot", "in", ["SP", "P", "RP"])
+      .where("team_roster_snapshot.roster_slot", "in", ["SP", "P"])
+      .where(sql<boolean>`'SP' = ANY(player.positions)`)
       .select([
         "team_roster_snapshot.player_id",
         "player.name",
