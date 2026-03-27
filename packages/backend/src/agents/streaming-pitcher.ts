@@ -1,14 +1,17 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import type { Category, StatComponents } from "../../../shared/dist/index.js";
+import type { Category, StatComponents, ExternalRankingEntry } from "../../../shared/dist/index.js";
 import { MLBStatsAPIAdapter, ProbablePitcherInfo } from "../adapters/mlb-statsapi.js";
+import { normalizeName } from "./sit-start-advisor.js";
+import { RotoballerAdapter } from "../adapters/rotoballer.js";
 
 /**
  * Streaming Pitcher Agent
  *
  * Ranks available pitchers by matchup favorability using opponent strength,
  * park factors (approximated), and projections. Detects multi-start weeks.
+ * Integrates Rotoballer verdicts and waiver pickup timing filters.
  */
 
 export interface StreamingCandidate {
@@ -28,12 +31,42 @@ export interface StreamingCandidate {
     opponentScore: number;
     multiStartBonus: number;
   };
+  rotoballerVerdict?: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
+  rotoballerGrade?: number;
+  rotoballerSourceUrl?: string;
+  pickupDeadline?: string; // ISO date string of latest Tue/Fri before gameDate
 }
 
 export interface StreamingResult {
   candidates: StreamingCandidate[];
   dateRange: { start: string; end: string };
   totalCandidates: number;
+  rotoballerSource?: {
+    articleTitle: string;
+    articleUrl: string;
+    scrapedAt: string;
+  };
+}
+
+/**
+ * Find the latest Tuesday (2) or Friday (5) strictly before the given game date.
+ * Returns ISO date string or undefined if no valid pickup day exists
+ * (e.g., game is today or tomorrow with no Tue/Fri in between).
+ */
+function getPickupDeadline(gameDate: string): string | undefined {
+  const game = new Date(gameDate + "T00:00:00");
+  // Walk backwards from day before game date
+  const cursor = new Date(game);
+  cursor.setDate(cursor.getDate() - 1);
+  // Search up to 7 days back
+  for (let i = 0; i < 7; i++) {
+    const dow = cursor.getDay(); // 0=Sun, 2=Tue, 5=Fri
+    if (dow === 2 || dow === 5) {
+      return cursor.toISOString().split("T")[0];
+    }
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return undefined;
 }
 
 export class StreamingPitcherAgent {
@@ -41,6 +74,7 @@ export class StreamingPitcherAgent {
     private db: Kysely<Database>,
     private mlbAdapter: MLBStatsAPIAdapter,
     private logger?: BaseLogger,
+    private rotoballerAdapter?: RotoballerAdapter,
   ) {}
 
   async getRecommendations(
@@ -101,6 +135,26 @@ export class StreamingPitcherAgent {
       startDate,
       endDateStr
     );
+
+    // 3b. Fetch Rotoballer rankings (if adapter provided)
+    let rotoballerRankings: ExternalRankingEntry[] = [];
+    let rotoballerSource: StreamingResult["rotoballerSource"] = undefined;
+    if (this.rotoballerAdapter) {
+      try {
+        rotoballerRankings = await this.rotoballerAdapter.getRankings();
+        if (rotoballerRankings.length > 0) {
+          const first = rotoballerRankings[0];
+          rotoballerSource = {
+            articleTitle: first.articleTitle,
+            articleUrl: first.sourceUrl,
+            scrapedAt: first.scrapedAt,
+          };
+        }
+        this.logger?.info({ count: rotoballerRankings.length }, "Rotoballer rankings loaded for streaming filter");
+      } catch (err) {
+        this.logger?.warn({ error: err instanceof Error ? err.message : String(err) }, "Rotoballer fetch failed — skipping verdict filter");
+      }
+    }
 
     // 4. Load all rostered player IDs (to exclude from recommendations)
     const rosteredPlayerIds = await this.getRosteredPlayerIds(leagueId, startDate);
@@ -168,6 +222,13 @@ export class StreamingPitcherAgent {
 
       const compositeScore = projectionScore + opponentScore + multiStartBonus;
 
+      // Match to Rotoballer ranking
+      const rbMatch = rotoballerRankings.find(
+        (e) => normalizeName(e.playerName) === normalizeName(projection.name)
+      );
+
+      const pickupDeadline = getPickupDeadline(probable.gameDate);
+
       candidates.push({
         playerId: projection.player_id,
         playerName: projection.name,
@@ -185,11 +246,26 @@ export class StreamingPitcherAgent {
           opponentScore,
           multiStartBonus,
         },
+        rotoballerVerdict: rbMatch?.verdict,
+        rotoballerGrade: rbMatch?.grade,
+        rotoballerSourceUrl: rbMatch?.sourceUrl,
+        pickupDeadline,
       });
     }
 
+    // 6b. Filter: must have a valid pickup deadline (Tue/Fri before game)
+    let filtered = candidates.filter(c => c.pickupDeadline !== undefined);
+
+    // 6c. Filter by Rotoballer verdict (only if rankings were available)
+    if (rotoballerRankings.length > 0) {
+      filtered = filtered.filter(c =>
+        c.rotoballerVerdict === "start" || c.rotoballerVerdict === "lean_start"
+      );
+    }
+    // If rotoballerRankings is empty, skip verdict filter per D-05 (graceful degradation)
+
     // 7. Sort by composite score and limit
-    const sortedCandidates = candidates
+    const sortedCandidates = filtered
       .sort((a, b) => b.compositeScore - a.compositeScore)
       .slice(0, limit);
 
@@ -197,7 +273,8 @@ export class StreamingPitcherAgent {
       {
         totalProbablePitchers: probablePitchers.length,
         matchedToProjections: candidates.length,
-        afterRosterFilter: sortedCandidates.length,
+        afterFilters: filtered.length,
+        afterLimit: sortedCandidates.length,
       },
       "Streaming pitcher recommendations complete",
     );
@@ -205,7 +282,8 @@ export class StreamingPitcherAgent {
     return {
       candidates: sortedCandidates,
       dateRange: { start: startDate, end: endDateStr },
-      totalCandidates: candidates.length,
+      totalCandidates: filtered.length,
+      rotoballerSource,
     };
   }
 
@@ -262,14 +340,10 @@ export class StreamingPitcherAgent {
       mlb_team: string | null;
     }>
   ) {
-    // Normalize name for matching
-    const normalize = (name: string) =>
-      name.toLowerCase().replace(/[^a-z]/g, "");
-
-    const searchName = normalize(probablePitcherName);
+    const searchName = normalizeName(probablePitcherName);
 
     return projections.find(p => {
-      const projName = normalize(p.name);
+      const projName = normalizeName(p.name);
       return projName === searchName;
     });
   }
