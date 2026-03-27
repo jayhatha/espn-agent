@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { StreamingPitcherAgent } from "../agents/streaming-pitcher.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
+import { RotoballerAdapter } from "../adapters/rotoballer.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 
 /**
@@ -48,9 +49,10 @@ export async function streamingRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Instantiate adapter and agent
+        // Instantiate adapters and agent
         const mlbAdapter = new MLBStatsAPIAdapter(request.log);
-        const streamingAgent = new StreamingPitcherAgent(db, mlbAdapter, request.log);
+        const rotoballerAdapter = new RotoballerAdapter(request.log);
+        const streamingAgent = new StreamingPitcherAgent(db, mlbAdapter, request.log, rotoballerAdapter);
 
         // Get recommendations
         const result = await streamingAgent.getRecommendations(leagueId, teamId, {
@@ -75,6 +77,10 @@ export async function streamingRoutes(app: FastifyInstance) {
           multiStartBonus: c.scoreBreakdown.multiStartBonus,
           weekStarts: c.weekStarts,
           ownershipPct: c.ownership,
+          rotoballerVerdict: c.rotoballerVerdict ?? null,
+          rotoballerGrade: c.rotoballerGrade ?? null,
+          rotoballerSourceUrl: c.rotoballerSourceUrl ?? null,
+          pickupDeadline: c.pickupDeadline ?? null,
         }));
 
         return {
@@ -82,6 +88,7 @@ export async function streamingRoutes(app: FastifyInstance) {
           dateRange: result.dateRange,
           totalCandidates: candidates.length,
           generatedAt: new Date().toISOString(),
+          rotoballerSource: result.rotoballerSource ?? null,
         };
       } catch (error) {
         request.log.error({ error }, "Failed to generate streaming pitcher recommendations");
