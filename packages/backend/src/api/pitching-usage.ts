@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { GsPacingAgent } from "../agents/gs-pacing.js";
+import { SitStartAdvisor } from "../agents/sit-start-advisor.js";
 import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
 
 /**
@@ -82,6 +83,34 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       } catch (error) {
         request.log.error({ error, leagueId, teamId }, "Failed to get start plan");
         return reply.code(500).send({ error: "Failed to generate SP start plan" });
+      }
+    },
+  );
+
+  // Get external sit/start recommendations (Pitcherlist + Rotoballer)
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+  }>(
+    "/api/leagues/:leagueId/teams/:teamId/pitching/sit-start",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess, requireTeamOwnership],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const teamId = parseInt(request.params.teamId, 10);
+
+      try {
+        const advisor = new SitStartAdvisor(db, request.log);
+        return await advisor.getRecommendations(leagueId, teamId);
+      } catch (error) {
+        request.log.error(
+          { error },
+          "Failed to generate sit/start recommendations",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to generate sit/start recommendations" });
       }
     },
   );
