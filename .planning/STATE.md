@@ -159,7 +159,8 @@ None yet.
 | 106 | Fix ASV filter — default missing players to $1 instead of skipping | 2026-03-24 | 6192346 | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/) |
 | 260327-h2i | Include scheduled start date in Sit/Start tab (gameDate + opponent from MLB Stats API) | 2026-03-27 | d2244e9 | [260327-h2i-include-the-date-of-the-scheduled-start-](./quick/260327-h2i-include-the-date-of-the-scheduled-start-/) |
 | 260327-hr3 | Fix snapshot refresh not updating projected standings (invalidate all queries) | 2026-03-27 | a9488b1 | [260327-hr3-if-i-refresh-snapshot-it-should-replace-](./quick/260327-hr3-if-i-refresh-snapshot-it-should-replace-/) |
-| 260327-orm | Replace Week label with today's date + season game progress (scoringPeriodId/162) | 2026-03-28 | 687ce8f | [260327-orm-change-current-week-from-the-season-to-c](./quick/260327-orm-change-current-week-from-the-season-to-c/) |
+| 260327-orm | Replace Week label with today's date + season game progress (MLB GP/162) | 2026-03-28 | 3e61847 | [260327-orm-change-current-week-from-the-season-to-c](./quick/260327-orm-change-current-week-from-the-season-to-c/) |
+| 107 | Fix tie handling in current standings — use assignRanksWithTies | 2026-03-28 | 48f489f | -- |
 
 ## Session Continuity
 
