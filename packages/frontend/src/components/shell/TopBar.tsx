@@ -23,7 +23,7 @@ interface LeagueStatus {
     degraded_reasons: string[];
   } | null;
   snapshotCount: number;
-  scoringPeriodId: number | null;
+  gamesPlayed: number | null;
 }
 
 interface ProjectedStandingsResponse {
@@ -139,8 +139,8 @@ export function TopBar() {
 
   const leagueName = data?.league?.name ?? "--";
   const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const scoringPeriod = data?.scoringPeriodId;
-  const seasonProgress = scoringPeriod != null ? `${scoringPeriod}/162` : "--";
+  const gp = data?.gamesPlayed;
+  const seasonProgress = gp != null ? `${gp}/162` : "--";
 
   const faabValue = faabData ? `$${faabData.faabRemaining}` : "--";
   const gsValue = gsData ? `${gsData.gsUsed}/${gsData.gsCap}` : "--";

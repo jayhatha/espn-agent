@@ -208,4 +208,37 @@ export class MLBStatsAPIAdapter {
 
     return teamGameCounts;
   }
+
+  /**
+   * Get the max games played by any MLB team this season.
+   * Uses the MLB standings endpoint — returns the highest GP across all 30 teams.
+   */
+  async getSeasonGamesPlayed(season: number): Promise<number | null> {
+    try {
+      const response = await this.client.get("/standings", {
+        params: {
+          leagueId: "103,104", // AL + NL
+          season,
+          standingsTypes: "regularSeason",
+        },
+      });
+
+      let maxGP = 0;
+      for (const record of response.data.records || []) {
+        for (const team of record.teamRecords || []) {
+          const gp = (team.wins ?? 0) + (team.losses ?? 0);
+          if (gp > maxGP) maxGP = gp;
+        }
+      }
+
+      this.logger?.debug({ season, maxGP }, "Fetched season games played");
+      return maxGP > 0 ? maxGP : null;
+    } catch (error: any) {
+      this.logger?.warn(
+        { error: error.message, season },
+        "Failed to fetch MLB standings for games played",
+      );
+      return null;
+    }
+  }
 }

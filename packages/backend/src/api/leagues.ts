@@ -6,7 +6,24 @@ import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryptio
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
 import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID } from "../../../shared/dist/index.js";
+
+/**
+ * Cached games played — one MLB API call per day max.
+ */
+let gamesPlayedCache: { value: number | null; date: string } | null = null;
+
+async function getCachedGamesPlayed(season: number, logger?: any): Promise<number | null> {
+  const today = new Date().toISOString().split("T")[0];
+  if (gamesPlayedCache && gamesPlayedCache.date === today) {
+    return gamesPlayedCache.value;
+  }
+  const mlbAdapter = new MLBStatsAPIAdapter(logger);
+  const gp = await mlbAdapter.getSeasonGamesPlayed(season);
+  gamesPlayedCache = { value: gp, date: today };
+  return gp;
+}
 
 /**
  * Leagues API Routes
@@ -324,22 +341,14 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .where("league_id", "=", leagueId)
         .executeTakeFirst();
 
-      // Get scoringPeriodId from latest raw payload
-      const latestPayload = await db
-        .selectFrom("league_raw_payload")
-        .select("response_json")
-        .where("league_id", "=", leagueId)
-        .orderBy("fetched_at", "desc")
-        .executeTakeFirst();
-
-      const rawJson = latestPayload?.response_json as Record<string, any> | undefined;
-      const scoringPeriodId = rawJson?.scoringPeriodId ?? rawJson?.status?.currentScoringPeriod?.id ?? null;
+      // Get season games played from MLB standings (cached per-day)
+      const gamesPlayed = await getCachedGamesPlayed(league.season, request.log);
 
       return {
         league,
         latestSnapshot,
         snapshotCount: snapshotCount?.count || 0,
-        scoringPeriodId,
+        gamesPlayed,
       };
     },
   );
