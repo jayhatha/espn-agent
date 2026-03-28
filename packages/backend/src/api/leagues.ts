@@ -324,10 +324,22 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .where("league_id", "=", leagueId)
         .executeTakeFirst();
 
+      // Get scoringPeriodId from latest raw payload
+      const latestPayload = await db
+        .selectFrom("league_raw_payload")
+        .select("response_json")
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst();
+
+      const rawJson = latestPayload?.response_json as Record<string, any> | undefined;
+      const scoringPeriodId = rawJson?.scoringPeriodId ?? rawJson?.status?.currentScoringPeriod?.id ?? null;
+
       return {
         league,
         latestSnapshot,
         snapshotCount: snapshotCount?.count || 0,
+        scoringPeriodId,
       };
     },
   );

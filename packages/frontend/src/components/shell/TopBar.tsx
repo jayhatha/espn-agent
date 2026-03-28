@@ -23,6 +23,7 @@ interface LeagueStatus {
     degraded_reasons: string[];
   } | null;
   snapshotCount: number;
+  scoringPeriodId: number | null;
 }
 
 interface ProjectedStandingsResponse {
@@ -65,7 +66,7 @@ function StatItem({
       )}
       title={warningTitle}
     >
-      <Icon size={14} className="text-shell-muted flex-shrink-0" />
+      <Icon size={14} className="text-shell-muted flex-shrink-0" aria-hidden="true" />
       <span className="text-shell-muted text-xs uppercase tracking-wide">{label}</span>
       <span
         className={cn(
@@ -137,8 +138,9 @@ export function TopBar() {
   }, [standingsData, teamId]);
 
   const leagueName = data?.league?.name ?? "--";
-  const season = data?.league?.season;
-  const weekLabel = season ? `${season}` : "--";
+  const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const scoringPeriod = data?.scoringPeriodId;
+  const seasonProgress = scoringPeriod != null ? `${scoringPeriod}/162` : "--";
 
   const faabValue = faabData ? `$${faabData.faabRemaining}` : "--";
   const gsValue = gsData ? `${gsData.gsUsed}/${gsData.gsCap}` : "--";
@@ -154,8 +156,8 @@ export function TopBar() {
       </div>
 
       {/* Right: summary stats with icons and links */}
-      <div className="flex items-center gap-6">
-        <StatItem label="Week" value={weekLabel} icon={Calendar} />
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+        <StatItem label={todayLabel} value={seasonProgress} icon={Calendar} />
         <StatItem
           label="FAAB"
           value={faabValue}
