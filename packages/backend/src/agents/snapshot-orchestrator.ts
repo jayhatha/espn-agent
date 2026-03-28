@@ -4,6 +4,7 @@ import type { Database } from "../db/schema.js";
 import type { LeagueSettings, StatComponents } from "../../../shared/dist/index.js";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
+import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
  * ESPN stat ID → component key mapping for player period stats extraction.
@@ -398,11 +399,10 @@ export class SnapshotOrchestratorAgent {
           : b.value - a.value,
       );
 
-      for (let i = 0; i < teamValues.length; i++) {
-        const rank = i + 1;
-        const rotoPoints = numTeams - rank + 1;
-        const { dbTeamId } = teamValues[i];
+      const sorted = teamValues.map((tv) => ({ teamId: tv.dbTeamId, value: tv.value }));
+      const ranked = assignRanksWithTies(sorted, numTeams);
 
+      for (const { teamId: dbTeamId, rank, rotoPoints } of ranked) {
         teamOverallPoints.set(
           dbTeamId,
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
@@ -422,20 +422,22 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    // Write overall standings
-    const overallRankings = Array.from(teamOverallPoints.entries())
-      .map(([teamId, points]) => ({ teamId, points }))
-      .sort((a, b) => b.points - a.points);
+    // Write overall standings with tie handling
+    const overallSorted = Array.from(teamOverallPoints.entries())
+      .map(([teamId, points]) => ({ teamId, value: points }))
+      .sort((a, b) => b.value - a.value);
 
-    for (let i = 0; i < overallRankings.length; i++) {
+    const overallRanked = assignRanksWithTies(overallSorted, numTeams);
+
+    for (const { teamId, rank } of overallRanked) {
       await trx
         .insertInto("team_daily_overall")
         .values({
           league_id: leagueId,
           snapshot_date: snapshotDate,
-          team_id: overallRankings[i].teamId,
-          overall_points: overallRankings[i].points,
-          overall_rank: i + 1,
+          team_id: teamId,
+          overall_points: teamOverallPoints.get(teamId) || 0,
+          overall_rank: rank,
         })
         .execute();
     }
