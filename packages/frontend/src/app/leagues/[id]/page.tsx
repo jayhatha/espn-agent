@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useSearchParams } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
 import {
   XIcon,
 } from "lucide-react";
@@ -92,16 +92,20 @@ export default function LeagueDetailPage() {
 
 function LeagueDetailPageContent() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const leagueId = params.id as string;
   const queryClient = useQueryClient();
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authSwid, setAuthSwid] = useState("");
   const [authS2, setAuthS2] = useState("");
-  const [showSnapshotBanner, setShowSnapshotBanner] = useState(
-    searchParams?.get("snapshotting") === "true",
-  );
+  const [showSnapshotBanner, setShowSnapshotBanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setShowSnapshotBanner(params.get('snapshotting') === 'true');
+    }
+  }, []);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["league", leagueId],
@@ -139,7 +143,6 @@ function LeagueDetailPageContent() {
       setShowAuthModal(false);
       setAuthSwid("");
       setAuthS2("");
-      alert("Authentication updated successfully!");
     },
   });
 
@@ -148,10 +151,23 @@ function LeagueDetailPageContent() {
       return api.triggerSnapshot(parseInt(leagueId, 10));
     },
     onSuccess: () => {
+      // Invalidate all queries that depend on snapshot data
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["league-teams", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["team-overview"] });
-      alert("Snapshot created successfully! Teams should now be available.");
+      queryClient.invalidateQueries({ queryKey: ["standings", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-timeseries", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["timeseries-overall", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["timeseries-projected", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["timeseries-category", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["timeseries-category-total", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["roster", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["waivers", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["sit-start", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["streaming-pitchers", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["gs-summary", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["gs-weekly", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["start-plan", leagueId] });
     },
   });
 
@@ -172,14 +188,14 @@ function LeagueDetailPageContent() {
 
   // Waiver recommendations for dashboard
   const { data: waiverRecs } = useQuery({
-    queryKey: ['dashboard-waivers', leagueId, selectedTeamId],
+    queryKey: ['waivers-recommendations', leagueId, selectedTeamId],
     queryFn: () => api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId!, { maxRecommendations: 3 }),
     enabled: !!selectedTeamId,
   });
 
   // Trade candidates for dashboard
   const { data: tradeCandidates } = useQuery({
-    queryKey: ['dashboard-trades', leagueId, selectedTeamId],
+    queryKey: ['trades-recommendations', leagueId, selectedTeamId],
     queryFn: () => api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!),
     enabled: !!selectedTeamId,
   });
@@ -386,18 +402,18 @@ function LeagueDetailPageContent() {
               </Heading>
               <button
                 onClick={() => setShowAuthModal(false)}
-                className="text-content-tertiary hover:text-content-secondary transition-colors"
+                className="text-content-tertiary dark:text-shell-muted hover:text-content-secondary transition-colors"
               >
                 <XIcon className="h-6 w-6" />
               </button>
             </div>
 
             <div className="mb-4">
-              <p className="text-body-sm text-content-secondary mb-4">
+              <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-4">
                 For private leagues, you&apos;ll need to provide your ESPN cookies.
                 Find these in your browser&apos;s DevTools:
               </p>
-              <ol className="text-body-sm text-content-secondary space-y-1 ml-5 list-decimal">
+              <ol className="text-body-sm text-content-secondary dark:text-shell-muted space-y-1 ml-5 list-decimal">
                 <li>Log into ESPN Fantasy Baseball</li>
                 <li>Open DevTools (F12)</li>
                 <li>Go to Application/Storage &rarr; Cookies</li>
