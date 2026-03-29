@@ -87,6 +87,28 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
     },
   );
 
+  // Get league-wide GS and K/GS overview
+  app.get<{
+    Params: { leagueId: string };
+  }>(
+    "/api/leagues/:leagueId/pitching/gs/league",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+
+      try {
+        const agent = new GsPacingAgent(db, request.log);
+        return await agent.getLeagueGsOverview(leagueId);
+      } catch (error) {
+        request.log.error({ error, leagueId }, "Failed to get league GS overview");
+        return reply.code(500).send({ error: "Failed to compute league GS overview" });
+      }
+    },
+  );
+
   // Get external sit/start recommendations (Pitcherlist + Rotoballer)
   app.get<{
     Params: { leagueId: string; teamId: string };

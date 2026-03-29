@@ -156,6 +156,16 @@ export default function StreamingPitchersPage() {
     staleTime: 5 * 60_000,
   });
 
+  const { data: gsLeague } = useQuery<{
+    teams: Array<{ teamId: number; teamName: string; gs: number; k: number; kPerGs: number | null }>;
+    gsCap: number;
+  }>({
+    queryKey: ["gs-league", leagueId],
+    queryFn: () => api.getGsLeagueOverview(parseInt(leagueId, 10)) as any,
+    enabled: activeTab === "gs-pacing",
+    staleTime: 5 * 60_000,
+  });
+
   const { data: startPlan } = useQuery({
     queryKey: ["start-plan", leagueId, selectedTeamId],
     queryFn: () => api.getStartPlan(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
@@ -332,6 +342,48 @@ export default function StreamingPitchersPage() {
                     ) : (
                       <div className="text-sm text-shell-muted">No SP starts recorded this week.</div>
                     )}
+                  </div>
+                )}
+                {/* League GS Overview */}
+                {gsLeague && gsLeague.teams.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-shell-text mb-3">League Overview</h3>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-shell-border text-left">
+                          <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Team</th>
+                          <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">GS</th>
+                          <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">K</th>
+                          <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-right">K/GS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gsLeague.teams.map((team) => {
+                          const isMyTeam = team.teamId === selectedTeamId;
+                          return (
+                            <tr
+                              key={team.teamId}
+                              className={cn(
+                                "border-b border-shell-border/50",
+                                isMyTeam && "bg-accent/5"
+                              )}
+                            >
+                              <td className={cn("py-2 pr-4", isMyTeam ? "text-accent font-semibold" : "text-shell-text")}>
+                                {team.teamName}
+                              </td>
+                              <td className="py-2 pr-4 font-mono text-right text-shell-text">{team.gs}</td>
+                              <td className="py-2 pr-4 font-mono text-right text-shell-text">{team.k}</td>
+                              <td className="py-2 font-mono text-right text-shell-text">
+                                {team.kPerGs != null ? team.kPerGs.toFixed(2) : "--"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <p className="text-xs text-shell-muted mt-2">
+                      League GS cap: {gsLeague.gsCap}
+                    </p>
                   </div>
                 )}
               </div>

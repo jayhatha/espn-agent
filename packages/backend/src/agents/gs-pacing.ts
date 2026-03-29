@@ -574,4 +574,58 @@ export class GsPacingAgent {
     d.setHours(0, 0, 0, 0);
     return d;
   }
+
+  /**
+   * Get league-wide GS and K totals for all teams.
+   * Uses ESPN raw payload valuesByStat (stat 33 = GS, stat 48 = K).
+   */
+  async getLeagueGsOverview(leagueId: number): Promise<{
+    teams: Array<{
+      teamId: number;
+      teamName: string;
+      gs: number;
+      k: number;
+      kPerGs: number | null;
+    }>;
+    gsCap: number;
+  }> {
+    const gsCap = await this.getGsCap(leagueId);
+
+    // Get all teams
+    const teams = await this.db
+      .selectFrom("team")
+      .select(["id", "name", "espn_team_id"])
+      .where("league_id", "=", leagueId)
+      .execute();
+
+    // Get latest raw payload for ESPN stat values
+    const latestPayload = await this.db
+      .selectFrom("league_raw_payload")
+      .select(["response_json"])
+      .where("league_id", "=", leagueId)
+      .orderBy("fetched_at", "desc")
+      .executeTakeFirst();
+
+    const raw = latestPayload?.response_json as any;
+    const espnTeams = raw?.teams || [];
+
+    const result = teams.map((team) => {
+      const espnTeam = espnTeams.find((t: any) => t.id === team.espn_team_id);
+      const gs = typeof espnTeam?.valuesByStat?.[33] === "number" ? espnTeam.valuesByStat[33] : 0;
+      const k = typeof espnTeam?.valuesByStat?.[48] === "number" ? espnTeam.valuesByStat[48] : 0;
+
+      return {
+        teamId: team.id,
+        teamName: team.name,
+        gs,
+        k,
+        kPerGs: gs > 0 ? Math.round((k / gs) * 100) / 100 : null,
+      };
+    });
+
+    // Sort by GS descending
+    result.sort((a, b) => b.gs - a.gs);
+
+    return { teams: result, gsCap };
+  }
 }

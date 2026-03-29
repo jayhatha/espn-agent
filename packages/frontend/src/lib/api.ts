@@ -407,6 +407,10 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/gs/weekly${query}`);
   },
 
+  async getGsLeagueOverview(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/pitching/gs/league`);
+  },
+
   async getStartPlan(leagueId: number, teamId: number) {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/pitching/start-plan`);
   },
