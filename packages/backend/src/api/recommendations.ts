@@ -217,6 +217,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         // Compute tenure stats: sum components_json from player_period_stats
         // WHERE team_id = teamId (stats accumulated while on this team)
+        // Filter to current season only (snapshot_date in current year)
+        const seasonStart = `${new Date().getFullYear()}-01-01`;
         const tenureRows =
           playerIds.length > 0
             ? await db
@@ -225,6 +227,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
                 .where("league_id", "=", leagueId)
                 .where("team_id", "=", teamId)
                 .where("player_id", "in", playerIds)
+                .where("snapshot_date", ">=", seasonStart)
                 .execute()
             : [];
 

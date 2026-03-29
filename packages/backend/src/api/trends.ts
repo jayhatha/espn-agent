@@ -156,13 +156,15 @@ export async function trendsRoutes(app: FastifyInstance) {
               .execute()
           : [];
 
-        // 5. Query full season stats
+        // 5. Query full season stats (current season only)
+        const currentSeasonStart = `${new Date().getFullYear()}-01-01`;
         const seasonStats = playerIds.length > 0
           ? await db
               .selectFrom("player_period_stats")
               .select(["player_id", "components_json"])
               .where("league_id", "=", leagueId)
               .where("player_id", "in", playerIds)
+              .where("snapshot_date", ">=", currentSeasonStart)
               .execute()
           : [];
 

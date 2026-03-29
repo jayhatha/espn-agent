@@ -465,12 +465,14 @@ export class GsPacingAgent {
       }
     }
 
-    // 2. Fallback: sum GS from tenure-scoped player_period_stats
+    // 2. Fallback: sum GS from tenure-scoped player_period_stats (current season only)
+    const currentSeasonStart = `${new Date().getFullYear()}-01-01`;
     const tenureRows = await this.db
       .selectFrom("player_period_stats")
       .select(["player_id", "components_json"])
       .where("league_id", "=", leagueId)
       .where("team_id", "=", teamId)
+      .where("snapshot_date", ">=", currentSeasonStart)
       .execute();
 
     if (tenureRows.length > 0) {
