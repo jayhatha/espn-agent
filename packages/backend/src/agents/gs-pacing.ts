@@ -623,8 +623,8 @@ export class GsPacingAgent {
       };
     });
 
-    // Sort by GS descending
-    result.sort((a, b) => b.gs - a.gs);
+    // Sort by K/GS descending (teams with no GS go last)
+    result.sort((a, b) => (b.kPerGs ?? -1) - (a.kPerGs ?? -1));
 
     return { teams: result, gsCap };
   }
