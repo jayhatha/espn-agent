@@ -646,7 +646,7 @@ export default function WaiversPage() {
                                   }
                                   actions={
                                     <span className="text-data font-semibold text-accent">
-                                      {player.pctOwned.toFixed(1)}%
+                                      {(player.pctOwned ?? 0).toFixed(1)}%
                                     </span>
                                   }
                                 />
