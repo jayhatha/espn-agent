@@ -167,7 +167,6 @@ function LeagueDetailPageContent() {
       queryClient.invalidateQueries({ queryKey: ["streaming-pitchers", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["gs-summary", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["gs-weekly", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["start-plan", leagueId] });
     },
   });
 

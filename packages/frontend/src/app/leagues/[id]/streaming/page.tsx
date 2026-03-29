@@ -15,7 +15,7 @@ import { cn } from "@/lib/cn";
 import { FileText } from "lucide-react";
 import { GsTracker } from "@/components/league/GsTracker";
 
-type PitchingTab = "gs-pacing" | "start-plan" | "sit-start" | "streaming";
+type PitchingTab = "gs-pacing" | "sit-start" | "streaming";
 
 interface Team {
   id: number;
@@ -166,13 +166,6 @@ export default function StreamingPitchersPage() {
     staleTime: 5 * 60_000,
   });
 
-  const { data: startPlan } = useQuery({
-    queryKey: ["start-plan", leagueId, selectedTeamId],
-    queryFn: () => api.getStartPlan(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
-    enabled: !!selectedTeamId && activeTab === "start-plan",
-    staleTime: 5 * 60_000,
-  });
-
   const { data: sitStartData, isLoading: sitStartLoading } = useQuery({
     queryKey: ["sit-start", leagueId, selectedTeamId],
     queryFn: () => api.getSitStart(parseInt(leagueId, 10), selectedTeamId!) as Promise<SitStartData>,
@@ -256,10 +249,9 @@ export default function StreamingPitchersPage() {
       {selectedTeamId && (
         <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border mb-6">
           <nav className="-mb-px flex border-b border-neutral-200 dark:border-shell-border">
-            {(["gs-pacing", "start-plan", "sit-start", "streaming"] as const).map((tab) => {
+            {(["gs-pacing", "sit-start", "streaming"] as const).map((tab) => {
               const labels: Record<string, string> = {
                 "gs-pacing": "GS Pacing",
-                "start-plan": "Start Plan",
                 "sit-start": "Sit/Start",
                 streaming: "Streaming Picks",
               };
@@ -384,57 +376,6 @@ export default function StreamingPitchersPage() {
                     <p className="text-xs text-shell-muted mt-2">
                       League GS cap: {gsLeague.gsCap}
                     </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Start Plan Tab */}
-            {activeTab === "start-plan" && (
-              <div className="space-y-4">
-                {startPlan?.alert && (
-                  <div className={cn(
-                    "p-3 rounded text-xs",
-                    startPlan.paceStatus === "burning_fast"
-                      ? "bg-negative/10 border border-negative/20 text-negative"
-                      : "bg-warning/10 border border-warning/20 text-warning"
-                  )}>
-                    {startPlan.alert}
-                  </div>
-                )}
-                {startPlan?.recommendations?.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-shell-border text-left">
-                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Pitcher</th>
-                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">K/GS</th>
-                        <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Rec</th>
-                        <th className="py-2 text-xs text-shell-muted uppercase tracking-wide">Reason</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {startPlan.recommendations.map((rec: any) => (
-                        <tr key={rec.playerId} className="border-b border-shell-border/50">
-                          <td className="py-2 pr-4 text-shell-text">{rec.playerName}</td>
-                          <td className="py-2 pr-4 font-mono text-right text-shell-text">
-                            {rec.kPerGs !== null ? rec.kPerGs.toFixed(1) : "—"}
-                          </td>
-                          <td className="py-2 pr-4">
-                            <Badge
-                              variant={rec.action === "start" ? "positive" : rec.action === "stream" ? "info" : "default"}
-                              className="text-xs"
-                            >
-                              {rec.action}
-                            </Badge>
-                          </td>
-                          <td className="py-2 text-xs text-shell-muted">{rec.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="text-center py-8 text-shell-muted text-sm">
-                    No SP start plan available. Ensure roster snapshots exist.
                   </div>
                 )}
               </div>
