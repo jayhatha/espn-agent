@@ -70,6 +70,7 @@ export class MLBStatsAPIAdapter {
           sportId: 1,
           startDate,
           endDate,
+          hydrate: "probablePitcher",
         },
       });
 
