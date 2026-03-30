@@ -83,6 +83,21 @@ Requirements for the In-Season Command Center milestone.
 - [x] **SITSTART-04**: API endpoint returns sit/start recommendations per team at GET /api/leagues/:leagueId/teams/:teamId/pitching/sit-start
 - [x] **SITSTART-05**: Frontend Sit/Start tab on Pitching Usage page displays verdict badges with source links and empty state
 
+### Sophisticated Projection Model
+
+- [ ] **PROJ-01**: FanGraphs CSV ingest parses G, PA (batters) and G, GS (pitchers) into stat_components_json
+- [ ] **PROJ-02**: Staleness prorating scales RoS projections by fraction of remaining season elapsed since upload
+- [ ] **PROJ-03**: canFillSlot extracted as standalone reusable function with OF slot rule (LF/CF/RF/OF)
+- [ ] **PROJ-04**: Hitter lineup allocation assigns best eligible players to starting slots; bench/IL contribute 0%
+- [ ] **PROJ-05**: GS cap enforcement scales SP counting components proportionally when projected GS exceeds remaining budget
+- [ ] **PROJ-06**: RP projections never scaled by GS cap
+- [ ] **PROJ-07**: Unified allocation pipeline chains prorate -> allocate hitters -> scale pitchers -> sum components
+- [ ] **PROJ-08**: Two-way players (Ohtani) contribute batting stats to hitter categories and pitching stats to pitcher categories
+- [ ] **PROJ-09**: Confidence intervals (P10/P50/P90) computed per category using per-stat CV model
+- [ ] **PROJ-10**: StandingsProjectionAgent uses allocateProjections instead of naive roster-wide summation
+- [ ] **PROJ-11**: TradeRecommendationAgent uses allocateProjections for trade impact simulation with roster gap detection
+- [ ] **PROJ-12**: WaiverRecommendationAgent uses allocateProjections for add/drop simulation (replaces hardcoded 0.5 delta)
+
 ## Future Requirements
 
 ### Advanced Analytics
@@ -154,12 +169,24 @@ Requirements for the In-Season Command Center milestone.
 | SITSTART-03 | Phase 77 | Complete |
 | SITSTART-04 | Phase 77 | Complete |
 | SITSTART-05 | Phase 77 | Complete |
+| PROJ-01 | Phase 79 | Pending |
+| PROJ-02 | Phase 79 | Pending |
+| PROJ-03 | Phase 79 | Pending |
+| PROJ-04 | Phase 79 | Pending |
+| PROJ-05 | Phase 79 | Pending |
+| PROJ-06 | Phase 79 | Pending |
+| PROJ-07 | Phase 79 | Pending |
+| PROJ-08 | Phase 79 | Pending |
+| PROJ-09 | Phase 79 | Pending |
+| PROJ-10 | Phase 79 | Pending |
+| PROJ-11 | Phase 79 | Pending |
+| PROJ-12 | Phase 79 | Pending |
 
 **Coverage:**
-- v6.0 requirements: 44 total
-- Mapped to phases: 44
+- v6.0 requirements: 56 total
+- Mapped to phases: 56
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-26 — added SITSTART-01 through SITSTART-05 for Phase 77*
+*Last updated: 2026-03-30 — added PROJ-01 through PROJ-12 for Phase 79*
