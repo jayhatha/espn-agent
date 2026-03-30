@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 79-03-PLAN.md
-last_updated: "2026-03-30T18:12:12.685Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 79-04-PLAN.md
+last_updated: "2026-03-30T18:26:34.806Z"
 progress:
   total_phases: 15
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 32
-  completed_plans: 31
+  completed_plans: 32
 ---
 
 # Project State
@@ -62,6 +62,7 @@ Plan: 4 of 4
 | Phase 79 P01 | 4min | 2 tasks | 7 files |
 | Phase 79-sophisticated-projection-model P02 | 7min | 2 tasks | 4 files |
 | Phase 79-sophisticated-projection-model P03 | 7min | 2 tasks | 4 files |
+| Phase 79-sophisticated-projection-model P04 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Plan: 4 of 4
 - [Phase 79-03]: Two-way players (Ohtani) contribute batting to batterComponents AND pitching to pitcherComponents; detected via IP>0 && AB>0
 - [Phase 79-03]: WHIP confidence interval is stable when IP/HA/BBA all have equal CV=0.20 -- ratio stays constant under proportional scaling; ERA shows real variance since ER CV (0.25) differs from IP CV (0.20)
 - [Phase 79-03]: allocateProjections pipeline order: prorate -> attach projections -> greedy lineup -> split SP/RP -> GS cap scale SPs -> sum batter components -> sum pitcher components (scaled SP + unscaled RP) -> detect roster gaps
+- [Phase 79-sophisticated-projection-model]: StandingsProjectionAgent: sequential team loop (not parallel) to avoid DB connection pool overload
+- [Phase 79-sophisticated-projection-model]: Trade gap detection runs once per analyzeTradeImpact (not per candidate) to limit overhead
+- [Phase 79-sophisticated-projection-model]: Waiver gap detection uses synchronous detectPostSwapGaps() with pre-fetched cache -- zero extra DB queries
 
 ### Roadmap Evolution
 
@@ -178,6 +182,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T18:12:12.679Z
-Stopped at: Completed 79-03-PLAN.md
+Last session: 2026-03-30T18:26:34.800Z
+Stopped at: Completed 79-04-PLAN.md
 Resume file: None

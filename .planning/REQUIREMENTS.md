@@ -94,9 +94,9 @@ Requirements for the In-Season Command Center milestone.
 - [x] **PROJ-07**: Unified allocation pipeline chains prorate -> allocate hitters -> scale pitchers -> sum components
 - [x] **PROJ-08**: Two-way players (Ohtani) contribute batting stats to hitter categories and pitching stats to pitcher categories
 - [x] **PROJ-09**: Confidence intervals (P10/P50/P90) computed per category using per-stat CV model
-- [ ] **PROJ-10**: StandingsProjectionAgent uses allocateProjections instead of naive roster-wide summation
-- [ ] **PROJ-11**: TradeRecommendationAgent uses allocateProjections for trade impact simulation with roster gap detection
-- [ ] **PROJ-12**: WaiverRecommendationAgent uses allocateProjections for add/drop simulation (replaces hardcoded 0.5 delta)
+- [x] **PROJ-10**: StandingsProjectionAgent uses allocateProjections instead of naive roster-wide summation
+- [x] **PROJ-11**: TradeRecommendationAgent uses allocateProjections for trade impact simulation with roster gap detection
+- [x] **PROJ-12**: WaiverRecommendationAgent uses allocateProjections for add/drop simulation (replaces hardcoded 0.5 delta)
 
 ## Future Requirements
 
@@ -178,9 +178,9 @@ Requirements for the In-Season Command Center milestone.
 | PROJ-07 | Phase 79 | Complete |
 | PROJ-08 | Phase 79 | Complete |
 | PROJ-09 | Phase 79 | Complete |
-| PROJ-10 | Phase 79 | Pending |
-| PROJ-11 | Phase 79 | Pending |
-| PROJ-12 | Phase 79 | Pending |
+| PROJ-10 | Phase 79 | Complete |
+| PROJ-11 | Phase 79 | Complete |
+| PROJ-12 | Phase 79 | Complete |
 
 **Coverage:**
 - v6.0 requirements: 56 total
