@@ -4,6 +4,8 @@ import type { Database } from "../db/schema.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { calculateFinalRate, combineComponents } from "../../../shared/dist/index.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
+import { allocateProjections } from "../projection/allocator.js";
+import type { AllocationInput, RosteredPlayer } from "../projection/types.js";
 
 /**
  * Standings Projection Agent
@@ -34,10 +36,7 @@ const PITCHING_STAT_KEYS = new Set([
   "ERA", "WHIP", "K9", "WPCT",
 ]);
 
-/** Detect whether a projection is for a pitcher based on its components */
-function isPitcherProjection(components: StatComponents): boolean {
-  return (components.IP ?? 0) > 0 || (components.ER !== undefined);
-}
+const DEFAULT_GS_CAP = 200;
 
 export class StandingsProjectionAgent {
   constructor(
@@ -73,6 +72,7 @@ export class StandingsProjectionAgent {
       .executeTakeFirstOrThrow();
 
     const categories = settings.settings_json.categories as Category[];
+    const rosterSlots = (settings.settings_json as any).roster_slots as Record<string, number> || {};
 
     // Get all teams
     const teams = await this.db
@@ -81,12 +81,27 @@ export class StandingsProjectionAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    // Compute projections for each team in parallel
-    const teamProjections = await Promise.all(
-      teams.map(team =>
-        this.computeTeamProjection(leagueId, snapshotDate, team.id, projectionsRunId, categories)
-      )
-    );
+    // Fetch projection as_of_date and GS cap once for all teams
+    const projectionAsOfDate = await this.getProjectionAsOfDate(projectionsRunId);
+    const gsCap = await this.getGsCap(leagueId);
+
+    // Compute projections for each team (sequentially to avoid DB overload)
+    const teamProjections: TeamProjection[] = [];
+    for (const team of teams) {
+      const gsUsed = await this.getGsUsed(leagueId, team.id);
+      const projection = await this.computeTeamProjection(
+        leagueId,
+        snapshotDate,
+        team.id,
+        projectionsRunId,
+        categories,
+        rosterSlots,
+        gsUsed,
+        gsCap,
+        projectionAsOfDate,
+      );
+      teamProjections.push(projection);
+    }
 
     // Rank teams by category and compute roto points
     await this.rankAndStore(
@@ -103,7 +118,7 @@ export class StandingsProjectionAgent {
   }
 
   /**
-   * Compute projected totals for a single team
+   * Compute projected totals for a single team using allocateProjections
    */
   private async computeTeamProjection(
     leagueId: number,
@@ -111,6 +126,10 @@ export class StandingsProjectionAgent {
     teamId: number,
     projectionsRunId: number,
     categories: Category[],
+    rosterSlots: Record<string, number>,
+    gsUsed: number,
+    gsCap: number,
+    projectionAsOfDate: string,
   ): Promise<TeamProjection> {
     // Get current totals with components
     const currentTotals = await this.db
@@ -121,13 +140,19 @@ export class StandingsProjectionAgent {
       .where("team_id", "=", teamId)
       .execute();
 
-    // Get roster
+    // Get roster with player positions (join player table)
     const roster = await this.db
-      .selectFrom("team_roster_snapshot")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .where("team_id", "=", teamId)
+      .selectFrom("team_roster_snapshot as r")
+      .innerJoin("player as p", "p.id", "r.player_id")
+      .select([
+        "r.player_id",
+        "r.roster_status",
+        "r.roster_slot",
+        "p.positions",
+      ])
+      .where("r.league_id", "=", leagueId)
+      .where("r.snapshot_date", "=", snapshotDate)
+      .where("r.team_id", "=", teamId)
       .execute();
 
     // Get projections for roster players
@@ -141,6 +166,46 @@ export class StandingsProjectionAgent {
             .where("player_id", "in", playerIds)
             .execute()
         : [];
+
+    // Build projectionsByPlayerId map for the allocator
+    const projectionsByPlayerId = new Map<number, StatComponents>();
+    for (const proj of projections) {
+      projectionsByPlayerId.set(proj.player_id, proj.stat_components_json as StatComponents);
+    }
+
+    // Build RosteredPlayer array for the allocator
+    const rosterPlayers: RosteredPlayer[] = roster.map((r) => ({
+      playerId: r.player_id,
+      positions: (r.positions as string[]) || [],
+      rosterStatus: (r.roster_status as "active" | "bench" | "il") || "active",
+      rosterSlot: r.roster_slot || null,
+      projectedComponents: null, // filled by allocator from projectionsByPlayerId
+    }));
+
+    // Run the allocation pipeline (lineup constraints + GS cap + staleness prorating)
+    const allocationInput: AllocationInput = {
+      roster: rosterPlayers,
+      rosterSlots,
+      projectionsByPlayerId,
+      gsUsed,
+      gsCap,
+      projectionAsOfDate,
+      snapshotDate,
+    };
+
+    const allocResult = allocateProjections(allocationInput);
+
+    this.logger?.debug(
+      {
+        teamId,
+        gsUsed,
+        gsCap,
+        gsScaleFactor: allocResult.gsScaleFactor,
+        prorateFactor: allocResult.prorateFactor,
+        gapCount: allocResult.gaps.length,
+      },
+      "Allocation result for team",
+    );
 
     const categoryProjections = new Map<
       string,
@@ -156,22 +221,15 @@ export class StandingsProjectionAgent {
         (t) => t.category_id === category.category_id,
       );
 
-      // Filter projections by category type to avoid cross-contamination
-      // (e.g., batter H/BB inflating pitcher WHIP, pitcher BB inflating batter BB)
+      // Use the allocated components (pitcher vs batter split done by allocator)
       const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-      const relevantProjections = projections.filter((proj) => {
-        const components = proj.stat_components_json as StatComponents;
-        const isPitcher = isPitcherProjection(components);
-        return isPitchingCat ? isPitcher : !isPitcher;
-      });
+      const projectedComponents = isPitchingCat
+        ? allocResult.pitcherComponents
+        : allocResult.batterComponents;
 
       if (category.type === "COUNTING") {
-        // Sum projected counting stats
-        const projectedSum = relevantProjections.reduce((sum, proj) => {
-          const components = proj.stat_components_json as StatComponents;
-          return sum + (components[category.stat_key] || 0);
-        }, 0);
-
+        // Current totals + allocated projected counting stats
+        const projectedSum = projectedComponents[category.stat_key] || 0;
         const finalValue = Number(currentTotal?.value || 0) + projectedSum;
 
         categoryProjections.set(category.category_id, {
@@ -180,15 +238,9 @@ export class StandingsProjectionAgent {
           isDegraded: false,
         });
       } else if (category.type === "RATE") {
-        // Component-based rate calculation
+        // Component-based rate: combine current actuals + allocated projected components
         const currentComponents = (currentTotal?.components_json ||
           {}) as StatComponents;
-
-        // Sum projected components
-        const projectedComponents = relevantProjections.reduce((acc, proj) => {
-          const components = proj.stat_components_json as StatComponents;
-          return combineComponents(acc, components);
-        }, {} as StatComponents);
 
         try {
           const finalValue = calculateFinalRate(
@@ -326,5 +378,73 @@ export class StandingsProjectionAgent {
         )
         .execute();
     }
+  }
+
+  /**
+   * Get GS already used by this team from ESPN raw payload or fallback to 0
+   */
+  private async getGsUsed(leagueId: number, teamId: number): Promise<number> {
+    const team = await this.db
+      .selectFrom("team")
+      .select(["espn_team_id"])
+      .where("id", "=", teamId)
+      .executeTakeFirst();
+
+    if (team) {
+      const latestPayload = await this.db
+        .selectFrom("league_raw_payload")
+        .select(["response_json"])
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst();
+
+      if (latestPayload) {
+        const raw = latestPayload.response_json as any;
+        const espnTeam = raw?.teams?.find(
+          (t: any) => t.id === team.espn_team_id,
+        );
+        const gsFromEspn = espnTeam?.valuesByStat?.[33];
+        if (typeof gsFromEspn === "number" && gsFromEspn >= 0) {
+          return gsFromEspn;
+        }
+      }
+    }
+
+    // Fallback: return 0 (conservative -- lets GS cap apply fully)
+    return 0;
+  }
+
+  /**
+   * Get GS cap for the league from settings or use default 200
+   */
+  private async getGsCap(leagueId: number): Promise<number> {
+    const settings = await this.db
+      .selectFrom("league_settings_version")
+      .select("settings_json")
+      .where("league_id", "=", leagueId)
+      .orderBy("effective_date", "desc")
+      .executeTakeFirst();
+
+    if (settings?.settings_json) {
+      const json = settings.settings_json as unknown as Record<string, unknown>;
+      const rosterSlots = json.roster_slots as Record<string, number> | undefined;
+      if (rosterSlots?.GS_LIMIT !== undefined) {
+        return rosterSlots.GS_LIMIT;
+      }
+    }
+
+    return DEFAULT_GS_CAP;
+  }
+
+  /**
+   * Get the as_of_date for a projections run (for staleness prorating)
+   */
+  private async getProjectionAsOfDate(projectionsRunId: number): Promise<string> {
+    const run = await this.db
+      .selectFrom("projections_run")
+      .select("as_of_date")
+      .where("id", "=", projectionsRunId)
+      .executeTakeFirstOrThrow();
+    return run.as_of_date;
   }
 }
