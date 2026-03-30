@@ -6,6 +6,9 @@ import {
   type RosterValidationResult,
   type StatComponents,
 } from "../../../shared/dist/index.js";
+import { allocateProjections } from "../projection/allocator.js";
+import type { AllocationInput, RosteredPlayer, RosterGap } from "../projection/types.js";
+import { canFillSlot } from "../projection/slot-eligibility.js";
 // ASV (Average Season Value) is stored on player.espn_asv, populated by snapshot pipeline
 
 /**
@@ -69,6 +72,7 @@ export interface TradeImpactAnalysis {
   fairnessScore: number; // -1 (bad for you) to 1 (great for you)
   recommendation: "accept" | "decline" | "consider";
   explanation: string;
+  rosterGaps?: RosterGap[]; // Gaps detected in post-trade roster via allocateProjections
 }
 
 export interface PositionalContext {
@@ -208,7 +212,7 @@ export class TradeRecommendationAgent {
       for (const player of postTradeRoster) {
         if (assigned.has(player.playerId)) continue;
 
-        const eligible = this.canFillSlot(player.positions, slotType);
+        const eligible = canFillSlot(player.positions, slotType);
         if (eligible && filled < count) {
           assigned.add(player.playerId);
           filled++;
@@ -230,34 +234,6 @@ export class TradeRecommendationAgent {
       isLegal: issues.length === 0,
       issues,
     };
-  }
-
-  /**
-   * Helper: Check if a player can fill a specific roster slot
-   */
-  private canFillSlot(playerPositions: string[], slotType: string): boolean {
-    // UTIL, BN, IL, DH accept any position
-    if (slotType === "UTIL" || slotType === "BN" || slotType === "IL" || slotType === "DH") {
-      return true;
-    }
-
-    // P slot accepts SP or RP
-    if (slotType === "P") {
-      return playerPositions.some((pos) => pos === "SP" || pos === "RP");
-    }
-
-    // MI (middle infield) accepts 2B or SS
-    if (slotType === "MI") {
-      return playerPositions.some((pos) => pos === "2B" || pos === "SS");
-    }
-
-    // CI (corner infield) accepts 1B or 3B
-    if (slotType === "CI") {
-      return playerPositions.some((pos) => pos === "1B" || pos === "3B");
-    }
-
-    // Specific slots require exact position match
-    return playerPositions.includes(slotType);
   }
 
   /**
@@ -329,6 +305,16 @@ export class TradeRecommendationAgent {
       projections,
     );
 
+    // Detect roster gaps via allocateProjections on the post-trade roster
+    const rosterGaps = await this.detectPostTradeGaps(
+      leagueId,
+      teamId,
+      snapshotDate,
+      roster,
+      trade,
+      snapshot.projections_run_id ?? undefined,
+    );
+
     // Calculate fairness score
     const fairnessScore = this.calculateFairnessScore(
       currentStandings.overallPoints,
@@ -363,6 +349,7 @@ export class TradeRecommendationAgent {
       fairnessScore,
       recommendation,
       explanation,
+      rosterGaps,
     };
   }
 
@@ -1174,7 +1161,7 @@ export class TradeRecommendationAgent {
 
       let count = 0;
       for (const player of roster) {
-        if (this.canFillSlot(player.positions, position)) {
+        if (canFillSlot(player.positions, position)) {
           count++;
         }
       }
@@ -1253,6 +1240,164 @@ export class TradeRecommendationAgent {
       needPositions,
       positionalBonus,
     };
+  }
+
+  /**
+   * Detect roster gaps in the post-trade roster using allocateProjections.
+   * Called once per analyzeTradeImpact (not per candidate — too expensive).
+   */
+  private async detectPostTradeGaps(
+    leagueId: number,
+    teamId: number,
+    snapshotDate: string,
+    currentRoster: Array<{ player_id: number; positions: string[]; roster_status: string }>,
+    trade: ProposedTrade,
+    projectionsRunId?: number,
+  ): Promise<RosterGap[]> {
+    // Get league settings for rosterSlots
+    const settingsVersion = await this.db
+      .selectFrom("league_daily_snapshot")
+      .innerJoin(
+        "league_settings_version",
+        "league_daily_snapshot.settings_version_id",
+        "league_settings_version.id",
+      )
+      .select(["league_settings_version.settings_json"])
+      .where("league_daily_snapshot.league_id", "=", leagueId)
+      .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    if (!settingsVersion) return [];
+
+    const rosterSlots = settingsVersion.settings_json.roster_slots || {};
+
+    // Build post-trade roster: remove givePlayers, add receivePlayers
+    const givePlayerIds = new Set(trade.givePlayers.map((p) => p.playerId));
+    const postTradeRoster = currentRoster.filter(
+      (p) => !givePlayerIds.has(p.player_id),
+    );
+
+    // Add received players with their positions
+    if (trade.receivePlayers.length > 0) {
+      const receiveIds = trade.receivePlayers.map((p) => p.playerId);
+      const receivedPlayers = await this.db
+        .selectFrom("player")
+        .select(["id", "positions"])
+        .where("id", "in", receiveIds)
+        .execute();
+
+      for (const rp of receivedPlayers) {
+        postTradeRoster.push({
+          player_id: rp.id,
+          positions: rp.positions as string[],
+          roster_status: "active",
+        });
+      }
+    }
+
+    // Get projections for the post-trade roster
+    const postTradePlayerIds = postTradeRoster.map((p) => p.player_id);
+    let projectionsByPlayerId = new Map<number, StatComponents>();
+
+    if (projectionsRunId && postTradePlayerIds.length > 0) {
+      const projs = await this.db
+        .selectFrom("player_projection")
+        .select(["player_id", "stat_components_json"])
+        .where("projections_run_id", "=", projectionsRunId)
+        .where("player_id", "in", postTradePlayerIds)
+        .execute();
+
+      for (const p of projs) {
+        projectionsByPlayerId.set(p.player_id, p.stat_components_json as StatComponents);
+      }
+    }
+
+    // Get GS data for the team
+    const { gsUsed, gsCap } = await this.getGsData(leagueId, teamId);
+
+    // Get projection as_of_date
+    let projectionAsOfDate = snapshotDate;
+    if (projectionsRunId) {
+      const run = await this.db
+        .selectFrom("projections_run")
+        .select("as_of_date")
+        .where("id", "=", projectionsRunId)
+        .executeTakeFirst();
+      if (run) projectionAsOfDate = run.as_of_date;
+    }
+
+    // Build RosteredPlayer[] for allocator
+    const rosterPlayers: RosteredPlayer[] = postTradeRoster.map((r) => ({
+      playerId: r.player_id,
+      positions: (r.positions as string[]) || [],
+      rosterStatus: (r.roster_status as "active" | "bench" | "il") || "active",
+      rosterSlot: null,
+      projectedComponents: null,
+    }));
+
+    const allocationInput: AllocationInput = {
+      roster: rosterPlayers,
+      rosterSlots,
+      projectionsByPlayerId,
+      gsUsed,
+      gsCap,
+      projectionAsOfDate,
+      snapshotDate,
+    };
+
+    const result = allocateProjections(allocationInput);
+    return result.gaps;
+  }
+
+  /**
+   * Get GS used and GS cap for a team (used for allocateProjections)
+   */
+  private async getGsData(leagueId: number, teamId: number): Promise<{ gsUsed: number; gsCap: number }> {
+    const DEFAULT_GS_CAP = 200;
+
+    // Get GS cap from league settings
+    const settings = await this.db
+      .selectFrom("league_settings_version")
+      .select("settings_json")
+      .where("league_id", "=", leagueId)
+      .orderBy("effective_date", "desc")
+      .executeTakeFirst();
+
+    let gsCap = DEFAULT_GS_CAP;
+    if (settings?.settings_json) {
+      const json = settings.settings_json as unknown as Record<string, unknown>;
+      const rosterSlots = json.roster_slots as Record<string, number> | undefined;
+      if (rosterSlots?.GS_LIMIT !== undefined) {
+        gsCap = rosterSlots.GS_LIMIT;
+      }
+    }
+
+    // Get GS used from ESPN raw payload
+    const team = await this.db
+      .selectFrom("team")
+      .select(["espn_team_id"])
+      .where("id", "=", teamId)
+      .executeTakeFirst();
+
+    if (team) {
+      const latestPayload = await this.db
+        .selectFrom("league_raw_payload")
+        .select(["response_json"])
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst();
+
+      if (latestPayload) {
+        const raw = latestPayload.response_json as any;
+        const espnTeam = raw?.teams?.find((t: any) => t.id === team.espn_team_id);
+        const gsFromEspn = espnTeam?.valuesByStat?.[33];
+        if (typeof gsFromEspn === "number" && gsFromEspn >= 0) {
+          return { gsUsed: gsFromEspn, gsCap };
+        }
+      }
+    }
+
+    return { gsUsed: 0, gsCap };
   }
 
   private generateTradeExplanation(

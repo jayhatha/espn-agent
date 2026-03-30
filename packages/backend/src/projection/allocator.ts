@@ -176,11 +176,6 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     spProjections,
   );
 
-  // Build lookup: playerId -> scaled SP components
-  const scaledSpComponents = new Map<number, StatComponents>(
-    scaledProjections.map((sp) => [sp.playerId, sp.scaledComponents]),
-  );
-
   // ── 8. Sum batter components ──────────────────────────────────────────────────
   let batterComponents: StatComponents = {};
 
@@ -207,7 +202,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
   let pitcherComponents: StatComponents = {};
 
   // Add scaled SP components
-  for (const { playerId, scaledComponents } of scaledProjections) {
+  for (const { scaledComponents } of scaledProjections) {
     const pitchComponents = extractPitcherComponents(scaledComponents);
     if (Object.keys(pitchComponents).length > 0) {
       pitcherComponents = combineComponents(pitcherComponents, pitchComponents);

@@ -5,6 +5,8 @@ import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { calculateFinalRate } from "../../../shared/dist/index.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { allocateProjections } from "../projection/allocator.js";
+import type { AllocationInput, RosteredPlayer, RosterGap } from "../projection/types.js";
 
 /**
  * Waiver Recommendation Agent
@@ -43,6 +45,7 @@ export interface WaiverRecommendation {
   topCategoryLabel?: string;
   isLegal: boolean;
   legalityIssues?: string[];
+  rosterGaps?: RosterGap[]; // Roster gaps detected in post-add roster via allocateProjections
 }
 
 export class WaiverRecommendationAgent {
@@ -353,7 +356,30 @@ export class WaiverRecommendationAgent {
       illegalCount: recommendations.length - legalRecommendations.length,
     }, "Filtered recommendations by position legality");
 
-    return legalRecommendations.slice(0, maxRecommendations);
+    const topN = legalRecommendations.slice(0, maxRecommendations);
+
+    // Detect roster gaps via allocateProjections for top-N recommendations
+    const rosterSlots = (settings.settings_json as any).roster_slots as Record<string, number> || {};
+    const { gsUsed, gsCap } = await this.getGsData(leagueId, teamId);
+    const projectionAsOfDate = await this.getProjectionAsOfDate(snapshot.projections_run_id);
+
+    for (const rec of topN) {
+      const rosterGaps = this.detectPostSwapGaps(
+        rec.addPlayerId,
+        rec.dropPlayerId,
+        roster,
+        playerMap,
+        projectionMap,
+        rosterSlots,
+        gsUsed,
+        gsCap,
+        projectionAsOfDate,
+        snapshotDate,
+      );
+      rec.rosterGaps = rosterGaps;
+    }
+
+    return topN;
   }
 
   /**
@@ -588,6 +614,124 @@ export class WaiverRecommendationAgent {
     if (!top) return undefined;
 
     return `This move gets you ${top.deltaPoints > 0 ? "+" : ""}${top.deltaPoints.toFixed(0)} roto point${Math.abs(top.deltaPoints) !== 1 ? "s" : ""} in ${top.categoryName}`;
+  }
+
+  /**
+   * Detect roster gaps after an add/drop swap using allocateProjections.
+   * Called synchronously (no DB queries) using already-fetched data.
+   */
+  private detectPostSwapGaps(
+    addPlayerId: number,
+    dropPlayerId: number,
+    currentRoster: Array<{ player_id: number }>,
+    playerMap: Map<number, { id: number; name: string; positions: string[] }>,
+    projectionMap: Map<number, any>,
+    rosterSlots: Record<string, number>,
+    gsUsed: number,
+    gsCap: number,
+    projectionAsOfDate: string,
+    snapshotDate: string,
+  ): RosterGap[] {
+    // Build post-swap roster player list
+    const postSwapPlayerIds = currentRoster
+      .map((r) => r.player_id)
+      .filter((id) => id !== dropPlayerId);
+    postSwapPlayerIds.push(addPlayerId);
+
+    // Build projectionsByPlayerId map from cached data
+    const projectionsByPlayerId = new Map<number, StatComponents>();
+    for (const playerId of postSwapPlayerIds) {
+      const proj = projectionMap.get(playerId);
+      if (proj) {
+        projectionsByPlayerId.set(playerId, proj.stat_components_json as StatComponents);
+      }
+    }
+
+    // Build RosteredPlayer array
+    const rosterPlayers: RosteredPlayer[] = postSwapPlayerIds.map((playerId) => {
+      const player = playerMap.get(playerId);
+      return {
+        playerId,
+        positions: player?.positions || [],
+        rosterStatus: "active" as const,
+        rosterSlot: null,
+        projectedComponents: null,
+      };
+    });
+
+    const allocationInput: AllocationInput = {
+      roster: rosterPlayers,
+      rosterSlots,
+      projectionsByPlayerId,
+      gsUsed,
+      gsCap,
+      projectionAsOfDate,
+      snapshotDate,
+    };
+
+    const result = allocateProjections(allocationInput);
+    return result.gaps;
+  }
+
+  /**
+   * Get GS used and GS cap for a team
+   */
+  private async getGsData(leagueId: number, teamId: number): Promise<{ gsUsed: number; gsCap: number }> {
+    const DEFAULT_GS_CAP = 200;
+
+    const settings = await this.db
+      .selectFrom("league_settings_version")
+      .select("settings_json")
+      .where("league_id", "=", leagueId)
+      .orderBy("effective_date", "desc")
+      .executeTakeFirst();
+
+    let gsCap = DEFAULT_GS_CAP;
+    if (settings?.settings_json) {
+      const json = settings.settings_json as unknown as Record<string, unknown>;
+      const rosterSlots = json.roster_slots as Record<string, number> | undefined;
+      if (rosterSlots?.GS_LIMIT !== undefined) {
+        gsCap = rosterSlots.GS_LIMIT;
+      }
+    }
+
+    const team = await this.db
+      .selectFrom("team")
+      .select(["espn_team_id"])
+      .where("id", "=", teamId)
+      .executeTakeFirst();
+
+    if (team) {
+      const latestPayload = await this.db
+        .selectFrom("league_raw_payload")
+        .select(["response_json"])
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst();
+
+      if (latestPayload) {
+        const raw = latestPayload.response_json as any;
+        const espnTeam = raw?.teams?.find((t: any) => t.id === team.espn_team_id);
+        const gsFromEspn = espnTeam?.valuesByStat?.[33];
+        if (typeof gsFromEspn === "number" && gsFromEspn >= 0) {
+          return { gsUsed: gsFromEspn, gsCap };
+        }
+      }
+    }
+
+    return { gsUsed: 0, gsCap };
+  }
+
+  /**
+   * Get projection as_of_date for staleness prorating
+   */
+  private async getProjectionAsOfDate(projectionsRunId: number): Promise<string> {
+    const run = await this.db
+      .selectFrom("projections_run")
+      .select("as_of_date")
+      .where("id", "=", projectionsRunId)
+      .executeTakeFirstOrThrow();
+    return run.as_of_date;
   }
 
   /**
