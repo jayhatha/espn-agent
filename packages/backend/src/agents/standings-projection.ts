@@ -5,7 +5,8 @@ import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { calculateFinalRate, combineComponents } from "../../../shared/dist/index.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
 import { allocateProjections } from "../projection/allocator.js";
-import type { AllocationInput, RosteredPlayer } from "../projection/types.js";
+import { computeRateConfidence } from "../projection/variance.js";
+import type { AllocationInput, RosteredPlayer, ConfidenceInterval } from "../projection/types.js";
 
 /**
  * Standings Projection Agent
@@ -23,6 +24,7 @@ interface TeamProjection {
       value: number;
       components: StatComponents;
       isDegraded: boolean;
+      confidence?: ConfidenceInterval;
     }
   >;
 }
@@ -213,6 +215,7 @@ export class StandingsProjectionAgent {
         value: number;
         components: StatComponents;
         isDegraded: boolean;
+        confidence?: ConfidenceInterval;
       }
     >();
 
@@ -227,15 +230,28 @@ export class StandingsProjectionAgent {
         ? allocResult.pitcherComponents
         : allocResult.batterComponents;
 
+      // Get confidence interval for this stat from allocator
+      const confidenceMap = isPitchingCat
+        ? allocResult.pitcherConfidence
+        : allocResult.batterConfidence;
+
       if (category.type === "COUNTING") {
         // Current totals + allocated projected counting stats
         const projectedSum = projectedComponents[category.stat_key] || 0;
-        const finalValue = Number(currentTotal?.value || 0) + projectedSum;
+        const currentValue = Number(currentTotal?.value || 0);
+        const finalValue = currentValue + projectedSum;
+
+        // Build confidence interval: current (fixed) + projected range
+        const ci = confidenceMap[category.stat_key];
+        const confidence: ConfidenceInterval | undefined = ci
+          ? { p10: currentValue + ci.p10, p50: finalValue, p90: currentValue + ci.p90 }
+          : undefined;
 
         categoryProjections.set(category.category_id, {
           value: finalValue,
           components: {},
           isDegraded: false,
+          confidence,
         });
       } else if (category.type === "RATE") {
         // Component-based rate: combine current actuals + allocated projected components
@@ -249,13 +265,23 @@ export class StandingsProjectionAgent {
             projectedComponents,
           );
 
+          const combinedComponents = combineComponents(currentComponents, projectedComponents);
+
+          // Compute rate stat confidence by varying components
+          const formulaId = category.formula_id || category.stat_key.toLowerCase();
+          const rateFn = (c: StatComponents) => {
+            try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
+          };
+          const componentKeys = Object.keys(projectedComponents).filter(
+            (k) => typeof projectedComponents[k] === "number" && (projectedComponents[k] as number) > 0,
+          );
+          const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
+
           categoryProjections.set(category.category_id, {
             value: finalValue,
-            components: combineComponents(
-              currentComponents,
-              projectedComponents,
-            ),
+            components: combinedComponents,
             isDegraded: false,
+            confidence: rateCI,
           });
         } catch (error) {
           this.logger?.warn(
@@ -304,12 +330,15 @@ export class StandingsProjectionAgent {
     const teamOverallPoints = new Map<number, number>();
 
     for (const category of categories) {
-      const values = teamProjections.map((tp) => ({
-        teamId: tp.teamId,
-        value: tp.categoryProjections.get(category.category_id)?.value || 0,
-        components:
-          tp.categoryProjections.get(category.category_id)?.components || {},
-      }));
+      const values = teamProjections.map((tp) => {
+        const catProj = tp.categoryProjections.get(category.category_id);
+        return {
+          teamId: tp.teamId,
+          value: catProj?.value || 0,
+          components: catProj?.components || {},
+          confidence: catProj?.confidence || undefined,
+        };
+      });
 
       // Sort by direction
       values.sort((a, b) => {
@@ -337,6 +366,11 @@ export class StandingsProjectionAgent {
         const currentPoints = teamOverallPoints.get(values[i].teamId) || 0;
         teamOverallPoints.set(values[i].teamId, currentPoints + rotoPoints);
 
+        // Store components + confidence intervals in JSONB column
+        const componentsWithConfidence = values[i].confidence
+          ? { ...values[i].components, confidence: values[i].confidence }
+          : values[i].components;
+
         categoryRows.push({
           league_id: leagueId,
           snapshot_date: snapshotDate,
@@ -345,7 +379,7 @@ export class StandingsProjectionAgent {
           projected_value: values[i].value,
           projected_rank: rank,
           projected_roto_points: rotoPoints,
-          projected_components_json: values[i].components,
+          projected_components_json: componentsWithConfidence as StatComponents,
         });
       }
 

@@ -3,6 +3,7 @@ import { combineComponents } from "../../../shared/dist/index.js";
 import { computeProrateFactor, prorateComponents } from "./staleness.js";
 import { allocateLineup } from "./hitter-allocation.js";
 import { applyGsCap } from "./pitcher-scaling.js";
+import { computeConfidenceIntervals } from "./variance.js";
 import type { AllocationInput, AllocationResult, RosteredPlayer, RosterGap } from "./types.js";
 
 /**
@@ -138,6 +139,8 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
       gaps: [],
       gsScaleFactor: 1.0,
       prorateFactor,
+      batterConfidence: {},
+      pitcherConfidence: {},
     };
   }
 
@@ -192,6 +195,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
 
   // ── 8. Sum batter components ──────────────────────────────────────────────────
   let batterComponents: StatComponents = {};
+  const perPlayerBatterProjections: StatComponents[] = [];
 
   for (const assignment of starterAssignments) {
     const player = playerMap.get(assignment.playerId);
@@ -202,24 +206,24 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     // Skip pitcher-only players in batter summation
     if (isPitcherOnly(components)) continue;
 
-    // For two-way players (like Ohtani), extract only batting components
-    const batComponents = isTwoWayPlayer(components)
-      ? extractBatterComponents(components)
-      : extractBatterComponents(components);
+    const batComponents = extractBatterComponents(components);
 
     if (Object.keys(batComponents).length > 0) {
       batterComponents = combineComponents(batterComponents, batComponents);
+      perPlayerBatterProjections.push(batComponents);
     }
   }
 
   // ── 9. Sum pitcher components ─────────────────────────────────────────────────
   let pitcherComponents: StatComponents = {};
+  const perPlayerPitcherProjections: StatComponents[] = [];
 
   // Add scaled SP components
   for (const { scaledComponents } of scaledProjections) {
     const pitchComponents = extractPitcherComponents(scaledComponents);
     if (Object.keys(pitchComponents).length > 0) {
       pitcherComponents = combineComponents(pitcherComponents, pitchComponents);
+      perPlayerPitcherProjections.push(pitchComponents);
     }
   }
 
@@ -232,6 +236,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     const pitchComponents = extractPitcherComponents(player.projectedComponents);
     if (Object.keys(pitchComponents).length > 0) {
       pitcherComponents = combineComponents(pitcherComponents, pitchComponents);
+      perPlayerPitcherProjections.push(pitchComponents);
     }
   }
 
@@ -250,9 +255,17 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
       const pitchComponents = extractPitcherComponents(player.projectedComponents);
       if (Object.keys(pitchComponents).length > 0) {
         pitcherComponents = combineComponents(pitcherComponents, pitchComponents);
+        perPlayerPitcherProjections.push(pitchComponents);
       }
     }
   }
+
+  // ── 9b. Compute confidence intervals from per-player data ─────────────────────
+  const BATTER_COUNTING_KEYS = ["HR", "R", "RBI", "SB", "H", "AB", "BB", "HBP", "SF", "TB"];
+  const PITCHER_COUNTING_KEYS = ["K", "W", "SV", "HLD", "QS", "IP", "ER", "HA", "BBA"];
+
+  const batterConfidence = computeConfidenceIntervals(perPlayerBatterProjections, BATTER_COUNTING_KEYS);
+  const pitcherConfidence = computeConfidenceIntervals(perPlayerPitcherProjections, PITCHER_COUNTING_KEYS);
 
   // ── 10. Detect roster gaps ─────────────────────────────────────────────────────
   const gaps: RosterGap[] = [];
@@ -288,5 +301,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     gaps,
     gsScaleFactor,
     prorateFactor,
+    batterConfidence,
+    pitcherConfidence,
   };
 }

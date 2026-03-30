@@ -31,6 +31,12 @@ export interface AllocationInput {
   seasonEndDate?: string; // default "2026-09-28"
 }
 
+export interface ConfidenceInterval {
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
 export interface AllocationResult {
   batterComponents: StatComponents;
   pitcherComponents: StatComponents;
@@ -38,4 +44,7 @@ export interface AllocationResult {
   gaps: RosterGap[];
   gsScaleFactor: number;
   prorateFactor: number;
+  /** Per-stat confidence intervals for counting stats (keyed by stat key) */
+  batterConfidence: Record<string, ConfidenceInterval>;
+  pitcherConfidence: Record<string, ConfidenceInterval>;
 }

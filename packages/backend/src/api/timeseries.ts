@@ -418,10 +418,15 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         snapshotDate: targetDate,
         previousSnapshotDate: previousSnapshot?.snapshot_date ?? null,
         categories,
-        categoryStandings: categoryStandings.map((cs) => ({
-          ...cs,
-          teamName: teamMap.get(cs.team_id)?.name || `Team ${cs.team_id}`,
-        })),
+        categoryStandings: categoryStandings.map((cs) => {
+          const componentsJson = cs.projected_components_json as Record<string, unknown> | null;
+          const confidence = componentsJson?.confidence as { p10: number; p50: number; p90: number } | undefined;
+          return {
+            ...cs,
+            teamName: teamMap.get(cs.team_id)?.name || `Team ${cs.team_id}`,
+            confidence: confidence || null,
+          };
+        }),
         overallStandings: overallStandings.map((os) => {
           const prevPoints = previousOverallMap.get(os.team_id);
           return {
