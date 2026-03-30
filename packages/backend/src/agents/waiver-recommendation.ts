@@ -282,10 +282,29 @@ export class WaiverRecommendationAgent {
       }
     }
 
-    // Simulate add/drops
-    const recommendations: WaiverRecommendation[] = [];
+    // Pre-score free agents by projection value to limit simulation pool
+    const scoredFreeAgents = freeAgents
+      .map((id) => {
+        const proj = projectionMap.get(id);
+        if (!proj) return { id, score: 0 };
+        const c = proj.stat_components_json as Record<string, number>;
+        // Quick value score: HR + RBI + R + SB for hitters, K + W*5 + SV*5 for pitchers
+        const isPitcher = (c.IP ?? 0) > 0 && (c.AB ?? 0) === 0;
+        const score = isPitcher
+          ? (c.K ?? 0) + (c.W ?? 0) * 5 + (c.SV ?? 0) * 5
+          : (c.HR ?? 0) + (c.RBI ?? 0) + (c.R ?? 0) + (c.SB ?? 0);
+        return { id, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 40); // Top 40 free agents by projected value
 
-    for (const addPlayerId of freeAgents) {
+    // Simulate add/drops with early exit
+    const recommendations: WaiverRecommendation[] = [];
+    const TARGET_RECS = maxRecommendations * 3; // Collect 3x target to allow filtering
+
+    for (const { id: addPlayerId } of scoredFreeAgents) {
+      if (recommendations.length >= TARGET_RECS) break; // Early exit
+
       for (const rosterPlayer of roster) {
         const dropPlayerId = rosterPlayer.player_id;
 
@@ -315,14 +334,6 @@ export class WaiverRecommendationAgent {
               addPlayer.positions,
               dropPlayer.positions
             );
-
-            this.logger?.info({
-              addPlayer: addPlayer.name,
-              addPositions: addPlayer.positions,
-              dropPlayer: dropPlayer.name,
-              dropPositions: dropPlayer.positions,
-              canReplace,
-            }, "Position validation result for recommendation");
 
             const isLegal = canReplace;
             const legalityIssues = canReplace
@@ -360,8 +371,10 @@ export class WaiverRecommendationAgent {
 
     // Detect roster gaps via allocateProjections for top-N recommendations
     const rosterSlots = (settings.settings_json as any).roster_slots as Record<string, number> || {};
-    const { gsUsed, gsCap } = await this.getGsData(leagueId, teamId);
-    const projectionAsOfDate = await this.getProjectionAsOfDate(snapshot.projections_run_id);
+    const [{ gsUsed, gsCap }, projectionAsOfDate] = await Promise.all([
+      this.getGsData(leagueId, teamId),
+      this.getProjectionAsOfDate(snapshot.projections_run_id),
+    ]);
 
     for (const rec of topN) {
       const rosterGaps = this.detectPostSwapGaps(

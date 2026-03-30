@@ -275,42 +275,46 @@ export class GsPacingAgent {
       .orderBy("as_of_date", "desc")
       .executeTakeFirst();
 
+    // Batch-fetch all SP projections upfront (avoids N+1 query per pitcher)
+    const spEligiblePitchers = rosterPitchers.filter(
+      (p) => ((p.positions as string[]) ?? []).includes("SP"),
+    );
+    const spPlayerIds = spEligiblePitchers.map((p) => p.player_id);
+
+    const projectionMap = new Map<number, Record<string, number>>();
+    if (latestRun && spPlayerIds.length > 0) {
+      const projections = await this.db
+        .selectFrom("player_projection")
+        .select(["player_id", "stat_components_json"])
+        .where("projections_run_id", "=", latestRun.id)
+        .where("player_id", "in", spPlayerIds)
+        .execute();
+
+      for (const proj of projections) {
+        projectionMap.set(proj.player_id, proj.stat_components_json as Record<string, number>);
+      }
+    }
+
     // Build recommendations
     const recommendations: GsStartRecommendation[] = [];
 
-    for (const pitcher of rosterPitchers) {
-      // Only include pitchers with SP eligibility
-      const positions = (pitcher.positions as string[]) ?? [];
-      if (!positions.includes("SP")) continue;
-
+    for (const pitcher of spEligiblePitchers) {
       let projectedK: number | null = null;
       let projectedIP: number | null = null;
       let kPerGs: number | null = null;
 
-      if (latestRun) {
-        const projection = await this.db
-          .selectFrom("player_projection")
-          .select("stat_components_json")
-          .where("projections_run_id", "=", latestRun.id)
-          .where("player_id", "=", pitcher.player_id)
-          .executeTakeFirst();
+      const components = projectionMap.get(pitcher.player_id);
+      if (components) {
+        projectedK = components.K ?? null;
+        projectedIP = components.IP ?? null;
 
-        if (projection) {
-          const components = projection.stat_components_json as Record<
-            string,
-            number
-          >;
-          projectedK = components.K ?? null;
-          projectedIP = components.IP ?? null;
-
-          // Approximate K/GS: assume ~6 IP per GS
-          if (projectedIP && projectedIP > 0) {
-            const estimatedGS = projectedIP / 6;
-            kPerGs =
-              estimatedGS > 0 && projectedK
-                ? Math.round((projectedK / estimatedGS) * 10) / 10
-                : null;
-          }
+        // Approximate K/GS: assume ~6 IP per GS
+        if (projectedIP && projectedIP > 0) {
+          const estimatedGS = projectedIP / 6;
+          kPerGs =
+            estimatedGS > 0 && projectedK
+              ? Math.round((projectedK / estimatedGS) * 10) / 10
+              : null;
         }
       }
 
