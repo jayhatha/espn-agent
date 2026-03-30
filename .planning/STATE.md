@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 78-02-PLAN.md
-last_updated: "2026-03-27T19:17:05.711Z"
+status: Ready to execute
+stopped_at: Completed 79-01-PLAN.md
+last_updated: "2026-03-30T17:56:39.251Z"
 progress:
-  total_phases: 14
+  total_phases: 15
   completed_phases: 14
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 32
+  completed_plans: 29
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 78 — streaming-picks-merge-rotoballer-verdicts-and-waiver-pickup-timing-into-streaming-tab
+**Current focus:** Phase 79 — sophisticated-projection-model
 
 ## Current Position
 
-Phase: 78
-Plan: Not started
+Phase: 79 (sophisticated-projection-model) — EXECUTING
+Plan: 2 of 4
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: Not started
 | Phase 77-sp-sit-start P02 | 3 min | 2 tasks | 2 files |
 | Phase 78-streaming-picks P01 | 2 | 2 tasks | 2 files |
 | Phase 78-streaming-picks P02 | 1 | 1 tasks | 1 files |
+| Phase 79 P01 | 4min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,9 @@ Plan: Not started
 - [Phase 77-sp-sit-start]: Verdict table uses inline helper functions rather than separate component — consistent with existing page pattern
 - [Phase 78-streaming-picks]: Pickup deadline uses Tue/Fri (days 2 and 5) hardcoded; graceful degradation skips verdict filter when Rotoballer returns empty; normalizeName reused from sit-start-advisor.ts replacing inline normalize()
 - [Phase 78-streaming-picks]: Reused existing getVerdictBadgeVariant and formatVerdict — no new copies per D-06; verdict badge + claim-by date placed inline in player info line; Rotoballer source attribution above candidate list
+- [Phase 79-01]: canFillSlot extracted as standalone export in projection/slot-eligibility.ts with added OF slot rule (was missing from TradeRecommendationAgent)
+- [Phase 79-01]: computeProrateFactor: factor = remainingFromToday/remainingFromAsOf, clamped 0-1; same-day=1.0, past-end=0.0, future asOf=1.0
+- [Phase 79-01]: FanGraphs ingest parses G/PA (batters) and G/GS (pitchers) into stat_components_json for allocation model use
 
 ### Roadmap Evolution
 
@@ -167,6 +171,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-27T19:45:27Z
-Stopped at: Completed quick task 260327-h2i
+Last session: 2026-03-30T17:56:39.246Z
+Stopped at: Completed 79-01-PLAN.md
 Resume file: None

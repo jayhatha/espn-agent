@@ -85,9 +85,9 @@ Requirements for the In-Season Command Center milestone.
 
 ### Sophisticated Projection Model
 
-- [ ] **PROJ-01**: FanGraphs CSV ingest parses G, PA (batters) and G, GS (pitchers) into stat_components_json
-- [ ] **PROJ-02**: Staleness prorating scales RoS projections by fraction of remaining season elapsed since upload
-- [ ] **PROJ-03**: canFillSlot extracted as standalone reusable function with OF slot rule (LF/CF/RF/OF)
+- [x] **PROJ-01**: FanGraphs CSV ingest parses G, PA (batters) and G, GS (pitchers) into stat_components_json
+- [x] **PROJ-02**: Staleness prorating scales RoS projections by fraction of remaining season elapsed since upload
+- [x] **PROJ-03**: canFillSlot extracted as standalone reusable function with OF slot rule (LF/CF/RF/OF)
 - [ ] **PROJ-04**: Hitter lineup allocation assigns best eligible players to starting slots; bench/IL contribute 0%
 - [ ] **PROJ-05**: GS cap enforcement scales SP counting components proportionally when projected GS exceeds remaining budget
 - [ ] **PROJ-06**: RP projections never scaled by GS cap
@@ -169,9 +169,9 @@ Requirements for the In-Season Command Center milestone.
 | SITSTART-03 | Phase 77 | Complete |
 | SITSTART-04 | Phase 77 | Complete |
 | SITSTART-05 | Phase 77 | Complete |
-| PROJ-01 | Phase 79 | Pending |
-| PROJ-02 | Phase 79 | Pending |
-| PROJ-03 | Phase 79 | Pending |
+| PROJ-01 | Phase 79 | Complete |
+| PROJ-02 | Phase 79 | Complete |
+| PROJ-03 | Phase 79 | Complete |
 | PROJ-04 | Phase 79 | Pending |
 | PROJ-05 | Phase 79 | Pending |
 | PROJ-06 | Phase 79 | Pending |
