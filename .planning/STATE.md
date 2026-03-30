@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
 status: Ready to execute
-stopped_at: Completed 79-02-PLAN.md
-last_updated: "2026-03-30T18:04:29.703Z"
+stopped_at: Completed 79-03-PLAN.md
+last_updated: "2026-03-30T18:12:12.685Z"
 progress:
   total_phases: 15
   completed_phases: 14
   total_plans: 32
-  completed_plans: 30
+  completed_plans: 31
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 79 (sophisticated-projection-model) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Plan: 3 of 4
 | Phase 78-streaming-picks P02 | 1 | 1 tasks | 1 files |
 | Phase 79 P01 | 4min | 2 tasks | 7 files |
 | Phase 79-sophisticated-projection-model P02 | 7min | 2 tasks | 4 files |
+| Phase 79-sophisticated-projection-model P03 | 7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,9 @@ Plan: 3 of 4
 - [Phase 79-01]: FanGraphs ingest parses G/PA (batters) and G/GS (pitchers) into stat_components_json for allocation model use
 - [Phase 79-02]: Bench/IL players bypass greedy assignment — separated before slot loop, immediately slotted with weight=0.0
 - [Phase 79-02]: applyGsCap receives only SP projections — caller (plan 79-03) filters SPs from RPs; RP isolation is an architectural boundary not enforced in this module
+- [Phase 79-03]: Two-way players (Ohtani) contribute batting to batterComponents AND pitching to pitcherComponents; detected via IP>0 && AB>0
+- [Phase 79-03]: WHIP confidence interval is stable when IP/HA/BBA all have equal CV=0.20 -- ratio stays constant under proportional scaling; ERA shows real variance since ER CV (0.25) differs from IP CV (0.20)
+- [Phase 79-03]: allocateProjections pipeline order: prorate -> attach projections -> greedy lineup -> split SP/RP -> GS cap scale SPs -> sum batter components -> sum pitcher components (scaled SP + unscaled RP) -> detect roster gaps
 
 ### Roadmap Evolution
 
@@ -174,6 +178,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T18:04:29.698Z
-Stopped at: Completed 79-02-PLAN.md
+Last session: 2026-03-30T18:12:12.679Z
+Stopped at: Completed 79-03-PLAN.md
 Resume file: None

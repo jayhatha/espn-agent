@@ -88,12 +88,12 @@ Requirements for the In-Season Command Center milestone.
 - [x] **PROJ-01**: FanGraphs CSV ingest parses G, PA (batters) and G, GS (pitchers) into stat_components_json
 - [x] **PROJ-02**: Staleness prorating scales RoS projections by fraction of remaining season elapsed since upload
 - [x] **PROJ-03**: canFillSlot extracted as standalone reusable function with OF slot rule (LF/CF/RF/OF)
-- [ ] **PROJ-04**: Hitter lineup allocation assigns best eligible players to starting slots; bench/IL contribute 0%
-- [ ] **PROJ-05**: GS cap enforcement scales SP counting components proportionally when projected GS exceeds remaining budget
-- [ ] **PROJ-06**: RP projections never scaled by GS cap
-- [ ] **PROJ-07**: Unified allocation pipeline chains prorate -> allocate hitters -> scale pitchers -> sum components
-- [ ] **PROJ-08**: Two-way players (Ohtani) contribute batting stats to hitter categories and pitching stats to pitcher categories
-- [ ] **PROJ-09**: Confidence intervals (P10/P50/P90) computed per category using per-stat CV model
+- [x] **PROJ-04**: Hitter lineup allocation assigns best eligible players to starting slots; bench/IL contribute 0%
+- [x] **PROJ-05**: GS cap enforcement scales SP counting components proportionally when projected GS exceeds remaining budget
+- [x] **PROJ-06**: RP projections never scaled by GS cap
+- [x] **PROJ-07**: Unified allocation pipeline chains prorate -> allocate hitters -> scale pitchers -> sum components
+- [x] **PROJ-08**: Two-way players (Ohtani) contribute batting stats to hitter categories and pitching stats to pitcher categories
+- [x] **PROJ-09**: Confidence intervals (P10/P50/P90) computed per category using per-stat CV model
 - [ ] **PROJ-10**: StandingsProjectionAgent uses allocateProjections instead of naive roster-wide summation
 - [ ] **PROJ-11**: TradeRecommendationAgent uses allocateProjections for trade impact simulation with roster gap detection
 - [ ] **PROJ-12**: WaiverRecommendationAgent uses allocateProjections for add/drop simulation (replaces hardcoded 0.5 delta)
@@ -172,12 +172,12 @@ Requirements for the In-Season Command Center milestone.
 | PROJ-01 | Phase 79 | Complete |
 | PROJ-02 | Phase 79 | Complete |
 | PROJ-03 | Phase 79 | Complete |
-| PROJ-04 | Phase 79 | Pending |
-| PROJ-05 | Phase 79 | Pending |
-| PROJ-06 | Phase 79 | Pending |
-| PROJ-07 | Phase 79 | Pending |
-| PROJ-08 | Phase 79 | Pending |
-| PROJ-09 | Phase 79 | Pending |
+| PROJ-04 | Phase 79 | Complete |
+| PROJ-05 | Phase 79 | Complete |
+| PROJ-06 | Phase 79 | Complete |
+| PROJ-07 | Phase 79 | Complete |
+| PROJ-08 | Phase 79 | Complete |
+| PROJ-09 | Phase 79 | Complete |
 | PROJ-10 | Phase 79 | Pending |
 | PROJ-11 | Phase 79 | Pending |
 | PROJ-12 | Phase 79 | Pending |

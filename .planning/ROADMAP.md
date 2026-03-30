@@ -258,10 +258,10 @@ Plans:
 **Goal:** Replace naive projection summation with a realistic allocation model that accounts for starting lineup constraints, 200 GS cap, projection staleness, and produces confidence intervals. Reusable for trade/waiver simulation with roster gap detection.
 **Depends on:** Phase 78
 **Requirements**: PROJ-01, PROJ-02, PROJ-03, PROJ-04, PROJ-05, PROJ-06, PROJ-07, PROJ-08, PROJ-09, PROJ-10, PROJ-11, PROJ-12
-**Plans:** 2/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 79-01-PLAN.md — Foundation: types, staleness prorating, slot eligibility extraction, FanGraphs G/PA/GS ingest
 - [x] 79-02-PLAN.md — Core allocation: hitter lineup assignment, GS cap-aware pitcher scaling
-- [ ] 79-03-PLAN.md — Pipeline integration: allocateProjections pipeline, variance/confidence interval model
+- [x] 79-03-PLAN.md — Pipeline integration: allocateProjections pipeline, variance/confidence interval model
 - [ ] 79-04-PLAN.md — Agent wiring: replace naive summation in standings, trade, and waiver agents
