@@ -269,6 +269,56 @@ describe("allocateProjections", () => {
     expect(result.gsScaleFactor).toBe(1.0);
   });
 
+  it("pitcher in P slot contributes to pitcherComponents (not dropped)", () => {
+    // Bug fix: pitchers in generic "P" slot were previously skipped entirely
+    const sp1 = makePlayer(1, ["SP"], "active");
+    const rpInPSlot = makePlayer(2, ["RP"], "active");
+
+    const projections = new Map([
+      [1, { IP: 180, ER: 60, HA: 150, BBA: 50, K: 200, W: 14, SV: 0, GS: 30 }],
+      [2, { IP: 65, ER: 25, HA: 55, BBA: 22, K: 70, W: 5, SV: 30, GS: 0 }],
+    ]);
+
+    const input: AllocationInput = {
+      ...DEFAULT_INPUT,
+      rosterSlots: { SP: 1, P: 1, BN: 3 },
+      roster: [sp1, rpInPSlot],
+      projectionsByPlayerId: projections,
+    };
+
+    const result = allocateProjections(input);
+
+    // Both pitchers should contribute K to pitcherComponents
+    // SP: K=200, RP in P slot: K=70 => total K=270
+    expect(result.pitcherComponents.K).toBeCloseTo(270, 1);
+    // SP IP + RP IP
+    expect(result.pitcherComponents.IP).toBeCloseTo(245, 1);
+  });
+
+  it("SP in P slot with projected GS is subject to GS cap scaling", () => {
+    // A starter placed in a "P" slot with GS > 0 should be treated as SP for GS cap
+    const spInPSlot = makePlayer(1, ["SP"], "active");
+
+    const projections = new Map([
+      [1, { IP: 120, ER: 40, HA: 100, BBA: 40, K: 130, W: 10, SV: 0, GS: 20 }],
+    ]);
+
+    const input: AllocationInput = {
+      ...DEFAULT_INPUT,
+      rosterSlots: { P: 1, BN: 3 },
+      roster: [spInPSlot],
+      projectionsByPlayerId: projections,
+      gsUsed: 190,
+      gsCap: 200,
+    };
+
+    const result = allocateProjections(input);
+
+    // gsRemaining=10, projectedGS=20 => scaleFactor=0.5
+    expect(result.gsScaleFactor).toBeCloseTo(0.5, 2);
+    expect(result.pitcherComponents.K).toBeCloseTo(65, 1); // 130 * 0.5
+  });
+
   it("bench player does not contribute to batterComponents", () => {
     const starter = makePlayer(1, ["OF"], "active");
     const benchPlayer = makePlayer(2, ["OF"], "bench");

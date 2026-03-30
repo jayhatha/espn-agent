@@ -66,17 +66,26 @@ function extractPitcherComponents(components: StatComponents): StatComponents {
 }
 
 /**
- * Check if a slot is a starting pitcher slot.
+ * Check if a slot is a pitcher slot (SP, RP, or generic P).
  */
-function isSpSlot(slotType: string): boolean {
-  return slotType === "SP";
+function isPitcherSlot(slotType: string): boolean {
+  return slotType === "SP" || slotType === "RP" || slotType === "P";
 }
 
 /**
- * Check if a slot is a relief pitcher slot.
+ * Determine if a pitcher in a given slot should be treated as an SP (subject to GS cap).
+ * SP slot = always SP. P slot = SP if projected GS > 0. RP slot = never SP.
  */
-function isRpSlot(slotType: string): boolean {
-  return slotType === "RP";
+function shouldTreatAsSP(slotType: string, components: StatComponents | null): boolean {
+  if (slotType === "SP") return true;
+  if (slotType === "RP") return false;
+  // "P" slot: classify by projected GS or IP threshold
+  if (slotType === "P" && components) {
+    if ((components.GS ?? 0) > 0) return true;
+    // Fallback: high IP without GS data suggests starter
+    if ((components.IP ?? 0) > 80 && components.GS === undefined) return true;
+  }
+  return false;
 }
 
 /**
@@ -149,6 +158,9 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
   );
 
   // ── 6. Collect SP projections for GS cap scaling ─────────────────────────────
+  // Pitchers in SP, RP, or P slots are classified:
+  //   - SP slot or P-slot with GS > 0 → SP (subject to GS cap)
+  //   - RP slot or P-slot with no GS → RP (never scaled)
   const spProjections: Array<{ playerId: number; components: StatComponents; projectedGS: number | null }> = [];
   const rpStarterIds = new Set<number>();
 
@@ -157,14 +169,16 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     const player = playerMap.get(assignment.playerId);
     if (!player || !player.projectedComponents) continue;
 
-    if (isSpSlot(slotType)) {
+    if (!isPitcherSlot(slotType)) continue;
+
+    if (shouldTreatAsSP(slotType, player.projectedComponents)) {
       const gs = player.projectedComponents.GS ?? null;
       spProjections.push({
         playerId: player.playerId,
         components: player.projectedComponents,
         projectedGS: gs,
       });
-    } else if (isRpSlot(slotType)) {
+    } else {
       rpStarterIds.add(player.playerId);
     }
   }
