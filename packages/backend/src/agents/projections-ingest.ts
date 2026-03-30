@@ -247,6 +247,9 @@ export class ProjectionsIngestAgent {
         "2B": parseFloat(row["2B"] as string) || 0,
         "3B": parseFloat(row["3B"] as string) || 0,
         CS: parseFloat(row.CS as string) || 0,
+        // Playing time fields for allocation model
+        G: parseFloat(row.G as string) || 0,
+        PA: parseFloat(row.PA as string) || 0,
       };
 
       // Match player using identity resolution
@@ -329,6 +332,9 @@ export class ProjectionsIngestAgent {
         SV: parseFloat(row.SV as string) || 0,
         HLD: parseFloat((row.HLD as string) || "0") || 0,
         QS: parseFloat((row.QS as string) || "0") || 0,
+        // Playing time fields for allocation model
+        G: parseFloat(row.G as string) || 0,
+        GS: parseFloat(row.GS as string) || 0,
       };
 
       // Match player using identity resolution
