@@ -265,7 +265,7 @@ export default function StandingsPage() {
     },
   ];
 
-  // Projected overall columns include delta
+  // Projected overall columns include delta and confidence range
   const projectedOverallColumns: StatsTableColumn[] = [
     {
       key: "rank",
@@ -292,9 +292,37 @@ export default function StandingsPage() {
       key: "points",
       label: <Term id="roto-points">Total Roto Points</Term>,
       align: "right",
-      format: (val) => (
-        <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
-      ),
+      format: (val, row) => {
+        // Compute approximate points range from per-category confidence
+        const teamId = row.team_id as number;
+        const catMap = projectedMatrix?.teamCategoryMap.get(teamId);
+        let hasConfidence = false;
+        let catCount = 0;
+        if (catMap && data?.categories) {
+          for (const cat of data.categories) {
+            const cd = catMap.get(cat.category_id) as CategoryStanding | undefined;
+            if (cd?.confidence) {
+              hasConfidence = true;
+              catCount++;
+            }
+          }
+        }
+        // Rough estimate: each category contributes ~0.5-1.5 roto point uncertainty
+        // With N categories, total SD ≈ sqrt(N) * 0.8
+        const pointsRange = hasConfidence && catCount > 0
+          ? Math.round(Math.sqrt(catCount) * 0.8 * 10) / 10
+          : 0;
+        return (
+          <div className="flex flex-col items-end">
+            <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
+            {pointsRange > 0 && (
+              <span className="text-[0.65rem] text-content-tertiary dark:text-shell-muted tabular-nums">
+                ±{pointsRange.toFixed(1)}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "pointsDelta",
