@@ -83,27 +83,50 @@ export class StandingsProjectionAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    // Fetch projection as_of_date and GS cap once for all teams
-    const projectionAsOfDate = await this.getProjectionAsOfDate(projectionsRunId);
-    const gsCap = await this.getGsCap(leagueId);
+    // Fetch shared data once for all teams (parallel)
+    const [projectionAsOfDate, gsCap, latestPayload, teamEspnIds] = await Promise.all([
+      this.getProjectionAsOfDate(projectionsRunId),
+      this.getGsCap(leagueId),
+      this.db
+        .selectFrom("league_raw_payload")
+        .select(["response_json"])
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst(),
+      this.db
+        .selectFrom("team")
+        .select(["id", "espn_team_id"])
+        .where("league_id", "=", leagueId)
+        .execute(),
+    ]);
 
-    // Compute projections for each team (sequentially to avoid DB overload)
-    const teamProjections: TeamProjection[] = [];
+    // Batch extract GS used per team from single ESPN payload (0 extra queries)
+    const espnIdMap = new Map(teamEspnIds.map((t) => [t.id, t.espn_team_id]));
+    const gsUsedByTeam = new Map<number, number>();
+    const rawPayload = latestPayload?.response_json as any;
     for (const team of teams) {
-      const gsUsed = await this.getGsUsed(leagueId, team.id);
-      const projection = await this.computeTeamProjection(
-        leagueId,
-        snapshotDate,
-        team.id,
-        projectionsRunId,
-        categories,
-        rosterSlots,
-        gsUsed,
-        gsCap,
-        projectionAsOfDate,
-      );
-      teamProjections.push(projection);
+      const espnTeamId = espnIdMap.get(team.id);
+      const espnTeam = rawPayload?.teams?.find((t: any) => t.id === espnTeamId);
+      const gs = espnTeam?.valuesByStat?.[33];
+      gsUsedByTeam.set(team.id, typeof gs === "number" && gs >= 0 ? gs : 0);
     }
+
+    // Compute projections for each team in parallel
+    const teamProjections = await Promise.all(
+      teams.map((team) =>
+        this.computeTeamProjection(
+          leagueId,
+          snapshotDate,
+          team.id,
+          projectionsRunId,
+          categories,
+          rosterSlots,
+          gsUsedByTeam.get(team.id) ?? 0,
+          gsCap,
+          projectionAsOfDate,
+        ),
+      ),
+    );
 
     // Rank teams by category and compute roto points
     await this.rankAndStore(
@@ -133,31 +156,31 @@ export class StandingsProjectionAgent {
     gsCap: number,
     projectionAsOfDate: string,
   ): Promise<TeamProjection> {
-    // Get current totals with components
-    const currentTotals = await this.db
-      .selectFrom("team_daily_category_totals")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .where("team_id", "=", teamId)
-      .execute();
+    // Parallel fetch: current totals + roster (independent queries)
+    const [currentTotals, roster] = await Promise.all([
+      this.db
+        .selectFrom("team_daily_category_totals")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", snapshotDate)
+        .where("team_id", "=", teamId)
+        .execute(),
+      this.db
+        .selectFrom("team_roster_snapshot as r")
+        .innerJoin("player as p", "p.id", "r.player_id")
+        .select([
+          "r.player_id",
+          "r.roster_status",
+          "r.roster_slot",
+          "p.positions",
+        ])
+        .where("r.league_id", "=", leagueId)
+        .where("r.snapshot_date", "=", snapshotDate)
+        .where("r.team_id", "=", teamId)
+        .execute(),
+    ]);
 
-    // Get roster with player positions (join player table)
-    const roster = await this.db
-      .selectFrom("team_roster_snapshot as r")
-      .innerJoin("player as p", "p.id", "r.player_id")
-      .select([
-        "r.player_id",
-        "r.roster_status",
-        "r.roster_slot",
-        "p.positions",
-      ])
-      .where("r.league_id", "=", leagueId)
-      .where("r.snapshot_date", "=", snapshotDate)
-      .where("r.team_id", "=", teamId)
-      .execute();
-
-    // Get projections for roster players
+    // Get projections for roster players (depends on roster result)
     const playerIds = roster.map((r) => r.player_id);
     const projections =
       playerIds.length > 0
@@ -412,40 +435,6 @@ export class StandingsProjectionAgent {
         )
         .execute();
     }
-  }
-
-  /**
-   * Get GS already used by this team from ESPN raw payload or fallback to 0
-   */
-  private async getGsUsed(leagueId: number, teamId: number): Promise<number> {
-    const team = await this.db
-      .selectFrom("team")
-      .select(["espn_team_id"])
-      .where("id", "=", teamId)
-      .executeTakeFirst();
-
-    if (team) {
-      const latestPayload = await this.db
-        .selectFrom("league_raw_payload")
-        .select(["response_json"])
-        .where("league_id", "=", leagueId)
-        .orderBy("fetched_at", "desc")
-        .executeTakeFirst();
-
-      if (latestPayload) {
-        const raw = latestPayload.response_json as any;
-        const espnTeam = raw?.teams?.find(
-          (t: any) => t.id === team.espn_team_id,
-        );
-        const gsFromEspn = espnTeam?.valuesByStat?.[33];
-        if (typeof gsFromEspn === "number" && gsFromEspn >= 0) {
-          return gsFromEspn;
-        }
-      }
-    }
-
-    // Fallback: return 0 (conservative -- lets GS cap apply fully)
-    return 0;
   }
 
   /**

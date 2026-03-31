@@ -164,12 +164,16 @@ export class SnapshotOrchestratorAgent {
         .executeTakeFirst();
 
       const isDegraded =
-        !projectionsRun || projectionsRun.as_of_date !== snapshotDate;
+        !projectionsRun ||
+        projectionsRun.as_of_date !== snapshotDate ||
+        projectionsRun.staleness !== "fresh";
       const degradedReasons: string[] = [];
-      if (isDegraded && projectionsRun) {
-        degradedReasons.push("projections_stale");
-      } else if (!projectionsRun) {
+      if (!projectionsRun) {
         degradedReasons.push("projections_missing");
+      } else if (projectionsRun.as_of_date !== snapshotDate) {
+        degradedReasons.push("projections_stale");
+      } else if (projectionsRun.staleness !== "fresh") {
+        degradedReasons.push("projections_stale");
       }
 
       // 6. Begin transaction and write snapshot
@@ -289,43 +293,74 @@ export class SnapshotOrchestratorAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
+    // Batch upsert all unique players (1 query instead of N per player)
+    const uniquePlayers = new Map<number, typeof teams[0]["roster"][0]>();
+    for (const team of teams) {
+      for (const entry of team.roster) {
+        uniquePlayers.set(entry.espnPlayerId, entry);
+      }
+    }
+
+    const playerValues = Array.from(uniquePlayers.values()).map((entry) => ({
+      id: entry.espnPlayerId,
+      name: entry.name,
+      mlb_team: entry.mlbTeam,
+      positions: entry.positions,
+      created_at: new Date(),
+    }));
+
+    if (playerValues.length > 0) {
+      // Batch in chunks of 500 to avoid parameter limits
+      for (let i = 0; i < playerValues.length; i += 500) {
+        const chunk = playerValues.slice(i, i + 500);
+        await trx
+          .insertInto("player")
+          .values(chunk as any)
+          .onConflict((oc) =>
+            oc.column("id").doUpdateSet({
+              name: (eb: any) => eb.ref("excluded.name"),
+              mlb_team: (eb: any) => eb.ref("excluded.mlb_team"),
+              positions: (eb: any) => eb.ref("excluded.positions"),
+            }),
+          )
+          .execute();
+      }
+    }
+
+    // Batch insert all roster snapshots (1 query instead of N per player)
+    const rosterRows: Array<{
+      league_id: number;
+      snapshot_date: string;
+      team_id: number;
+      player_id: number;
+      roster_status: "active" | "bench" | "il" | "na" | "unknown";
+      roster_slot: string | null;
+      acquisition_type: string | null;
+    }> = [];
+
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
       for (const entry of team.roster) {
-        // Upsert player (player.id IS the ESPN player ID after migration 016)
-        const playerResult = await trx
-          .insertInto("player")
-          .values({
-            id: entry.espnPlayerId,
-            name: entry.name,
-            mlb_team: entry.mlbTeam,
-            positions: entry.positions,
-            created_at: new Date(),
-          } as any)
-          .onConflict((oc) =>
-            oc.column("id").doUpdateSet({
-              name: entry.name,
-              mlb_team: entry.mlbTeam,
-              positions: entry.positions,
-            }),
-          )
-          .returning("id")
-          .executeTakeFirstOrThrow();
+        rosterRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          player_id: entry.espnPlayerId,
+          roster_status: entry.rosterStatus,
+          roster_slot: entry.rosterSlot,
+          acquisition_type: entry.acquisitionType,
+        });
+      }
+    }
 
-        // Write roster snapshot
+    if (rosterRows.length > 0) {
+      for (let i = 0; i < rosterRows.length; i += 500) {
+        const chunk = rosterRows.slice(i, i + 500);
         await trx
           .insertInto("team_roster_snapshot")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            player_id: playerResult.id,
-            roster_status: entry.rosterStatus,
-            roster_slot: entry.rosterSlot,
-            acquisition_type: entry.acquisitionType,
-          })
+          .values(chunk)
           .execute();
       }
     }
@@ -359,30 +394,50 @@ export class SnapshotOrchestratorAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
-    // Write category totals for each team
+    // Batch insert all category totals (1 query instead of teams × categories)
+    const categoryTotalsRows: Array<{
+      league_id: number;
+      snapshot_date: string;
+      team_id: number;
+      category_id: string;
+      value: number;
+      components_json: null;
+    }> = [];
+
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
 
       for (const cat of categories) {
-        const value = team.statValues[cat.espnStatId] ?? 0;
-        await trx
-          .insertInto("team_daily_category_totals")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            category_id: cat.statKey,
-            value,
-            components_json: null,
-          })
-          .execute();
+        categoryTotalsRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          category_id: cat.statKey,
+          value: team.statValues[cat.espnStatId] ?? 0,
+          components_json: null,
+        });
       }
     }
 
-    // Rank teams per category and compute roto points
+    if (categoryTotalsRows.length > 0) {
+      await trx
+        .insertInto("team_daily_category_totals")
+        .values(categoryTotalsRows)
+        .execute();
+    }
+
+    // Rank teams per category and batch insert ranks
     const numTeams = teams.length;
     const teamOverallPoints = new Map<number, number>();
+    const categoryRankRows: Array<{
+      league_id: number;
+      snapshot_date: string;
+      team_id: number;
+      category_id: string;
+      rank: number;
+      roto_points: number;
+    }> = [];
 
     for (const cat of categories) {
       const teamValues = teams
@@ -392,7 +447,6 @@ export class SnapshotOrchestratorAgent {
         }))
         .filter((tv) => tv.dbTeamId != null);
 
-      // Sort by direction
       teamValues.sort((a, b) =>
         cat.direction === "LOWER_BETTER"
           ? a.value - b.value
@@ -408,37 +462,43 @@ export class SnapshotOrchestratorAgent {
           (teamOverallPoints.get(dbTeamId) || 0) + rotoPoints,
         );
 
-        await trx
-          .insertInto("team_daily_category_ranks")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            team_id: dbTeamId,
-            category_id: cat.statKey,
-            rank,
-            roto_points: rotoPoints,
-          })
-          .execute();
+        categoryRankRows.push({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          team_id: dbTeamId,
+          category_id: cat.statKey,
+          rank,
+          roto_points: rotoPoints,
+        });
       }
     }
 
-    // Write overall standings with tie handling
+    if (categoryRankRows.length > 0) {
+      await trx
+        .insertInto("team_daily_category_ranks")
+        .values(categoryRankRows)
+        .execute();
+    }
+
+    // Batch insert overall standings
     const overallSorted = Array.from(teamOverallPoints.entries())
       .map(([teamId, points]) => ({ teamId, value: points }))
       .sort((a, b) => b.value - a.value);
 
     const overallRanked = assignRanksWithTies(overallSorted, numTeams);
 
-    for (const { teamId, rank } of overallRanked) {
+    if (overallRanked.length > 0) {
       await trx
         .insertInto("team_daily_overall")
-        .values({
-          league_id: leagueId,
-          snapshot_date: snapshotDate,
-          team_id: teamId,
-          overall_points: teamOverallPoints.get(teamId) || 0,
-          overall_rank: rank,
-        })
+        .values(
+          overallRanked.map(({ teamId, rank }) => ({
+            league_id: leagueId,
+            snapshot_date: snapshotDate,
+            team_id: teamId,
+            overall_points: teamOverallPoints.get(teamId) || 0,
+            overall_rank: rank,
+          })),
+        )
         .execute();
     }
 
@@ -639,6 +699,9 @@ export class SnapshotOrchestratorAgent {
             components[componentKey] = (components[componentKey] || 0) + value;
           }
         }
+
+        // Skip if no stats were mapped (avoids storing empty {} rows that pollute tenure aggregation)
+        if (Object.keys(components).length === 0) continue;
 
         // Upsert into player_period_stats
         await trx
