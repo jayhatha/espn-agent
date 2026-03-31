@@ -112,4 +112,4 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | OPS as custom rate stat | OBP + SLG components, not a simple stat | ✓ Good |
 
 ---
-*Last updated: 2026-03-25 after Phase 72 — UI audit fixes complete (mobile responsive layout, TopBar projected stat, semantic token migration, error handling)*
+*Last updated: 2026-03-31 after Phase 80 — Standings Swing Attribution complete (three-bucket attribution engine, API endpoint, "What Changed?" UI panel on Projected Standings tab)*
