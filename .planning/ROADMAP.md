@@ -265,3 +265,13 @@ Plans:
 - [x] 79-02-PLAN.md — Core allocation: hitter lineup assignment, GS cap-aware pitcher scaling
 - [x] 79-03-PLAN.md — Pipeline integration: allocateProjections pipeline, variance/confidence interval model
 - [x] 79-04-PLAN.md — Agent wiring: replace naive summation in standings, trade, and waiver agents
+
+### Phase 80: Standings Swing Attribution
+
+**Goal:** When projected standings swing significantly between snapshots, surface why: player projection changes, actual performance deviations, or competitor roto point movement. Compare snapshot-over-snapshot deltas at category level, identify driving players, attribute to specific causes.
+**Requirements**: TBD
+**Depends on:** Phase 79
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 80 to break down)
