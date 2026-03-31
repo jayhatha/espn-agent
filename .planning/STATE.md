@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
 status: Ready to execute
-stopped_at: Completed 80-01-PLAN.md
-last_updated: "2026-03-31T19:21:57.786Z"
+stopped_at: Completed 80-02-PLAN.md
+last_updated: "2026-03-31T19:30:46.908Z"
 progress:
   total_phases: 16
   completed_phases: 15
   total_plans: 35
-  completed_plans: 33
+  completed_plans: 34
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Position
 
 Phase: 80 (standings-swing-attribution) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: 2 of 3
 | Phase 79-sophisticated-projection-model P03 | 7min | 2 tasks | 4 files |
 | Phase 79-sophisticated-projection-model P04 | 10min | 2 tasks | 4 files |
 | Phase 80 P01 | 6 min | 2 tasks | 2 files |
+| Phase 80-standings-swing-attribution-surface-why-projected-standings-changed-between-snapshots P02 | 6 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Plan: 2 of 3
 - [Phase 80]: computeActualPerformanceDelta returns hypotheticalProjected map for chained attribution without recomputing
 - [Phase 80]: sameRunId guard short-circuits projection delta to 0 before ranking (Pitfall 5 from RESEARCH.md)
 - [Phase 80]: attributeCompetitorMovement is pure residual: total - actual - projection
+- [Phase 80]: snapshotDate auto-resolved to latest snapshot in swing route — consistent with standings/projected pattern
+- [Phase 80]: category.name used (not display_name) — matches Category interface in shared/types.ts
 
 ### Roadmap Evolution
 
@@ -186,6 +189,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T19:21:57.782Z
-Stopped at: Completed 80-01-PLAN.md
+Last session: 2026-03-31T19:30:46.905Z
+Stopped at: Completed 80-02-PLAN.md
 Resume file: None
