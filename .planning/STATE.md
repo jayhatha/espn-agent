@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 79-04-PLAN.md
-last_updated: "2026-03-30T21:11:37.072Z"
+status: Ready to execute
+stopped_at: Completed 80-01-PLAN.md
+last_updated: "2026-03-31T19:21:57.786Z"
 progress:
-  total_phases: 15
+  total_phases: 16
   completed_phases: 15
-  total_plans: 32
-  completed_plans: 32
+  total_plans: 35
+  completed_plans: 33
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 79 — sophisticated-projection-model
+**Current focus:** Phase 80 — standings-swing-attribution
 
 ## Current Position
 
-Phase: 79
-Plan: Not started
+Phase: 80 (standings-swing-attribution) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Plan: Not started
 | Phase 79-sophisticated-projection-model P02 | 7min | 2 tasks | 4 files |
 | Phase 79-sophisticated-projection-model P03 | 7min | 2 tasks | 4 files |
 | Phase 79-sophisticated-projection-model P04 | 10min | 2 tasks | 4 files |
+| Phase 80 P01 | 6 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,9 @@ Plan: Not started
 - [Phase 79-sophisticated-projection-model]: StandingsProjectionAgent: sequential team loop (not parallel) to avoid DB connection pool overload
 - [Phase 79-sophisticated-projection-model]: Trade gap detection runs once per analyzeTradeImpact (not per candidate) to limit overhead
 - [Phase 79-sophisticated-projection-model]: Waiver gap detection uses synchronous detectPostSwapGaps() with pre-fetched cache -- zero extra DB queries
+- [Phase 80]: computeActualPerformanceDelta returns hypotheticalProjected map for chained attribution without recomputing
+- [Phase 80]: sameRunId guard short-circuits projection delta to 0 before ranking (Pitfall 5 from RESEARCH.md)
+- [Phase 80]: attributeCompetitorMovement is pure residual: total - actual - projection
 
 ### Roadmap Evolution
 
@@ -182,6 +186,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T18:26:34.800Z
-Stopped at: Completed 79-04-PLAN.md
+Last session: 2026-03-31T19:21:57.782Z
+Stopped at: Completed 80-01-PLAN.md
 Resume file: None
