@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Ready to execute
-stopped_at: Completed 80-02-PLAN.md
-last_updated: "2026-03-31T19:30:46.908Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 80-03-PLAN.md
+last_updated: "2026-03-31T19:49:23.457Z"
 progress:
   total_phases: 16
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
 ---
 
 # Project State
@@ -65,6 +65,7 @@ Plan: 3 of 3
 | Phase 79-sophisticated-projection-model P04 | 10min | 2 tasks | 4 files |
 | Phase 80 P01 | 6 min | 2 tasks | 2 files |
 | Phase 80-standings-swing-attribution-surface-why-projected-standings-changed-between-snapshots P02 | 6 min | 2 tasks | 4 files |
+| Phase 80-standings-swing-attribution P03 | 5 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,7 @@ Plan: 3 of 3
 - [Phase 80]: attributeCompetitorMovement is pure residual: total - actual - projection
 - [Phase 80]: snapshotDate auto-resolved to latest snapshot in swing route — consistent with standings/projected pattern
 - [Phase 80]: category.name used (not display_name) — matches Category interface in shared/types.ts
+- [Phase 80]: SwingAttributionPanel uses named export + default export; page imports as named; panel hidden when attribution_available=false or |totalDelta|<0.5
 
 ### Roadmap Evolution
 
@@ -189,6 +191,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-31T19:30:46.905Z
-Stopped at: Completed 80-02-PLAN.md
+Last session: 2026-03-31T19:49:23.453Z
+Stopped at: Completed 80-03-PLAN.md
 Resume file: None
