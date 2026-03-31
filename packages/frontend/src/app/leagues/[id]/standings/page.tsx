@@ -65,6 +65,7 @@ interface OverallStanding {
   teamName: string;
   previousProjectedPoints: number | null;
   pointsDelta: number | null;
+  confidence?: { p10: number; p50: number; p90: number } | null;
 }
 
 interface CurrentOverallStanding {
@@ -293,31 +294,13 @@ export default function StandingsPage() {
       label: <Term id="roto-points">Total Roto Points</Term>,
       align: "right",
       format: (val, row) => {
-        // Compute approximate points range from per-category confidence
-        const teamId = row.team_id as number;
-        const catMap = projectedMatrix?.teamCategoryMap.get(teamId);
-        let hasConfidence = false;
-        let catCount = 0;
-        if (catMap && data?.categories) {
-          for (const cat of data.categories) {
-            const cd = catMap.get(cat.category_id) as CategoryStanding | undefined;
-            if (cd?.confidence) {
-              hasConfidence = true;
-              catCount++;
-            }
-          }
-        }
-        // Rough estimate: each category contributes ~0.5-1.5 roto point uncertainty
-        // With N categories, total SD ≈ sqrt(N) * 0.8
-        const pointsRange = hasConfidence && catCount > 0
-          ? Math.round(Math.sqrt(catCount) * 0.8 * 10) / 10
-          : 0;
+        const mc = (row as OverallStanding).confidence;
         return (
           <div className="flex flex-col items-end">
             <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
-            {pointsRange > 0 && (
+            {mc && (
               <span className="text-[0.65rem] text-content-tertiary dark:text-shell-muted tabular-nums">
-                ±{pointsRange.toFixed(1)}
+                {mc.p10}–{mc.p90}
               </span>
             )}
           </div>

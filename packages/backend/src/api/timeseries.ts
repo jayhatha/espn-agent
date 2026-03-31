@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { parseIntParam } from "../utils/validation.js";
+import { monteCarloRotoPoints } from "../projection/variance.js";
+import type { TeamCategoryValue } from "../projection/variance.js";
 
 /**
  * Time Series API Routes
@@ -414,6 +416,31 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         }
       }
 
+      // Run Monte Carlo simulation for overall roto point ranges
+      // Uses per-category confidence intervals to simulate ranking outcomes
+      const mcInput: TeamCategoryValue[] = [];
+      const catArray = categories as Array<{ category_id: string; direction: string }>;
+      for (const cs of categoryStandings) {
+        const componentsJson = cs.projected_components_json as Record<string, unknown> | null;
+        const ci = componentsJson?.confidence as { p10: number; p50: number; p90: number } | undefined;
+        mcInput.push({
+          teamId: cs.team_id,
+          categoryId: cs.category_id,
+          projectedValue: cs.projected_value,
+          confidence: ci,
+        });
+      }
+      const overallConfidence = mcInput.length > 0
+        ? monteCarloRotoPoints(
+            mcInput,
+            catArray.map((c) => ({
+              categoryId: c.category_id,
+              direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
+            })),
+            teams.length,
+          )
+        : new Map();
+
       return {
         snapshotDate: targetDate,
         previousSnapshotDate: previousSnapshot?.snapshot_date ?? null,
@@ -429,6 +456,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         }),
         overallStandings: overallStandings.map((os) => {
           const prevPoints = previousOverallMap.get(os.team_id);
+          const mc = overallConfidence.get(os.team_id);
           return {
             ...os,
             teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
@@ -436,6 +464,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             pointsDelta: prevPoints != null
               ? os.projected_overall_points - prevPoints
               : null,
+            confidence: mc ? { p10: mc.p10, p50: mc.p50, p90: mc.p90 } : null,
           };
         }),
         currentCategoryStandings,
