@@ -271,7 +271,9 @@ Plans:
 **Goal:** When projected standings swing significantly between snapshots, surface why: player projection changes, actual performance deviations, or competitor roto point movement. Compare snapshot-over-snapshot deltas at category level, identify driving players, attribute to specific causes.
 **Requirements**: TBD
 **Depends on:** Phase 79
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 80 to break down)
+- [ ] 80-01-PLAN.md — TDD: StandingsSwingAttributionAgent with 6 unit tests (three-bucket model, LOWER_BETTER direction, single-snapshot guard)
+- [ ] 80-02-PLAN.md — API: GET /standings/swing route in timeseries.ts + api.getStandingsSwing() in frontend client
+- [ ] 80-03-PLAN.md — Frontend: SwingAttributionPanel component + integration into Projected Standings tab
