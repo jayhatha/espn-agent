@@ -525,12 +525,8 @@ export class StandingsSwingAttributionAgent {
     const catDeltas = new Map<string, { playerId: number; delta: number }>();
 
     for (const playerId of playerIds) {
-      const prevComponents = prevProjMap.has(playerId)
-        ? (JSON.parse(prevProjMap.get(playerId) as unknown as string) as Record<string, number>)
-        : {};
-      const currComponents = currProjMap.has(playerId)
-        ? (JSON.parse(currProjMap.get(playerId) as unknown as string) as Record<string, number>)
-        : {};
+      const prevComponents = (prevProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
+      const currComponents = (currProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
 
       for (const [stat, currVal] of Object.entries(currComponents)) {
         const prevVal = prevComponents[stat] ?? 0;
