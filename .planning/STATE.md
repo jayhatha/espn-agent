@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Phase complete — ready for verification
+status: Milestone complete
 stopped_at: Completed 80-03-PLAN.md
-last_updated: "2026-03-31T19:49:23.457Z"
+last_updated: "2026-03-31T19:54:38.777Z"
 progress:
   total_phases: 16
   completed_phases: 16
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 
 ## Current Position
 
-Phase: 80 (standings-swing-attribution) — EXECUTING
-Plan: 3 of 3
+Phase: 80
+Plan: Not started
 
 ## Performance Metrics
 
