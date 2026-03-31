@@ -163,14 +163,22 @@ export class SnapshotOrchestratorAgent {
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 
+      // Normalize dates for comparison (DB may return Date object or ISO string)
+      const normDate = (d: unknown): string => {
+        if (d instanceof Date) return d.toISOString().split("T")[0];
+        return String(d).split("T")[0];
+      };
+      const projDate = projectionsRun ? normDate(projectionsRun.as_of_date) : "";
+      const snapDate = normDate(snapshotDate);
+
       const isDegraded =
         !projectionsRun ||
-        projectionsRun.as_of_date !== snapshotDate ||
+        projDate !== snapDate ||
         projectionsRun.staleness !== "fresh";
       const degradedReasons: string[] = [];
       if (!projectionsRun) {
         degradedReasons.push("projections_missing");
-      } else if (projectionsRun.as_of_date !== snapshotDate) {
+      } else if (projDate !== snapDate) {
         degradedReasons.push("projections_stale");
       } else if (projectionsRun.staleness !== "fresh") {
         degradedReasons.push("projections_stale");

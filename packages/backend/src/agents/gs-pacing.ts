@@ -264,7 +264,7 @@ export class GsPacingAgent {
       .where("trs.league_id", "=", leagueId)
       .where("trs.team_id", "=", teamId)
       .where("trs.snapshot_date", "=", latestSnapshot.snapshot_date)
-      .where("trs.roster_slot", "in", ["SP", "P", "BENCH"])
+      .where("trs.roster_slot", "in", ["SP", "P", "BE"])
       .execute();
 
     // Get latest projection run
@@ -340,7 +340,7 @@ export class GsPacingAgent {
               : "Starting pitcher with no projection data";
         }
       } else if (season.paceStatus === "too_slow") {
-        if (pitcher.roster_slot === "BENCH") {
+        if (pitcher.roster_slot === "BE") {
           action = "start";
           reason = "Activate to increase GS pace — currently underutilizing starts";
         } else {
