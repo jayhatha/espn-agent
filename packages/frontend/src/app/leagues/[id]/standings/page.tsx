@@ -22,6 +22,7 @@ import { GapDetailRow } from "@/components/league/GapDetailRow";
 import { CategoryMiniChart } from "@/components/league/CategoryMiniChart";
 import { CategoryOpportunityMap } from "@/components/league/CategoryOpportunityMap";
 import { AtRiskSummary } from "@/components/league/AtRiskSummary";
+import { SwingAttributionPanel } from "@/components/league/SwingAttributionPanel";
 import { Term } from "@/components/ui/Term";
 import { cn } from "@/lib/cn";
 
@@ -75,6 +76,32 @@ interface CurrentOverallStanding {
   overall_points: number;
   overall_rank: number;
   teamName: string;
+}
+
+interface SwingAttributionData {
+  snapshotDate: string;
+  previousSnapshotDate: string | null;
+  attribution_available: boolean;
+  teamId: number;
+  teamName: string;
+  totalDelta: number;
+  buckets: {
+    actual_performance: number;
+    projection_change: number;
+    competitor_movement: number;
+  } | null;
+  categoryBreakdown: Array<{
+    category_id: string;
+    categoryName: string;
+    prevProjectedValue: number;
+    currProjectedValue: number;
+    prevRotoPoints: number;
+    currRotoPoints: number;
+    rotoDelta: number;
+    bucket: "actual_performance" | "projection_change" | "competitor_movement" | "mixed";
+    topDriverPlayer?: string;
+    topCompetitorMoved?: string;
+  }>;
 }
 
 interface StandingsData {
@@ -142,6 +169,20 @@ export default function StandingsPage() {
       return results;
     },
     enabled: viewMode === "projected" && !!data && data.overallStandings.length === 0 && !!selectedTeamId,
+  });
+
+  // Swing attribution — fetches when projected tab is active and a team is selected
+  const { data: swingData } = useQuery({
+    queryKey: ["standings-swing", leagueId, selectedTeamId, data?.snapshotDate],
+    queryFn: async () => {
+      if (!selectedTeamId) return null;
+      return api.getStandingsSwing(
+        parseInt(leagueId, 10),
+        selectedTeamId,
+        data?.snapshotDate ? { snapshotDate: data.snapshotDate } : undefined,
+      ) as Promise<SwingAttributionData>;
+    },
+    enabled: viewMode === "projected" && !!selectedTeamId && !!data?.snapshotDate,
   });
 
   const currentMatrix = useMemo(() => {
@@ -637,6 +678,24 @@ export default function StandingsPage() {
                   />
                 </CardContent>
               </Card>
+
+              {/* What Changed? — Swing Attribution Panel */}
+              {selectedTeamId && swingData?.attribution_available && Math.abs(swingData.totalDelta) >= 0.5 && (
+                <Card>
+                  <CardHeader>
+                    <Heading level={3}>What Changed?</Heading>
+                    <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                      Why your projected roto points changed since the last snapshot
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <SwingAttributionPanel
+                      data={swingData}
+                      previousSnapshotDate={swingData.previousSnapshotDate}
+                    />
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Marginal Gains Summary */}
               {selectedTeamId && marginalGains.length > 0 && (
