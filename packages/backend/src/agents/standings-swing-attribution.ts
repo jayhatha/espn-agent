@@ -254,7 +254,7 @@ export class StandingsSwingAttributionAgent {
     const numTeams = teams.length;
     const categories = (settingsRow?.settings_json?.categories as Array<{
       category_id: string;
-      display_name: string;
+      name: string;
       direction?: string;
     }>) ?? [];
 
@@ -326,7 +326,6 @@ export class StandingsSwingAttributionAgent {
     let playerNameByProjectionDiff = new Map<string, string>(); // category_id → topDriverPlayer name
     if (!sameRunId && prevRunId !== null && currRunId !== null) {
       playerNameByProjectionDiff = await this.computeTopProjectionDrivers(
-        leagueId,
         teamId,
         currDate,
         prevRunId,
@@ -410,7 +409,7 @@ export class StandingsSwingAttributionAgent {
 
       categoryBreakdown.push({
         category_id: catId,
-        categoryName: cat.display_name,
+        categoryName: cat.name,
         prevProjectedValue: allPrevProjected.get(teamId) ?? 0,
         currProjectedValue: allCurrProjected.get(teamId) ?? 0,
         prevRotoPoints,
@@ -441,14 +440,14 @@ export class StandingsSwingAttributionAgent {
   // ── Private helpers ──────────────────────────────────────────────────────
 
   private buildCategoryMap(
-    rows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number }>,
+    rows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number | null }>,
   ): Map<number, Map<string, { projected_value: number; projected_roto_points: number }>> {
     const result = new Map<number, Map<string, { projected_value: number; projected_roto_points: number }>>();
     for (const row of rows) {
       if (!result.has(row.team_id)) result.set(row.team_id, new Map());
       result.get(row.team_id)!.set(row.category_id, {
         projected_value: row.projected_value,
-        projected_roto_points: row.projected_roto_points,
+        projected_roto_points: row.projected_roto_points ?? 0,
       });
     }
     return result;
@@ -472,12 +471,11 @@ export class StandingsSwingAttributionAgent {
    * Pitfall 5 guard: caller must verify sameRunId=false before calling.
    */
   private async computeTopProjectionDrivers(
-    leagueId: number,
     teamId: number,
     currDate: string,
     prevRunId: number,
     currRunId: number,
-    prevCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number }>,
+    prevCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number | null }>,
   ): Promise<Map<string, string>> {
     // Get roster players at currDate
     const rosterRows = await this.db
@@ -506,14 +504,14 @@ export class StandingsSwingAttributionAgent {
         .execute(),
       this.db
         .selectFrom("player")
-        .select(["espn_player_id", "name"])
-        .where("espn_player_id", "in", playerIds)
+        .select(["id", "name"])
+        .where("id", "in", playerIds)
         .execute(),
     ]);
 
     const prevProjMap = new Map(prevProj.map((p) => [p.player_id, p.stat_components_json]));
     const currProjMap = new Map(currProj.map((p) => [p.player_id, p.stat_components_json]));
-    const nameMap = new Map(playerNames.map((p) => [p.espn_player_id, p.name]));
+    const nameMap = new Map(playerNames.map((p) => [p.id, p.name]));
 
     // Find top driver per category: player whose stat changed most
     const result = new Map<string, string>();
@@ -563,8 +561,8 @@ export class StandingsSwingAttributionAgent {
    */
   private async computeTopCompetitorMover(
     teams: Array<{ id: number; name: string }>,
-    prevCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number }>,
-    currCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number }>,
+    prevCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number | null }>,
+    currCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number | null }>,
     myTeamId: number,
   ): Promise<Map<string, string>> {
     const teamNameMap = new Map(teams.map((t) => [t.id, t.name]));

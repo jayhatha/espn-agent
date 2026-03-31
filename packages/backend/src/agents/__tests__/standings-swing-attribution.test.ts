@@ -4,7 +4,6 @@ import {
   computeActualPerformanceDelta,
   computeProjectionChangeDelta,
   attributeCompetitorMovement,
-  type CategoryAttribution,
 } from "../standings-swing-attribution.js";
 
 /**

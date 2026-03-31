@@ -4,6 +4,7 @@ import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { parseIntParam } from "../utils/validation.js";
 import { monteCarloRotoPoints } from "../projection/variance.js";
 import type { TeamCategoryValue } from "../projection/variance.js";
+import { StandingsSwingAttributionAgent } from "../agents/standings-swing-attribution.js";
 
 /**
  * Time Series API Routes
@@ -473,6 +474,56 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
         })),
       };
+    },
+  );
+
+  // Standings swing attribution — explains WHY projected standings changed between snapshots
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { teamId?: string; snapshotDate?: string };
+  }>(
+    "/api/leagues/:leagueId/standings/swing",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      try {
+        const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+        const { teamId, snapshotDate } = request.query;
+
+        if (!teamId) {
+          return reply.code(400).send({ error: "teamId is required" });
+        }
+
+        const parsedTeamId = parseInt(teamId, 10);
+        if (isNaN(parsedTeamId)) {
+          return reply.code(400).send({ error: "teamId must be a number" });
+        }
+
+        // Resolve snapshotDate: use latest if not provided
+        let currDate = snapshotDate;
+        if (!currDate) {
+          const latest = await db
+            .selectFrom("league_daily_snapshot")
+            .select("snapshot_date")
+            .where("league_id", "=", leagueId)
+            .orderBy("snapshot_date", "desc")
+            .executeTakeFirst();
+
+          if (!latest) {
+            return reply.code(404).send({ error: "No snapshots found for this league" });
+          }
+          currDate = latest.snapshot_date;
+        }
+
+        const agent = new StandingsSwingAttributionAgent(db, request.log);
+        const result = await agent.computeSwing(leagueId, parsedTeamId, currDate);
+        return result;
+      } catch (err) {
+        request.log.error({ err }, "Failed to compute standings swing attribution");
+        return reply.code(500).send({ error: "Failed to compute attribution" });
+      }
     },
   );
 
