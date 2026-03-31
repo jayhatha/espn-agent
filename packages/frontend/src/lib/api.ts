@@ -163,6 +163,16 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/standings/projected${query ? '?' + query : ''}`);
   },
 
+  // Standings swing attribution
+  async getStandingsSwing(
+    leagueId: number,
+    teamId: number,
+    params?: { snapshotDate?: string },
+  ) {
+    const query = new URLSearchParams(cleanParams({ ...(params || {}), teamId: String(teamId) })).toString();
+    return fetchAPI(`/api/leagues/${leagueId}/standings/swing?${query}`);
+  },
+
   // Free agents
   async getFreeAgents(leagueId: number, params?: { limit?: number; sortBy?: string; position?: string }) {
     const query = new URLSearchParams(cleanParams(params || {})).toString();
