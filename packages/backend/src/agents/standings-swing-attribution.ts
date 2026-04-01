@@ -527,13 +527,21 @@ export class StandingsSwingAttributionAgent {
       }
     }
 
-    // Map category_ids to their primary component stat keys for significance checking.
-    // Counting stats map directly (HR→HR). Rate stats map to their primary counting component.
-    const CATEGORY_TO_COMPONENTS: Record<string, string[]> = {
-      ERA: ["ER", "IP"], WHIP: ["H", "BB", "IP"], OPS: ["H", "BB", "HBP", "AB", "SF", "TB"],
-      AVG: ["H", "AB"], OBP: ["H", "BB", "HBP", "AB", "SF"], SLG: ["TB", "AB"],
+    // Map category_ids to their component stat keys and whether they are pitcher-only.
+    // Pitchers use HA (hits allowed) and BBA (walks allowed), not H/BB.
+    const CATEGORY_CONFIG: Record<string, { components: string[]; pitcherOnly: boolean }> = {
+      ERA:  { components: ["ER", "IP"], pitcherOnly: true },
+      WHIP: { components: ["HA", "BBA", "IP"], pitcherOnly: true },
+      W:    { components: ["W"], pitcherOnly: true },
+      SV:   { components: ["SV"], pitcherOnly: true },
+      K:    { components: ["K"], pitcherOnly: true },
+      HLD:  { components: ["HLD"], pitcherOnly: true },
+      QS:   { components: ["QS"], pitcherOnly: true },
+      OPS:  { components: ["H", "BB", "HBP", "AB", "SF", "TB"], pitcherOnly: false },
+      AVG:  { components: ["H", "AB"], pitcherOnly: false },
+      OBP:  { components: ["H", "BB", "HBP", "AB", "SF"], pitcherOnly: false },
+      SLG:  { components: ["TB", "AB"], pitcherOnly: false },
     };
-    // For counting stats, the category_id IS the stat key
     const categoryIds = [...teamCatTotals.keys()];
 
     // Collect ALL significant drivers per category (not just top 1)
@@ -543,8 +551,18 @@ export class StandingsSwingAttributionAgent {
       const prevComponents = (prevProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
       const currComponents = (currProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
 
+      // Determine if this player is a pitcher (has IP in their projections)
+      const isPitcher = "IP" in prevComponents || "IP" in currComponents;
+
       for (const catId of categoryIds) {
-        const componentKeys = CATEGORY_TO_COMPONENTS[catId] ?? [catId];
+        const config = CATEGORY_CONFIG[catId];
+        const componentKeys = config?.components ?? [catId];
+        const pitcherOnly = config?.pitcherOnly ?? false;
+
+        // Skip pitcher categories for hitters and vice versa
+        if (pitcherOnly && !isPitcher) continue;
+        if (!pitcherOnly && isPitcher) continue;
+
         // Sum absolute component deltas for this category to measure player's total impact
         let totalComponentDelta = 0;
         for (const key of componentKeys) {
