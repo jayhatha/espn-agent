@@ -188,9 +188,10 @@ None yet.
 | 108 | Fix pctOwned null crash on waivers page | 2026-03-29 | 1962890 | -- |
 | 109 | Fix tenure/season stats showing previous year (add season filter) | 2026-03-29 | 51b05de | -- |
 | 260329-k0x | Add league GS + K/GS overview table to GS Pacing tab | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
+| 260401-f32 | Fix waiver page position filter + % Owned + add % Started column | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
 
 ## Session Continuity
 
-Last session: 2026-03-31T19:49:23.453Z
-Stopped at: Completed 80-03-PLAN.md
+Last session: 2026-04-01T18:01:43Z
+Stopped at: Completed quick task 260401-f32
 Resume file: None
