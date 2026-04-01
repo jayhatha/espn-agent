@@ -602,28 +602,40 @@ export class GsPacingAgent {
       .where("league_id", "=", leagueId)
       .execute();
 
-    // Get latest raw payload for ESPN stat values
-    const latestPayload = await this.db
-      .selectFrom("league_raw_payload")
-      .select(["response_json"])
-      .where("league_id", "=", leagueId)
-      .orderBy("fetched_at", "desc")
-      .executeTakeFirst();
+    // Extract only GS/K stats from raw payload using JSONB extraction
+    // (avoids loading the full ~3MB response_json into memory — 33ms vs 10s)
+    const { rows: espnStatRows } = await sql<{
+      espn_id: number;
+      gs: number;
+      k: number;
+    }>`
+      SELECT
+        (elem->>'id')::int as espn_id,
+        COALESCE((elem->'valuesByStat'->>'33')::numeric, 0) as gs,
+        COALESCE((elem->'valuesByStat'->>'48')::numeric, 0) as k
+      FROM (
+        SELECT response_json->'teams' as teams_arr
+        FROM league_raw_payload
+        WHERE league_id = ${leagueId}
+        ORDER BY fetched_at DESC
+        LIMIT 1
+      ) sub,
+      jsonb_array_elements(sub.teams_arr) as elem
+    `.execute(this.db);
 
-    const raw = latestPayload?.response_json as any;
-    const espnTeams = raw?.teams || [];
+    const espnStatMap = new Map(
+      espnStatRows.map((r) => [Number(r.espn_id), { gs: Number(r.gs), k: Number(r.k) }]),
+    );
 
     const result = teams.map((team) => {
-      const espnTeam = espnTeams.find((t: any) => t.id === team.espn_team_id);
-      const gs = typeof espnTeam?.valuesByStat?.[33] === "number" ? espnTeam.valuesByStat[33] : 0;
-      const k = typeof espnTeam?.valuesByStat?.[48] === "number" ? espnTeam.valuesByStat[48] : 0;
+      const stats = espnStatMap.get(team.espn_team_id) ?? { gs: 0, k: 0 };
 
       return {
         teamId: team.id,
         teamName: team.name,
-        gs,
-        k,
-        kPerGs: gs > 0 ? Math.round((k / gs) * 100) / 100 : null,
+        gs: stats.gs,
+        k: stats.k,
+        kPerGs: stats.gs > 0 ? Math.round((stats.k / stats.gs) * 100) / 100 : null,
       };
     });
 

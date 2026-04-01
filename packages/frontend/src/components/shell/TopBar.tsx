@@ -101,7 +101,7 @@ export function TopBar() {
   }, [id]);
 
   const { data } = useQuery<LeagueStatus>({
-    queryKey: ["league-status", id],
+    queryKey: ["league", id],
     queryFn: () => api.getLeagueStatus(leagueId) as Promise<LeagueStatus>,
     enabled: !!id,
     staleTime: 60_000,

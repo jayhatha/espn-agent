@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -15,7 +15,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "@/lib/api";
-import { CHART_THEME } from "@/lib/chart-theme";
+import { useChartTheme } from "@/lib/useChartTheme";
 import { cn } from "@/lib/cn";
 import { Container } from "@/components/ui/Container";
 import { Heading } from "@/components/ui/Heading";
@@ -129,13 +129,13 @@ function TrendBadge({ trend, drivingStat }: { trend: string; drivingStat: string
   }
   if (trend === "insufficient") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400 dark:bg-shell-border dark:text-shell-muted">
         ? Insufficient
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-500/10 text-neutral-400 dark:bg-shell-border dark:text-shell-muted">
       &#8212; Neutral
     </span>
   );
@@ -152,6 +152,7 @@ function formatPct(ratio: number | null | undefined): string {
 }
 
 export default function TrendsPage() {
+  const chartTheme = useChartTheme();
   const params = useParams();
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -175,7 +176,7 @@ export default function TrendsPage() {
 
   // Fetch teams
   const { data: teamsData } = useQuery({
-    queryKey: ["teams", leagueId],
+    queryKey: ["league-teams", leagueId],
     queryFn: async () => {
       return api.getTeams(parseInt(leagueId, 10)) as Promise<{
         teams: Team[];
@@ -309,7 +310,7 @@ export default function TrendsPage() {
   });
 
   const teams = teamsData?.teams || [];
-  const teamMap = new Map(teams.map((t) => [t.id, t.name]));
+  const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
 
   // Fetch league categories for dynamic category dropdown
   const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
@@ -331,7 +332,7 @@ export default function TrendsPage() {
   }, [categories, selectedCategory]);
 
   // Transform data for charts
-  const getChartData = () => {
+  const chartData = useMemo(() => {
     if (viewMode === "overall" && overallData) {
       const dateMap = new Map<string, any>();
       overallData.series.forEach((point) => {
@@ -388,9 +389,7 @@ export default function TrendsPage() {
       );
     }
     return [];
-  };
-
-  const chartData = getChartData();
+  }, [viewMode, overallData, categoryTotalData, categoryData, projectedData, teamMap]);
   const isChartView = viewMode === "overall" || viewMode === "category" || viewMode === "projected" || viewMode === "values";
   const isLoading =
     (viewMode === "overall" && overallLoading) ||
@@ -412,8 +411,8 @@ export default function TrendsPage() {
     cn(
       "whitespace-nowrap py-4 px-6 border-b-2 font-medium text-body-sm transition-colors",
       active
-        ? "border-accent text-content font-semibold"
-        : "border-transparent text-content-secondary hover:text-content hover:border-neutral-300"
+        ? "border-accent dark:border-shell-accent text-content dark:text-shell-text font-semibold"
+        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300 dark:hover:border-shell-border"
     );
 
   // Sort hot/cold players: hot first, then cold, then neutral, then insufficient
@@ -500,7 +499,7 @@ export default function TrendsPage() {
                 <select
                   value={selectedSeason || ""}
                   onChange={(e) => setSelectedSeason(e.target.value || undefined)}
-                  className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   <option value="">Current Season</option>
                   {seasonsData?.seasons?.map((s: number) => (
@@ -528,7 +527,7 @@ export default function TrendsPage() {
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
               disabled={categoriesLoading}
-              className="block w-full md:w-64 rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-bg text-content dark:text-shell-text text-body-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="block w-full md:w-64 rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-bg text-content dark:text-shell-text text-body-sm px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {categories.map((cat: { value: string; label: string }) => (
                 <option key={cat.value} value={cat.value}>
@@ -559,7 +558,7 @@ export default function TrendsPage() {
                     type="checkbox"
                     checked={showAnnotations}
                     onChange={(e) => setShowAnnotations(e.target.checked)}
-                    className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
+                    className="h-4 w-4 rounded border-neutral-300 text-accent dark:text-shell-accent focus:ring-accent dark:focus:ring-shell-accent"
                   />
                   <label
                     htmlFor="show-annotations"
@@ -576,7 +575,7 @@ export default function TrendsPage() {
                       type="checkbox"
                       checked={showInflectionPoints}
                       onChange={(e) => setShowInflectionPoints(e.target.checked)}
-                      className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
+                      className="h-4 w-4 rounded border-neutral-300 text-accent dark:text-shell-accent focus:ring-accent dark:focus:ring-shell-accent"
                     />
                     <label
                       htmlFor="show-inflection-points"
@@ -595,7 +594,7 @@ export default function TrendsPage() {
       {/* Content Area */}
       <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-6">
         {isLoading ? (
-          <LoadingSpinner message="Loading data..." />
+          <LoadingSpinner quips />
 
         ) : viewMode === "hotcold" ? (
           /* ── Hot/Cold Players Panel ─────────────────────────── */
@@ -808,12 +807,12 @@ export default function TrendsPage() {
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid
-                    stroke={CHART_THEME.grid.stroke}
-                    strokeDasharray={CHART_THEME.grid.strokeDasharray}
+                    stroke={chartTheme.grid.stroke}
+                    strokeDasharray={chartTheme.grid.strokeDasharray}
                   />
                   <XAxis
                     dataKey="date"
-                    tick={CHART_THEME.axis.tick}
+                    tick={chartTheme.axis.tick}
                     tickFormatter={(date) =>
                       new Date(date).toLocaleDateString(undefined, {
                         month: "short",
@@ -822,21 +821,21 @@ export default function TrendsPage() {
                     }
                   />
                   <YAxis
-                    tick={CHART_THEME.axis.tick}
+                    tick={chartTheme.axis.tick}
                     reversed={viewMode !== "values"}
                     domain={viewMode === "values" ? ["auto", "auto"] : [1, teamNames.length]}
                     label={{
                       value: viewMode === "values" ? selectedCategory : "Rank",
                       angle: -90,
                       position: "insideLeft",
-                      ...CHART_THEME.axis.label,
+                      ...chartTheme.axis.label,
                     }}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: CHART_THEME.tooltip.backgroundColor,
-                      borderColor: CHART_THEME.tooltip.borderColor,
-                      borderRadius: CHART_THEME.tooltip.borderRadius,
+                      backgroundColor: chartTheme.tooltip.backgroundColor,
+                      borderColor: chartTheme.tooltip.borderColor,
+                      borderRadius: chartTheme.tooltip.borderRadius,
                     }}
                     labelFormatter={(date) =>
                       new Date(date).toLocaleDateString(undefined, {
@@ -873,7 +872,7 @@ export default function TrendsPage() {
                         key={teamName}
                         type="monotone"
                         dataKey={teamName}
-                        stroke={CHART_THEME.colors[index % CHART_THEME.colors.length]}
+                        stroke={chartTheme.colors[index % chartTheme.colors.length]}
                         strokeWidth={isSelected ? 3 : 2}
                         opacity={isSelected ? 1 : 0.4}
                         dot={{ r: isSelected ? 4 : 2 }}
@@ -889,10 +888,10 @@ export default function TrendsPage() {
                       x={annotation.event_date}
                       stroke={
                         annotation.event_type === "trade"
-                          ? CHART_THEME.colors[5]
+                          ? chartTheme.colors[5]
                           : annotation.event_type === "drop"
-                          ? CHART_THEME.colors[4]
-                          : CHART_THEME.colors[3]
+                          ? chartTheme.colors[4]
+                          : chartTheme.colors[3]
                       }
                       strokeDasharray="3 3"
                       strokeOpacity={0.5}
@@ -905,7 +904,7 @@ export default function TrendsPage() {
                     <ReferenceLine
                       key={`ip-${ip.date}`}
                       x={ip.date}
-                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? CHART_THEME.colors[3] : CHART_THEME.colors[4]) : (ip.pointsDelta != null && ip.pointsDelta > 0 ? CHART_THEME.colors[3] : CHART_THEME.colors[4])}
+                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? chartTheme.colors[3] : chartTheme.colors[4]) : (ip.pointsDelta != null && ip.pointsDelta > 0 ? chartTheme.colors[3] : chartTheme.colors[4])}
                       strokeDasharray="6 3"
                       strokeOpacity={0.6}
                       label={<InflectionPointMarker point={ip} />}

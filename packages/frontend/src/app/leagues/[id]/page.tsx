@@ -22,6 +22,7 @@ import { StatsSection } from "./_sections/StatsSection";
 import { CategoryTableSection } from "./_sections/CategoryTableSection";
 // NavigationSection removed -- shell LeagueNav handles navigation
 import { RosterSection } from "./_sections/RosterSection";
+import { FadeIn } from "@/components/motion/FadeIn";
 
 interface Team {
   id: number;
@@ -167,6 +168,8 @@ function LeagueDetailPageContent() {
       queryClient.invalidateQueries({ queryKey: ["streaming-pitchers", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["gs-summary", leagueId] });
       queryClient.invalidateQueries({ queryKey: ["gs-weekly", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["topbar-projected", leagueId] });
+      queryClient.invalidateQueries({ queryKey: ["faab-summary", leagueId] });
     },
   });
 
@@ -315,7 +318,7 @@ function LeagueDetailPageContent() {
   if (isLoading) {
     return (
       <Container size="wide" className="py-8">
-        <LoadingSpinner message="Loading league data..." />
+        <LoadingSpinner quips />
       </Container>
     );
   }
@@ -368,26 +371,34 @@ function LeagueDetailPageContent() {
 
       {selectedTeamId && teamOverview && (
         <>
-          <ActionsSection
-            actionItems={actionItems}
-            leagueId={leagueId}
-          />
+          <FadeIn>
+            <ActionsSection
+              actionItems={actionItems}
+              leagueId={leagueId}
+            />
+          </FadeIn>
 
-          <StatsSection
-            categories={teamOverview.categories}
-            totalTeams={teamOverview.overall?.total_teams ?? 10}
-            miniChartData={miniChartData}
-          />
+          <FadeIn delay={80}>
+            <StatsSection
+              categories={teamOverview.categories}
+              totalTeams={teamOverview.overall?.total_teams ?? 10}
+              miniChartData={miniChartData}
+            />
+          </FadeIn>
 
-          <CategoryTableSection
-            categories={teamOverview.categories}
-            totalTeams={teamOverview.overall?.total_teams ?? 10}
-          />
+          <FadeIn delay={160}>
+            <CategoryTableSection
+              categories={teamOverview.categories}
+              totalTeams={teamOverview.overall?.total_teams ?? 10}
+            />
+          </FadeIn>
 
-          <RosterSection
-            groupedRoster={groupedRoster}
-            hasRosterData={teamOverview.roster.length > 0}
-          />
+          <FadeIn delay={240}>
+            <RosterSection
+              groupedRoster={groupedRoster}
+              hasRosterData={teamOverview.roster.length > 0}
+            />
+          </FadeIn>
         </>
       )}
 
