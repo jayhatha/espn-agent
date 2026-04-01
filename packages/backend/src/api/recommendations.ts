@@ -4,6 +4,9 @@ import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
 import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-recommendation.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import type { ESPNAuthCookies } from "../adapters/espn.js";
+import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 
 /**
  * Recommendations API Routes
@@ -27,10 +30,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       const { snapshotDate, limit, position } = request.query;
       const maxPlayers = limit ? parseInt(limit, 10) : 300;
 
-      // Fetch league credentials
+      // Fetch league credentials (encrypted in DB)
       const league = await db
         .selectFrom("league")
-        .select(["id", "espn_league_id", "season", "espn_swid", "espn_s2"])
+        .select(["id", "espn_league_id", "season", "espn_swid_encrypted", "espn_s2_encrypted"])
         .where("id", "=", leagueId)
         .executeTakeFirst();
 
@@ -38,10 +41,20 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "League not found" });
       }
 
-      const espnAuth =
-        league.espn_swid && league.espn_s2
-          ? { SWID: league.espn_swid, espn_s2: league.espn_s2 }
-          : undefined;
+      // Build auth: env vars first, then encrypted DB fallback
+      let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
+      if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        if (hasEncryptionKey()) {
+          try {
+            espnAuth = {
+              SWID: decryptToken(league.espn_swid_encrypted as any),
+              espn_s2: decryptToken(league.espn_s2_encrypted as any),
+            };
+          } catch (error) {
+            request.log.error({ error }, "Failed to decrypt ESPN cookies for free agents");
+          }
+        }
+      }
 
       // Get latest snapshot date if not provided
       let date = snapshotDate;
