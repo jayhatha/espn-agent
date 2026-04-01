@@ -185,6 +185,7 @@ None yet.
 | 260327-hr3 | Fix snapshot refresh not updating projected standings (invalidate all queries) | 2026-03-27 | a9488b1 | [260327-hr3-if-i-refresh-snapshot-it-should-replace-](./quick/260327-hr3-if-i-refresh-snapshot-it-should-replace-/) |
 | 260327-orm | Replace Week label with today's date + season game progress (MLB GP/162) | 2026-03-28 | 3e61847 | [260327-orm-change-current-week-from-the-season-to-c](./quick/260327-orm-change-current-week-from-the-season-to-c/) |
 | 107 | Fix tie handling in current standings — use assignRanksWithTies | 2026-03-28 | 48f489f | -- |
+| 260401-f32 | Fix waiver page position filter, %owned from ESPN, add %started column | 2026-04-01 | 2a2c667 | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
 | 108 | Fix pctOwned null crash on waivers page | 2026-03-29 | 1962890 | -- |
 | 109 | Fix tenure/season stats showing previous year (add season filter) | 2026-03-29 | 51b05de | -- |
 | 260329-k0x | Add league GS + K/GS overview table to GS Pacing tab | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
