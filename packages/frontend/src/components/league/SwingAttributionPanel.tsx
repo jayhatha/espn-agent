@@ -1,3 +1,8 @@
+interface ProjectionDriver {
+  playerName: string;
+  delta: number;
+}
+
 interface CategoryAttribution {
   category_id: string;
   categoryName: string;
@@ -8,6 +13,7 @@ interface CategoryAttribution {
   rotoDelta: number;
   bucket: "actual_performance" | "projection_change" | "competitor_movement" | "mixed";
   topDriverPlayer?: string;
+  projectionDrivers?: ProjectionDriver[];
   topCompetitorMoved?: string;
 }
 
@@ -141,19 +147,29 @@ export function SwingAttributionPanel({
                       {formatDelta(cat.rotoDelta)}
                     </td>
                     <td className="py-2 px-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium dark:bg-shell-bg bg-surface-secondary text-content-secondary dark:text-shell-muted">
-                          {bucketLabel(cat.bucket)}
-                        </span>
-                        {cat.bucket === "projection_change" && cat.topDriverPlayer && (
-                          <span className="text-caption text-content-tertiary dark:text-shell-muted truncate max-w-[100px]">
-                            {cat.topDriverPlayer}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium dark:bg-shell-bg bg-surface-secondary text-content-secondary dark:text-shell-muted">
+                            {bucketLabel(cat.bucket)}
                           </span>
-                        )}
-                        {cat.bucket === "competitor_movement" && cat.topCompetitorMoved && (
-                          <span className="text-caption text-content-tertiary dark:text-shell-muted truncate max-w-[100px]">
-                            {cat.topCompetitorMoved}
-                          </span>
+                          {cat.bucket === "competitor_movement" && cat.topCompetitorMoved && (
+                            <span className="text-caption text-content-tertiary dark:text-shell-muted truncate max-w-[120px]">
+                              {cat.topCompetitorMoved}
+                            </span>
+                          )}
+                        </div>
+                        {cat.projectionDrivers && cat.projectionDrivers.length > 0 && (
+                          <div className="flex flex-col gap-0.5 pl-0.5">
+                            {cat.projectionDrivers.map((d) => (
+                              <span key={d.playerName} className="text-caption text-content-tertiary dark:text-shell-muted">
+                                <span className="truncate">{d.playerName}</span>
+                                {" "}
+                                <span className={`font-mono ${d.delta > 0 ? "text-positive" : "text-negative"}`}>
+                                  {d.delta > 0 ? "+" : ""}{d.delta}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </td>

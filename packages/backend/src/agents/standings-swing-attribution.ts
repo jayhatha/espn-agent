@@ -20,6 +20,11 @@ import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 // ─── Exported interfaces ────────────────────────────────────────────────────
 
+export interface ProjectionDriver {
+  playerName: string;
+  delta: number;        // signed: positive = projection went up, negative = went down
+}
+
 export interface CategoryAttribution {
   category_id: string;
   categoryName: string;
@@ -30,6 +35,7 @@ export interface CategoryAttribution {
   rotoDelta: number;
   bucket: "actual_performance" | "projection_change" | "competitor_movement" | "mixed";
   topDriverPlayer?: string;
+  projectionDrivers?: ProjectionDriver[];
   topCompetitorMoved?: string;
 }
 
@@ -323,9 +329,9 @@ export class StandingsSwingAttributionAgent {
 
     // ── Optional: player-level diff for projection_change bucket ───────────
     // Only diff when prevRunId !== currRunId (Pitfall 5 guard)
-    let playerNameByProjectionDiff = new Map<string, string>(); // category_id → topDriverPlayer name
+    let projectionDriversByCat = new Map<string, { topDriver: string; drivers: ProjectionDriver[] }>();
     if (!sameRunId && prevRunId !== null && currRunId !== null) {
-      playerNameByProjectionDiff = await this.computeTopProjectionDrivers(
+      projectionDriversByCat = await this.computeTopProjectionDrivers(
         teamId,
         currDate,
         prevRunId,
@@ -416,7 +422,8 @@ export class StandingsSwingAttributionAgent {
         currRotoPoints,
         rotoDelta,
         bucket,
-        topDriverPlayer: playerNameByProjectionDiff.get(catId),
+        topDriverPlayer: projectionDriversByCat.get(catId)?.topDriver,
+        projectionDrivers: projectionDriversByCat.get(catId)?.drivers,
         topCompetitorMoved: competitorNameByCategory.get(catId),
       });
     }
@@ -476,7 +483,7 @@ export class StandingsSwingAttributionAgent {
     prevRunId: number,
     currRunId: number,
     prevCatRows: Array<{ team_id: number; category_id: string; projected_value: number; projected_roto_points: number | null }>,
-  ): Promise<Map<string, string>> {
+  ): Promise<Map<string, { topDriver: string; drivers: ProjectionDriver[] }>> {
     // Get roster players at currDate
     const rosterRows = await this.db
       .selectFrom("team_roster_snapshot")
@@ -513,8 +520,6 @@ export class StandingsSwingAttributionAgent {
     const currProjMap = new Map(currProj.map((p) => [p.player_id, p.stat_components_json]));
     const nameMap = new Map(playerNames.map((p) => [p.id, p.name]));
 
-    // Find top driver per category: player whose stat changed most
-    const result = new Map<string, string>();
     const teamCatTotals = new Map<string, number>();
     for (const row of prevCatRows) {
       if (row.team_id === teamId) {
@@ -522,29 +527,59 @@ export class StandingsSwingAttributionAgent {
       }
     }
 
-    const catDeltas = new Map<string, { playerId: number; delta: number }>();
+    // Map category_ids to their primary component stat keys for significance checking.
+    // Counting stats map directly (HR→HR). Rate stats map to their primary counting component.
+    const CATEGORY_TO_COMPONENTS: Record<string, string[]> = {
+      ERA: ["ER", "IP"], WHIP: ["H", "BB", "IP"], OPS: ["H", "BB", "HBP", "AB", "SF", "TB"],
+      AVG: ["H", "AB"], OBP: ["H", "BB", "HBP", "AB", "SF"], SLG: ["TB", "AB"],
+    };
+    // For counting stats, the category_id IS the stat key
+    const categoryIds = [...teamCatTotals.keys()];
+
+    // Collect ALL significant drivers per category (not just top 1)
+    const catDrivers = new Map<string, Array<{ playerId: number; delta: number }>>();
 
     for (const playerId of playerIds) {
       const prevComponents = (prevProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
       const currComponents = (currProjMap.get(playerId) as Record<string, number> | undefined) ?? {};
 
-      for (const [stat, currVal] of Object.entries(currComponents)) {
-        const prevVal = prevComponents[stat] ?? 0;
-        const delta = Math.abs(currVal - prevVal);
-        const teamTotal = teamCatTotals.get(stat) ?? 0;
-        // Only surface if change exceeds 5% of team total (reduces noise)
-        if (teamTotal > 0 && delta / teamTotal >= 0.05) {
-          const existing = catDeltas.get(stat);
-          if (!existing || delta > existing.delta) {
-            catDeltas.set(stat, { playerId, delta });
-          }
+      for (const catId of categoryIds) {
+        const componentKeys = CATEGORY_TO_COMPONENTS[catId] ?? [catId];
+        // Sum absolute component deltas for this category to measure player's total impact
+        let totalComponentDelta = 0;
+        for (const key of componentKeys) {
+          totalComponentDelta += Math.abs((currComponents[key] ?? 0) - (prevComponents[key] ?? 0));
+        }
+        if (totalComponentDelta === 0) continue;
+
+        // Use the primary component's signed delta for display
+        const primaryKey = componentKeys[0];
+        const signedDelta = (currComponents[primaryKey] ?? 0) - (prevComponents[primaryKey] ?? 0);
+
+        const teamTotal = teamCatTotals.get(catId) ?? 0;
+        // Surface if change exceeds 2% of team total (lower threshold for detail)
+        if (teamTotal > 0 && totalComponentDelta / Math.abs(teamTotal) >= 0.02) {
+          if (!catDrivers.has(catId)) catDrivers.set(catId, []);
+          catDrivers.get(catId)!.push({ playerId, delta: signedDelta });
         }
       }
     }
 
-    for (const [catId, { playerId }] of catDeltas.entries()) {
-      const name = nameMap.get(playerId);
-      if (name) result.set(catId, name);
+    // Build result: top driver name + sorted driver list per category
+    const result = new Map<string, { topDriver: string; drivers: ProjectionDriver[] }>();
+    for (const [catId, drivers] of catDrivers.entries()) {
+      // Sort by absolute delta descending, cap at 5 players per category
+      drivers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      const topDriverName = nameMap.get(drivers[0].playerId) ?? "";
+
+      const driverList: ProjectionDriver[] = drivers.slice(0, 5).map((d) => ({
+        playerName: nameMap.get(d.playerId) ?? `Player ${d.playerId}`,
+        delta: Math.round(d.delta * 10) / 10,
+      }));
+
+      if (topDriverName) {
+        result.set(catId, { topDriver: topDriverName, drivers: driverList });
+      }
     }
 
     return result;
