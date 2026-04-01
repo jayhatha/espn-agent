@@ -86,7 +86,7 @@ function getSnapshotStatus(snapshot: LatestSnapshot | null): {
   if (!snapshot) return { label: "No Data", color: "bg-neutral-400 text-white" };
   if (snapshot.is_degraded) return { label: "Degraded", color: "bg-negative text-white" };
   const age = Date.now() - new Date(snapshot.snapshot_date).getTime();
-  if (age > 24 * 60 * 60 * 1000) return { label: "Stale", color: "bg-yellow-500 text-white" };
+  if (age > 24 * 60 * 60 * 1000) return { label: "Stale", color: "bg-warning text-white" };
   return { label: "Live", color: "bg-positive text-white" };
 }
 
@@ -170,7 +170,7 @@ export function IdentitySection({
             {/* Hero Card */}
             <div className="border-l-4 border-shell-accent bg-white dark:bg-shell-panel rounded-r-lg pl-5 pr-4 py-5 mb-3">
               {/* Team name */}
-              <h1 className="text-3xl font-extrabold tracking-tight text-content dark:text-shell-text mb-4">
+              <h1 className="text-h1 font-extrabold tracking-tight text-content dark:text-shell-text mb-4">
                 {teamOverview.team.name}
               </h1>
 
@@ -257,7 +257,7 @@ export function IdentitySection({
               {/* Status pill */}
               <span
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  "rounded-full px-2 py-0.5 text-xs font-medium transition-all duration-300",
                   status.color
                 )}
               >

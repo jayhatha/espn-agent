@@ -9,6 +9,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       fontSize: {
@@ -37,7 +38,7 @@ module.exports = {
         content: {
           DEFAULT: '#111827',
           secondary: '#4b5563',
-          tertiary: '#9ca3af',
+          tertiary: '#6b7280',   // was #9ca3af — now 5.0:1 on white (WCAG AA)
           inverse: '#ffffff',
         },
         // ONE primary accent color
@@ -51,21 +52,33 @@ module.exports = {
           DEFAULT: '#059669',
           light: '#ecfdf5',
           border: '#a7f3d0',
+          dark: '#34d399',         // text on dark backgrounds
+          'dark-bg': '#064e3b',    // bg on dark (use with /20 or /30)
+          'dark-border': '#065f46', // border on dark
         },
         negative: {
           DEFAULT: '#dc2626',
           light: '#fef2f2',
           border: '#fecaca',
+          dark: '#f87171',
+          'dark-bg': '#7f1d1d',
+          'dark-border': '#991b1b',
         },
         warning: {
           DEFAULT: '#d97706',
           light: '#fffbeb',
           border: '#fde68a',
+          dark: '#fbbf24',
+          'dark-bg': '#78350f',
+          'dark-border': '#92400e',
         },
         info: {
           DEFAULT: '#2563eb',
           light: '#eff6ff',
           border: '#bfdbfe',
+          dark: '#60a5fa',
+          'dark-bg': '#1e3a5f',
+          'dark-border': '#1e40af',
         },
         // Shell dark theme palette (v6.0 Command Center)
         shell: {
@@ -74,8 +87,8 @@ module.exports = {
           border: '#1D2128',   // borders
           nav:    '#0E1014',   // sidebar background (slightly deeper)
           text:   '#E2E8F0',   // primary text on dark
-          muted:  '#8B97AB',   // secondary/muted text
-          accent: '#6366F1',   // interactive highlight (indigo)
+          muted:  '#94A3B8',   // secondary/muted text — was #8B97AB, now 5.0:1 on shell-bg (WCAG AA)
+          accent: '#0D9488',   // interactive highlight (teal-600)
         },
         // Grafana dark theme palette (for mobile draft companion)
         grafana: {

@@ -225,7 +225,6 @@ export default function TradesPage() {
       givePlayerIds.length === 0 ||
       receivePlayerIds.length === 0
     ) {
-      alert("Please select at least one player to give and receive");
       return;
     }
 
@@ -271,7 +270,7 @@ export default function TradesPage() {
       ? "text-positive"
       : value < 0
         ? "text-negative"
-        : "text-content-secondary";
+        : "text-content-secondary dark:text-shell-muted";
 
   if (!selectedTeamId) {
     return (
@@ -293,7 +292,7 @@ export default function TradesPage() {
       {/* Compact header with inline mode toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-content dark:text-shell-text">Trades</h1>
+          <h1 className="text-h3 font-semibold text-content dark:text-shell-text">Trades</h1>
           <p className="text-body-sm text-content-secondary dark:text-shell-muted">
             {showAnalyzer ? "Build and analyze custom trades" : "Auto-discovered roto-point-positive swaps"}
           </p>
@@ -331,7 +330,7 @@ export default function TradesPage() {
           {/* Partner Selection */}
           <Card>
             <CardContent>
-              <label className="block text-body-sm font-medium text-content mb-3">
+              <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
                 Select Trade Partner
               </label>
               <select
@@ -370,7 +369,7 @@ export default function TradesPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Your Team */}
                     <div>
-                      <label className="block text-body-sm font-medium text-content mb-3">
+                      <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
                         You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
                       </label>
                       <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
@@ -399,7 +398,7 @@ export default function TradesPage() {
                                   }
                                   setTradeAnalysis(null);
                                 }}
-                                className="h-4 w-4 text-accent border-neutral-300 rounded focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="h-4 w-4 text-accent dark:text-shell-accent border-neutral-300 dark:border-shell-border rounded focus:ring-accent dark:focus:ring-shell-accent disabled:opacity-50 disabled:cursor-not-allowed"
                               />
                             </div>
                             <div className="flex-1">
@@ -428,7 +427,7 @@ export default function TradesPage() {
 
                     {/* Partner Team */}
                     <div>
-                      <label className="block text-body-sm font-medium text-content mb-3">
+                      <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
                         You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
                       </label>
                       <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
@@ -492,7 +491,7 @@ export default function TradesPage() {
                 {givePlayerIds.length > 0 && receivePlayerIds.length > 0 && (
                   <div className="mt-4">
                     {isValidating ? (
-                      <div className="flex items-center gap-2 text-body-sm text-content-secondary">
+                      <div className="flex items-center gap-2 text-body-sm text-content-secondary dark:text-shell-muted">
                         <Loader2 className="animate-spin h-4 w-4" />
                         Checking roster validity...
                       </div>
@@ -531,13 +530,19 @@ export default function TradesPage() {
                       isValidating
                     }
                   >
-                    {analyzeTradeM.isPending
-                      ? "Analyzing..."
-                      : isValidating
-                        ? "Validating..."
-                        : validationResult && !validationResult.isLegal
-                          ? "Fix Roster Issues First"
-                          : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
+                    {analyzeTradeM.isPending ? (
+                      <>
+                        <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                        Analyzing...
+                      </>
+                    ) : isValidating ? (
+                      <>
+                        <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                        Validating...
+                      </>
+                    ) : validationResult && !validationResult.isLegal
+                      ? "Fix Roster Issues First"
+                      : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
                   </Button>
                 </div>
 
@@ -579,16 +584,16 @@ export default function TradesPage() {
                 <div className="mb-6 p-4 border border-neutral-200 dark:border-shell-border rounded-lg bg-surface-secondary dark:bg-shell-bg">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                      <div className="text-body-sm text-content-secondary mb-1">
+                      <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">
                         Net Roto Point Impact
                       </div>
                       <div
-                        className={cn("text-3xl font-bold", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}
+                        className={cn("text-h2 font-bold font-mono", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}
                       >
                         {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
                         {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto pts
                       </div>
-                      <div className="text-body-sm text-content-secondary mt-1">
+                      <div className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
                         {tradeAnalysis.currentOverallPoints.toFixed(1)} &rarr;{" "}
                         {tradeAnalysis.projectedOverallPoints.toFixed(1)}
                       </div>
@@ -603,10 +608,10 @@ export default function TradesPage() {
                   </div>
 
                   <div className="mt-4 p-3 bg-white dark:bg-shell-panel rounded-lg border border-neutral-200 dark:border-shell-border">
-                    <div className="text-body-sm font-medium text-content mb-1">
+                    <div className="text-body-sm font-medium text-content dark:text-shell-text mb-1">
                       Analysis
                     </div>
-                    <p className="text-body-sm text-content-secondary">
+                    <p className="text-body-sm text-content-secondary dark:text-shell-muted">
                       {tradeAnalysis.deltaOverallPoints > 0
                         ? `This trade gains you ${tradeAnalysis.deltaOverallPoints.toFixed(1)} roto points. `
                         : tradeAnalysis.deltaOverallPoints < 0
@@ -634,20 +639,20 @@ export default function TradesPage() {
 
                 {/* Category Breakdown */}
                 <div>
-                  <Heading level={4} className="uppercase tracking-wider mb-3 text-body-sm text-content-secondary font-semibold">
+                  <Heading level={4} className="uppercase tracking-wider mb-3 text-body-sm text-content-secondary dark:text-shell-muted font-semibold">
                     Category Impact
                   </Heading>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead className="bg-surface-secondary dark:bg-shell-bg">
                         <tr>
-                          <th className="px-4 py-3 text-left text-data font-medium text-content-secondary uppercase">
+                          <th className="px-4 py-3 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
                             Category
                           </th>
-                          <th className="px-4 py-3 text-center text-data font-medium text-content-secondary uppercase">
+                          <th className="px-4 py-3 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
                             Rank Change
                           </th>
-                          <th className="px-4 py-3 text-right text-data font-medium text-content-secondary uppercase">
+                          <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
                             Point Change
                           </th>
                         </tr>
@@ -658,10 +663,10 @@ export default function TradesPage() {
                           .map((cat) => (
                           <tr key={cat.categoryName} className={cn(
                             "hover:bg-surface-secondary dark:hover:bg-shell-bg",
-                            cat.deltaPoints > 0 && "bg-positive-light/30",
-                            cat.deltaPoints < 0 && "bg-negative-light/30",
+                            cat.deltaPoints > 0 && "bg-positive-light/30 dark:bg-positive-dark-bg/15",
+                            cat.deltaPoints < 0 && "bg-negative-light/30 dark:bg-negative-dark-bg/15",
                           )}>
-                            <td className="px-4 py-3 text-body-sm font-medium text-content">
+                            <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
                               {cat.categoryName}
                             </td>
                             <td className="px-4 py-3 text-body-sm text-center">
@@ -684,7 +689,7 @@ export default function TradesPage() {
                           </tr>
                         ))}
                         <tr className="bg-surface-secondary dark:bg-shell-bg font-semibold">
-                          <td className="px-4 py-3 text-body-sm text-content">Total</td>
+                          <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">Total</td>
                           <td className="px-4 py-3" />
                           <td className="px-4 py-3 text-body-sm text-right">
                             <span className={cn("text-data", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}>
@@ -712,7 +717,10 @@ export default function TradesPage() {
               candidatesData.candidates[0].positionalContext.needPositions.length >
                 0 && (
                 <div className="mb-4 px-4 py-2.5 bg-shell-panel dark:bg-shell-panel border border-shell-border rounded-lg flex items-center gap-3">
-                  <span className="text-body-sm text-content-secondary dark:text-shell-muted">
+                  <span
+                    className="text-body-sm text-content-secondary dark:text-shell-muted cursor-help border-b border-dotted border-content-secondary/40"
+                    title="Positions where adding a player would give you the biggest projected standings improvement"
+                  >
                     Positions of need:
                   </span>
                   <div className="flex gap-1.5">
@@ -840,11 +848,11 @@ export default function TradesPage() {
                       </div>
                     )}
 
-                    <p className="text-xs text-content-secondary dark:text-shell-muted leading-relaxed line-clamp-2">
+                    <p className="text-body-sm text-content-secondary dark:text-shell-muted leading-relaxed line-clamp-2 max-w-prose">
                       {candidate.explanation}
                     </p>
                     {expandedCandidate !== idx && (
-                      <div className="mt-2 text-xs text-accent font-medium">
+                      <div className="mt-2 text-xs text-accent dark:text-shell-accent font-medium">
                         Click to see category breakdown
                       </div>
                     )}
@@ -852,20 +860,20 @@ export default function TradesPage() {
                     {/* Expandable Category Breakdown */}
                     {expandedCandidate === idx && (
                       <div className="mt-3 border-t border-shell-border pt-3">
-                        <div className="text-body-sm font-medium text-content-secondary mb-2 uppercase tracking-wider">
+                        <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-2 uppercase tracking-wider">
                           Category Impact
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                             <thead className="bg-surface-secondary dark:bg-shell-bg">
                               <tr>
-                                <th className="px-3 py-2 text-left text-data font-medium text-content-secondary">
+                                <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted">
                                   Category
                                 </th>
-                                <th className="px-3 py-2 text-center text-data font-medium text-content-secondary">
+                                <th className="px-3 py-2 text-center text-data font-medium text-content-secondary dark:text-shell-muted">
                                   Rank
                                 </th>
-                                <th className="px-3 py-2 text-right text-data font-medium text-content-secondary">
+                                <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted">
                                   Points
                                 </th>
                               </tr>
@@ -879,7 +887,7 @@ export default function TradesPage() {
                                     cat.deltaPoints > 0 && "bg-positive-light/30",
                                     cat.deltaPoints < 0 && "bg-negative-light/30",
                                   )}>
-                                    <td className="px-3 py-2 text-body-sm font-medium text-content">
+                                    <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text">
                                       {cat.categoryName}
                                     </td>
                                     <td className="px-3 py-2 text-body-sm text-center">
@@ -917,7 +925,7 @@ export default function TradesPage() {
                     )}
 
                     {/* Expand hint */}
-                    <div className="mt-2 text-data text-content-tertiary text-center">
+                    <div className="mt-2 text-data text-content-tertiary dark:text-shell-muted text-center">
                       {expandedCandidate === idx ? "Click to collapse" : "Click to see category breakdown"}
                     </div>
                   </div>

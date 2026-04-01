@@ -262,7 +262,7 @@ export default function MovesPage() {
   return (
     <Container size="wide" className="py-6 sm:py-8">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-content dark:text-shell-text">Move Impact</h1>
+        <h1 className="text-h3 font-semibold text-content dark:text-shell-text">Move Impact</h1>
         <p className="text-body-sm text-content-secondary dark:text-shell-muted">
           See which roster moves helped or hurt your season
         </p>
