@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { PlayerStatLine } from "@/components/league/PlayerStatLine";
 import { calculateAVG, calculateOBP, calculateERA, calculateWHIP } from "@espn-fantasy/shared";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
@@ -59,6 +58,15 @@ interface RosterPlayer {
 
 function isPitcher(positions: string[]): boolean {
   return positions.some((p) => ["SP", "RP", "P"].includes(p));
+}
+
+const HITTER_SLOT_ORDER = ["C", "1B", "2B", "SS", "3B", "OF", "UTIL", "DH", "BE", "IL"];
+const PITCHER_SLOT_ORDER = ["SP", "RP", "P", "BE", "IL"];
+
+function slotSortKey(slot: string, isPitcherSlot: boolean): number {
+  const order = isPitcherSlot ? PITCHER_SLOT_ORDER : HITTER_SLOT_ORDER;
+  const idx = order.indexOf(slot);
+  return idx >= 0 ? idx : order.length;
 }
 
 function formatStat(value: number | null | undefined, decimals = 0): string {
@@ -333,7 +341,9 @@ export default function LineupOptimizerPage() {
 
           {/* Hitters Table */}
           {(() => {
-            const hitters = rosterData.roster.filter((p) => !isPitcher(p.positions));
+            const hitters = rosterData.roster
+              .filter((p) => !isPitcher(p.positions))
+              .sort((a, b) => slotSortKey(a.rosterSlot, false) - slotSortKey(b.rosterSlot, false));
             if (hitters.length === 0) return null;
             return (
               <Card>
@@ -345,8 +355,8 @@ export default function LineupOptimizerPage() {
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">Slot</th>
                           <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Pos</th>
                           <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
                           <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">HR</th>
                           <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">R</th>
@@ -359,23 +369,17 @@ export default function LineupOptimizerPage() {
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                         {hitters.map((player) => {
                           const proj = player.projections;
+                          const isBench = player.rosterSlot === "BE" || player.rosterSlot === "Bench";
                           return (
-                            <tr key={player.playerId}>
+                            <tr key={player.playerId} className={isBench ? "opacity-60" : ""}>
+                              <td className="px-3 py-2 text-data font-medium text-content-secondary dark:text-shell-muted w-12">
+                                {player.rosterSlot}
+                              </td>
                               <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
                                 {player.playerName}
-                                {player.tenureStats && (
-                                  <div className="mt-0.5">
-                                    <PlayerStatLine components={player.tenureStats} label="On Team" positions={player.positions} />
-                                  </div>
-                                )}
-                                {player.currentStats && (
-                                  <div className="mt-0.5">
-                                    <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
-                                {player.positions.join(", ")}
+                                <span className="ml-1.5 text-caption text-content-tertiary dark:text-shell-muted">
+                                  {player.positions.join(", ")}
+                                </span>
                               </td>
                               <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.mlbTeam || "--"}
@@ -411,7 +415,9 @@ export default function LineupOptimizerPage() {
 
           {/* Pitchers Table */}
           {(() => {
-            const pitchers = rosterData.roster.filter((p) => isPitcher(p.positions));
+            const pitchers = rosterData.roster
+              .filter((p) => isPitcher(p.positions))
+              .sort((a, b) => slotSortKey(a.rosterSlot, true) - slotSortKey(b.rosterSlot, true));
             if (pitchers.length === 0) return null;
             return (
               <Card>
@@ -423,8 +429,8 @@ export default function LineupOptimizerPage() {
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">Slot</th>
                           <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Pos</th>
                           <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
                           <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">W</th>
                           <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">SV</th>
@@ -437,23 +443,17 @@ export default function LineupOptimizerPage() {
                         {pitchers.map((player) => {
                           const proj = player.projections;
                           const ip = proj?.IP ?? 0;
+                          const isBench = player.rosterSlot === "BE" || player.rosterSlot === "Bench";
                           return (
-                            <tr key={player.playerId}>
+                            <tr key={player.playerId} className={isBench ? "opacity-60" : ""}>
+                              <td className="px-3 py-2 text-data font-medium text-content-secondary dark:text-shell-muted w-12">
+                                {player.rosterSlot}
+                              </td>
                               <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
                                 {player.playerName}
-                                {player.tenureStats && (
-                                  <div className="mt-0.5">
-                                    <PlayerStatLine components={player.tenureStats} label="On Team" positions={player.positions} />
-                                  </div>
-                                )}
-                                {player.currentStats && (
-                                  <div className="mt-0.5">
-                                    <PlayerStatLine components={player.currentStats} label="YTD" positions={player.positions} />
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
-                                {player.positions.join(", ")}
+                                <span className="ml-1.5 text-caption text-content-tertiary dark:text-shell-muted">
+                                  {player.positions.join(", ")}
+                                </span>
                               </td>
                               <td className="px-3 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {player.mlbTeam || "--"}
