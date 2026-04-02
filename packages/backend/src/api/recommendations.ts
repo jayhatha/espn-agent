@@ -4,6 +4,7 @@ import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
 import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-recommendation.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { PitcherlistAdapter, normalizePitcherName } from "../adapters/pitcherlist.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
@@ -118,6 +119,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           );
         }
 
+        // Fetch PitcherList Top 100 SP rankings (6-hour cache, graceful degradation)
+        const plAdapter = new PitcherlistAdapter(request.log);
+        const top100 = await plAdapter.getTop100Rankings().catch(() => []);
+        const plRankMap = new Map(
+          top100.map((entry) => [normalizePitcherName(entry.playerName), entry.rank]),
+        );
+
         const enriched = freeAgentData.map((fa) => ({
           playerId: fa.playerId,
           espnPlayerId: fa.playerId,
@@ -127,6 +135,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           pctOwned: fa.pctOwned,
           pctStarted: fa.pctStarted,
           projections: projMap.get(fa.playerId) || null,
+          pitcherlistRank: plRankMap.get(normalizePitcherName(fa.name)) ?? null,
         }));
 
         return { freeAgents: enriched, snapshotDate: date ?? null };

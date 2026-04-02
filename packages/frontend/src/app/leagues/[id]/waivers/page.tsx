@@ -48,6 +48,7 @@ interface FreeAgent {
   } | null;
   pctOwned: number;
   pctStarted: number;
+  pitcherlistRank: number | null;
 }
 
 interface RosterPlayer {
@@ -335,6 +336,7 @@ export default function WaiversPage() {
         K: pitcher ? (proj.K ?? 0) : null,
         ERA: pitcher && ip > 0 ? calculateERA(proj) : null,
         WHIP: pitcher && ip > 0 ? calculateWHIP(proj) : null,
+        plRank: p.pitcherlistRank,
         _isPitcher: pitcher,
       };
     });
@@ -732,6 +734,7 @@ export default function WaiversPage() {
                             <th className={TH_CLASS}>Pos</th>
                             <SortHeader label="% Own" sortKey="pctOwned" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
                             <SortHeader label="% Start" sortKey="pctStarted" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
+                            <SortHeader label="PL" sortKey="plRank" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
                             {renderStatHeaders(faSortKey, faSortDir, (k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir))}
                           </tr>
                         </thead>
@@ -758,6 +761,20 @@ export default function WaiversPage() {
                               </td>
                               <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
                                 {row.pctStarted.toFixed(1)}%
+                              </td>
+                              <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                {row.plRank != null ? (
+                                  <span className={cn(
+                                    "inline-flex items-center justify-center min-w-[1.5rem] px-1 py-0.5 rounded text-caption font-medium",
+                                    row.plRank <= 20 ? "bg-positive-light text-positive dark:bg-positive-dark-bg/30 dark:text-positive" :
+                                    row.plRank <= 50 ? "bg-info-light text-info dark:bg-info-dark-bg/30 dark:text-info" :
+                                    "text-content-secondary dark:text-shell-muted"
+                                  )}>
+                                    {row.plRank}
+                                  </span>
+                                ) : (
+                                  <span className="text-content-tertiary dark:text-shell-muted">--</span>
+                                )}
                               </td>
                               {renderStatCells(row)}
                             </tr>
