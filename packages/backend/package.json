@@ -16,7 +16,7 @@
     "@fastify/env": "^4.3.0",
     "@fastify/multipart": "^8.3.0",
     "@fastify/redis": "^6.1.1",
-    "axios": "^1.6.5",
+    "axios": "^1.15.0",
     "bullmq": "^5.1.5",
     "csv-parse": "^5.5.3",
     "date-fns": "^2.30.0",
