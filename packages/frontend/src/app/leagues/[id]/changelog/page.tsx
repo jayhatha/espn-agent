@@ -3,11 +3,27 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ScrollText, TrendingUp, TrendingDown, Zap } from "lucide-react";
+import { ScrollText, TrendingUp, TrendingDown, Zap, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Returns true during local MLB game hours (roughly 1pm–midnight). */
+function isGameWindow(): boolean {
+  const h = new Date().getHours();
+  return h >= 13;
+}
+
+function formatRelativeTime(date: Date): string {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins / 60)}h ago`;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -71,7 +87,7 @@ function EventCard({
         "border rounded-lg p-4 transition-opacity",
         isOurTeam
           ? "border-shell-border bg-surface-1"
-          : "border-shell-border/50 bg-surface-0 opacity-60"
+          : "border-shell-border/50 bg-surface-0 opacity-60",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -80,7 +96,9 @@ function EventCard({
           <div
             className={cn(
               "mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center",
-              gained ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
+              gained
+                ? "bg-positive/10 text-positive"
+                : "bg-negative/10 text-negative",
             )}
           >
             {gained ? (
@@ -96,7 +114,7 @@ function EventCard({
               <span
                 className={cn(
                   "text-sm font-semibold",
-                  isOurTeam ? "text-content-primary" : "text-content-secondary"
+                  isOurTeam ? "text-content-primary" : "text-content-secondary",
                 )}
               >
                 {teamName}
@@ -106,7 +124,7 @@ function EventCard({
                   "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium",
                   gained
                     ? "bg-positive/10 text-positive"
-                    : "bg-negative/10 text-negative"
+                    : "bg-negative/10 text-negative",
                 )}
               >
                 {event.category_name}
@@ -115,7 +133,9 @@ function EventCard({
 
             {/* Passed label */}
             {passedLabel && (
-              <p className="text-xs text-content-secondary mt-0.5">{passedLabel}</p>
+              <p className="text-xs text-content-secondary mt-0.5">
+                {passedLabel}
+              </p>
             )}
 
             {/* Proximate cause */}
@@ -135,12 +155,14 @@ function EventCard({
           <span
             className={cn(
               "font-mono text-sm font-semibold",
-              gained ? "text-positive" : "text-negative"
+              gained ? "text-positive" : "text-negative",
             )}
           >
             {deltaStr} pts
           </span>
-          <p className="text-xs text-content-tertiary mt-0.5">{formattedTime}</p>
+          <p className="text-xs text-content-tertiary mt-0.5">
+            {formattedTime}
+          </p>
         </div>
       </div>
     </div>
@@ -157,6 +179,8 @@ export default function ChangeLogPage() {
   const [ourTeamId, setOurTeamId] = useState<number | null>(null);
   const [liveEvents, setLiveEvents] = useState<ChangeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
+  const [isGameTime, setIsGameTime] = useState(isGameWindow());
   const seenIds = useRef(new Set<number>());
 
   // Load our team from localStorage (same pattern as rest of app)
@@ -167,6 +191,22 @@ export default function ChangeLogPage() {
       if (!isNaN(parsed)) setOurTeamId(parsed);
     }
   }, [leagueId]);
+
+  // Update game window state every minute
+  useEffect(() => {
+    const interval = setInterval(() => setIsGameTime(isGameWindow()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    try {
+      await api.triggerLiveRefresh(leagueIdNum);
+      setLastPolledAt(new Date());
+    } catch {
+      // non-fatal — user can try again
+    }
+  }, [leagueIdNum]);
 
   // Fetch teams for name lookup
   const { data: teamsData } = useQuery({
@@ -222,9 +262,12 @@ export default function ChangeLogPage() {
 
     es.onmessage = (e) => {
       try {
-        const msg = JSON.parse(e.data) as { type: string; data?: ChangeEvent };
+        const msg = JSON.parse(e.data) as { type: string; data?: unknown };
         if (msg.type === "event" && msg.data) {
-          addEvents([msg.data]);
+          addEvents([msg.data as ChangeEvent]);
+        } else if (msg.type === "live_poll") {
+          const d = msg.data as { polledAt: string };
+          setLastPolledAt(new Date(d.polledAt));
         }
       } catch {
         // ignore malformed frames
@@ -243,22 +286,51 @@ export default function ChangeLogPage() {
         title="Change Log"
         backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
         actions={
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full",
-              isConnected
-                ? "bg-positive/10 text-positive"
-                : "bg-surface-2 text-content-tertiary"
+          <div className="flex items-center gap-2">
+            {/* Last polled timestamp */}
+            {lastPolledAt && (
+              <span className="text-xs text-content-tertiary hidden sm:inline">
+                Updated {formatRelativeTime(lastPolledAt)}
+              </span>
             )}
-          >
+
+            {/* Games in progress indicator */}
+            {isGameTime && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                Games live
+              </span>
+            )}
+
+            {/* Manual refresh button */}
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-shell-border text-content-secondary hover:text-content-primary hover:border-accent transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Refresh
+            </button>
+
+            {/* SSE connection dot */}
             <span
               className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                isConnected ? "bg-positive animate-pulse" : "bg-content-tertiary"
+                "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full",
+                isConnected
+                  ? "bg-positive/10 text-positive"
+                  : "bg-surface-2 text-content-tertiary",
               )}
-            />
-            {isConnected ? "Live" : "Connecting…"}
-          </span>
+            >
+              <span
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  isConnected
+                    ? "bg-positive animate-pulse"
+                    : "bg-content-tertiary",
+                )}
+              />
+              {isConnected ? "Live" : "Connecting…"}
+            </span>
+          </div>
         }
       />
 
@@ -273,9 +345,11 @@ export default function ChangeLogPage() {
       {!isLoading && liveEvents.length === 0 && (
         <div className="text-center py-16">
           <ScrollText className="w-8 h-8 text-content-tertiary mx-auto mb-3" />
-          <p className="text-content-secondary text-sm">No standings changes yet.</p>
+          <p className="text-content-secondary text-sm">
+            No standings changes yet.
+          </p>
           <p className="text-content-tertiary text-xs mt-1">
-            Changes appear after the next snapshot runs.
+            Changes stream live during game hours. Check back once games start.
           </p>
         </div>
       )}
