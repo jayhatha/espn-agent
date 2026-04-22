@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: Milestone complete
-stopped_at: Completed 80-03-PLAN.md
-last_updated: "2026-03-31T19:54:38.777Z"
+status: In progress
+stopped_at: Phase 81 complete — all 3 plans committed
+last_updated: "2026-04-22T00:00:00.000Z"
 progress:
-  total_phases: 16
-  completed_phases: 16
-  total_plans: 35
-  completed_plans: 35
+  total_phases: 17
+  completed_phases: 17
+  total_plans: 41
+  completed_plans: 41
 ---
 
 # Project State
@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 80 — standings-swing-attribution
+**Current focus:** Phase 81 complete — live standings change log with SSE + Slack-ready notification bus
 
 ## Current Position
 
@@ -66,6 +66,9 @@ Plan: Not started
 | Phase 80 P01 | 6 min | 2 tasks | 2 files |
 | Phase 80-standings-swing-attribution-surface-why-projected-standings-changed-between-snapshots P02 | 6 min | 2 tasks | 4 files |
 | Phase 80-standings-swing-attribution P03 | 5 | 2 tasks | 2 files |
+| Phase 81 P01 | — | 3 tasks | 4 files |
+| Phase 81 P02 | — | 3 tasks | 3 files |
+| Phase 81 P03 | — | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -149,6 +152,7 @@ Plan: Not started
 - Phase 76 added: API hardening — validate ESPN response shapes, add runtime type guards, log unexpected fields/missing data, add retry with backoff
 - Phase 77 added: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
 - Phase 78 added: Streaming picks — merge Rotoballer verdicts and waiver pickup timing into streaming tab
+- Phase 81 added: Live Standings Change Log — Streaming activity feed with Slack-ready notification layer
 
 ### Blockers/Concerns
 
