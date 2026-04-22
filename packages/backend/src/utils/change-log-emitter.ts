@@ -15,3 +15,11 @@ export interface ChangeLogSignal {
   snapshotDate: string;
   eventCount: number;
 }
+
+export const LIVE_POLL_EVENT = "live_poll";
+
+export interface LivePollSignal {
+  leagueId: number;
+  polledAt: string; // ISO string
+  eventCount: number;
+}

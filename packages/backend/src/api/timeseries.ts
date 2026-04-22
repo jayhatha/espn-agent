@@ -5,7 +5,13 @@ import { parseIntParam } from "../utils/validation.js";
 import { monteCarloRotoPoints } from "../projection/variance.js";
 import type { TeamCategoryValue } from "../projection/variance.js";
 import { StandingsSwingAttributionAgent } from "../agents/standings-swing-attribution.js";
-import { changeLogEmitter, CHANGE_LOG_EVENT } from "../utils/change-log-emitter.js";
+import {
+  changeLogEmitter,
+  CHANGE_LOG_EVENT,
+  LIVE_POLL_EVENT,
+  type LivePollSignal,
+} from "../utils/change-log-emitter.js";
+import { LivePollAgent } from "../agents/live-poll.js";
 
 /**
  * Time Series API Routes
@@ -64,7 +70,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         const seasons = result.map((r) => r.season);
         return { seasons };
       } catch (err) {
-        return reply.code(400).send({ error: err instanceof Error ? err.message : "Invalid request" });
+        return reply
+          .code(400)
+          .send({
+            error: err instanceof Error ? err.message : "Invalid request",
+          });
       }
     },
   );
@@ -89,7 +99,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, limit } = request.query;
       // Default to current season if no date filters provided
-      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
+      const season =
+        request.query.season ||
+        (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       let query = db
         .selectFrom("team_daily_overall")
@@ -115,7 +127,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
-      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
+      const series = await query
+        .orderBy("snapshot_date", "asc")
+        .limit(queryLimit)
+        .execute();
 
       return { series };
     },
@@ -134,7 +149,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, categoryId, limit } = request.query;
-      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
+      const season =
+        request.query.season ||
+        (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -165,7 +182,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
-      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
+      const series = await query
+        .orderBy("snapshot_date", "asc")
+        .limit(queryLimit)
+        .execute();
 
       return { series };
     },
@@ -184,7 +204,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, categoryId, limit } = request.query;
-      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
+      const season =
+        request.query.season ||
+        (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       if (!categoryId) {
         return reply.code(400).send({ error: "categoryId is required" });
@@ -221,7 +243,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
-      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
+      const series = await query
+        .orderBy("snapshot_date", "asc")
+        .limit(queryLimit)
+        .execute();
 
       return { series };
     },
@@ -240,7 +265,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseIntParam(request.params.leagueId, "leagueId");
       const { from, to, teamIds, limit } = request.query;
-      const season = request.query.season || (!from && !to ? await getDefaultSeason(leagueId) : null);
+      const season =
+        request.query.season ||
+        (!from && !to ? await getDefaultSeason(leagueId) : null);
 
       let query = db
         .selectFrom("team_daily_projected_overall")
@@ -266,7 +293,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
-      const series = await query.orderBy("snapshot_date", "asc").limit(queryLimit).execute();
+      const series = await query
+        .orderBy("snapshot_date", "asc")
+        .limit(queryLimit)
+        .execute();
 
       return { series };
     },
@@ -311,7 +341,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .where("league_id", "=", leagueId)
         .execute();
 
-      const teamMap = new Map<any, typeof teams[0]>(teams.map((t) => [t.id, t]));
+      const teamMap = new Map<any, (typeof teams)[0]>(
+        teams.map((t) => [t.id, t]),
+      );
 
       // Get projected category standings
       const categoryStandings = await db
@@ -351,7 +383,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .where("snapshot_date", "=", previousSnapshot.snapshot_date)
           .execute();
         previousOverallMap = new Map(
-          previousOverall.map((po) => [po.team_id, po.projected_overall_points]),
+          previousOverall.map((po) => [
+            po.team_id,
+            po.projected_overall_points,
+          ]),
         );
       }
 
@@ -421,10 +456,18 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       // Run Monte Carlo simulation for overall roto point ranges
       // Uses per-category confidence intervals to simulate ranking outcomes
       const mcInput: TeamCategoryValue[] = [];
-      const catArray = categories as Array<{ category_id: string; direction: string }>;
+      const catArray = categories as Array<{
+        category_id: string;
+        direction: string;
+      }>;
       for (const cs of categoryStandings) {
-        const componentsJson = cs.projected_components_json as Record<string, unknown> | null;
-        const ci = componentsJson?.confidence as { p10: number; p50: number; p90: number } | undefined;
+        const componentsJson = cs.projected_components_json as Record<
+          string,
+          unknown
+        > | null;
+        const ci = componentsJson?.confidence as
+          | { p10: number; p50: number; p90: number }
+          | undefined;
         mcInput.push({
           teamId: cs.team_id,
           categoryId: cs.category_id,
@@ -432,24 +475,30 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           confidence: ci,
         });
       }
-      const overallConfidence = mcInput.length > 0
-        ? monteCarloRotoPoints(
-            mcInput,
-            catArray.map((c) => ({
-              categoryId: c.category_id,
-              direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
-            })),
-            teams.length,
-          )
-        : new Map();
+      const overallConfidence =
+        mcInput.length > 0
+          ? monteCarloRotoPoints(
+              mcInput,
+              catArray.map((c) => ({
+                categoryId: c.category_id,
+                direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
+              })),
+              teams.length,
+            )
+          : new Map();
 
       return {
         snapshotDate: targetDate,
         previousSnapshotDate: previousSnapshot?.snapshot_date ?? null,
         categories,
         categoryStandings: categoryStandings.map((cs) => {
-          const componentsJson = cs.projected_components_json as Record<string, unknown> | null;
-          const confidence = componentsJson?.confidence as { p10: number; p50: number; p90: number } | undefined;
+          const componentsJson = cs.projected_components_json as Record<
+            string,
+            unknown
+          > | null;
+          const confidence = componentsJson?.confidence as
+            | { p10: number; p50: number; p90: number }
+            | undefined;
           return {
             ...cs,
             teamName: teamMap.get(cs.team_id)?.name || `Team ${cs.team_id}`,
@@ -463,9 +512,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             ...os,
             teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
             previousProjectedPoints: prevPoints ?? null,
-            pointsDelta: prevPoints != null
-              ? os.projected_overall_points - prevPoints
-              : null,
+            pointsDelta:
+              prevPoints != null
+                ? os.projected_overall_points - prevPoints
+                : null,
             confidence: mc ? { p10: mc.p10, p50: mc.p50, p90: mc.p90 } : null,
           };
         }),
@@ -513,16 +563,25 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
             .executeTakeFirst();
 
           if (!latest) {
-            return reply.code(404).send({ error: "No snapshots found for this league" });
+            return reply
+              .code(404)
+              .send({ error: "No snapshots found for this league" });
           }
           currDate = latest.snapshot_date;
         }
 
         const agent = new StandingsSwingAttributionAgent(db, request.log);
-        const result = await agent.computeSwing(leagueId, parsedTeamId, currDate);
+        const result = await agent.computeSwing(
+          leagueId,
+          parsedTeamId,
+          currDate,
+        );
         return result;
       } catch (err) {
-        request.log.error({ err }, "Failed to compute standings swing attribution");
+        request.log.error(
+          { err },
+          "Failed to compute standings swing attribution",
+        );
         return reply.code(500).send({ error: "Failed to compute attribution" });
       }
     },
@@ -554,8 +613,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .send({ error: "No settings found for this league" });
       }
 
-      const categories =
-        settingsVersion.settings_json.categories || [];
+      const categories = settingsVersion.settings_json.categories || [];
       return { categories };
     },
   );
@@ -999,7 +1057,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       if (isNaN(leagueId)) {
         return reply.code(400).send({ error: "Invalid leagueId" });
       }
-      const historyLimit = Math.min(parseInt(request.query.limit ?? "50", 10), 200);
+      const historyLimit = Math.min(
+        parseInt(request.query.limit ?? "50", 10),
+        200,
+      );
 
       // Tell Fastify not to manage the response
       reply.hijack();
@@ -1036,7 +1097,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }
 
       // Subscribe to live events
-      function onNewEvent(payload: { leagueId: number; snapshotDate: string }): void {
+      function onNewEvent(payload: {
+        leagueId: number;
+        snapshotDate: string;
+      }): void {
         if (payload.leagueId !== leagueId) return;
         db.selectFrom("standings_change_event")
           .selectAll()
@@ -1049,10 +1113,20 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
               sendEvent({ type: "event", data: event });
             }
           })
-          .catch(() => {/* ignore */});
+          .catch(() => {
+            /* ignore */
+          });
       }
 
       changeLogEmitter.on(CHANGE_LOG_EVENT, onNewEvent);
+
+      // Subscribe to live poll signals (even when no events, update "last polled" on client)
+      function onLivePoll(signal: LivePollSignal): void {
+        if (signal.leagueId !== leagueId) return;
+        sendEvent({ type: "live_poll", data: { polledAt: signal.polledAt } });
+      }
+
+      changeLogEmitter.on(LIVE_POLL_EVENT, onLivePoll);
 
       // Heartbeat every 30s
       const heartbeat = setInterval(() => {
@@ -1063,13 +1137,17 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       request.raw.on("close", () => {
         clearInterval(heartbeat);
         changeLogEmitter.off(CHANGE_LOG_EVENT, onNewEvent);
+        changeLogEmitter.off(LIVE_POLL_EVENT, onLivePoll);
         if (reply.raw.writable) reply.raw.end();
       });
     },
   );
 
   // Phase 81: REST paginated change log history
-  app.get<{ Params: { leagueId: string }; Querystring: { limit?: string; before?: string } }>(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { limit?: string; before?: string };
+  }>(
     "/api/leagues/:leagueId/standings/change-log",
     {
       onRequest: [authenticate],
@@ -1101,6 +1179,27 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .execute();
 
         return { events };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return reply.code(500).send({ error: msg });
+      }
+    },
+  );
+
+  // Phase 82: Manual live refresh trigger
+  app.post<{ Params: { leagueId: string } }>(
+    "/api/leagues/:leagueId/live-refresh",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      try {
+        const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+        const today = new Date().toISOString().split("T")[0];
+        const agent = new LivePollAgent(db, request.log);
+        const eventCount = await agent.refresh(leagueId, today);
+        return reply.send({ polledAt: new Date().toISOString(), eventCount });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         return reply.code(500).send({ error: msg });

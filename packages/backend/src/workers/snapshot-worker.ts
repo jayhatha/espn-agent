@@ -8,6 +8,9 @@ import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 // Import backfill worker so it runs in the same process
 import "./backfill-worker.js";
 
+// Import live poll worker so it runs in the same process (scheduling is gated by LIVE_POLL_ENABLED)
+import { scheduleLivePolls } from "./live-poll-worker.js";
+
 /**
  * Background worker for daily snapshot jobs
  * Per AGENTS.md §8
@@ -169,3 +172,11 @@ process.on("SIGTERM", async () => {
 });
 
 logger.info("Worker started");
+
+// Schedule both daily snapshots and live polls on startup
+scheduleDailySnapshots().catch((err) =>
+  logger.error({ err }, "Failed to schedule daily snapshots"),
+);
+scheduleLivePolls().catch((err) =>
+  logger.error({ err }, "Failed to schedule live polls"),
+);
