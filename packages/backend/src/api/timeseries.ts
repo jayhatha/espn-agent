@@ -5,6 +5,7 @@ import { parseIntParam } from "../utils/validation.js";
 import { monteCarloRotoPoints } from "../projection/variance.js";
 import type { TeamCategoryValue } from "../projection/variance.js";
 import { StandingsSwingAttributionAgent } from "../agents/standings-swing-attribution.js";
+import { changeLogEmitter, CHANGE_LOG_EVENT } from "../utils/change-log-emitter.js";
 
 /**
  * Time Series API Routes
@@ -983,6 +984,127 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       );
 
       return { inflectionPoints };
+    },
+  );
+
+  // Phase 81: SSE live standings change log
+  app.get<{ Params: { leagueId: string }; Querystring: { limit?: string } }>(
+    "/api/leagues/:leagueId/standings/live-log",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      if (isNaN(leagueId)) {
+        return reply.code(400).send({ error: "Invalid leagueId" });
+      }
+      const historyLimit = Math.min(parseInt(request.query.limit ?? "50", 10), 200);
+
+      // Tell Fastify not to manage the response
+      reply.hijack();
+
+      // SSE headers
+      reply.raw.setHeader("Content-Type", "text/event-stream");
+      reply.raw.setHeader("Cache-Control", "no-cache");
+      reply.raw.setHeader("Connection", "keep-alive");
+      reply.raw.setHeader("X-Accel-Buffering", "no");
+      reply.raw.flushHeaders();
+
+      function sendEvent(data: unknown): void {
+        if (reply.raw.writable) {
+          reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+      }
+
+      // Send historical events on connect
+      try {
+        const history = await db
+          .selectFrom("standings_change_event")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .orderBy("occurred_at", "desc")
+          .limit(historyLimit)
+          .execute();
+
+        for (const event of history.reverse()) {
+          sendEvent({ type: "event", data: event });
+        }
+        sendEvent({ type: "history_end", count: history.length });
+      } catch (_err) {
+        sendEvent({ type: "error", message: "Failed to load history" });
+      }
+
+      // Subscribe to live events
+      function onNewEvent(payload: { leagueId: number; snapshotDate: string }): void {
+        if (payload.leagueId !== leagueId) return;
+        db.selectFrom("standings_change_event")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", payload.snapshotDate)
+          .orderBy("occurred_at", "asc")
+          .execute()
+          .then((events) => {
+            for (const event of events) {
+              sendEvent({ type: "event", data: event });
+            }
+          })
+          .catch(() => {/* ignore */});
+      }
+
+      changeLogEmitter.on(CHANGE_LOG_EVENT, onNewEvent);
+
+      // Heartbeat every 30s
+      const heartbeat = setInterval(() => {
+        sendEvent({ type: "heartbeat", ts: Date.now() });
+      }, 30_000);
+
+      // Cleanup on disconnect
+      request.raw.on("close", () => {
+        clearInterval(heartbeat);
+        changeLogEmitter.off(CHANGE_LOG_EVENT, onNewEvent);
+        if (reply.raw.writable) reply.raw.end();
+      });
+    },
+  );
+
+  // Phase 81: REST paginated change log history
+  app.get<{ Params: { leagueId: string }; Querystring: { limit?: string; before?: string } }>(
+    "/api/leagues/:leagueId/standings/change-log",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      try {
+        const leagueId = parseInt(request.params.leagueId, 10);
+        if (isNaN(leagueId)) {
+          return reply.code(400).send({ error: "Invalid leagueId" });
+        }
+        const limit = Math.min(parseInt(request.query.limit ?? "50", 10), 200);
+
+        let query = db
+          .selectFrom("standings_change_event")
+          .selectAll()
+          .where("league_id", "=", leagueId);
+
+        if (request.query.before) {
+          const beforeDate = new Date(request.query.before);
+          if (!isNaN(beforeDate.getTime())) {
+            query = query.where("occurred_at", "<", beforeDate);
+          }
+        }
+
+        const events = await query
+          .orderBy("occurred_at", "desc")
+          .limit(limit)
+          .execute();
+
+        return { events };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return reply.code(500).send({ error: msg });
+      }
     },
   );
 }

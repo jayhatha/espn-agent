@@ -1,9 +1,13 @@
 import type { BaseLogger } from "pino";
+import pino from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { LeagueSettings, StatComponents } from "../../../shared/dist/index.js";
 import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
+import { StandingsChangeLogAgent } from "./standings-change-log.js";
+import { createNotificationBus } from "../utils/notification-bus.js";
+import { changeLogEmitter, CHANGE_LOG_EVENT } from "../utils/change-log-emitter.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
@@ -272,6 +276,21 @@ export class SnapshotOrchestratorAgent {
           snapshotDate,
           projectionsRun.id,
         );
+      }
+
+      // 8. Generate standings change log events (Phase 81)
+      // Non-blocking: errors here do not fail the snapshot
+      try {
+        const logger = this.logger ?? pino();
+        const bus = createNotificationBus(logger);
+        const changeLogAgent = new StandingsChangeLogAgent(this.db, logger, bus);
+        const eventCount = await changeLogAgent.generateEvents(leagueId, snapshotDate);
+        if (eventCount > 0) {
+          changeLogEmitter.emit(CHANGE_LOG_EVENT, { leagueId, snapshotDate, eventCount });
+        }
+        this.logger?.info({ leagueId, snapshotDate, eventCount }, "Change log events generated");
+      } catch (err) {
+        this.logger?.warn({ err, leagueId, snapshotDate }, "Change log generation failed — non-fatal");
       }
 
       this.logger?.info(
