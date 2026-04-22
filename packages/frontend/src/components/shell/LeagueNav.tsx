@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   Settings,
   Menu,
   X,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -31,6 +32,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard",      href: "",           icon: LayoutDashboard },
   { label: "Standings",      href: "/standings", icon: Trophy },
+  { label: "Change Log",     href: "/changelog", icon: ScrollText },
   { label: "Categories",     href: "/trends",    icon: BarChart3 },
   { label: "Roster",         href: "/lineup",    icon: Users },
   { label: "Waivers",        href: "/waivers",   icon: RefreshCw, badgeKey: "waivers" },
@@ -47,6 +49,8 @@ export function LeagueNav() {
 
   const [teamId, setTeamId] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -57,17 +61,61 @@ export function LeagueNav() {
     }
   }, [id]);
 
+  // Mobile nav: focus trap, Escape to close, body overflow lock
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    document.body.classList.add("overflow-hidden");
+
+    // Focus first link in nav
+    const firstLink = navRef.current?.querySelector("a") as HTMLElement | null;
+    firstLink?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileOpen(false);
+        hamburgerRef.current?.focus();
+        return;
+      }
+
+      if (e.key === "Tab" && navRef.current) {
+        const focusable = navRef.current.querySelectorAll<HTMLElement>(
+          'a, button, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileOpen]);
+
   const leagueId = id ? parseInt(id, 10) : 0;
 
   const { data: waiverData } = useQuery({
-    queryKey: ["signals-waivers", id, teamId],
+    queryKey: ["waivers-recommendations", id, teamId],
     queryFn: () => api.getWaiverRecommendations(leagueId, teamId!, { maxRecommendations: 5 }),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
   });
 
   const { data: tradeData } = useQuery({
-    queryKey: ["signals-trades", id, teamId],
+    queryKey: ["trades-recommendations", id, teamId],
     queryFn: () => api.getTradeRecommendations(leagueId, teamId!),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
@@ -90,9 +138,12 @@ export function LeagueNav() {
     <>
       {/* Mobile hamburger toggle — visible only on mobile */}
       <button
+        ref={hamburgerRef}
         onClick={() => setMobileOpen(!mobileOpen)}
         className="fixed top-3 left-3 z-40 md:hidden p-2 rounded-lg bg-shell-panel border border-shell-border text-shell-text"
         aria-label="Toggle navigation"
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-nav"
       >
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -105,7 +156,10 @@ export function LeagueNav() {
         />
       )}
 
-      <nav className={cn(
+      <nav
+        ref={navRef}
+        id="mobile-nav"
+        className={cn(
         "fixed left-0 top-0 h-screen w-60 bg-shell-nav border-r border-shell-border flex-col z-30 overflow-y-auto",
         mobileOpen ? "flex" : "hidden",
         "md:flex"
@@ -131,9 +185,9 @@ export function LeagueNav() {
                   href={href}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                    "flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md text-sm transition-colors",
                     active
-                      ? "bg-shell-accent/10 text-shell-accent font-medium"
+                      ? "bg-shell-accent/20 text-shell-accent font-medium"
                       : "text-shell-muted hover:text-shell-text hover:bg-shell-panel"
                   )}
                 >

@@ -462,4 +462,13 @@ export const api = {
 
     return response.json();
   },
+
+  // Change log (Phase 81)
+  async getChangeLogHistory(leagueId: number, limit = 50) {
+    return fetchAPI(`/api/leagues/${leagueId}/standings/change-log?limit=${limit}`);
+  },
+
+  getChangeLogSSEUrl(leagueId: number): string {
+    return `${API_URL}/api/leagues/${leagueId}/standings/live-log`;
+  },
 };
