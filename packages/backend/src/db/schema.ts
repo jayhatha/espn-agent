@@ -31,6 +31,28 @@ type WithGeneratedId<T extends { id: unknown }> = Omit<T, "id"> & {
   id: Generated<T["id"]>;
 };
 
+export interface StandingsChangeEventRow {
+  id: Generated<number>;
+  league_id: number;
+  team_id: number;
+  snapshot_date: string;
+  occurred_at: Generated<Date>;
+  category_id: string;
+  category_name: string;
+  prev_roto_pts: number;
+  curr_roto_pts: number;
+  roto_delta: number;
+  passed_team_id: number | null;
+  passed_team_name: string | null;
+  direction: "gained" | "lost";
+  proximate_cause: {
+    playerName: string;
+    stat: string;
+    value: number;
+    description: string;
+  } | null;
+}
+
 export interface SeasonMetadata {
   league_id: number;
   season: number;
@@ -77,6 +99,8 @@ export interface Database {
   injury_event: WithGeneratedId<InjuryEvent>;
   // Season finalization (Phase 74)
   season_metadata: SeasonMetadata;
+  // Phase 81: Standings change event log
+  standings_change_event: StandingsChangeEventRow;
 }
 
 export interface LeagueSettingsVersion {
