@@ -89,6 +89,8 @@ export interface ESPNTeamData {
   primaryOwner?: string; // SWID of primary owner
   owners?: string[]; // Array of SWIDs
   faabSpent?: number; // FAAB dollars spent from transactionCounter
+  espnPoints?: number; // ESPN pre-computed roto points total (batch-updated, cached)
+  espnPointsDelta?: number; // Live in-game scoring delta (non-zero during active game windows)
 }
 
 export interface ESPNFreeAgent {
@@ -1259,6 +1261,8 @@ export class ESPNAdapter {
           primaryOwner: t.primaryOwner,
           owners: t.owners || [],
           faabSpent: typeof faabSpent === "number" ? faabSpent : undefined,
+          espnPoints: typeof t.points === "number" ? t.points : undefined,
+          espnPointsDelta: typeof t.pointsDelta === "number" ? t.pointsDelta : undefined,
         };
       }),
       standings: teams.map((t: any) => ({

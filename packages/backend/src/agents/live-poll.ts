@@ -74,7 +74,16 @@ export class LivePollAgent {
       leagueId: league.espn_league_id,
       season: league.season,
       auth,
-      views: ["mSettings", "mTeam", "mStandings"],
+      views: ["mSettings", "mTeam", "mStandings", "mLiveScoring"],
+      // filterStatsForSplitTypeIds: [5] = current scoring period (live/today)
+      // filterStatsForSourceIds: [0] = real-time source
+      // This is what ESPN's own standings page sends to get live stats
+      xFantasyFilter: {
+        players: {
+          filterStatsForSourceIds: { value: [0] },
+          filterStatsForSplitTypeIds: { value: [5] },
+        },
+      },
     });
     const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
     const { teams, settings } = normalized;
@@ -100,6 +109,19 @@ export class LivePollAgent {
     const espnTeamIdToDbId = new Map(
       dbTeams.map((t) => [t.espn_team_id, t.id]),
     );
+
+    // 3a. Build ESPN live point totals: dbTeamId → (espnPoints + espnPointsDelta).
+    // During active game windows, pointsDelta carries the live delta for in-progress
+    // games that haven't been baked into the batch-cached espnPoints yet.
+    // ESPN's website displays espnPoints + espnPointsDelta as the live roto total.
+    const espnLivePoints = new Map<number, number>();
+    for (const team of teams) {
+      const dbTeamId = espnTeamIdToDbId.get(team.id);
+      if (!dbTeamId) continue;
+      if (team.espnPoints !== undefined) {
+        espnLivePoints.set(dbTeamId, team.espnPoints + (team.espnPointsDelta ?? 0));
+      }
+    }
 
     // 4. Resolve most recent settings version + projections run
     const settingsVersion = await this.db
@@ -241,8 +263,14 @@ export class LivePollAgent {
           .execute();
       }
 
-      // Insert overall standings
-      const overallSorted = Array.from(teamOverallPoints.entries())
+      // Insert overall standings.
+      // Use ESPN's live total (espnPoints + espnPointsDelta) when available — this matches
+      // the live-adjusted values ESPN's website displays during active game windows.
+      // Falls back to our computed roto total (from valuesByStat rankings) if ESPN
+      // pre-computed data is unavailable.
+      const useEspnLive = espnLivePoints.size > 0;
+      const overallPointsMap = useEspnLive ? espnLivePoints : teamOverallPoints;
+      const overallSorted = Array.from(overallPointsMap.entries())
         .map(([teamId, value]) => ({ teamId, value }))
         .sort((a, b) => b.value - a.value);
 
@@ -256,7 +284,7 @@ export class LivePollAgent {
               league_id: leagueId,
               snapshot_date: today,
               team_id: teamId,
-              overall_points: teamOverallPoints.get(teamId) ?? 0,
+              overall_points: overallPointsMap.get(teamId) ?? 0,
               overall_rank: rank,
             })),
           )
