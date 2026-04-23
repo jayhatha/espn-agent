@@ -526,6 +526,97 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
     },
   );
 
+  // Standings neighborhood — 2 above + me + 2 below in overall points
+  app.get<{
+    Params: { leagueId: string; teamId: string };
+  }>(
+    "/api/leagues/:leagueId/teams/:teamId/standings/neighborhood",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+      const teamId = parseIntParam(request.params.teamId, "teamId");
+
+      // Get latest snapshot date
+      const latest = await db
+        .selectFrom("league_daily_snapshot")
+        .select("snapshot_date")
+        .where("league_id", "=", leagueId)
+        .orderBy("snapshot_date", "desc")
+        .executeTakeFirst();
+
+      if (!latest) {
+        return reply.code(404).send({ error: "No snapshots found" });
+      }
+
+      const normDate = (d: unknown): string => {
+        if (d instanceof Date) return (d as Date).toISOString().split("T")[0];
+        return String(d).split("T")[0];
+      };
+      const today = normDate(latest.snapshot_date);
+
+      // Fetch actual overall standings for today
+      const allOverall = await db
+        .selectFrom("team_daily_overall")
+        .innerJoin("team", "team.id", "team_daily_overall.team_id")
+        .select([
+          "team_daily_overall.team_id",
+          "team.name",
+          "team_daily_overall.overall_points",
+          "team_daily_overall.overall_rank",
+        ])
+        .where("team_daily_overall.league_id", "=", leagueId)
+        .where("team_daily_overall.snapshot_date", "=", today)
+        .orderBy("team_daily_overall.overall_rank", "asc")
+        .execute();
+
+      // Fetch projected overall for today
+      const allProjected = await db
+        .selectFrom("team_daily_projected_overall")
+        .select([
+          "team_id",
+          "projected_overall_points",
+          "projected_overall_rank",
+        ])
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", today)
+        .execute();
+
+      const projectedMap = new Map(
+        allProjected.map((p) => [p.team_id, p]),
+      );
+
+      // Find my index in sorted overall list
+      const myIdx = allOverall.findIndex((r) => r.team_id === teamId);
+      if (myIdx === -1) {
+        // Team not in today's standings — return empty neighborhood
+        return reply.send({ neighborhood: [], snapshotDate: today });
+      }
+
+      const start = Math.max(0, myIdx - 2);
+      const end = Math.min(allOverall.length - 1, myIdx + 2);
+      const slice = allOverall.slice(start, end + 1);
+
+      const neighborhood = slice.map((row) => ({
+        teamId: row.team_id,
+        teamName: row.name,
+        overallPoints: Number(row.overall_points),
+        overallRank: row.overall_rank,
+        isMyTeam: row.team_id === teamId,
+        projectedPoints:
+          projectedMap.get(row.team_id)?.projected_overall_points != null
+            ? Number(projectedMap.get(row.team_id)!.projected_overall_points)
+            : null,
+        projectedRank:
+          projectedMap.get(row.team_id)?.projected_overall_rank ?? null,
+      }));
+
+      return reply.send({ neighborhood, snapshotDate: today });
+    },
+  );
+
   // Standings swing attribution — explains WHY projected standings changed between snapshots
   app.get<{
     Params: { leagueId: string };
