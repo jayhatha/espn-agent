@@ -17,6 +17,7 @@ export class StandingsChangeLogAgent {
   async generateEvents(
     leagueId: number,
     snapshotDate: string,
+    eventSource: "live" | "snapshot" = "snapshot",
   ): Promise<number> {
     // 1. Find two most recent snapshots
     const snapshots = await this.db
@@ -244,6 +245,7 @@ export class StandingsChangeLogAgent {
           passed_team_id: passedTeamId,
           passed_team_name: passedTeamName,
           direction: directionLabel,
+          event_source: eventSource,
           proximate_cause: proximateCause,
         };
 
@@ -252,7 +254,8 @@ export class StandingsChangeLogAgent {
         const eventKey = `${team.id}:${categoryId}`;
         const existingDelta = existingDeltaMap.get(eventKey);
         const isNewOrChanged =
-          existingDelta === undefined || Math.abs(existingDelta - rotoDelta) >= 0.01;
+          existingDelta === undefined ||
+          Math.abs(existingDelta - rotoDelta) >= 0.01;
 
         const result = await this.db
           .insertInto("standings_change_event")
@@ -268,6 +271,7 @@ export class StandingsChangeLogAgent {
             passed_team_id: passedTeamId,
             passed_team_name: passedTeamName,
             direction: directionLabel,
+            event_source: eventSource,
             proximate_cause: proximateCause,
           })
           .onConflict((oc) =>
@@ -390,23 +394,20 @@ export class StandingsChangeLogAgent {
 
       // 3. Build vivid description from stat delta + top player
       const gained = rotoDelta > 0;
-      const absStatDelta =
-        statDelta !== null ? Math.abs(statDelta) : null;
+      const absStatDelta = statDelta !== null ? Math.abs(statDelta) : null;
 
       let description: string;
       if (topPlayer && absStatDelta !== null && absStatDelta >= 0.5) {
-        const deltaStr =
-          Number.isInteger(absStatDelta)
-            ? absStatDelta.toString()
-            : absStatDelta.toFixed(1);
+        const deltaStr = Number.isInteger(absStatDelta)
+          ? absStatDelta.toString()
+          : absStatDelta.toFixed(1);
         description = `${topPlayer} led a ${deltaStr}-${categoryName} ${gained ? "gain" : "drop"} today`;
       } else if (topPlayer) {
         description = `${topPlayer} drove ${categoryName} ${gained ? "up" : "down"}`;
       } else if (absStatDelta !== null && absStatDelta >= 0.5) {
-        const deltaStr =
-          Number.isInteger(absStatDelta)
-            ? absStatDelta.toString()
-            : absStatDelta.toFixed(1);
+        const deltaStr = Number.isInteger(absStatDelta)
+          ? absStatDelta.toString()
+          : absStatDelta.toFixed(1);
         description = `${deltaStr} ${categoryName} ${gained ? "added" : "lost"} today`;
       } else {
         description = `${categoryName} projections ${gained ? "improved" : "declined"}`;

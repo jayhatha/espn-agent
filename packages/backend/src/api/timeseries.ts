@@ -540,79 +540,79 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         const leagueId = parseIntParam(request.params.leagueId, "leagueId");
         const teamId = parseIntParam(request.params.teamId, "teamId");
 
-      // Get latest snapshot date
-      const latest = await db
-        .selectFrom("league_daily_snapshot")
-        .select("snapshot_date")
-        .where("league_id", "=", leagueId)
-        .orderBy("snapshot_date", "desc")
-        .executeTakeFirst();
+        // Get latest snapshot date
+        const latest = await db
+          .selectFrom("league_daily_snapshot")
+          .select("snapshot_date")
+          .where("league_id", "=", leagueId)
+          .orderBy("snapshot_date", "desc")
+          .executeTakeFirst();
 
-      if (!latest) {
-        return reply.code(404).send({ error: "No snapshots found" });
-      }
+        if (!latest) {
+          return reply.code(404).send({ error: "No snapshots found" });
+        }
 
-      const normDate = (d: unknown): string => {
-        if (d instanceof Date) return (d as Date).toISOString().split("T")[0];
-        return String(d).split("T")[0];
-      };
-      const today = normDate(latest.snapshot_date);
+        const normDate = (d: unknown): string => {
+          if (d instanceof Date) return (d as Date).toISOString().split("T")[0];
+          return String(d).split("T")[0];
+        };
+        const today = normDate(latest.snapshot_date);
 
-      // Fetch actual overall standings for today
-      const allOverall = await db
-        .selectFrom("team_daily_overall")
-        .innerJoin("team", "team.id", "team_daily_overall.team_id")
-        .select([
-          "team_daily_overall.team_id",
-          "team.name",
-          "team_daily_overall.overall_points",
-          "team_daily_overall.overall_rank",
-        ])
-        .where("team_daily_overall.league_id", "=", leagueId)
-        .where("team_daily_overall.snapshot_date", "=", today)
-        .orderBy("team_daily_overall.overall_rank", "asc")
-        .execute();
+        // Fetch actual overall standings for today
+        const allOverall = await db
+          .selectFrom("team_daily_overall")
+          .innerJoin("team", "team.id", "team_daily_overall.team_id")
+          .select([
+            "team_daily_overall.team_id",
+            "team.name",
+            "team_daily_overall.overall_points",
+            "team_daily_overall.overall_rank",
+          ])
+          .where("team_daily_overall.league_id", "=", leagueId)
+          .where("team_daily_overall.snapshot_date", "=", today)
+          .orderBy("team_daily_overall.overall_rank", "asc")
+          .execute();
 
-      // Fetch projected overall for today
-      const allProjected = await db
-        .selectFrom("team_daily_projected_overall")
-        .select([
-          "team_id",
-          "projected_overall_points",
-          "projected_overall_rank",
-        ])
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", today)
-        .execute();
+        // Fetch projected overall for today
+        const allProjected = await db
+          .selectFrom("team_daily_projected_overall")
+          .select([
+            "team_id",
+            "projected_overall_points",
+            "projected_overall_rank",
+          ])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", today)
+          .execute();
 
-      const projectedMap = new Map(allProjected.map((p) => [p.team_id, p]));
+        const projectedMap = new Map(allProjected.map((p) => [p.team_id, p]));
 
-      // Find my index in sorted overall list
-      const myIdx = allOverall.findIndex((r) => r.team_id === teamId);
-      if (myIdx === -1) {
-        // Team not in today's standings — return empty neighborhood
-        return reply.send({ neighborhood: [], snapshotDate: today });
-      }
+        // Find my index in sorted overall list
+        const myIdx = allOverall.findIndex((r) => r.team_id === teamId);
+        if (myIdx === -1) {
+          // Team not in today's standings — return empty neighborhood
+          return reply.send({ neighborhood: [], snapshotDate: today });
+        }
 
-      const start = Math.max(0, myIdx - 2);
-      const end = Math.min(allOverall.length - 1, myIdx + 2);
-      const slice = allOverall.slice(start, end + 1);
+        const start = Math.max(0, myIdx - 2);
+        const end = Math.min(allOverall.length - 1, myIdx + 2);
+        const slice = allOverall.slice(start, end + 1);
 
-      const neighborhood = slice.map((row) => ({
-        teamId: row.team_id,
-        teamName: row.name,
-        overallPoints: Number(row.overall_points),
-        overallRank: row.overall_rank,
-        isMyTeam: row.team_id === teamId,
-        projectedPoints:
-          projectedMap.get(row.team_id)?.projected_overall_points != null
-            ? Number(projectedMap.get(row.team_id)!.projected_overall_points)
-            : null,
-        projectedRank:
-          projectedMap.get(row.team_id)?.projected_overall_rank ?? null,
-      }));
+        const neighborhood = slice.map((row) => ({
+          teamId: row.team_id,
+          teamName: row.name,
+          overallPoints: Number(row.overall_points),
+          overallRank: row.overall_rank,
+          isMyTeam: row.team_id === teamId,
+          projectedPoints:
+            projectedMap.get(row.team_id)?.projected_overall_points != null
+              ? Number(projectedMap.get(row.team_id)!.projected_overall_points)
+              : null,
+          projectedRank:
+            projectedMap.get(row.team_id)?.projected_overall_rank ?? null,
+        }));
 
-      return reply.send({ neighborhood, snapshotDate: today });
+        return reply.send({ neighborhood, snapshotDate: today });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         return reply.code(400).send({ error: msg });
@@ -1247,9 +1247,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
   );
 
   // Phase 81: REST paginated change log history
+  // Phase 84: adds ?source=live filter for current-standings events only
   app.get<{
     Params: { leagueId: string };
-    Querystring: { limit?: string; before?: string };
+    Querystring: { limit?: string; before?: string; source?: string };
   }>(
     "/api/leagues/:leagueId/standings/change-log",
     {
@@ -1274,6 +1275,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           if (!isNaN(beforeDate.getTime())) {
             query = query.where("occurred_at", "<", beforeDate);
           }
+        }
+
+        // ?source=live — only events from live-poll cycles (actual stat changes)
+        if (request.query.source === "live") {
+          query = query.where("event_source", "=", "live");
         }
 
         const events = await query

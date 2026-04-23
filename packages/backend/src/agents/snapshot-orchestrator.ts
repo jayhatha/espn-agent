@@ -2,12 +2,23 @@ import type { BaseLogger } from "pino";
 import pino from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import type { LeagueSettings, StatComponents } from "../../../shared/dist/index.js";
-import { ESPNAdapter, type ESPNAuthCookies, type ESPNTeamData, type ESPNScoringCategory } from "../adapters/espn.js";
+import type {
+  LeagueSettings,
+  StatComponents,
+} from "../../../shared/dist/index.js";
+import {
+  ESPNAdapter,
+  type ESPNAuthCookies,
+  type ESPNTeamData,
+  type ESPNScoringCategory,
+} from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { StandingsChangeLogAgent } from "./standings-change-log.js";
 import { createNotificationBus } from "../utils/notification-bus.js";
-import { changeLogEmitter, CHANGE_LOG_EVENT } from "../utils/change-log-emitter.js";
+import {
+  changeLogEmitter,
+  CHANGE_LOG_EVENT,
+} from "../utils/change-log-emitter.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
@@ -112,7 +123,13 @@ export class SnapshotOrchestratorAgent {
         leagueId: league.espn_league_id,
         season: league.season,
         auth: espnAuth,
-        views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+        views: [
+          "mSettings",
+          "mTeam",
+          "mRoster",
+          "mStandings",
+          "kona_player_info",
+        ],
         xFantasyFilter: {
           players: {
             limit: 1500,
@@ -132,7 +149,13 @@ export class SnapshotOrchestratorAgent {
           league_id: leagueId,
           fetched_at: espnData.fetchedAt,
           endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
-          views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+          views: [
+            "mSettings",
+            "mTeam",
+            "mRoster",
+            "mStandings",
+            "kona_player_info",
+          ],
           scoring_period_id: null,
           x_fantasy_filter: {
             players: {
@@ -172,7 +195,9 @@ export class SnapshotOrchestratorAgent {
         if (d instanceof Date) return d.toISOString().split("T")[0];
         return String(d).split("T")[0];
       };
-      const projDate = projectionsRun ? normDate(projectionsRun.as_of_date) : "";
+      const projDate = projectionsRun
+        ? normDate(projectionsRun.as_of_date)
+        : "";
       const snapDate = normDate(snapshotDate);
 
       const isDegraded =
@@ -236,7 +261,11 @@ export class SnapshotOrchestratorAgent {
 
         // Write players and roster snapshots
         await this.writePlayersAndRosters(
-          trx, leagueId, snapshotDate, normalized.teams, espnTeamIdToDbId,
+          trx,
+          leagueId,
+          snapshotDate,
+          normalized.teams,
+          espnTeamIdToDbId,
         );
 
         // Write free agent players
@@ -246,8 +275,12 @@ export class SnapshotOrchestratorAgent {
         const categories = normalized.settings.categories;
         if (categories.length > 0) {
           await this.writeCurrentStandings(
-            trx, leagueId, snapshotDate, normalized.teams,
-            espnTeamIdToDbId, categories,
+            trx,
+            leagueId,
+            snapshotDate,
+            normalized.teams,
+            espnTeamIdToDbId,
+            categories,
           );
         }
 
@@ -261,8 +294,12 @@ export class SnapshotOrchestratorAgent {
           1;
         if (rawTeams && Array.isArray(rawTeams)) {
           await this.writePlayerPeriodStats(
-            trx, leagueId, snapshotDate, rawTeams,
-            espnTeamIdToDbId, snapshotScoringPeriodId,
+            trx,
+            leagueId,
+            snapshotDate,
+            rawTeams,
+            espnTeamIdToDbId,
+            snapshotScoringPeriodId,
           );
         }
 
@@ -283,14 +320,32 @@ export class SnapshotOrchestratorAgent {
       try {
         const logger = this.logger ?? pino();
         const bus = createNotificationBus(logger);
-        const changeLogAgent = new StandingsChangeLogAgent(this.db, logger, bus);
-        const eventCount = await changeLogAgent.generateEvents(leagueId, snapshotDate);
+        const changeLogAgent = new StandingsChangeLogAgent(
+          this.db,
+          logger,
+          bus,
+        );
+        const eventCount = await changeLogAgent.generateEvents(
+          leagueId,
+          snapshotDate,
+          "snapshot",
+        );
         if (eventCount > 0) {
-          changeLogEmitter.emit(CHANGE_LOG_EVENT, { leagueId, snapshotDate, eventCount });
+          changeLogEmitter.emit(CHANGE_LOG_EVENT, {
+            leagueId,
+            snapshotDate,
+            eventCount,
+          });
         }
-        this.logger?.info({ leagueId, snapshotDate, eventCount }, "Change log events generated");
+        this.logger?.info(
+          { leagueId, snapshotDate, eventCount },
+          "Change log events generated",
+        );
       } catch (err) {
-        this.logger?.warn({ err, leagueId, snapshotDate }, "Change log generation failed — non-fatal");
+        this.logger?.warn(
+          { err, leagueId, snapshotDate },
+          "Change log generation failed — non-fatal",
+        );
       }
 
       this.logger?.info(
@@ -321,7 +376,7 @@ export class SnapshotOrchestratorAgent {
       .execute();
 
     // Batch upsert all unique players (1 query instead of N per player)
-    const uniquePlayers = new Map<number, typeof teams[0]["roster"][0]>();
+    const uniquePlayers = new Map<number, (typeof teams)[0]["roster"][0]>();
     for (const team of teams) {
       for (const entry of team.roster) {
         uniquePlayers.set(entry.espnPlayerId, entry);
@@ -385,15 +440,15 @@ export class SnapshotOrchestratorAgent {
     if (rosterRows.length > 0) {
       for (let i = 0; i < rosterRows.length; i += 500) {
         const chunk = rosterRows.slice(i, i + 500);
-        await trx
-          .insertInto("team_roster_snapshot")
-          .values(chunk)
-          .execute();
+        await trx.insertInto("team_roster_snapshot").values(chunk).execute();
       }
     }
 
     const totalPlayers = teams.reduce((sum, t) => sum + t.roster.length, 0);
-    this.logger?.info({ leagueId, totalPlayers }, "Players and rosters written");
+    this.logger?.info(
+      { leagueId, totalPlayers },
+      "Players and rosters written",
+    );
   }
 
   private async writeCurrentStandings(
@@ -480,7 +535,10 @@ export class SnapshotOrchestratorAgent {
           : b.value - a.value,
       );
 
-      const sorted = teamValues.map((tv) => ({ teamId: tv.dbTeamId, value: tv.value }));
+      const sorted = teamValues.map((tv) => ({
+        teamId: tv.dbTeamId,
+        value: tv.value,
+      }));
       const ranked = assignRanksWithTies(sorted, numTeams);
 
       for (const { teamId: dbTeamId, rank, rotoPoints } of ranked) {
@@ -541,23 +599,25 @@ export class SnapshotOrchestratorAgent {
     settings: any,
   ): Promise<number> {
     // Check if settings changed
-    void await this.db
+    void (await this.db
       .selectFrom("league_settings_version")
       .selectAll()
       .where("league_id", "=", leagueId)
       .orderBy("effective_date", "desc")
-      .executeTakeFirst();
+      .executeTakeFirst());
 
     // Convert ESPN categories to shared Category format
-    const categories = (settings.categories || []).map((cat: ESPNScoringCategory) => ({
-      category_id: cat.statKey,
-      name: cat.name,
-      stat_key: cat.statKey,
-      type: cat.type,
-      direction: cat.direction,
-      formula_id: cat.formulaId,
-      required_components: cat.requiredComponents,
-    }));
+    const categories = (settings.categories || []).map(
+      (cat: ESPNScoringCategory) => ({
+        category_id: cat.statKey,
+        name: cat.name,
+        stat_key: cat.statKey,
+        type: cat.type,
+        direction: cat.direction,
+        formula_id: cat.formulaId,
+        required_components: cat.requiredComponents,
+      }),
+    );
 
     const settingsJson: LeagueSettings = {
       scoring_format: settings.scoringFormat || "unknown",
@@ -635,7 +695,10 @@ export class SnapshotOrchestratorAgent {
         .execute();
     }
 
-    this.logger?.info({ freeAgentCount: freeAgents.length }, "Free agent players written");
+    this.logger?.info(
+      { freeAgentCount: freeAgents.length },
+      "Free agent players written",
+    );
   }
 
   /**
@@ -698,7 +761,8 @@ export class SnapshotOrchestratorAgent {
         // Skip IL (17) and NA (19)
         if (lineupSlotId === 17 || lineupSlotId === 19) continue;
 
-        const espnPlayerId = entry.playerId ?? entry.playerPoolEntry?.player?.id;
+        const espnPlayerId =
+          entry.playerId ?? entry.playerPoolEntry?.player?.id;
         if (!espnPlayerId) continue;
 
         const dbPlayerId = espnPlayerIdToDbId.get(espnPlayerId);
@@ -707,17 +771,21 @@ export class SnapshotOrchestratorAgent {
         // Extract player stats for current scoring period (statSplitTypeId=5)
         const playerStats = entry.playerPoolEntry?.player?.stats || [];
         const periodStats = playerStats.find(
-          (s: any) => s.statSplitTypeId === 5 && s.scoringPeriodId === scoringPeriodId,
+          (s: any) =>
+            s.statSplitTypeId === 5 && s.scoringPeriodId === scoringPeriodId,
         );
 
         if (!periodStats?.stats) continue;
 
         // Map ESPN stat IDs to component keys
         const components: Record<string, number> = {};
-        for (const [statIdStr, value] of Object.entries(periodStats.stats as Record<string, number>)) {
+        for (const [statIdStr, value] of Object.entries(
+          periodStats.stats as Record<string, number>,
+        )) {
           const statId = parseInt(statIdStr, 10);
           const componentKey = ESPN_PERIOD_STAT_MAP[statId];
-          if (!componentKey || typeof value !== "number" || value === 0) continue;
+          if (!componentKey || typeof value !== "number" || value === 0)
+            continue;
 
           if (componentKey === "OUTS") {
             // Convert outs to innings pitched
@@ -743,12 +811,14 @@ export class SnapshotOrchestratorAgent {
             components_json: components as StatComponents,
           })
           .onConflict((oc) =>
-            oc.columns(["league_id", "scoring_period", "player_id"]).doUpdateSet({
-              snapshot_date: snapshotDate,
-              team_id: dbTeamId,
-              lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
-              components_json: components as StatComponents,
-            }),
+            oc
+              .columns(["league_id", "scoring_period", "player_id"])
+              .doUpdateSet({
+                snapshot_date: snapshotDate,
+                team_id: dbTeamId,
+                lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
+                components_json: components as StatComponents,
+              }),
           )
           .execute();
 

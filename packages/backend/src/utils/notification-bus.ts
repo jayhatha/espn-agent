@@ -12,6 +12,7 @@ export interface StandingsChangeEventPayload {
   passed_team_id: number | null;
   passed_team_name: string | null;
   direction: "gained" | "lost";
+  event_source: string; // "live" | "snapshot"
   proximate_cause: {
     playerName: string;
     stat: string;
@@ -38,15 +39,17 @@ export class SlackWebhookNotificationBus implements NotificationBus {
 
   async emit(event: StandingsChangeEventPayload): Promise<void> {
     const sign = event.direction === "gained" ? "📈" : "📉";
-    const deltaStr = event.roto_delta > 0
-      ? `+${event.roto_delta.toFixed(1)}`
-      : event.roto_delta.toFixed(1);
+    const deltaStr =
+      event.roto_delta > 0
+        ? `+${event.roto_delta.toFixed(1)}`
+        : event.roto_delta.toFixed(1);
 
     let text = `${sign} *${event.category_name}* ${deltaStr} pts`;
     if (event.passed_team_name) {
-      text += event.direction === "gained"
-        ? ` — passed *${event.passed_team_name}*`
-        : ` — passed by *${event.passed_team_name}*`;
+      text +=
+        event.direction === "gained"
+          ? ` — passed *${event.passed_team_name}*`
+          : ` — passed by *${event.passed_team_name}*`;
     }
     if (event.proximate_cause) {
       text += `\n> ${event.proximate_cause.description}`;
@@ -59,7 +62,10 @@ export class SlackWebhookNotificationBus implements NotificationBus {
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        this.logger.warn({ status: res.status }, "Slack webhook delivery failed");
+        this.logger.warn(
+          { status: res.status },
+          "Slack webhook delivery failed",
+        );
       }
     } catch (err) {
       this.logger.warn({ err }, "Slack webhook emit error — continuing");

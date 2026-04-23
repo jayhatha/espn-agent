@@ -285,7 +285,7 @@ export class LivePollAgent {
     try {
       const bus = createNotificationBus(log);
       const changeLogAgent = new StandingsChangeLogAgent(this.db, log, bus);
-      eventCount = await changeLogAgent.generateEvents(leagueId, today);
+      eventCount = await changeLogAgent.generateEvents(leagueId, today, "live");
     } catch (err) {
       log.warn(
         { err, leagueId },

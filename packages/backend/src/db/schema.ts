@@ -45,6 +45,7 @@ export interface StandingsChangeEventRow {
   passed_team_id: number | null;
   passed_team_name: string | null;
   direction: "gained" | "lost";
+  event_source: string; // "live" | "snapshot"
   proximate_cause: {
     playerName: string;
     stat: string;
@@ -175,7 +176,7 @@ export interface SlackNotificationTarget {
   slack_user_link_id: string;
   league_id: number;
   team_id: string;
-  target_type: 'channel' | 'dm';
+  target_type: "channel" | "dm";
   channel_id: string | null;
   thread_ts: string | null;
   is_enabled: boolean;
@@ -189,7 +190,7 @@ export interface AgentReport {
   slack_user_link_id: string;
   league_id: number;
   report_date: string; // DATE
-  kind: 'morning';
+  kind: "morning";
   summary_markdown: string;
   data_json: object;
   created_at: Date;
@@ -198,12 +199,19 @@ export interface AgentReport {
 export interface AgentAction {
   id: string;
   report_id: string;
-  action_type: 'ADD_DROP' | 'WAIVER_CLAIM' | 'SET_LINEUP' | 'TRADE_OFFER';
+  action_type: "ADD_DROP" | "WAIVER_CLAIM" | "SET_LINEUP" | "TRADE_OFFER";
   payload_json: object;
   expected_impact_json: object;
   risk_flags_json: object | null;
   evidence_json: object | null;
-  status: 'proposed' | 'approved' | 'rejected' | 'expired' | 'executing' | 'done' | 'failed';
+  status:
+    | "proposed"
+    | "approved"
+    | "rejected"
+    | "expired"
+    | "executing"
+    | "done"
+    | "failed";
   expires_at: Date;
   created_at: Date;
   updated_at: Date;
@@ -213,7 +221,7 @@ export interface AgentActionDecision {
   id: Generated<string>;
   action_id: string;
   decided_by_slack_user_link_id: string;
-  decision: 'approve' | 'reject' | 'modify';
+  decision: "approve" | "reject" | "modify";
   override_payload_json: object | null;
   decided_at: Date;
 }
