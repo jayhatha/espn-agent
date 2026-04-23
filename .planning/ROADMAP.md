@@ -350,9 +350,9 @@ Plans:
 **Goal:** Rename the "Change Log" feature to "Streaming Results" and upgrade it into a live league standings ticker. The panel shows real current standings (not projections) for the user's team plus the two teams above and two below in overall roto points. Events are filtered to only those that affect current standings, and each event identifies the specific cause — which category changed, the stat event responsible (home run, stolen base, etc.), and the player involved.
 **Depends on:** Phase 83
 **Requirements:** STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06
-**Plans:** 0 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 
-- [ ] 84-01-PLAN.md — Backend: filter change-log events to current-standings-only (exclude projection-driven events); enrich event payload with category, stat type (HR/SB/K/etc.), and player name
-- [ ] 84-02-PLAN.md — Frontend: rename Change Log → Streaming Results; live standings strip showing my team ± 2 neighbors in real roto points; event cards display play-by-play attribution (player, stat, category gained/lost)
+- [x] 84-01-PLAN.md — Backend: add event_source column to standings_change_event; filter change-log API endpoint to live-only events via ?source=live param; tag live-poll events vs snapshot events at write time
+- [x] 84-02-PLAN.md — Frontend: rename Change Log → Streaming Results (nav + page); history feed filtered to live events only; stat abbreviation chips on EventCard (HR/SB/ERA etc.) with full category name alongside

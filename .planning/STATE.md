@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
 status: In progress
-stopped_at: Phase 82 complete — live game polling + real-time changelog indicators
+stopped_at: Phase 84 complete — Streaming Results: event_source live/snapshot filter, stat abbreviation chips, nav rename
 last_updated: "2026-04-23T00:00:00.000Z"
 progress:
   total_phases: 18
@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 82 complete — live game polling (15-min BullMQ worker) + changelog page real-time indicators (game-window chip, last-polled timestamp, manual refresh)
+**Current focus:** Phase 84 complete — Streaming Results page: event_source field added to DB + API (live vs snapshot filter), frontend renamed to Streaming Results with stat abbreviation chips on EventCard and history filtered to live-only events
 
 ## Current Position
 
@@ -153,6 +153,7 @@ _Updated after each plan completion_
 - Phase 77 added: SP sit/start recommendations from Pitcherlist and Rotoballer — scrape weekly rankings, match to rostered SPs, display start/sit verdict with source links
 - Phase 78 added: Streaming picks — merge Rotoballer verdicts and waiver pickup timing into streaming tab
 - Phase 81 added: Live Standings Change Log — Streaming activity feed with Slack-ready notification layer
+- Phase 84 added: Streaming Results — Live standings and category rankings with play-by-play event attribution
 
 ### Blockers/Concerns
 
