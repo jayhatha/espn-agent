@@ -12,7 +12,10 @@ import {
   LIVE_POLL_EVENT,
 } from "../utils/change-log-emitter.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
-import { getEspnAuthFromEnv, getEspnAuthFromLeague } from "../utils/espn-env.js";
+import {
+  getEspnAuthFromEnv,
+  getEspnAuthFromLeague,
+} from "../utils/espn-env.js";
 
 /**
  * LivePollAgent
@@ -59,6 +62,14 @@ export class LivePollAgent {
     // 2. Fetch ESPN — lightweight views only (no rosters, no free agents)
     // Auth: env vars take priority; fall back to DB-stored encrypted credentials
     const auth = getEspnAuthFromEnv() ?? getEspnAuthFromLeague(league);
+    if (!auth) {
+      log.warn(
+        { leagueId },
+        "LivePollAgent: no ESPN credentials available — skipping refresh. " +
+          "Set ESPN_SWID + ESPN_S2 env vars or store credentials via /auth endpoint.",
+      );
+      return 0;
+    }
     const espnData = await this.espnAdapter.fetchLeague({
       leagueId: league.espn_league_id,
       season: league.season,
