@@ -50,7 +50,8 @@ function statAbbrev(categoryName: string): string {
   if (name === "OBP") return "OBP";
   if (name === "SLG") return "SLG";
   if (name === "RBI" || name.includes("RUNS BATTED")) return "RBI";
-  if (name === "R" || (name.includes("RUN") && !name.includes("HOME"))) return "R";
+  if (name === "R" || (name.includes("RUN") && !name.includes("HOME")))
+    return "R";
   if (name === "W" || name.includes("WIN")) return "W";
   if (name === "SV" || name.includes("SAVE")) return "SV";
   if (name === "HLD" || name.includes("HOLD")) return "HLD";
@@ -186,7 +187,9 @@ function EventCard({
               )}
             >
               <span>{statAbbrev(event.category_name)}</span>
-              <span className="opacity-60 font-normal text-[10px]">{event.category_name}</span>
+              <span className="opacity-60 font-normal text-[10px]">
+                {event.category_name}
+              </span>
             </span>
 
             {/* Narrative lines */}
@@ -232,9 +235,13 @@ function StandingsNeighborhood({
 }) {
   return (
     <div className="rounded-lg border border-shell-border overflow-hidden mb-6">
-      <div className="px-3 py-2 border-b border-shell-border bg-surface-1">
+      <div className="px-3 py-2 border-b border-shell-border bg-surface-1 flex items-center gap-2">
         <span className="text-xs font-medium text-content-tertiary uppercase tracking-wider">
-          Standings — Today
+          Live Standings
+        </span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-positive">
+          <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
+          live
         </span>
       </div>
       <div className="divide-y divide-shell-border/50">
@@ -421,6 +428,10 @@ export default function ChangeLogPage() {
         } else if (msg.type === "live_poll") {
           const d = msg.data as { polledAt: string };
           setLastPolledAt(new Date(d.polledAt));
+          // Refresh neighborhood standings immediately when live poll completes
+          queryClient.invalidateQueries({
+            queryKey: ["standings-neighborhood", leagueId],
+          });
         }
       } catch {
         // ignore malformed frames
