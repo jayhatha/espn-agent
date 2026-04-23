@@ -17,10 +17,10 @@ import { cn } from "@/lib/cn";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Returns true during local MLB game hours (roughly 1pm–midnight). */
+/** Returns true during MLB game hours (1pm–midnight ET = 17:00–04:00 UTC). */
 function isGameWindow(): boolean {
-  const h = new Date().getHours();
-  return h >= 13;
+  const h = new Date().getUTCHours();
+  return h >= 17 || h < 4;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -85,8 +85,10 @@ function EventCard({
   numTeams: number;
 }) {
   const gained = event.direction === "gained";
-  const catRank = Math.round(numTeams - event.curr_roto_pts + 1);
-  const prevRank = Math.round(
+  // Use Math.ceil so tied teams (fractional roto_pts like 8.5) map to the better
+  // of the two shared positions (4th rather than 5th in a 4th/5th tie).
+  const catRank = Math.ceil(numTeams - event.curr_roto_pts + 1);
+  const prevRank = Math.ceil(
     numTeams - (event.curr_roto_pts - event.roto_delta) + 1,
   );
   const rankChanged = catRank !== prevRank;
@@ -281,6 +283,7 @@ export default function ChangeLogPage() {
   const [liveEvents, setLiveEvents] = useState<ChangeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
+  const [refreshError, setRefreshError] = useState(false);
   // false on server; real value set after mount to avoid SSR/client hydration mismatch
   const [isGameTime, setIsGameTime] = useState(false);
   const seenIds = useRef(new Set<number>());
@@ -305,6 +308,7 @@ export default function ChangeLogPage() {
 
   // Manual refresh handler
   const handleRefresh = useCallback(async () => {
+    setRefreshError(false);
     try {
       await api.triggerLiveRefresh(leagueIdNum);
       setLastPolledAt(new Date());
@@ -312,7 +316,7 @@ export default function ChangeLogPage() {
         queryKey: ["standings-neighborhood", leagueId],
       });
     } catch {
-      // non-fatal — user can try again
+      setRefreshError(true);
     }
   }, [leagueIdNum, leagueId, queryClient]);
 
@@ -434,10 +438,16 @@ export default function ChangeLogPage() {
             {/* Manual refresh button */}
             <button
               onClick={handleRefresh}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-shell-border text-content-secondary hover:text-content-primary hover:border-accent transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors",
+                refreshError
+                  ? "border-negative/40 text-negative"
+                  : "border-shell-border text-content-secondary hover:text-content-primary hover:border-accent",
+              )}
+              title={refreshError ? "Refresh failed — try again" : undefined}
             >
               <RefreshCw className="w-3 h-3" />
-              Refresh
+              {refreshError ? "Failed" : "Refresh"}
             </button>
 
             {/* SSE connection dot */}
@@ -480,8 +490,8 @@ export default function ChangeLogPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && myEvents.length === 0 && (
+      {/* Empty state — gate on ourTeamId being resolved to avoid flash before localStorage loads */}
+      {!isLoading && ourTeamId != null && myEvents.length === 0 && (
         <div className="text-center py-16">
           <ScrollText className="w-8 h-8 text-content-tertiary mx-auto mb-3" />
           <p className="text-content-secondary text-sm">
