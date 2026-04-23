@@ -72,6 +72,12 @@ export async function buildServer(): Promise<FastifyInstance> {
       } else if (/^chrome-extension:\/\//.test(origin)) {
         // Allow Chrome extension WebSocket connections
         callback(null, true);
+      } else if (
+        process.env.NODE_ENV !== "production" &&
+        /^http:\/\/localhost:\d+$/.test(origin)
+      ) {
+        // Allow any localhost port in development (port shifts when e.g. Docker occupies :3000)
+        callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"), false);
       }
