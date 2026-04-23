@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v6.0
 milestone_name: In-Season Command Center
-status: In progress
-stopped_at: Phase 84 complete — Streaming Results: event_source live/snapshot filter, stat abbreviation chips, nav rename
+status: Complete
+stopped_at: v6.0 milestone complete — all 18 phases done, ROADMAP audit passed
 last_updated: "2026-04-23T00:00:00.000Z"
 progress:
   total_phases: 18
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 
 ## Current Position
 
-Phase: 80
-Plan: Not started
+Phase: 84 (final)
+Plan: Complete — v6.0 milestone finished
 
 ## Performance Metrics
 
