@@ -6,9 +6,11 @@
 ## Delivered
 
 ### `packages/frontend/src/lib/api.ts` (modified)
+
 - Added `triggerLiveRefresh(leagueId)` → `POST /api/leagues/${leagueId}/live-refresh`
 
 ### `packages/frontend/src/app/leagues/[id]/changelog/page.tsx` (modified)
+
 - Added `isGameWindow()` helper — checks local hour ≥ 13 (1pm)
 - Added `formatRelativeTime(date)` helper — returns "just now / Xm ago / Xh ago"
 - Added `RefreshCw` to lucide-react imports

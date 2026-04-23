@@ -6,14 +6,17 @@
 ## Delivered
 
 ### `packages/frontend/src/lib/api.ts` (modified)
+
 - `getChangeLogHistory(leagueId, limit)` — REST fetch for initial 50 events
 - `getChangeLogSSEUrl(leagueId)` — synchronous URL builder for `EventSource`
 
 ### `packages/frontend/src/components/shell/LeagueNav.tsx` (modified)
+
 - `ScrollText` added to lucide-react imports
 - "Change Log" nav item added after "Standings" → `/leagues/[id]/changelog`
 
 ### `packages/frontend/src/app/leagues/[id]/changelog/page.tsx` (new)
+
 - Loads team list for name resolution
 - Fetches history via REST on mount (deduplication via `seenIds` ref)
 - `EventSource` SSE subscription for live updates

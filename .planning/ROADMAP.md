@@ -60,97 +60,115 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
 ## Phase Details
 
 ### Phase 65: Dark Mode Shell
+
 **Goal**: Users navigate a fully dark Linear-style command center with left sidebar, top summary bar, and consistent dark typography across all pages
 **Depends on**: Nothing (v6.0 foundation)
 **Requirements**: SHELL-01, SHELL-02, SHELL-03, SHELL-04, SHELL-05, SHELL-06, SHELL-07
 **Success Criteria** (what must be TRUE):
-  1. Every page renders on #0B0D10 background with #111318 panels and #1D2128 borders — no white or light-mode surfaces visible anywhere
-  2. Left sidebar shows all 9 nav items (Dashboard, Standings, Categories, Roster, Waivers, FAAB Market, Pitching Usage, Trades, Settings) with icon + label
-  3. Top bar displays league name, current week, FAAB remaining, GS pace, and projected total points on every sub-page
-  4. All numbers render in JetBrains Mono; all headers and body text render in Inter
-  5. Right signals panel shows contextual daily action items that update per page
-**Plans**: 4 plans
-Plans:
+
+1. Every page renders on #0B0D10 background with #111318 panels and #1D2128 borders — no white or light-mode surfaces visible anywhere
+2. Left sidebar shows all 9 nav items (Dashboard, Standings, Categories, Roster, Waivers, FAAB Market, Pitching Usage, Trades, Settings) with icon + label
+3. Top bar displays league name, current week, FAAB remaining, GS pace, and projected total points on every sub-page
+4. All numbers render in JetBrains Mono; all headers and body text render in Inter
+5. Right signals panel shows contextual daily action items that update per page
+   **Plans**: 4 plans
+   Plans:
+
 - [ ] 65-01-PLAN.md — Dark mode foundation: next-themes, Tailwind config, shell tokens, JetBrains Mono
 - [ ] 65-02-PLAN.md — Shell layout + components: LeagueNav, TopBar, SignalsPanel, settings stub
 - [ ] 65-03-PLAN.md — Dark variant migration: all 16 UI components restyled for dark mode
 - [ ] 65-04-PLAN.md — Page-level dark migration: dark overrides on all 17 page/section files under leagues/[id]/
 
 ### Phase 66: Roto Math Foundation
+
 **Goal**: Users can see their projected roto standings with live rank-based points, per-category pace bars, and hover-to-inspect gap detail
 **Depends on**: Phase 65
 **Requirements**: ROTO-01, ROTO-02, ROTO-03, ROTO-05, ROTO-07, ROTO-08
 **Success Criteria** (what must be TRUE):
-  1. Projected standings table shows all 13 teams with current roto points, projected final roto points, and point change since last snapshot
-  2. Roto points are computed by ranking each team's projected category totals against all other teams (not hardcoded or estimated)
-  3. Historical category curves are displayed as fallback visualization when live standings are unavailable
-  4. Marginal gain engine returns the cheapest path (stat improvement needed) to gain one roto point in each category
-  5. Category pace bars show current total vs projected target with a color-coded progress indicator
-  6. Hovering a category row expands to show teams immediately above and below with exact stat gaps
-**Plans**: 2 plans
-Plans:
+
+1. Projected standings table shows all 13 teams with current roto points, projected final roto points, and point change since last snapshot
+2. Roto points are computed by ranking each team's projected category totals against all other teams (not hardcoded or estimated)
+3. Historical category curves are displayed as fallback visualization when live standings are unavailable
+4. Marginal gain engine returns the cheapest path (stat improvement needed) to gain one roto point in each category
+5. Category pace bars show current total vs projected target with a color-coded progress indicator
+6. Hovering a category row expands to show teams immediately above and below with exact stat gaps
+   **Plans**: 2 plans
+   Plans:
+
 - [ ] 66-01-PLAN.md — Roto math engine: interpolateRotoPoints() + computeMarginalGains() pure functions, standings API delta
 - [ ] 66-02-PLAN.md — Standings UI upgrade: delta column, pace bars, expandable gap detail, historical fallback charts
 
 ### Phase 67: Net Waiver Analysis + Category Opportunity
+
 **Goal**: Waiver recommendations show real roto-point delta (including the drop side) and a category opportunity map prioritizes which categories to target
 **Depends on**: Phase 66
 **Requirements**: WAIVER-01, WAIVER-02, WAIVER-03, WAIVER-04, WAIVER-05, ROTO-04, ROTO-06
 **Success Criteria** (what must be TRUE):
-  1. Waiver recommendation delta is computed from real add/drop simulation — the hardcoded 0.5 deltaOverallPoints is gone
-  2. Each waiver recommendation shows per-category breakdown: which categories improve and which decline from the add/drop
-  3. Marginal analysis label shows "this move gets you +N roto points in category X" for top recommendations
-  4. Rate stat add/drop simulation uses component math (ERA, WHIP, OPS recalculated from components — never averaged)
-  5. Category opportunity map displays gap-to-next-rank per category with a difficulty rating
-  6. "Standings Points at Risk" summary highlights categories where points could shift up or down within the current week
-**Plans**: 2 plans
-Plans:
+
+1. Waiver recommendation delta is computed from real add/drop simulation — the hardcoded 0.5 deltaOverallPoints is gone
+2. Each waiver recommendation shows per-category breakdown: which categories improve and which decline from the add/drop
+3. Marginal analysis label shows "this move gets you +N roto points in category X" for top recommendations
+4. Rate stat add/drop simulation uses component math (ERA, WHIP, OPS recalculated from components — never averaged)
+5. Category opportunity map displays gap-to-next-rank per category with a difficulty rating
+6. "Standings Points at Risk" summary highlights categories where points could shift up or down within the current week
+   **Plans**: 2 plans
+   Plans:
+
 - [ ] 67-01-PLAN.md — Backend: enhanced waiver labels, marginal gain difficulty, at-risk categories
 - [ ] 67-02-PLAN.md — Frontend: category opportunity map, at-risk summary, waiver marginal labels
 
 ### Phase 68: FAAB Tracking + Pitching Usage
+
 **Goal**: Users can track FAAB budget pace against the league and monitor GS usage with weekly start recommendations
 **Depends on**: Phase 65 (shell only — independent of waiver math)
 **Requirements**: FAAB-01, FAAB-02, FAAB-03, FAAB-04, FAAB-05, PITCH-01, PITCH-02, PITCH-03, PITCH-04, PITCH-05
 **Success Criteria** (what must be TRUE):
-  1. FAAB page shows my remaining budget vs league average remaining with a spend-rate projection that flags if budget runs out before season end
-  2. Bid history lists each claim with won/lost outcome and ROI score (player value gained per FAAB dollar)
-  3. Suggested bid amounts reflect remaining budget, weeks left in season, and projected player value
-  4. Season GS tracker shows starts used vs 200-start cap with a projected pace line
-  5. Weekly GS view shows this week's starts consumed and remaining starts available
-  6. SP start planner recommends which SPs to start or sit to keep GS pace on target, with an alert when pace is burning too fast or too slow
-**Plans**: 2 plans
-Plans:
+
+1. FAAB page shows my remaining budget vs league average remaining with a spend-rate projection that flags if budget runs out before season end
+2. Bid history lists each claim with won/lost outcome and ROI score (player value gained per FAAB dollar)
+3. Suggested bid amounts reflect remaining budget, weeks left in season, and projected player value
+4. Season GS tracker shows starts used vs 200-start cap with a projected pace line
+5. Weekly GS view shows this week's starts consumed and remaining starts available
+6. SP start planner recommends which SPs to start or sit to keep GS pace on target, with an alert when pace is burning too fast or too slow
+   **Plans**: 2 plans
+   Plans:
+
 - [ ] 68-01-PLAN.md — Backend: FaabTrackerAgent + GsPacingAgent agents, FAAB and pitching usage API endpoints
 - [ ] 68-02-PLAN.md — Frontend: FAAB Market page with budget gauge + bid history, Pitching Usage page with GS tracker + start planner, TopBar wiring
 
 ### Phase 69: Trade Finder
+
 **Goal**: Trade analysis shows roto-point delta with per-category breakdown and an automatic scan surfaces all roto-positive 1-for-1 swaps
 **Depends on**: Phase 67 (waiver delta must be correct before trade finder is meaningful)
 **Requirements**: TRADE-01, TRADE-02, TRADE-03, TRADE-04, TRADE-05
 **Success Criteria** (what must be TRUE):
-  1. Trade impact view shows net roto-point delta for any proposed trade with the same math as waiver analysis
-  2. Per-category breakdown for a trade shows which categories improve and which decline
-  3. Automatic trade finder scans all 12 other teams and returns a ranked list of 1-for-1 swaps that produce a net positive roto-point gain
-  4. Trade finder results are ranked by net roto points gained (highest benefit first)
-  5. Rate stat adjustments in trade simulation use component math — not counting-stat-only approximations
-**Plans**: 2 plans
-Plans:
+
+1. Trade impact view shows net roto-point delta for any proposed trade with the same math as waiver analysis
+2. Per-category breakdown for a trade shows which categories improve and which decline
+3. Automatic trade finder scans all 12 other teams and returns a ranked list of 1-for-1 swaps that produce a net positive roto-point gain
+4. Trade finder results are ranked by net roto points gained (highest benefit first)
+5. Rate stat adjustments in trade simulation use component math — not counting-stat-only approximations
+   **Plans**: 2 plans
+   Plans:
+
 - [ ] 69-01-PLAN.md — Backend: fix rate stat component math in TradeRecommendationAgent to match waiver pattern
 - [ ] 69-02-PLAN.md — Frontend: roto-point-framed trade UI with auto finder as primary view
 
 ### Phase 70: Trends and Efficiency
+
 **Goal**: Users can see which roster players are running hot or cold over 7 days and how much production is being left on the bench
 **Depends on**: Phase 65 (shell only — independent of roto math and waiver delta)
 **Requirements**: TREND-01, TREND-02, TREND-03, TREND-04, TREND-05
 **Success Criteria** (what must be TRUE):
-  1. Hot/cold panel shows 7-day trend for every player on the active roster with directional indicator
-  2. Hot players are highlighted by OPS surge, HR burst, or K spike — label identifies which stat is driving the heat
-  3. Cold players are flagged with a declining production indicator so the user knows who to consider dropping
-  4. Lineup efficiency view shows production from benched players (HR, SB, OPS missed) for each recent day
-  5. A warning indicator appears when a benched player produced more than a started player at the same position
-**Plans**: 2 plans
-Plans:
+
+1. Hot/cold panel shows 7-day trend for every player on the active roster with directional indicator
+2. Hot players are highlighted by OPS surge, HR burst, or K spike — label identifies which stat is driving the heat
+3. Cold players are flagged with a declining production indicator so the user knows who to consider dropping
+4. Lineup efficiency view shows production from benched players (HR, SB, OPS missed) for each recent day
+5. A warning indicator appears when a benched player produced more than a started player at the same position
+   **Plans**: 2 plans
+   Plans:
+
 - [ ] 70-01-PLAN.md — Backend trends API: hot/cold 7-day rolling stats + lineup efficiency endpoints
 - [ ] 70-02-PLAN.md — Frontend trends UI: hot/cold panel with driving stat labels + lineup efficiency view with bench warnings
 
@@ -159,14 +177,14 @@ Plans:
 **Execution Order:**
 Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category map). Phases 68 and 70 depend only on Phase 65 and can run after it. Phase 69 depends on Phase 67.
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 65. Dark Mode Shell | 4/4 | Complete    | 2026-03-23 | - |
-| 66. Roto Math Foundation | v6.0 | 0/2 | Not started | - |
-| 67. Net Waiver Analysis + Category Opportunity | 2/2 | Complete    | 2026-03-23 | - |
-| 68. FAAB Tracking + Pitching Usage | 2/2 | Complete    | 2026-03-23 | - |
-| 69. Trade Finder | 2/2 | Complete    | 2026-03-23 | - |
-| 70. Trends and Efficiency | 2/2 | Complete    | 2026-03-23 | - |
+| Phase                                          | Milestone | Plans Complete | Status      | Completed |
+| ---------------------------------------------- | --------- | -------------- | ----------- | --------- |
+| 65. Dark Mode Shell                            | 4/4       | Complete       | 2026-03-23  | -         |
+| 66. Roto Math Foundation                       | v6.0      | 0/2            | Not started | -         |
+| 67. Net Waiver Analysis + Category Opportunity | 2/2       | Complete       | 2026-03-23  | -         |
+| 68. FAAB Tracking + Pitching Usage             | 2/2       | Complete       | 2026-03-23  | -         |
+| 69. Trade Finder                               | 2/2       | Complete       | 2026-03-23  | -         |
+| 70. Trends and Efficiency                      | 2/2       | Complete       | 2026-03-23  | -         |
 
 ### Phase 71: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 
@@ -176,6 +194,7 @@ Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category 
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 71-01-PLAN.md — Fix season defaults, add Compute Impacts button, improve empty states
 
 ### Phase 72: UI audit fixes — mobile responsive layout, TopBar projected stat, semantic token cleanup, error handling
@@ -186,6 +205,7 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
+
 - [x] 72-01-PLAN.md — Priority fixes: mobile responsive layout, TopBar projected stat, waivers page error/token fixes
 - [x] 72-02-PLAN.md — Token migration: semantic color classes, arbitrary text sizes, date formatting
 
@@ -197,6 +217,7 @@ Plans:
 **Plans:** 1/2 plans executed
 
 Plans:
+
 - [x] 73-01-PLAN.md -- Backend API enrichment (currentStats) + shared PlayerStatLine component
 - [ ] 73-02-PLAN.md -- Wire stat lines into waivers page + roster stats section on lineup page
 
@@ -208,6 +229,7 @@ Plans:
 **Plans:** 1/1 plans complete
 
 Plans:
+
 - [x] 74-01-PLAN.md — Season metadata table, finalization guard in snapshot orchestrator, auto-finalization in backfill, admin reset endpoint
 
 ### Phase 75: Active stats — show each player's stat contribution to a specific team based on roster tenure, not full-season totals
@@ -218,6 +240,7 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
+
 - [x] 75-01-PLAN.md — Backend: enable daily player_period_stats population + extend roster API with tenure stats
 - [x] 75-02-PLAN.md — Frontend: add "On Team" label to PlayerStatLine, wire tenure stats into lineup and waivers pages
 
@@ -229,6 +252,7 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
+
 - [x] 76-01-PLAN.md — Strengthen Zod schemas (roster entries, scoringItems), add assertEspnCriticalShape + logUnexpectedFields with unit tests
 - [x] 76-02-PLAN.md — Wire validation into adapter fetch methods, remove duplicate 429 handler, clean up CLAUDE.md Known Issue #8
 
@@ -240,6 +264,7 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
+
 - [x] 77-01-PLAN.md — Backend: cheerio install, Pitcherlist + Rotoballer adapters, SitStartAdvisor agent, API endpoint with tests
 - [x] 77-02-PLAN.md — Frontend: Sit/Start tab on Pitching Usage page with verdict badges, source links, and empty state
 
@@ -251,6 +276,7 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
+
 - [x] TBD (run /gsd:plan-phase 78 to break down) (completed 2026-03-27)
 
 ### Phase 79: Sophisticated Projection Model
@@ -261,6 +287,7 @@ Plans:
 **Plans:** 4/4 plans complete
 
 Plans:
+
 - [x] 79-01-PLAN.md — Foundation: types, staleness prorating, slot eligibility extraction, FanGraphs G/PA/GS ingest
 - [x] 79-02-PLAN.md — Core allocation: hitter lineup assignment, GS cap-aware pitcher scaling
 - [x] 79-03-PLAN.md — Pipeline integration: allocateProjections pipeline, variance/confidence interval model
@@ -274,6 +301,46 @@ Plans:
 **Plans:** 3/3 plans complete
 
 Plans:
+
 - [x] 80-01-PLAN.md — TDD: StandingsSwingAttributionAgent with 6 unit tests (three-bucket model, LOWER_BETTER direction, single-snapshot guard)
 - [x] 80-02-PLAN.md — API: GET /standings/swing route in timeseries.ts + api.getStandingsSwing() in frontend client
 - [x] 80-03-PLAN.md — Frontend: SwingAttributionPanel component + integration into Projected Standings tab
+
+### Phase 81: Live Standings Change Log — Streaming activity feed with Slack-ready notification layer
+
+**Goal:** Dashboard gains a "Change Log" tab showing a real-time streaming feed of standings events: when total roto points change, the entry names which category shifted, who was passed or who passed us, and which player/event was the proximate cause (e.g., "our SP gave up 2 HR → lost 1 pt in ERA"). A notification bus abstraction makes every event deliverable to Slack (or any future channel) without touching the feed logic.
+**Requirements**: LOG-01, LOG-02, LOG-03, LOG-04, LOG-05, LOG-06, LOG-07, LOG-08
+**Depends on:** Phase 80
+**Plans:** 3/3 plans complete
+
+Plans:
+
+- [x] 81-01-PLAN.md — Backend: StandingsChangeLogAgent (snapshot diff → typed events), event persistence table, notification bus interface + no-op Slack adapter
+- [x] 81-02-PLAN.md — Backend: SSE endpoint GET /leagues/:id/standings/live-log, snapshot worker hook to emit events on each snapshot, Slack adapter wiring (env-gated)
+- [x] 81-03-PLAN.md — Frontend: "Change Log" tab on dashboard with live SSE feed, event cards (category badge, passer/passee, proximate cause), empty + error states
+
+### Phase 82: Live Game Polling — Real-time intra-day standings refresh during MLB game hours
+
+**Goal:** During live game windows (roughly 1pm–midnight ET), poll ESPN's team stats endpoint every 15 minutes, update current standings in real-time, and stream standings changes through the existing SSE/changelog infrastructure. Users get live event cards as games unfold instead of waiting for the overnight snapshot.
+**Requirements**: LIVE-01, LIVE-02, LIVE-03, LIVE-04, LIVE-05
+**Depends on:** Phase 81
+**Plans:** 2/2 plans complete
+
+Plans:
+
+- [x] 82-01-PLAN.md — Backend: LivePollAgent + BullMQ live-poll-worker (15 min cron, game-window guard), live-refresh API route, LIVE_POLL_EVENT emitter extension
+- [x] 82-02-PLAN.md — Frontend: game-window indicator, last-polled timestamp, refresh button wired to live-refresh API
+
+---
+
+### Phase 83: Changelog — My-team filter, standings neighborhood panel, play-by-play narrative
+
+**Goal:** Transform the changelog page into a focused command center for the user's own team. (1) Filter the event feed to show only events where the user's team gains or loses roto points. (2) Add a live "standings neighborhood" panel showing overall points for the 2 teams above and 2 below the user in total standings, updated after each live-poll cycle. (3) Rewrite event card narrative to play-by-play style: "[Player] hit a 3-run homer. Now [rank] in HR, passing [opponent]. Now [overall place] overall, passing [opponent]."
+**Requirements**: LIVE-06, LIVE-07, LIVE-08
+**Depends on:** Phase 82
+**Plans:** 0/2 plans complete
+
+Plans:
+
+- [ ] 83-01-PLAN.md — Backend: standings neighborhood API endpoint; enrich StandingsChangeLogAgent event narrative with play-by-play description field
+- [ ] 83-02-PLAN.md — Frontend: filter changelog feed to my-team only; add StandingsNeighborhood component; upgrade EventCard narrative copy

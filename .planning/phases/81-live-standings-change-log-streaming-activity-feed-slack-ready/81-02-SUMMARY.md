@@ -6,17 +6,20 @@
 ## Delivered
 
 ### `packages/backend/src/utils/change-log-emitter.ts`
+
 - Singleton `EventEmitter` exported as `changeLogEmitter`
 - `setMaxListeners(100)` for up to 100 concurrent SSE clients
 - `CHANGE_LOG_EVENT` constant + `ChangeLogSignal` interface
 
 ### `packages/backend/src/agents/snapshot-orchestrator.ts` (modified)
+
 - Step 8 added after `computeProjectedStandings()`
 - Creates `StandingsChangeLogAgent` + `NotificationBus` per snapshot run
 - Calls `generateEvents()`, emits signal to `changeLogEmitter` if `eventCount > 0`
 - Wrapped in try/catch — failure is non-fatal (logged as warn)
 
 ### `packages/backend/src/api/timeseries.ts` (modified)
+
 - `GET /api/leagues/:leagueId/standings/live-log` — SSE endpoint
   - `reply.hijack()` so Fastify doesn't manage response lifecycle
   - Sends last 50 history events on connect, then `history_end` frame
@@ -28,4 +31,5 @@
   - Auth: `authenticate` + `requireLeagueAccess`
 
 ## Notes
+
 - Used `reply.hijack()` instead of `await new Promise()` — cleaner lifecycle control

@@ -17,10 +17,12 @@ Phase 80 already implements StandingsSwingAttributionAgent (snapshot diff → ca
 ## Implementation Decisions
 
 ### Event Persistence
+
 **Decision: New `standings_change_event` table.**
 Events are computed at snapshot time and persisted, so the feed has history on first load (not just future snapshots). Without persistence, a page refresh loses all history. Migration: `021_add_standings_change_event.sql`.
 
 Schema:
+
 ```sql
 CREATE TABLE standings_change_event (
   id            BIGSERIAL PRIMARY KEY,
@@ -43,11 +45,14 @@ CREATE INDEX idx_sce_team ON standings_change_event (team_id, occurred_at DESC);
 ```
 
 ### Event Generation
+
 **Decision: Hook into SnapshotOrchestratorAgent.executeSnapshot() after snapshot writes.**
 Call `StandingsChangeLogAgent.generateEvents(leagueId, snapshotDate)` at the end of executeSnapshot. The agent re-uses Phase 80's diff logic (computes category deltas between the two most recent snapshots) but writes events to `standings_change_event` instead of returning attribution data. Only events where `|roto_delta| >= 0.5` are emitted (noise gate).
 
 ### Notification Bus
+
 **Decision: `NotificationBus` interface in `utils/notification-bus.ts` with no-op and Slack adapters.**
+
 ```ts
 interface NotificationBus {
   emit(event: StandingsChangeEvent): Promise<void>;
@@ -55,13 +60,16 @@ interface NotificationBus {
 class NoOpNotificationBus implements NotificationBus { ... }
 class SlackWebhookNotificationBus implements NotificationBus { ... } // env-gated
 ```
+
 Bus is instantiated with env check: if `SLACK_WEBHOOK_URL` is set → SlackWebhookNotificationBus, else NoOpNotificationBus. The StandingsChangeLogAgent receives the bus via constructor injection. This decouples event generation from delivery — zero Slack code touches the agent or the SSE endpoint.
 
 Slack message format (future): "📉 We dropped 1pt in ERA — Martinez gave up 2 HR. Now 8th (was 7th). Passed by The Destroyers."
 
 ### Streaming Transport
+
 **Decision: SSE (Server-Sent Events).**
 No existing WebSocket infra in this codebase. SSE is simpler for one-way server→client push. Fastify supports SSE via raw `reply.raw` + `Content-Type: text/event-stream`. New route: `GET /api/leagues/:leagueId/standings/live-log`. The endpoint returns:
+
 1. Historical events (last 50) as `data:` frames immediately on connect
 2. Subscribes to an in-process EventEmitter for new events as they arrive (snapshot worker emits to same EventEmitter after writing to DB)
 3. Heartbeat `data: {"type":"heartbeat"}` every 30s to keep connection alive
@@ -69,28 +77,40 @@ No existing WebSocket infra in this codebase. SSE is simpler for one-way server�
 **No Redis pub/sub for now** — single process, in-process EventEmitter is sufficient. If multi-process needed later, swap emitter for a Redis channel.
 
 ### Frontend Location
+
 **Decision: New dedicated page `/leagues/[id]/changelog/` with LeagueNav entry.**
 Not a tab on standings (standings is already complex). New nav item "Change Log" between Standings and Categories. Page uses SSE via `EventSource` in a `useChangeLog` hook. Events displayed as a reverse-chronological feed (newest at top) with category badge, delta indicator, passer/passee label, and proximate cause line.
 
 ### My Team Context
+
 **Decision: Highlight events for the user's own team using `selectedTeamId` from localStorage (existing pattern).**
 Events for other teams are shown at reduced opacity. The feed shows ALL teams' events (gives context about who is moving) but visually emphasizes our team's events.
 
 ### Feed Capacity
+
 **Decision: Last 200 events in DB, last 50 loaded on initial SSE connect, then live updates.**
 No infinite scroll needed for MVP. Events older than 90 days are pruned by a future cleanup job (note deferred).
 
 ### Proximate Cause Attribution
+
 **Decision: Re-use Phase 80's `topDriverPlayer` and `projectionDrivers` from category breakdown.**
 The change log agent calls the same attribution math as Phase 80 but formats output into a human-readable `proximate_cause` JSONB blob:
+
 ```json
-{ "playerName": "L. Martinez", "stat": "HR", "value": 2, "description": "gave up 2 HR (SP)" }
+{
+  "playerName": "L. Martinez",
+  "stat": "HR",
+  "value": 2,
+  "description": "gave up 2 HR (SP)"
+}
 ```
+
 When bucket is `competitor_movement`, proximate cause is the competitor team's top mover.
 
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 - **Pattern model**: `StandingsSwingAttributionAgent` (Phase 80) — use same snapshot diff math, same assignRanksWithTies, same three-bucket model
