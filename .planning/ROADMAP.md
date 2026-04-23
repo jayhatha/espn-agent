@@ -338,9 +338,21 @@ Plans:
 **Goal:** Transform the changelog page into a focused command center for the user's own team. (1) Filter the event feed to show only events where the user's team gains or loses roto points. (2) Add a live "standings neighborhood" panel showing overall points for the 2 teams above and 2 below the user in total standings, updated after each live-poll cycle. (3) Rewrite event card narrative to play-by-play style: "[Player] hit a 3-run homer. Now [rank] in HR, passing [opponent]. Now [overall place] overall, passing [opponent]."
 **Requirements**: LIVE-06, LIVE-07, LIVE-08
 **Depends on:** Phase 82
-**Plans:** 0/2 plans complete
+**Plans:** 2/2 plans complete
 
 Plans:
 
-- [ ] 83-01-PLAN.md — Backend: standings neighborhood API endpoint; enrich StandingsChangeLogAgent event narrative with play-by-play description field
-- [ ] 83-02-PLAN.md — Frontend: filter changelog feed to my-team only; add StandingsNeighborhood component; upgrade EventCard narrative copy
+- [x] 83-01-PLAN.md — Backend: standings neighborhood API endpoint; enrich StandingsChangeLogAgent event narrative with play-by-play description field
+- [x] 83-02-PLAN.md — Frontend: filter changelog feed to my-team only; add StandingsNeighborhood component; upgrade EventCard narrative copy
+
+### Phase 84: Streaming Results — Live standings and category rankings with play-by-play event attribution
+
+**Goal:** Rename the "Change Log" feature to "Streaming Results" and upgrade it into a live league standings ticker. The panel shows real current standings (not projections) for the user's team plus the two teams above and two below in overall roto points. Events are filtered to only those that affect current standings, and each event identifies the specific cause — which category changed, the stat event responsible (home run, stolen base, etc.), and the player involved.
+**Depends on:** Phase 83
+**Requirements:** STREAM-01, STREAM-02, STREAM-03, STREAM-04, STREAM-05, STREAM-06
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] 84-01-PLAN.md — Backend: filter change-log events to current-standings-only (exclude projection-driven events); enrich event payload with category, stat type (HR/SB/K/etc.), and player name
+- [ ] 84-02-PLAN.md — Frontend: rename Change Log → Streaming Results; live standings strip showing my team ± 2 neighbors in real roto points; event cards display play-by-play attribution (player, stat, category gained/lost)

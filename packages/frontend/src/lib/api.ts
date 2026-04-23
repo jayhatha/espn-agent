@@ -619,9 +619,11 @@ export const api = {
   },
 
   // Change log (Phase 81)
-  async getChangeLogHistory(leagueId: number, limit = 50) {
+  async getChangeLogHistory(leagueId: number, limit = 50, source?: string) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (source) params.set("source", source);
     return fetchAPI(
-      `/api/leagues/${leagueId}/standings/change-log?limit=${limit}`,
+      `/api/leagues/${leagueId}/standings/change-log?${params}`,
     );
   },
 

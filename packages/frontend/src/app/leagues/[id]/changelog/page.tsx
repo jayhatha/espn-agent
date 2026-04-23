@@ -37,6 +37,28 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
+/** Maps verbose category names to compact stat abbreviations for event chips. */
+function statAbbrev(categoryName: string): string {
+  const name = categoryName.toUpperCase();
+  if (name === "HR" || name.includes("HOME RUN")) return "HR";
+  if (name === "SB" || name.includes("STOLEN")) return "SB";
+  if (name === "K" || name.includes("STRIKEOUT")) return "K";
+  if (name === "ERA" || name.startsWith("EARN")) return "ERA";
+  if (name === "WHIP" || name.includes("WALKS+HITS")) return "WHIP";
+  if (name === "AVG" || name.includes("BATTING AVG")) return "AVG";
+  if (name === "OPS") return "OPS";
+  if (name === "OBP") return "OBP";
+  if (name === "SLG") return "SLG";
+  if (name === "RBI" || name.includes("RUNS BATTED")) return "RBI";
+  if (name === "R" || (name.includes("RUN") && !name.includes("HOME"))) return "R";
+  if (name === "W" || name.includes("WIN")) return "W";
+  if (name === "SV" || name.includes("SAVE")) return "SV";
+  if (name === "HLD" || name.includes("HOLD")) return "HLD";
+  if (name === "QS" || name.includes("QUALITY")) return "QS";
+  // fallback: first 4 chars uppercase
+  return categoryName.slice(0, 4).toUpperCase();
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProximateCause {
@@ -154,16 +176,17 @@ function EventCard({
           </div>
 
           <div className="min-w-0">
-            {/* Category badge */}
+            {/* Category badge — abbreviated stat + full name */}
             <span
               className={cn(
-                "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium mb-1.5",
+                "inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono font-medium mb-1.5",
                 gained
                   ? "bg-positive/10 text-positive"
                   : "bg-negative/10 text-negative",
               )}
             >
-              {event.category_name}
+              <span>{statAbbrev(event.category_name)}</span>
+              <span className="opacity-60 font-normal text-[10px]">{event.category_name}</span>
             </span>
 
             {/* Narrative lines */}
@@ -333,9 +356,9 @@ export default function ChangeLogPage() {
 
   // Fetch history via REST on mount
   const { data: historyData, isLoading } = useQuery({
-    queryKey: ["change-log-history", leagueId],
+    queryKey: ["change-log-history", leagueId, "live"],
     queryFn: () =>
-      api.getChangeLogHistory(leagueIdNum, 50) as Promise<{
+      api.getChangeLogHistory(leagueIdNum, 50, "live") as Promise<{
         events: ChangeEvent[];
       }>,
   });
@@ -416,7 +439,7 @@ export default function ChangeLogPage() {
   return (
     <Container className="py-8">
       <PageHeader
-        title="Change Log"
+        title="Streaming Results"
         backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
         actions={
           <div className="flex items-center gap-2">
@@ -486,7 +509,7 @@ export default function ChangeLogPage() {
       {/* Loading state */}
       {isLoading && (
         <div className="text-center py-16 text-content-tertiary text-sm">
-          Loading change log…
+          Loading streaming results…
         </div>
       )}
 

@@ -30,16 +30,21 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",      href: "",           icon: LayoutDashboard },
-  { label: "Standings",      href: "/standings", icon: Trophy },
-  { label: "Change Log",     href: "/changelog", icon: ScrollText },
-  { label: "Categories",     href: "/trends",    icon: BarChart3 },
-  { label: "Roster",         href: "/lineup",    icon: Users },
-  { label: "Waivers",        href: "/waivers",   icon: RefreshCw, badgeKey: "waivers" },
-  { label: "FAAB Market",    href: "/moves",     icon: DollarSign },
+  { label: "Dashboard", href: "", icon: LayoutDashboard },
+  { label: "Standings", href: "/standings", icon: Trophy },
+  { label: "Streaming Results", href: "/changelog", icon: ScrollText },
+  { label: "Categories", href: "/trends", icon: BarChart3 },
+  { label: "Roster", href: "/lineup", icon: Users },
+  { label: "Waivers", href: "/waivers", icon: RefreshCw, badgeKey: "waivers" },
+  { label: "FAAB Market", href: "/moves", icon: DollarSign },
   { label: "Pitching Usage", href: "/streaming", icon: Activity },
-  { label: "Trades",         href: "/trades",    icon: ArrowLeftRight, badgeKey: "trades" },
-  { label: "Settings",       href: "/settings",  icon: Settings },
+  {
+    label: "Trades",
+    href: "/trades",
+    icon: ArrowLeftRight,
+    badgeKey: "trades",
+  },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function LeagueNav() {
@@ -80,7 +85,7 @@ export function LeagueNav() {
 
       if (e.key === "Tab" && navRef.current) {
         const focusable = navRef.current.querySelectorAll<HTMLElement>(
-          'a, button, [tabindex]:not([tabindex="-1"])'
+          'a, button, [tabindex]:not([tabindex="-1"])',
         );
         if (focusable.length === 0) return;
 
@@ -109,7 +114,10 @@ export function LeagueNav() {
 
   const { data: waiverData } = useQuery({
     queryKey: ["waivers-recommendations", id, teamId],
-    queryFn: () => api.getWaiverRecommendations(leagueId, teamId!, { maxRecommendations: 5 }),
+    queryFn: () =>
+      api.getWaiverRecommendations(leagueId, teamId!, {
+        maxRecommendations: 5,
+      }),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
   });
@@ -160,10 +168,11 @@ export function LeagueNav() {
         ref={navRef}
         id="mobile-nav"
         className={cn(
-        "fixed left-0 top-0 h-screen w-60 bg-shell-nav border-r border-shell-border flex-col z-30 overflow-y-auto",
-        mobileOpen ? "flex" : "hidden",
-        "md:flex"
-      )}>
+          "fixed left-0 top-0 h-screen w-60 bg-shell-nav border-r border-shell-border flex-col z-30 overflow-y-auto",
+          mobileOpen ? "flex" : "hidden",
+          "md:flex",
+        )}
+      >
         {/* App logo / branding */}
         <div className="px-4 py-5 border-b border-shell-border flex-shrink-0">
           <span className="text-shell-text font-semibold text-sm tracking-wide">
@@ -188,7 +197,7 @@ export function LeagueNav() {
                     "flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md text-sm transition-colors",
                     active
                       ? "bg-shell-accent/20 text-shell-accent font-medium"
-                      : "text-shell-muted hover:text-shell-text hover:bg-shell-panel"
+                      : "text-shell-muted hover:text-shell-text hover:bg-shell-panel",
                   )}
                 >
                   <Icon size={18} className="flex-shrink-0" />
