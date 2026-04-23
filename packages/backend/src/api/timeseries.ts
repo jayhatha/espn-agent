@@ -536,8 +536,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       preHandler: [requireLeagueAccess],
     },
     async (request, reply) => {
-      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-      const teamId = parseIntParam(request.params.teamId, "teamId");
+      try {
+        const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+        const teamId = parseIntParam(request.params.teamId, "teamId");
 
       // Get latest snapshot date
       const latest = await db
@@ -584,9 +585,7 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         .where("snapshot_date", "=", today)
         .execute();
 
-      const projectedMap = new Map(
-        allProjected.map((p) => [p.team_id, p]),
-      );
+      const projectedMap = new Map(allProjected.map((p) => [p.team_id, p]));
 
       // Find my index in sorted overall list
       const myIdx = allOverall.findIndex((r) => r.team_id === teamId);
@@ -614,6 +613,10 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
       }));
 
       return reply.send({ neighborhood, snapshotDate: today });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        return reply.code(400).send({ error: msg });
+      }
     },
   );
 
