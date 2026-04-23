@@ -70,11 +70,9 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         const seasons = result.map((r) => r.season);
         return { seasons };
       } catch (err) {
-        return reply
-          .code(400)
-          .send({
-            error: err instanceof Error ? err.message : "Invalid request",
-          });
+        return reply.code(400).send({
+          error: err instanceof Error ? err.message : "Invalid request",
+        });
       }
     },
   );
@@ -1064,6 +1062,17 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
 
       // Tell Fastify not to manage the response
       reply.hijack();
+
+      // Transfer Fastify-buffered headers (e.g., CORS set by @fastify/cors) to the raw
+      // response. reply.hijack() bypasses Fastify's normal send path which does this
+      // transfer automatically; without it the SSE response has no CORS headers and
+      // browsers block the EventSource connection immediately.
+      const bufferedHeaders = reply.getHeaders();
+      for (const [hKey, hVal] of Object.entries(bufferedHeaders)) {
+        if (hVal !== undefined) {
+          reply.raw.setHeader(hKey, hVal as string | string[]);
+        }
+      }
 
       // SSE headers
       reply.raw.setHeader("Content-Type", "text/event-stream");

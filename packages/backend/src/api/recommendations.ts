@@ -468,18 +468,28 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         request.log,
       );
 
-      const recommendations = await waiverAgent.getRecommendations(
-        leagueId,
-        teamId,
-        date,
-        {
-          maxRecommendations: maxRecommendations
-            ? parseInt(maxRecommendations, 10)
-            : 10,
-        },
-      );
-
-      return { recommendations, snapshotDate: date };
+      try {
+        const recommendations = await waiverAgent.getRecommendations(
+          leagueId,
+          teamId,
+          date,
+          {
+            maxRecommendations: maxRecommendations
+              ? parseInt(maxRecommendations, 10)
+              : 10,
+          },
+        );
+        return { recommendations, snapshotDate: date };
+      } catch (error) {
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to compute waiver recommendations",
+        );
+        return reply.code(500).send({
+          error: "Failed to compute waiver recommendations",
+          details: error instanceof Error ? error.message : String(error),
+        });
+      }
     },
   );
 

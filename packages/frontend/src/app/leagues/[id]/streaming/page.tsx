@@ -142,21 +142,21 @@ export default function StreamingPitchersPage() {
   };
 
   // GS pacing data
-  const { data: gsSummary } = useQuery({
+  const { data: gsSummary, isLoading: gsSummaryLoading, error: gsSummaryError } = useQuery({
     queryKey: ["gs-summary", leagueId, selectedTeamId],
     queryFn: () => api.getGsSummary(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
     enabled: !!selectedTeamId,
     staleTime: 5 * 60_000,
   });
 
-  const { data: gsWeekly } = useQuery({
+  const { data: gsWeekly, isLoading: gsWeeklyLoading } = useQuery({
     queryKey: ["gs-weekly", leagueId, selectedTeamId],
     queryFn: () => api.getGsWeekly(parseInt(leagueId, 10), selectedTeamId!) as Promise<any>,
     enabled: !!selectedTeamId && activeTab === "gs-pacing",
     staleTime: 5 * 60_000,
   });
 
-  const { data: gsLeague } = useQuery<{
+  const { data: gsLeague, isLoading: gsLeagueLoading } = useQuery<{
     teams: Array<{ teamId: number; teamName: string; gs: number; k: number; kPerGs: number | null }>;
     gsCap: number;
   }>({
@@ -199,7 +199,7 @@ export default function StreamingPitchersPage() {
     cn(
       "px-4 py-3 text-sm font-medium border-b-2 transition-colors",
       isActive
-        ? "border-accent text-shell-text"
+        ? "border-accent dark:border-shell-accent text-shell-text"
         : "border-transparent text-shell-muted hover:text-shell-text hover:border-shell-border"
     );
 
@@ -207,7 +207,6 @@ export default function StreamingPitchersPage() {
     <Container className="py-8">
       <PageHeader
         title="Pitching Usage"
-        subtitle="GS pacing, start/sit recommendations, and streaming picks"
         backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
       />
 
@@ -271,6 +270,23 @@ export default function StreamingPitchersPage() {
             {/* GS Pacing Tab */}
             {activeTab === "gs-pacing" && (
               <div className="space-y-6">
+                {/* Loading state */}
+                {(gsSummaryLoading || gsLeagueLoading) && (
+                  <LoadingSkeleton lines={3} />
+                )}
+
+                {/* Error state */}
+                {gsSummaryError && !gsSummaryLoading && (
+                  <ErrorAlert message="Failed to load GS pacing data. Try refreshing the page." />
+                )}
+
+                {/* Empty state after successful load with no data */}
+                {!gsSummaryLoading && !gsSummaryError && !gsSummary && (
+                  <p className="text-sm text-shell-muted py-4">
+                    No GS pacing data yet. Run a snapshot to sync league data from ESPN.
+                  </p>
+                )}
+
                 {gsSummary && (
                   <div>
                     <h3 className="text-sm font-semibold text-shell-text mb-3">Season Tracker</h3>
@@ -357,10 +373,10 @@ export default function StreamingPitchersPage() {
                               key={team.teamId}
                               className={cn(
                                 "border-b border-shell-border/50",
-                                isMyTeam && "bg-accent/5"
+                                isMyTeam && "bg-shell-accent/10"
                               )}
                             >
-                              <td className={cn("py-2 pr-4", isMyTeam ? "text-accent font-semibold" : "text-shell-text")}>
+                              <td className={cn("py-2 pr-4", isMyTeam ? "text-shell-accent font-semibold" : "text-shell-text")}>
                                 {team.teamName}
                               </td>
                               <td className="py-2 pr-4 font-mono text-right text-shell-text">{team.gs}</td>
@@ -392,7 +408,7 @@ export default function StreamingPitchersPage() {
                         href={sitStartData.sources.pitcherlist.articleUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-accent hover:underline"
+                        className="text-xs text-accent dark:text-shell-accent hover:underline"
                       >
                         Pitcherlist: {sitStartData.sources.pitcherlist.articleTitle}
                       </a>
@@ -402,7 +418,7 @@ export default function StreamingPitchersPage() {
                         href={sitStartData.sources.fangraphs.articleUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-accent hover:underline"
+                        className="text-xs text-accent dark:text-shell-accent hover:underline"
                       >
                         FanGraphs: {sitStartData.sources.fangraphs.articleTitle}
                       </a>
@@ -412,7 +428,7 @@ export default function StreamingPitchersPage() {
                         href={sitStartData.sources.rotoballer.articleUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-accent hover:underline"
+                        className="text-xs text-accent dark:text-shell-accent hover:underline"
                       >
                         Rotoballer: {sitStartData.sources.rotoballer.articleTitle}
                         {sitStartData.sources.rotoballer.status === "degraded" && (
@@ -595,7 +611,7 @@ export default function StreamingPitchersPage() {
                 href={data.rotoballerSource.articleUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-accent hover:underline"
+                className="text-xs text-accent dark:text-shell-accent hover:underline"
               >
                 Rotoballer: {data.rotoballerSource.articleTitle}
               </a>
