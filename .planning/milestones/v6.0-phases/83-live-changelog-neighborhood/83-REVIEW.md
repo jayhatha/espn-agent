@@ -135,7 +135,7 @@ if (!auth) {
   log.warn(
     { leagueId },
     "LivePollAgent: no ESPN credentials available — skipping refresh. " +
-    "Set ESPN_SWID + ESPN_S2 env vars or store credentials via /auth endpoint.",
+      "Set ESPN_SWID + ESPN_S2 env vars or store credentials via /auth endpoint.",
   );
   return 0;
 }
@@ -168,6 +168,7 @@ static isGameWindow(): boolean {
 ```
 
 For a Pacific-time user (UTC−7):
+
 - At 10 am PT (17:00 UTC) the **backend** considers games in window; the **frontend** does not (h=10 < 13) → neighborhood panel doesn't poll, "Games live" badge absent.
 - At 1 pm PT (20:00 UTC) the **frontend** starts polling → `refetchInterval: 5 * 60 * 1000` activates, consistent with backend.
 - At 4 pm PT (23:00 UTC) both agree.
@@ -269,7 +270,9 @@ const handleRefresh = useCallback(async () => {
   try {
     await api.triggerLiveRefresh(leagueIdNum);
     setLastPolledAt(new Date());
-    queryClient.invalidateQueries({ queryKey: ["standings-neighborhood", leagueId] });
+    queryClient.invalidateQueries({
+      queryKey: ["standings-neighborhood", leagueId],
+    });
   } catch {
     setRefreshError(true);
   }
