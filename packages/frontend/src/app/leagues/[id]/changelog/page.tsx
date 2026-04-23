@@ -2,8 +2,14 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { ScrollText, TrendingUp, TrendingDown, Zap, RefreshCw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ScrollText,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  RefreshCw,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -23,6 +29,12 @@ function formatRelativeTime(date: Date): string {
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
+}
+
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,27 +63,37 @@ interface ChangeEvent {
   proximate_cause: ProximateCause | null;
 }
 
+interface NeighborhoodEntry {
+  teamId: number;
+  teamName: string;
+  overallPoints: number;
+  overallRank: number;
+  isMyTeam: boolean;
+  projectedPoints: number | null;
+  projectedRank: number | null;
+}
+
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
 function EventCard({
   event,
-  isOurTeam,
   teamName,
+  numTeams,
 }: {
   event: ChangeEvent;
-  isOurTeam: boolean;
   teamName: string;
+  numTeams: number;
 }) {
   const gained = event.direction === "gained";
+  const catRank = Math.round(numTeams - event.curr_roto_pts + 1);
+  const prevRank = Math.round(
+    numTeams - (event.curr_roto_pts - event.roto_delta) + 1,
+  );
+  const rankChanged = catRank !== prevRank;
+
   const deltaStr = gained
     ? `+${Number(event.roto_delta).toFixed(1)}`
     : Number(event.roto_delta).toFixed(1);
-
-  const passedLabel = event.passed_team_name
-    ? gained
-      ? `Passed ${event.passed_team_name}`
-      : `Passed by ${event.passed_team_name}`
-    : null;
 
   const formattedTime = new Date(event.occurred_at).toLocaleString("en-US", {
     month: "short",
@@ -81,17 +103,38 @@ function EventCard({
     hour12: true,
   });
 
+  // Build narrative lines
+  const lines: string[] = [];
+
+  if (event.proximate_cause?.description) {
+    lines.push(event.proximate_cause.description);
+  }
+
+  const passedText =
+    gained && event.passed_team_name
+      ? `, passing ${event.passed_team_name}`
+      : !gained && event.passed_team_name
+        ? `, passed by ${event.passed_team_name}`
+        : "";
+
+  if (rankChanged) {
+    lines.push(
+      `Now ${ordinal(catRank)} in ${event.category_name}${passedText}.`,
+    );
+  } else if (passedText) {
+    lines.push(`${ordinal(catRank)} in ${event.category_name}${passedText}.`);
+  }
+
   return (
     <div
       className={cn(
-        "border rounded-lg p-4 transition-opacity",
-        isOurTeam
-          ? "border-shell-border bg-surface-1"
-          : "border-shell-border/50 bg-surface-0 opacity-60",
+        "border rounded-lg p-4 transition-colors",
+        gained ? "border-positive/20" : "border-negative/20",
+        "bg-surface-1",
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        {/* Left: icon + content */}
+        {/* Left: icon + narrative */}
         <div className="flex items-start gap-3 min-w-0">
           <div
             className={cn(
@@ -109,44 +152,32 @@ function EventCard({
           </div>
 
           <div className="min-w-0">
-            {/* Team name + category badge */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={cn(
-                  "text-sm font-semibold",
-                  isOurTeam ? "text-content-primary" : "text-content-secondary",
-                )}
-              >
-                {teamName}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium",
-                  gained
-                    ? "bg-positive/10 text-positive"
-                    : "bg-negative/10 text-negative",
-                )}
-              >
-                {event.category_name}
-              </span>
-            </div>
+            {/* Category badge */}
+            <span
+              className={cn(
+                "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium mb-1.5",
+                gained
+                  ? "bg-positive/10 text-positive"
+                  : "bg-negative/10 text-negative",
+              )}
+            >
+              {event.category_name}
+            </span>
 
-            {/* Passed label */}
-            {passedLabel && (
-              <p className="text-xs text-content-secondary mt-0.5">
-                {passedLabel}
+            {/* Narrative lines */}
+            {lines.map((line, i) => (
+              <p
+                key={i}
+                className={cn(
+                  "text-sm",
+                  i === 0
+                    ? "text-content-primary"
+                    : "text-content-secondary",
+                )}
+              >
+                {line}
               </p>
-            )}
-
-            {/* Proximate cause */}
-            {event.proximate_cause && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <Zap className="w-3 h-3 text-content-tertiary shrink-0" />
-                <p className="text-xs text-content-tertiary">
-                  {event.proximate_cause.description}
-                </p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
 
@@ -160,10 +191,87 @@ function EventCard({
           >
             {deltaStr} pts
           </span>
-          <p className="text-xs text-content-tertiary mt-0.5">
-            {formattedTime}
-          </p>
+          <p className="text-xs text-content-tertiary mt-0.5">{formattedTime}</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Standings Neighborhood ──────────────────────────────────────────────────
+
+function StandingsNeighborhood({
+  neighborhood,
+}: {
+  neighborhood: NeighborhoodEntry[];
+}) {
+  return (
+    <div className="rounded-lg border border-shell-border overflow-hidden mb-6">
+      <div className="px-3 py-2 border-b border-shell-border bg-surface-1">
+        <span className="text-xs font-medium text-content-tertiary uppercase tracking-wider">
+          Standings — Today
+        </span>
+      </div>
+      <div className="divide-y divide-shell-border/50">
+        {neighborhood.map((row) => (
+          <div
+            key={row.teamId}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5",
+              row.isMyTeam
+                ? "bg-accent/5 border-l-2 border-accent"
+                : "bg-surface-0",
+            )}
+          >
+            {/* Rank */}
+            <span
+              className={cn(
+                "w-5 text-right font-mono text-sm tabular-nums",
+                row.isMyTeam
+                  ? "text-content-primary font-semibold"
+                  : "text-content-tertiary",
+              )}
+            >
+              {row.overallRank}
+            </span>
+
+            {/* Team name */}
+            <span
+              className={cn(
+                "flex-1 text-sm truncate",
+                row.isMyTeam
+                  ? "text-content-primary font-medium"
+                  : "text-content-secondary",
+              )}
+            >
+              {row.teamName}
+              {row.isMyTeam && (
+                <span className="ml-1.5 text-xs text-accent font-normal">
+                  you
+                </span>
+              )}
+            </span>
+
+            {/* Points */}
+            <span
+              className={cn(
+                "font-mono text-sm tabular-nums",
+                row.isMyTeam
+                  ? "text-content-primary font-semibold"
+                  : "text-content-tertiary",
+              )}
+            >
+              {Number(row.overallPoints).toFixed(1)}
+            </span>
+
+            {/* Projected rank (subtle) */}
+            {row.projectedRank != null && (
+              <span className="font-mono text-xs text-content-tertiary tabular-nums w-8 text-right">
+                → {row.projectedRank}
+              </span>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -180,7 +288,8 @@ export default function ChangeLogPage() {
   const [liveEvents, setLiveEvents] = useState<ChangeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
-  const [isGameTime, setIsGameTime] = useState(isGameWindow());
+  // false on server; real value set after mount to avoid SSR/client hydration mismatch
+  const [isGameTime, setIsGameTime] = useState(false);
   const seenIds = useRef(new Set<number>());
 
   // Load our team from localStorage (same pattern as rest of app)
@@ -192,21 +301,27 @@ export default function ChangeLogPage() {
     }
   }, [leagueId]);
 
-  // Update game window state every minute
+  // Set real game-window value on mount (client only), then update every minute
   useEffect(() => {
+    setIsGameTime(isGameWindow());
     const interval = setInterval(() => setIsGameTime(isGameWindow()), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  const queryClient = useQueryClient();
 
   // Manual refresh handler
   const handleRefresh = useCallback(async () => {
     try {
       await api.triggerLiveRefresh(leagueIdNum);
       setLastPolledAt(new Date());
+      queryClient.invalidateQueries({
+        queryKey: ["standings-neighborhood", leagueId],
+      });
     } catch {
       // non-fatal — user can try again
     }
-  }, [leagueIdNum]);
+  }, [leagueIdNum, leagueId, queryClient]);
 
   // Fetch teams for name lookup
   const { data: teamsData } = useQuery({
@@ -228,18 +343,36 @@ export default function ChangeLogPage() {
       }>,
   });
 
-  // Deduplicated event merge (newest first)
+  // Fetch standings neighborhood (2 above + me + 2 below)
+  const { data: neighborhoodData } = useQuery({
+    queryKey: ["standings-neighborhood", leagueId, ourTeamId],
+    queryFn: () =>
+      api.getStandingsNeighborhood(leagueIdNum, ourTeamId!) as Promise<{
+        neighborhood: NeighborhoodEntry[];
+        snapshotDate: string;
+      }>,
+    enabled: ourTeamId != null,
+    refetchInterval: 5 * 60 * 1000, // refresh every 5 min
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Deduplicated event merge (newest first).
+  // For events whose ID is already in the feed (intraday delta update), update in-place.
   const addEvents = useCallback((incoming: ChangeEvent[]) => {
     setLiveEvents((prev) => {
+      let updated = prev;
       const newOnes: ChangeEvent[] = [];
       for (const evt of incoming) {
-        if (!seenIds.current.has(evt.id)) {
+        if (seenIds.current.has(evt.id)) {
+          // Update the existing card in-place with the latest delta
+          updated = updated.map((e) => (e.id === evt.id ? evt : e));
+        } else {
           seenIds.current.add(evt.id);
           newOnes.push(evt);
         }
       }
-      if (newOnes.length === 0) return prev;
-      return [...newOnes, ...prev];
+      if (newOnes.length === 0 && updated === prev) return prev;
+      return newOnes.length > 0 ? [...newOnes, ...updated] : updated;
     });
   }, []);
 
@@ -279,6 +412,9 @@ export default function ChangeLogPage() {
       setIsConnected(false);
     };
   }, [leagueIdNum, addEvents]);
+
+  const myEvents = liveEvents.filter((e) => e.team_id === ourTeamId);
+  const numTeams = teamsData?.teams.length ?? 10;
 
   return (
     <Container className="py-8">
@@ -334,6 +470,13 @@ export default function ChangeLogPage() {
         }
       />
 
+      {/* Standings neighborhood panel */}
+      {neighborhoodData?.neighborhood && neighborhoodData.neighborhood.length > 0 && (
+        <div className="mt-6">
+          <StandingsNeighborhood neighborhood={neighborhoodData.neighborhood} />
+        </div>
+      )}
+
       {/* Loading state */}
       {isLoading && (
         <div className="text-center py-16 text-content-tertiary text-sm">
@@ -342,27 +485,27 @@ export default function ChangeLogPage() {
       )}
 
       {/* Empty state */}
-      {!isLoading && liveEvents.length === 0 && (
+      {!isLoading && myEvents.length === 0 && (
         <div className="text-center py-16">
           <ScrollText className="w-8 h-8 text-content-tertiary mx-auto mb-3" />
           <p className="text-content-secondary text-sm">
-            No standings changes yet.
+            No changes affecting your team yet.
           </p>
           <p className="text-content-tertiary text-xs mt-1">
-            Changes stream live during game hours. Check back once games start.
+            Changes appear here when your standing in any category shifts.
           </p>
         </div>
       )}
 
-      {/* Event feed */}
-      {liveEvents.length > 0 && (
+      {/* Event feed — my team only */}
+      {myEvents.length > 0 && (
         <div className="flex flex-col gap-3 mt-6">
-          {liveEvents.map((event) => (
+          {myEvents.map((event) => (
             <EventCard
               key={event.id}
               event={event}
-              isOurTeam={event.team_id === ourTeamId}
               teamName={teamMap.get(event.team_id) ?? `Team ${event.team_id}`}
+              numTeams={numTeams}
             />
           ))}
         </div>

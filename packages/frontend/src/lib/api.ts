@@ -637,4 +637,25 @@ export const api = {
       method: "POST",
     });
   },
+
+  // Phase 83: standings neighborhood
+  async getStandingsNeighborhood(
+    leagueId: number,
+    teamId: number,
+  ): Promise<{
+    neighborhood: Array<{
+      teamId: number;
+      teamName: string;
+      overallPoints: number;
+      overallRank: number;
+      isMyTeam: boolean;
+      projectedPoints: number | null;
+      projectedRank: number | null;
+    }>;
+    snapshotDate: string;
+  }> {
+    return this.get(
+      `/api/leagues/${leagueId}/teams/${teamId}/standings/neighborhood`,
+    );
+  },
 };
