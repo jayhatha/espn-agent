@@ -635,6 +635,7 @@ export const api = {
   ): Promise<{ polledAt: string; eventCount: number }> {
     return fetchAPI(`/api/leagues/${leagueId}/live-refresh`, {
       method: "POST",
+      body: JSON.stringify({}),
     });
   },
 
