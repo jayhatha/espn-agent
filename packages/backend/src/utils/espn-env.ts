@@ -4,10 +4,11 @@
 // Fallback: encrypted DB columns (espn_swid_encrypted, espn_s2_encrypted)
 // =============================================================================
 
+import { decryptToken, hasEncryptionKey } from "./encryption.js";
+
 /**
  * Get ESPN auth cookies from environment variables.
  * Returns the auth object if both ESPN_SWID and ESPN_S2 are set, undefined otherwise.
- * Returns strict type with required SWID/espn_s2 (not optional) since env vars are validated.
  */
 export function getEspnAuthFromEnv(): { SWID: string; espn_s2: string } | undefined {
   const swid = process.env.ESPN_SWID;
@@ -18,4 +19,26 @@ export function getEspnAuthFromEnv(): { SWID: string; espn_s2: string } | undefi
   }
 
   return undefined;
+}
+
+/**
+ * Get ESPN auth cookies from an encrypted league row.
+ * Decrypts espn_swid_encrypted + espn_s2_encrypted using ENCRYPTION_KEY.
+ * Returns undefined if credentials are not stored or cannot be decrypted.
+ */
+export function getEspnAuthFromLeague(league: {
+  espn_swid_encrypted?: Buffer | string | null;
+  espn_s2_encrypted?: Buffer | string | null;
+}): { SWID: string; espn_s2: string } | undefined {
+  if (!league.espn_swid_encrypted || !league.espn_s2_encrypted) return undefined;
+  if (!hasEncryptionKey()) return undefined;
+
+  try {
+    return {
+      SWID: decryptToken(league.espn_swid_encrypted as Buffer),
+      espn_s2: decryptToken(league.espn_s2_encrypted as Buffer),
+    };
+  } catch {
+    return undefined;
+  }
 }

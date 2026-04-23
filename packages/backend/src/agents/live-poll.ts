@@ -12,7 +12,7 @@ import {
   LIVE_POLL_EVENT,
 } from "../utils/change-log-emitter.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
-import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { getEspnAuthFromEnv, getEspnAuthFromLeague } from "../utils/espn-env.js";
 
 /**
  * LivePollAgent
@@ -57,7 +57,8 @@ export class LivePollAgent {
       .executeTakeFirstOrThrow();
 
     // 2. Fetch ESPN — lightweight views only (no rosters, no free agents)
-    const auth = getEspnAuthFromEnv();
+    // Auth: env vars take priority; fall back to DB-stored encrypted credentials
+    const auth = getEspnAuthFromEnv() ?? getEspnAuthFromLeague(league);
     const espnData = await this.espnAdapter.fetchLeague({
       leagueId: league.espn_league_id,
       season: league.season,
@@ -244,8 +245,8 @@ export class LivePollAgent {
               league_id: leagueId,
               snapshot_date: today,
               team_id: teamId,
+              overall_points: teamOverallPoints.get(teamId) ?? 0,
               overall_rank: rank,
-              roto_points: teamOverallPoints.get(teamId) ?? 0,
             })),
           )
           .execute();
@@ -293,7 +294,10 @@ export class LivePollAgent {
     // Always emit LIVE_POLL_EVENT so frontend can update "last refreshed" indicator
     changeLogEmitter.emit(LIVE_POLL_EVENT, { leagueId, polledAt, eventCount });
 
-    log.info({ leagueId, today, eventCount }, "LivePollAgent: refresh complete");
+    log.info(
+      { leagueId, today, eventCount },
+      "LivePollAgent: refresh complete",
+    );
     return eventCount;
   }
 }
