@@ -170,9 +170,7 @@ function EventCard({
                 key={i}
                 className={cn(
                   "text-sm",
-                  i === 0
-                    ? "text-content-primary"
-                    : "text-content-secondary",
+                  i === 0 ? "text-content-primary" : "text-content-secondary",
                 )}
               >
                 {line}
@@ -191,7 +189,9 @@ function EventCard({
           >
             {deltaStr} pts
           </span>
-          <p className="text-xs text-content-tertiary mt-0.5">{formattedTime}</p>
+          <p className="text-xs text-content-tertiary mt-0.5">
+            {formattedTime}
+          </p>
         </div>
       </div>
     </div>
@@ -263,13 +263,6 @@ function StandingsNeighborhood({
             >
               {Number(row.overallPoints).toFixed(1)}
             </span>
-
-            {/* Projected rank (subtle) */}
-            {row.projectedRank != null && (
-              <span className="font-mono text-xs text-content-tertiary tabular-nums w-8 text-right">
-                → {row.projectedRank}
-              </span>
-            )}
           </div>
         ))}
       </div>
@@ -352,7 +345,7 @@ export default function ChangeLogPage() {
         snapshotDate: string;
       }>,
     enabled: ourTeamId != null,
-    refetchInterval: 5 * 60 * 1000, // refresh every 5 min
+    refetchInterval: isGameTime ? 5 * 60 * 1000 : false, // only poll during game hours
     staleTime: 2 * 60 * 1000,
   });
 
@@ -471,11 +464,14 @@ export default function ChangeLogPage() {
       />
 
       {/* Standings neighborhood panel */}
-      {neighborhoodData?.neighborhood && neighborhoodData.neighborhood.length > 0 && (
-        <div className="mt-6">
-          <StandingsNeighborhood neighborhood={neighborhoodData.neighborhood} />
-        </div>
-      )}
+      {neighborhoodData?.neighborhood &&
+        neighborhoodData.neighborhood.length > 0 && (
+          <div className="mt-6">
+            <StandingsNeighborhood
+              neighborhood={neighborhoodData.neighborhood}
+            />
+          </div>
+        )}
 
       {/* Loading state */}
       {isLoading && (
