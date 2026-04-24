@@ -315,7 +315,7 @@ function AdminPageContent() {
           <Zap className="mr-3 h-8 w-8 text-accent" />
           Admin Dashboard
         </Heading>
-        <p className="mt-2 text-body-sm text-content-secondary">
+        <p className="mt-2 text-body-sm text-content-secondary dark:text-shell-muted">
           Manage projections, users, and system health
         </p>
       </div>
@@ -361,7 +361,7 @@ function AdminPageContent() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <Heading level={2} className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-content-secondary" />
+              <Users className="h-5 w-5 text-content-secondary dark:text-shell-muted" />
               Users
             </Heading>
             {usersData?.users && (
@@ -377,41 +377,41 @@ function AdminPageContent() {
               <LoadingSpinner />
             </div>
           ) : !usersData?.users || usersData.users.length === 0 ? (
-            <p className="text-center py-8 text-body-sm text-content-secondary">No users found</p>
+            <p className="text-center py-8 text-body-sm text-content-secondary dark:text-shell-muted">No users found</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-neutral-100">
-                <thead className="bg-surface-secondary">
+              <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+                <thead className="bg-surface-secondary dark:bg-shell-bg">
                   <tr>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Display Name
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Role
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Joined
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Last Login
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-neutral-100">
+                <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                   {usersData.users.map((user: User) => {
                     const isSelf = currentUser?.id === user.id;
                     return (
-                      <tr key={user.id} className="hover:bg-surface-secondary transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content">
+                      <tr key={user.id} className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content dark:text-shell-text">
                           {user.email}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {user.display_name || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-body-sm">
@@ -421,10 +421,10 @@ function AdminPageContent() {
                             {user.role}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {new Date(user.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {user.last_login_at
                             ? new Date(user.last_login_at).toLocaleDateString()
                             : "Never"}
@@ -454,10 +454,10 @@ function AdminPageContent() {
       <Card className="mb-8">
         <CardHeader>
           <Heading level={2} className="flex items-center gap-2">
-            <Upload className="h-5 w-5 text-content-secondary" />
+            <Upload className="h-5 w-5 text-content-secondary dark:text-shell-muted" />
             Upload Projections
           </Heading>
-          <p className="text-body-sm text-content-secondary mt-1">
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
             Upload FanGraphs Depth Charts RoS projections. Upload both batter and pitcher files together.
           </p>
         </CardHeader>
@@ -467,7 +467,7 @@ function AdminPageContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Batter CSV Drop Zone */}
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Batters CSV
                 </label>
                 <div
@@ -475,7 +475,7 @@ function AdminPageContent() {
                     "relative border-2 border-dashed rounded-card p-6 text-center transition-colors",
                     batterDragActive
                       ? "border-accent bg-accent-light"
-                      : "border-neutral-300 bg-surface-secondary"
+                      : "border-neutral-300 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg"
                   )}
                   onDragEnter={handleBatterDrag}
                   onDragLeave={handleBatterDrag}
@@ -491,7 +491,7 @@ function AdminPageContent() {
                   />
                   <label htmlFor="batter-upload" className="cursor-pointer">
                     <Upload className="mx-auto h-10 w-10 text-content-tertiary" />
-                    <p className="mt-2 text-body-sm font-medium text-content">
+                    <p className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
                       {batterFile ? batterFile.name : "Drop batters CSV or click"}
                     </p>
                   </label>
@@ -500,7 +500,7 @@ function AdminPageContent() {
 
               {/* Pitcher CSV Drop Zone */}
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Pitchers CSV
                 </label>
                 <div
@@ -508,7 +508,7 @@ function AdminPageContent() {
                     "relative border-2 border-dashed rounded-card p-6 text-center transition-colors",
                     pitcherDragActive
                       ? "border-accent bg-accent-light"
-                      : "border-neutral-300 bg-surface-secondary"
+                      : "border-neutral-300 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg"
                   )}
                   onDragEnter={handlePitcherDrag}
                   onDragLeave={handlePitcherDrag}
@@ -524,7 +524,7 @@ function AdminPageContent() {
                   />
                   <label htmlFor="pitcher-upload" className="cursor-pointer">
                     <Upload className="mx-auto h-10 w-10 text-content-tertiary" />
-                    <p className="mt-2 text-body-sm font-medium text-content">
+                    <p className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
                       {pitcherFile ? pitcherFile.name : "Drop pitchers CSV or click"}
                     </p>
                   </label>
@@ -545,10 +545,11 @@ function AdminPageContent() {
               </div>
             )}
 
-            <div className="flex items-center justify-end">
+            <div className="flex items-center justify-center mt-4">
               <Button
                 type="submit"
                 variant="primary"
+                className="w-full sm:w-auto"
                 disabled={(!batterFile && !pitcherFile) || uploadMutation.isPending}
               >
                 {uploadMutation.isPending ? "Uploading..." : "Upload Projections"}
@@ -599,7 +600,7 @@ function AdminPageContent() {
       <Card className="mb-8">
         <CardHeader>
           <Heading level={2}>Player Pool Sync</Heading>
-          <p className="text-body-sm text-content-secondary mt-1">
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
             Sync top ~500 rostered players from ESPN to populate the player pool for draft recommendations.
             This runs automatically at 4 AM ET daily, but you can trigger it manually here.
           </p>
@@ -619,14 +620,14 @@ function AdminPageContent() {
 
           <div className="flex items-end gap-4">
             <div className="flex-1">
-              <label className="block text-body-sm font-medium text-content mb-2">
+              <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                 Season
               </label>
               <input
                 type="number"
                 value={playerPoolSeason}
                 onChange={(e) => setPlayerPoolSeason(parseInt(e.target.value, 10))}
-                className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-body-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                className="flex h-10 w-full rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-3 py-2 text-body-sm text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus:ring-shell-accent focus-visible:ring-offset-2"
                 min="2020"
                 max={new Date().getFullYear() + 1}
               />
@@ -641,8 +642,8 @@ function AdminPageContent() {
             </Button>
           </div>
 
-          <div className="mt-4 text-body-sm text-content-secondary">
-            <p><span className="font-medium text-content">Note:</span> This requires at least one connected league for the season. The sync uses that league's auth credentials to fetch player data from ESPN.</p>
+          <div className="mt-4 text-body-sm text-content-secondary dark:text-shell-muted">
+            <p><span className="font-medium text-content dark:text-shell-text">Note:</span> This requires at least one connected league for the season. The sync uses that league's auth credentials to fetch player data from ESPN.</p>
           </div>
         </CardContent>
       </Card>
@@ -651,10 +652,10 @@ function AdminPageContent() {
       <Card className="mb-8">
         <CardHeader>
           <Heading level={2} className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-content-secondary" />
+            <CheckCircle className="h-5 w-5 text-content-secondary dark:text-shell-muted" />
             Auction Value Validation
           </Heading>
-          <p className="text-body-sm text-content-secondary mt-1">
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
             Compare our VBD-based auction values against ESPN's pre-draft baseline values to validate calculation accuracy.
           </p>
         </CardHeader>
@@ -682,45 +683,45 @@ function AdminPageContent() {
           ) : projectionsData?.runs?.length === 0 ? (
             <div className="text-center py-8">
               <Upload className="mx-auto h-12 w-12 text-content-tertiary" />
-              <p className="mt-2 text-body-sm text-content-secondary">
+              <p className="mt-2 text-body-sm text-content-secondary dark:text-shell-muted">
                 No projections uploaded yet
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-neutral-100">
-                <thead className="bg-surface-secondary">
+              <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+                <thead className="bg-surface-secondary dark:bg-shell-bg">
                   <tr>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       As of Date
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Source
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       System
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Uploaded
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-neutral-100">
+                <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                   {projectionsData?.runs?.map((run: ProjectionRun) => (
-                    <tr key={run.id} className="hover:bg-surface-secondary transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content">
+                    <tr key={run.id} className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text">
                         {run.as_of_date}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                         {run.source}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                         {run.system}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                         {new Date(run.ingested_at).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -748,36 +749,36 @@ function AdminPageContent() {
               <LoadingSpinner />
             </div>
           ) : !leaguesData?.leagues || leaguesData.leagues.length === 0 ? (
-            <p className="text-center py-8 text-body-sm text-content-secondary">No leagues found</p>
+            <p className="text-center py-8 text-body-sm text-content-secondary dark:text-shell-muted">No leagues found</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-neutral-100">
-                <thead className="bg-surface-secondary">
+              <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+                <thead className="bg-surface-secondary dark:bg-shell-bg">
                   <tr>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       League Name
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       ESPN ID
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Latest Snapshot
                     </th>
-                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-neutral-100">
+                <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                   {leaguesData.leagues.map((league: League) => (
-                    <tr key={league.id} className="hover:bg-surface-secondary transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content">
+                    <tr key={league.id} className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text">
                         {league.name}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                         {league.espn_league_id}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                      <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                         {league.snapshot_date
                           ? new Date(league.snapshot_date).toLocaleDateString()
                           : "Never"}
@@ -788,7 +789,7 @@ function AdminPageContent() {
                             {league.status}
                           </Badge>
                           {league.is_degraded && league.degraded_reasons && (
-                            <p className="text-body-sm text-content-secondary mt-1">
+                            <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
                               {league.degraded_reasons.join(", ")}
                             </p>
                           )}
@@ -807,7 +808,7 @@ function AdminPageContent() {
       <Card className="mb-8">
         <CardHeader>
           <Heading level={2}>Historical Backfill</Heading>
-          <p className="text-body-sm text-content-secondary mt-1">
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
             Backfill historical snapshots for a league and season. This will fetch data from ESPN for the specified weeks.
           </p>
         </CardHeader>
@@ -816,13 +817,13 @@ function AdminPageContent() {
           <form onSubmit={handleBackfillSubmit} className="space-y-4 mb-8">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   League
                 </label>
                 <select
                   value={selectedLeagueId || ""}
                   onChange={(e) => setSelectedLeagueId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-body-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-3 py-2 text-body-sm text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus:ring-shell-accent focus-visible:ring-offset-2"
                   required
                 >
                   <option value="">Select a league</option>
@@ -835,7 +836,7 @@ function AdminPageContent() {
               </div>
 
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Season
                 </label>
                 <input
@@ -844,13 +845,13 @@ function AdminPageContent() {
                   onChange={(e) => setSeason(parseInt(e.target.value, 10))}
                   min={2017}
                   max={new Date().getFullYear()}
-                  className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-body-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-3 py-2 text-body-sm text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus:ring-shell-accent focus-visible:ring-offset-2"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Start Week
                 </label>
                 <input
@@ -859,13 +860,13 @@ function AdminPageContent() {
                   onChange={(e) => setStartWeek(parseInt(e.target.value, 10))}
                   min={1}
                   max={30}
-                  className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-body-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-3 py-2 text-body-sm text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus:ring-shell-accent focus-visible:ring-offset-2"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   End Week
                 </label>
                 <input
@@ -874,7 +875,7 @@ function AdminPageContent() {
                   onChange={(e) => setEndWeek(parseInt(e.target.value, 10))}
                   min={1}
                   max={30}
-                  className="flex h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-body-sm text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                  className="flex h-10 w-full rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-3 py-2 text-body-sm text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus:ring-shell-accent focus-visible:ring-offset-2"
                   required
                 />
               </div>
@@ -886,12 +887,12 @@ function AdminPageContent() {
                 type="checkbox"
                 checked={clearExisting}
                 onChange={(e) => setClearExisting(e.target.checked)}
-                className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
+                className="h-4 w-4 text-accent focus:ring-accent dark:focus:ring-shell-accent border-neutral-300 dark:border-shell-border rounded"
               />
-              <label htmlFor="clearExisting" className="ml-2 block text-body-sm text-content">
+              <label htmlFor="clearExisting" className="ml-2 block text-body-sm text-content dark:text-shell-text">
                 Clear existing data before backfill
               </label>
-              <span className="ml-2 text-body-sm text-content-secondary">
+              <span className="ml-2 text-body-sm text-content-secondary dark:text-shell-muted">
                 (Deletes existing snapshots for the selected season/week range)
               </span>
             </div>
@@ -921,17 +922,17 @@ function AdminPageContent() {
 
           {/* Active Job Progress */}
           {activeJobId && activeJobData && (
-            <div className="mb-8 p-4 bg-surface-secondary rounded-card border border-neutral-100">
-              <h3 className="text-body-sm font-semibold text-content mb-3">
+            <div className="mb-8 p-4 bg-surface-secondary dark:bg-shell-bg rounded-card border border-neutral-100 dark:border-shell-border">
+              <h3 className="text-body-sm font-semibold text-content dark:text-shell-text mb-3">
                 Active Backfill Job
               </h3>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-body-sm">
-                  <span className="text-content-secondary">Job ID:</span>
-                  <span className="font-mono text-xs text-content">{activeJobId}</span>
+                  <span className="text-content-secondary dark:text-shell-muted">Job ID:</span>
+                  <span className="font-mono text-xs text-content dark:text-shell-text">{activeJobId}</span>
                 </div>
                 <div className="flex items-center justify-between text-body-sm">
-                  <span className="text-content-secondary">Status:</span>
+                  <span className="text-content-secondary dark:text-shell-muted">Status:</span>
                   <Badge variant={getJobStatusVariant(activeJobData.status)}>
                     {activeJobData.status}
                   </Badge>
@@ -939,22 +940,22 @@ function AdminPageContent() {
                 {activeJobData.progress && (
                   <>
                     <div className="flex items-center justify-between text-body-sm">
-                      <span className="text-content-secondary">Stage:</span>
-                      <span className="text-content">{activeJobData.progress.stage || "Processing"}</span>
+                      <span className="text-content-secondary dark:text-shell-muted">Stage:</span>
+                      <span className="text-content dark:text-shell-text">{activeJobData.progress.stage || "Processing"}</span>
                     </div>
                     <div className="flex items-center justify-between text-body-sm">
-                      <span className="text-content-secondary">Progress:</span>
-                      <span className="text-content">
+                      <span className="text-content-secondary dark:text-shell-muted">Progress:</span>
+                      <span className="text-content dark:text-shell-text">
                         {activeJobData.progress.completedWeeks || 0} of {activeJobData.progress.totalWeeks || 0} weeks
                       </span>
                     </div>
-                    <div className="w-full bg-neutral-200 rounded-full h-4 overflow-hidden">
+                    <div className="w-full bg-neutral-200 dark:bg-shell-border rounded-full h-4 overflow-hidden">
                       <div
-                        className="bg-accent h-4 transition-all duration-300"
-                        style={{ width: `${activeJobData.progress.percentage || 0}%` }}
+                        className="bg-accent h-4 w-full transition-transform duration-300 origin-left"
+                        style={{ transform: `scaleX(${(activeJobData.progress.percentage || 0) / 100})` }}
                       />
                     </div>
-                    <div className="text-body-sm text-content-secondary text-right">
+                    <div className="text-body-sm text-content-secondary dark:text-shell-muted text-right">
                       {activeJobData.progress.percentage?.toFixed(1) || 0}%
                     </div>
                   </>
@@ -983,44 +984,44 @@ function AdminPageContent() {
           <div>
             <Heading level={3} className="mb-3">Recent Backfill Jobs</Heading>
             {!backfillJobsData?.jobs || backfillJobsData.jobs.length === 0 ? (
-              <p className="text-center py-8 text-body-sm text-content-secondary">
+              <p className="text-center py-8 text-body-sm text-content-secondary dark:text-shell-muted">
                 No backfill jobs yet
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-neutral-100">
-                  <thead className="bg-surface-secondary">
+                <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+                  <thead className="bg-surface-secondary dark:bg-shell-bg">
                     <tr>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Job ID
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         League
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Season
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Progress
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Created
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-neutral-100">
+                  <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                     {backfillJobsData.jobs.map((job: BackfillJob) => (
-                      <tr key={job.id} className="hover:bg-surface-secondary transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-content">
+                      <tr key={job.id} className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-content dark:text-shell-text">
                           {job.id.length > 20 ? `${job.id.substring(0, 20)}...` : job.id}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {job.data?.leagueId || "-"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {job.data?.season || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1028,12 +1029,12 @@ function AdminPageContent() {
                             {job.status}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {job.progress?.percentage
                             ? `${job.progress.percentage.toFixed(0)}%`
                             : "-"}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {job.createdAt
                             ? new Date(job.createdAt).toLocaleString()
                             : "-"}

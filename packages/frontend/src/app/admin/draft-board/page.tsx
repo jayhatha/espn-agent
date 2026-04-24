@@ -419,7 +419,7 @@ function DraftBoardContent() {
       />
 
       {/* CSV Upload */}
-      <div className="mb-6 rounded-card border border-neutral-200 bg-surface-secondary p-4">
+      <div className="mb-6 rounded-card border border-neutral-200 dark:border-shell-border bg-surface-secondary dark:bg-shell-bg p-4">
         <div className="flex flex-wrap items-center gap-3">
           <input
             ref={fileInputRef}
@@ -431,7 +431,7 @@ function DraftBoardContent() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-body-sm font-medium text-content hover:bg-surface-secondary transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-shell-border bg-white dark:bg-shell-panel px-4 py-2 text-body-sm font-medium text-content dark:text-shell-text hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
           >
             <Upload className="h-4 w-4" />
             Upload Auction CSV
@@ -443,15 +443,15 @@ function DraftBoardContent() {
           {uploadedSources.map((src) => (
             <span
               key={src.name}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white border border-neutral-200 px-3 py-1 text-body-sm"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-shell-panel border border-neutral-200 dark:border-shell-border px-3 py-1 text-body-sm"
             >
-              <span className="font-medium text-content">{src.name}</span>
+              <span className="font-medium text-content dark:text-shell-text">{src.name}</span>
               <span className="text-content-tertiary">
                 {src.entries.length} players
               </span>
               <button
                 onClick={() => removeSource(src.name)}
-                className="ml-0.5 rounded-full p-0.5 text-content-tertiary hover:text-negative hover:bg-red-50 transition-colors"
+                className="ml-0.5 rounded-full p-0.5 text-content-tertiary hover:text-negative hover:bg-red-50 dark:hover:bg-negative-dark-bg/20 transition-colors"
                 title={`Remove ${src.name}`}
               >
                 <X className="h-3 w-3" />
@@ -459,7 +459,7 @@ function DraftBoardContent() {
             </span>
           ))}
           {uploadedSources.length > 0 && (
-            <span className="text-body-sm text-content-secondary">
+            <span className="text-body-sm text-content-secondary dark:text-shell-muted">
               {totalUploadEntries} total / {uploadMatchCount} matched
             </span>
           )}
@@ -467,7 +467,7 @@ function DraftBoardContent() {
       </div>
 
       {/* Rankings info */}
-      <div className="mb-6 flex flex-wrap items-center gap-2 text-body-sm text-content-secondary">
+      <div className="mb-6 flex flex-wrap items-center gap-2 text-body-sm text-content-secondary dark:text-shell-muted">
         <Badge variant="info">{PITCHER_RANKINGS.length} SP rankings</Badge>
         <Badge variant="info">{RELIEVER_RANKINGS.length} RP rankings (CloserMonkey)</Badge>
         <Badge variant="info">{HITTER_RANKINGS.length} hitter rankings</Badge>
@@ -479,7 +479,7 @@ function DraftBoardContent() {
         <div className="flex items-center gap-3">
           <label
             htmlFor="pos-filter"
-            className="text-body-sm font-medium text-content whitespace-nowrap"
+            className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
           >
             Position:
           </label>
@@ -487,7 +487,7 @@ function DraftBoardContent() {
             id="pos-filter"
             value={position}
             onChange={(e) => setPosition(e.target.value)}
-            className="border border-neutral-300 rounded-lg px-3 py-2 text-body-sm text-content bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="border border-neutral-300 dark:border-shell-border rounded-lg px-3 py-2 text-body-sm text-content dark:text-shell-text bg-white dark:bg-shell-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-shell-accent"
           >
             {POSITIONS.map((p) => (
               <option key={p} value={p}>
@@ -500,7 +500,7 @@ function DraftBoardContent() {
         <div className="flex items-center gap-3">
           <label
             htmlFor="sort-select"
-            className="text-body-sm font-medium text-content whitespace-nowrap"
+            className="text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap"
           >
             Sort by:
           </label>
@@ -508,7 +508,7 @@ function DraftBoardContent() {
             id="sort-select"
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="border border-neutral-300 rounded-lg px-3 py-2 text-body-sm text-content bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="border border-neutral-300 dark:border-shell-border rounded-lg px-3 py-2 text-body-sm text-content dark:text-shell-text bg-white dark:bg-shell-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-shell-accent"
           >
             <option value="espnAuctionValue">ESPN Auction $</option>
             <option value="averageDraftPosition">ESPN ADP</option>
@@ -526,7 +526,7 @@ function DraftBoardContent() {
         </div>
 
         {espnData && (
-          <span className="text-body-sm text-content-secondary">
+          <span className="text-body-sm text-content-secondary dark:text-shell-muted">
             {filtered.length} of {espnData.players.length} players
           </span>
         )}
@@ -553,71 +553,71 @@ function DraftBoardContent() {
 
       {/* Table */}
       {!isLoading && !error && filtered.length > 0 && (
-        <div className="rounded-card border border-neutral-200 bg-white shadow-card overflow-hidden">
+        <div className="rounded-card border border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel shadow-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-neutral-100">
-              <thead className="bg-surface-secondary sticky top-0">
+            <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+              <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     #
                   </th>
-                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Player
                   </th>
-                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Pos
                   </th>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     ESPN $
                   </th>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Avg $
                   </th>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     ADP
                   </th>
                   {uploadedSources.length > 0 && (
-                    <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       CSV $
                     </th>
                   )}
                   {uploadedSources.length > 0 && (
-                    <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                       +/-
                     </th>
                   )}
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Rank +/-
                   </th>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Ext Rank
                   </th>
-                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Tier
                   </th>
-                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                     Own%
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-neutral-100">
+              <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                 {filtered.map((player, idx) => (
                   <tr
                     key={player.playerId}
-                    className="hover:bg-surface-secondary transition-colors"
+                    className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors"
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content">
+                    <td className="px-4 py-3 whitespace-nowrap text-data font-medium text-content dark:text-shell-text">
                       {idx + 1}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-body-sm font-medium text-content">
+                      <div className="text-body-sm font-medium text-content dark:text-shell-text">
                         {player.playerName}
                       </div>
                       <div className="text-body-sm text-content-tertiary">
                         {player.mlbTeam}
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-content-secondary">
+                    <td className="px-4 py-3 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                       {player.positions.join("/")}
                     </td>
                     <td
@@ -626,16 +626,16 @@ function DraftBoardContent() {
                         player.espnAuctionValue >= 20
                           ? "text-positive"
                           : player.espnAuctionValue >= 5
-                            ? "text-content"
-                            : "text-content-secondary",
+                            ? "text-content dark:text-shell-text"
+                            : "text-content-secondary dark:text-shell-muted",
                       )}
                     >
                       ${player.espnAuctionValue}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary dark:text-shell-muted">
                       ${player.averageAuctionValue.toFixed(0)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary dark:text-shell-muted">
                       {player.averageDraftPosition > 0
                         ? player.averageDraftPosition.toFixed(1)
                         : "\u2014"}
@@ -647,8 +647,8 @@ function DraftBoardContent() {
                           player.uploadedValue != null && player.uploadedValue >= 20
                             ? "text-positive"
                             : player.uploadedValue != null && player.uploadedValue >= 5
-                              ? "text-content"
-                              : "text-content-secondary",
+                              ? "text-content dark:text-shell-text"
+                              : "text-content-secondary dark:text-shell-muted",
                         )}
                       >
                         {player.uploadedValue != null ? `$${player.uploadedValue}` : "\u2014"}
@@ -659,14 +659,14 @@ function DraftBoardContent() {
                         className={cn(
                           "px-4 py-3 whitespace-nowrap text-data text-right font-semibold",
                           player.valueDiff != null && player.valueDiff >= 5
-                            ? "text-green-600"
+                            ? "text-green-600 dark:text-positive-dark"
                             : player.valueDiff != null && player.valueDiff > 0
-                              ? "text-green-500"
+                              ? "text-green-500 dark:text-positive-dark"
                               : player.valueDiff != null && player.valueDiff <= -5
-                                ? "text-red-600"
+                                ? "text-red-600 dark:text-negative-dark"
                                 : player.valueDiff != null && player.valueDiff < 0
-                                  ? "text-red-400"
-                                  : "text-content-secondary",
+                                  ? "text-red-400 dark:text-negative-dark"
+                                  : "text-content-secondary dark:text-shell-muted",
                         )}
                       >
                         {player.valueDiff != null
@@ -678,16 +678,16 @@ function DraftBoardContent() {
                       className={cn(
                         "px-4 py-3 whitespace-nowrap text-data text-right",
                         player.rankDiff != null && player.rankDiff >= 20
-                          ? "text-green-600 font-semibold"
+                          ? "text-green-600 dark:text-positive-dark font-semibold"
                           : player.rankDiff != null && player.rankDiff > 0
-                            ? "text-green-500"
+                            ? "text-green-500 dark:text-positive-dark"
                             : player.rankDiff != null && player.rankDiff <= -20
-                              ? "text-red-600 font-semibold"
+                              ? "text-red-600 dark:text-negative-dark font-semibold"
                               : player.rankDiff != null && player.rankDiff < 0
-                                ? "text-red-400"
+                                ? "text-red-400 dark:text-negative-dark"
                                 : player.rankDiff === 0
-                                  ? "text-content-secondary"
-                                  : "text-content-secondary",
+                                  ? "text-content-secondary dark:text-shell-muted"
+                                  : "text-content-secondary dark:text-shell-muted",
                       )}
                     >
                       {player.rankDiff != null
@@ -696,12 +696,12 @@ function DraftBoardContent() {
                           : `${player.rankDiff}`
                         : "\u2014"}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content dark:text-shell-text">
                       {player.externalRank != null ? (
                         <span className="inline-flex items-center gap-1">
                           {player.externalRank}
                           {player.externalSource && (
-                            <span className="text-[10px] text-content-tertiary">
+                            <span className="text-caption text-content-tertiary">
                               {player.externalSource}
                             </span>
                           )}
@@ -723,7 +723,7 @@ function DraftBoardContent() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary">
+                    <td className="px-4 py-3 whitespace-nowrap text-data text-right text-content-secondary dark:text-shell-muted">
                       {player.percentOwned > 0
                         ? `${player.percentOwned.toFixed(0)}%`
                         : "\u2014"}
@@ -734,8 +734,8 @@ function DraftBoardContent() {
             </table>
           </div>
 
-          <div className="bg-surface-secondary px-4 py-3 border-t border-neutral-100">
-            <p className="text-body-sm text-content-secondary">
+          <div className="bg-surface-secondary dark:bg-shell-bg px-4 py-3 border-t border-neutral-100 dark:border-shell-border">
+            <p className="text-body-sm text-content-secondary dark:text-shell-muted">
               {espnData?.meta.season} season &middot;{" "}
               {espnData?.meta.totalPlayers} ESPN players &middot;{" "}
               {matchCount} matched to external rankings
@@ -750,10 +750,10 @@ function DraftBoardContent() {
       {!isLoading && !error && filtered.length === 0 && (
         <div className="text-center py-12">
           <BarChart3 className="mx-auto h-12 w-12 text-content-tertiary" />
-          <h3 className="mt-2 text-body-sm font-medium text-content">
+          <h3 className="mt-2 text-body-sm font-medium text-content dark:text-shell-text">
             No players found
           </h3>
-          <p className="mt-1 text-body-sm text-content-secondary">
+          <p className="mt-1 text-body-sm text-content-secondary dark:text-shell-muted">
             {position !== "ALL"
               ? `No players for position ${position}.`
               : "ESPN draft data not available."}

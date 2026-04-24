@@ -54,8 +54,8 @@ export function GapDetailRow({
   return (
     <tr>
       <td colSpan={colSpan} className="p-0">
-        <div className="border-l-2 border-accent bg-surface-secondary dark:bg-shell-bg px-4 py-2.5">
-          <div className="text-[11px] font-medium text-content-secondary mb-1.5 uppercase tracking-wider">
+        <div className="border-l-2 border-accent dark:border-shell-accent bg-surface-secondary dark:bg-shell-bg px-4 py-2.5">
+          <div className="text-caption font-medium text-content-secondary dark:text-shell-muted mb-1.5 uppercase tracking-wider">
             {categoryName} Gap Detail
           </div>
           <div className="space-y-1">
@@ -64,19 +64,19 @@ export function GapDetailRow({
               <div className="flex items-center gap-3 text-body-sm">
                 <span
                   className={cn(
-                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    "inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium",
                     getRankColor(teamAbove.rank, numTeams),
                   )}
                 >
                   #{teamAbove.rank}
                 </span>
-                <span className="text-content-secondary truncate max-w-[140px]">
+                <span className="text-content-secondary dark:text-shell-muted truncate max-w-[100px] sm:max-w-[140px]">
                   {teamAbove.teamName}
                 </span>
                 <span className="font-mono text-data text-content dark:text-shell-text">
                   {formatStatValue(getValueForTeam(teamAbove.teamId), statType, statKey)}
                 </span>
-                <span className="text-[10px] text-content-tertiary">
+                <span className="text-caption text-content-tertiary dark:text-shell-muted">
                   gap: {formatStatValue(Math.abs(getValueForTeam(teamAbove.teamId) - myValue), statType, statKey)}
                 </span>
               </div>
@@ -86,20 +86,20 @@ export function GapDetailRow({
             <div className="flex items-center gap-3 text-body-sm font-medium">
               <span
                 className={cn(
-                  "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                  "inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium",
                   getRankColor(myRanked.rank, numTeams),
                 )}
               >
                 #{myRanked.rank}
               </span>
-              <span className="text-accent truncate max-w-[140px]">
+              <span className="text-accent dark:text-shell-accent truncate max-w-[100px] sm:max-w-[140px]">
                 {myRanked.teamName}
               </span>
-              <span className="font-mono text-data text-accent">
+              <span className="font-mono text-data text-accent dark:text-shell-accent">
                 {formatStatValue(myValue, statType, statKey)}
               </span>
               {teamAbove === null && (
-                <span className="text-[10px] text-positive">Best in league</span>
+                <span className="text-caption text-positive">Best in league</span>
               )}
             </div>
 
@@ -108,19 +108,19 @@ export function GapDetailRow({
               <div className="flex items-center gap-3 text-body-sm">
                 <span
                   className={cn(
-                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    "inline-flex items-center px-1.5 py-0.5 rounded text-caption font-medium",
                     getRankColor(teamBelow.rank, numTeams),
                   )}
                 >
                   #{teamBelow.rank}
                 </span>
-                <span className="text-content-secondary truncate max-w-[140px]">
+                <span className="text-content-secondary dark:text-shell-muted truncate max-w-[100px] sm:max-w-[140px]">
                   {teamBelow.teamName}
                 </span>
                 <span className="font-mono text-data text-content dark:text-shell-text">
                   {formatStatValue(getValueForTeam(teamBelow.teamId), statType, statKey)}
                 </span>
-                <span className="text-[10px] text-positive">
+                <span className="text-caption text-positive">
                   lead: {formatStatValue(Math.abs(myValue - getValueForTeam(teamBelow.teamId)), statType, statKey)}
                 </span>
               </div>

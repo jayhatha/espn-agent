@@ -62,7 +62,7 @@ export function TeamHealthOverview({
                       level={getScarcityLevel(cat.rank, totalTeams)}
                     />
                   </div>
-                  <span className="text-body-sm text-content-secondary">
+                  <span className="text-body-sm text-content-secondary dark:text-shell-muted">
                     {formatStatValue(cat.value, cat.type, cat.stat_key)}
                   </span>
                 </div>
@@ -78,7 +78,7 @@ export function TeamHealthOverview({
             ))}
           </div>
         ) : (
-          <p className="text-body-sm text-content-secondary italic">
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted italic">
             No top-tier categories yet
           </p>
         )}
@@ -107,7 +107,7 @@ export function TeamHealthOverview({
                       level={getScarcityLevel(cat.rank, totalTeams)}
                     />
                   </div>
-                  <span className="text-body-sm text-content-secondary">
+                  <span className="text-body-sm text-content-secondary dark:text-shell-muted">
                     {formatStatValue(cat.value, cat.type, cat.stat_key)}
                   </span>
                 </div>
@@ -123,8 +123,8 @@ export function TeamHealthOverview({
             ))}
           </div>
         ) : (
-          <p className="text-body-sm text-content-secondary italic">
-            No weak categories—great job!
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted italic">
+            All categories competitive
           </p>
         )}
       </div>

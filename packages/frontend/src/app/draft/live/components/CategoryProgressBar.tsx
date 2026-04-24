@@ -30,9 +30,9 @@ export function CategoryProgressBar({ progress }: CategoryProgressBarProps) {
       ? percent > 110 && percent <= 140
       : percent >= 60 && percent < 90;
 
-  let barColor = "bg-red-500";
-  if (isOnTrack) barColor = "bg-green-500";
-  else if (isWarning) barColor = "bg-yellow-500";
+  let barColor = "bg-grafana-negative";
+  if (isOnTrack) barColor = "bg-grafana-positive";
+  else if (isWarning) barColor = "bg-grafana-warning";
 
   const arrow = direction === "LOWER_BETTER" ? "\u2193" : "\u2191";
 
@@ -46,27 +46,27 @@ export function CategoryProgressBar({ progress }: CategoryProgressBarProps) {
     <div className="flex items-center gap-2">
       {/* Label + direction */}
       <div className="w-12 flex-shrink-0 text-right">
-        <span className="text-xs font-semibold text-neutral-300">
+        <span className="text-xs font-semibold text-grafana-muted">
           {label}
         </span>
-        <span className="text-[10px] text-neutral-500 ml-0.5">{arrow}</span>
+        <span className="text-caption text-grafana-muted/70 ml-0.5">{arrow}</span>
       </div>
 
       {/* Bar track */}
-      <div className="flex-1 h-5 bg-neutral-800 rounded overflow-hidden relative">
+      <div className="flex-1 h-5 bg-grafana-panel rounded overflow-hidden relative">
         <div
-          className={`h-full rounded transition-all ${barColor}`}
-          style={{ width: `${cappedPercent}%` }}
+          className={`h-full w-full transition-transform duration-500 origin-left ${barColor}`}
+          style={{ transform: `scaleX(${cappedPercent / 100})` }}
         />
         {/* Percentage overlay */}
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/80">
+        <span className="absolute inset-0 flex items-center justify-center text-caption font-bold text-white/80">
           {Math.round(percent)}%
         </span>
       </div>
 
       {/* Projected / Target */}
       <div className="w-20 flex-shrink-0 text-right">
-        <span className="text-[11px] font-mono text-neutral-400">
+        <span className="text-data text-grafana-muted">
           {fmt(projected)}/{fmt(target)}
         </span>
       </div>

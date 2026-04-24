@@ -103,7 +103,7 @@ export function DateRangeFilter({
       </div>
 
       {/* Error message */}
-      {error && <div className="mt-2 text-body-sm text-negative">{error}</div>}
+      {error && <div role="alert" className="mt-2 text-body-sm text-negative">{error}</div>}
     </div>
   );
 }

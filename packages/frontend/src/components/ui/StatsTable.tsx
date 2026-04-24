@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 
 export interface StatsTableColumn {
   key: string;
-  label: string;
+  label: React.ReactNode;
   align?: "left" | "right" | "center";
   format?: (value: any, row: Record<string, any>) => React.ReactNode;
   sortable?: boolean;
@@ -42,7 +42,7 @@ export function StatsTable({
   defaultSortDir = "asc",
   rowKey = "id",
   highlightRow,
-  highlightClassName = "bg-accent-light dark:bg-shell-accent/10",
+  highlightClassName = "bg-accent-light dark:bg-shell-accent/20",
   emptyMessage = "No data available",
   compact = false,
   stickyHeader = false,
@@ -123,8 +123,29 @@ export function StatsTable({
                     ? "cursor-pointer hover:bg-surface-tertiary dark:hover:bg-shell-panel select-none"
                     : ""
                 )}
+                aria-sort={
+                  sortable && sortKey === col.key
+                    ? sortDir === "asc"
+                      ? "ascending"
+                      : "descending"
+                    : sortable && col.sortable !== false
+                      ? "none"
+                      : undefined
+                }
+                tabIndex={sortable && col.sortable !== false ? 0 : undefined}
+                role={sortable && col.sortable !== false ? "button" : undefined}
                 onClick={() =>
                   sortable && col.sortable !== false && handleSort(col.key)
+                }
+                onKeyDown={
+                  sortable && col.sortable !== false
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSort(col.key);
+                        }
+                      }
+                    : undefined
                 }
               >
                 <span className="inline-flex items-center gap-1">

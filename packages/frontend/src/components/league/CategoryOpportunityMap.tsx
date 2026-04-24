@@ -13,15 +13,15 @@ interface CategoryOpportunityMapProps {
 const difficultyConfig = {
   easy: {
     label: "Easy",
-    className: "text-positive bg-positive/10",
+    className: "text-positive dark:text-positive-dark bg-positive/10",
   },
   medium: {
     label: "Medium",
-    className: "text-warning bg-warning/10",
+    className: "text-warning dark:text-warning-dark bg-warning/10",
   },
   hard: {
     label: "Hard",
-    className: "text-negative bg-negative/10",
+    className: "text-negative dark:text-negative-dark bg-negative/10",
   },
   elite: {
     label: "Elite",
@@ -41,22 +41,22 @@ export function CategoryOpportunityMap({
         <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
           <thead className="bg-surface-secondary dark:bg-shell-bg">
             <tr>
-              <th className="px-3 py-2.5 text-left text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 <Term id="category-opportunity">Category</Term>
               </th>
-              <th className="px-3 py-2.5 text-center text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 Rank
               </th>
-              <th className="px-3 py-2.5 text-right text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 My Value
               </th>
-              <th className="px-3 py-2.5 text-right text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 Gap
               </th>
-              <th className="px-3 py-2.5 text-left text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 Team Above
               </th>
-              <th className="px-3 py-2.5 text-center text-data font-medium text-content-secondary uppercase tracking-wider">
+              <th className="px-3 py-2.5 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                 Difficulty
               </th>
             </tr>
@@ -87,7 +87,7 @@ export function CategoryOpportunityMap({
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     {gain.teamAbove ? (
-                      <span className="font-mono text-data text-content-secondary">
+                      <span className="font-mono text-data text-content-secondary dark:text-shell-muted">
                         {formatStatValue(gain.gap, statType, gain.categoryName)}
                       </span>
                     ) : (
@@ -96,7 +96,7 @@ export function CategoryOpportunityMap({
                   </td>
                   <td className="px-3 py-2.5 text-left">
                     {gain.teamAbove ? (
-                      <span className="text-body-sm text-content-secondary truncate max-w-[120px] inline-block">
+                      <span className="text-body-sm text-content-secondary dark:text-shell-muted truncate max-w-[120px] inline-block">
                         {gain.teamAbove.teamName}
                       </span>
                     ) : (

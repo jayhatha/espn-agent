@@ -9,5 +9,3 @@ export const COLORS = [
   "#14b8a6", // teal
   "#f97316", // orange
 ];
-
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";

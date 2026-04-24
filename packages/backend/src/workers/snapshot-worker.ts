@@ -28,8 +28,12 @@ const connection = new IORedis(
 );
 
 // Create queue and DLQ
-export const snapshotQueue = new Queue("snapshots", { connection: connection as any });
-export const snapshotDLQ = new Queue("snapshots-dlq", { connection: connection as any });
+export const snapshotQueue = new Queue("snapshots", {
+  connection: connection as any,
+});
+export const snapshotDLQ = new Queue("snapshots-dlq", {
+  connection: connection as any,
+});
 
 interface SnapshotJobData {
   leagueId: number;

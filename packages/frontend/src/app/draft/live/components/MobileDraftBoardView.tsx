@@ -70,22 +70,22 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
   const draftedNamesSeen = new Set<string>();
 
   return (
-    <div className="bg-[#22252b] border border-[#2d3139] rounded-xl overflow-hidden">
+    <div className="bg-grafana-panel border border-grafana-border rounded-xl overflow-hidden">
       {/* Header bar */}
       <div
         className="flex items-center justify-between px-4 min-h-[44px] cursor-pointer select-none"
         onClick={() => setExpanded((prev) => !prev)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm text-[#99a5bc] uppercase tracking-wide font-medium">
+          <span className="text-sm text-grafana-muted uppercase tracking-wide font-medium">
             Draft Board
           </span>
-          <span className="text-xs text-[#6b7a99]">{expanded ? "▼" : "▶"}</span>
+          <span className="text-xs text-grafana-muted/70">{expanded ? "▼" : "▶"}</span>
         </div>
-        <div className="text-sm text-[#99a5bc] font-mono">
-          <span className="text-[#d9dde6] font-semibold">${totalBudgetRemaining} left</span>
+        <div className="text-sm text-grafana-muted font-mono">
+          <span className="text-grafana-text font-semibold">${totalBudgetRemaining} left</span>
           {(cumulativeSurplus ?? 0) > 0 && (
-            <span className="text-[#37872d] font-semibold ml-2">
+            <span className="text-grafana-positive font-semibold ml-2">
               +${cumulativeSurplus} banked
             </span>
           )}
@@ -99,7 +99,7 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
           style={{ borderCollapse: "collapse" }}
         >
           <thead>
-            <tr className="text-[11px] text-[#6b7a99] uppercase bg-[#1a1d23]">
+            <tr className="text-caption text-grafana-muted/70 uppercase bg-grafana-bg">
               <th className="text-left w-8 px-3 py-2 font-normal">Pos</th>
               <th className="text-left px-1 py-2 font-normal">Player</th>
               <th className="text-right w-10 px-3 py-2 font-normal">FG$</th>
@@ -155,19 +155,19 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
                         <span
                           className={`font-mono font-bold text-sm ${
                             isFilled
-                              ? "text-[#37872d]"
+                              ? "text-grafana-positive"
                               : posNeeded
-                              ? "text-[#e0b400]"
-                              : "text-[#99a5bc]"
+                              ? "text-grafana-warning"
+                              : "text-grafana-muted"
                           }`}
                         >
                           {label}
                         </span>
                         {isFilled && (
-                          <span className="text-xs text-[#37872d]">✓</span>
+                          <span className="text-xs text-grafana-positive">✓</span>
                         )}
                         {posNeeded && (
-                          <span className="text-xs text-[#e0b400]">○</span>
+                          <span className="text-xs text-grafana-warning">○</span>
                         )}
                       </div>
                     </td>
@@ -175,18 +175,18 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
 
                   {/* Drafted players */}
                   {uniqueDrafted.map((p, i) => (
-                    <tr key={`d-${label}-${i}`} className="text-[#37872d]">
+                    <tr key={`d-${label}-${i}`} className="text-grafana-positive">
                       <td className="px-3 py-0.5"></td>
                       <td className="px-1 py-0.5 font-medium text-xs">{p.name}</td>
-                      <td className="text-right px-3 py-0.5 text-[#99a5bc] font-mono text-xs">
+                      <td className="text-right px-3 py-0.5 text-grafana-muted font-mono text-xs">
                         ${p.cost}
                       </td>
                       <td className="text-center px-1 py-0.5">
                         <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          className={`text-caption px-1.5 py-0.5 rounded font-bold ${
                             p.tier === "target"
-                              ? "bg-[#37872d]/30 text-[#37872d]"
-                              : "bg-[#5b9cf6]/30 text-[#5b9cf6]"
+                              ? "bg-grafana-positive/30 text-grafana-positive"
+                              : "bg-info-dark/30 text-info-dark"
                           }`}
                         >
                           {p.tier === "target" ? "T" : "R"}
@@ -200,7 +200,7 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
                     <tr
                       key={`a-${label}-${i}`}
                       className={
-                        p.tier === "target" ? "text-[#d9dde6]" : "text-[#99a5bc]"
+                        p.tier === "target" ? "text-grafana-text" : "text-grafana-muted"
                       }
                     >
                       <td className="px-3 py-0.5"></td>
@@ -210,10 +210,10 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
                       </td>
                       <td className="text-center px-1 py-0.5">
                         <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                          className={`text-caption px-1.5 py-0.5 rounded font-bold ${
                             p.tier === "target"
-                              ? "bg-[#37872d]/15 text-[#37872d]"
-                              : "bg-[#5b9cf6]/15 text-[#5b9cf6]"
+                              ? "bg-grafana-positive/15 text-grafana-positive"
+                              : "bg-info-dark/15 text-info-dark"
                           }`}
                         >
                           {p.tier === "target" ? "T" : "R"}
@@ -228,7 +228,7 @@ export function MobileDraftBoardView({ boardState }: MobileDraftBoardViewProps) 
                       <td className="px-3 py-0.5"></td>
                       <td
                         colSpan={3}
-                        className="px-1 py-0.5 text-[#6b7a99]/60 italic text-xs"
+                        className="px-1 py-0.5 text-grafana-muted/70/60 italic text-xs"
                       >
                         no targets
                       </td>

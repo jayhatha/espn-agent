@@ -5,6 +5,8 @@ import { parsePitcherlistTiers } from "../pitcherlist.js";
  * Pitcherlist Adapter Tests
  *
  * Tests HTML parsing of tier-grouped pitcher rankings from pitcherlist.com.
+ * Fixtures match the real 2026 Pitcherlist markup: tier labels in <p> with
+ * bold/large text, pitcher entries as <p><strong><a class="player-tag">...</a></strong></p>.
  */
 
 const FIXTURE_HTML = `
@@ -15,37 +17,23 @@ const FIXTURE_HTML = `
 <article>
   <h1 class="entry-title">SP Streamer Ranks: 3/26 &amp; 3/27 &amp; 3/28 Fantasy Baseball</h1>
 
-  <h2>Auto-Start</h2>
-  <table>
-    <tbody>
-      <tr><td><a href="/player/corbin-burnes">Corbin Burnes</a></td><td>MIL</td></tr>
-      <tr><td><a href="/player/tyler-glasnow">Tyler Glasnow</a></td><td>LAD</td></tr>
-      <tr><td><a href="/player/paul-skenes">Paul Skenes</a></td><td>PIT</td></tr>
-    </tbody>
-  </table>
+  <h2>Thursday 3/26 Starting Pitcher Streamer Rankings</h2>
 
-  <h2>Probably Start</h2>
-  <table>
-    <tbody>
-      <tr><td><a href="/player/kyle-bradish">Kyle Bradish</a></td><td>BAL</td></tr>
-      <tr><td><a href="/player/braxton-garrett">Braxton Garrett</a></td><td>MIA</td></tr>
-    </tbody>
-  </table>
+  <p><span style="color: #3366ff;"><strong><span style="font-size: 20pt;">Auto-Starts</span></strong></span></p>
+  <p><strong><a class="player-tag" href="/player/corbin-burnes">Corbin Burnes</a> @ CIN - </strong>Aces gonna ace.</p>
+  <p><strong><a class="player-tag" href="/player/tyler-glasnow">Tyler Glasnow</a> vs. SDP - </strong>Aces gonna ace.</p>
+  <p><strong><a class="player-tag" href="/player/paul-skenes">Paul Skenes</a> @ NYM - </strong>Aces gonna ace.</p>
 
-  <h2>Questionable Start</h2>
-  <table>
-    <tbody>
-      <tr><td><a href="/player/cristopher-sanchez">Cristopher S&#225;nchez</a></td><td>PHI</td></tr>
-      <tr><td><a href="/player/jose-berrios">Jos&#233; Berr&#237;os</a></td><td>TOR</td></tr>
-    </tbody>
-  </table>
+  <p><span style="color: #339966; font-size: 20pt;"><strong>Probably Starts</strong></span></p>
+  <p><strong><a class="player-tag" href="/player/kyle-bradish">Kyle Bradish</a> vs. MIN - </strong>Good matchup.</p>
+  <p><strong><a class="player-tag" href="/player/braxton-garrett">Braxton Garrett</a> vs. ATL - </strong>Decent arm.</p>
 
-  <h2>Do Not Start</h2>
-  <table>
-    <tbody>
-      <tr><td><a href="/player/wade-miley">Wade Miley</a></td><td>CHC</td></tr>
-    </tbody>
-  </table>
+  <p><span style="color: #ff9900; font-size: 20pt;"><strong>Questionable Starts</strong></span></p>
+  <p><strong><a class="player-tag" href="/player/cristopher-sanchez">Cristopher S&#225;nchez</a> vs. TEX - </strong>Risky.</p>
+  <p><strong><a class="player-tag" href="/player/jose-berrios">Jos&#233; Berr&#237;os</a> @ BOS - </strong>Tough matchup.</p>
+
+  <p><span style="font-size: 20pt; color: #ff0000;"><strong>Do Not Starts</strong></span></p>
+  <p><strong><a class="player-tag" href="/player/wade-miley">Wade Miley</a> vs. STL - </strong>Just no.</p>
 </article>
 </body>
 </html>
@@ -64,11 +52,53 @@ const NO_TIERS_HTML = `
 </html>
 `;
 
+// Fallback format: sit/start table (used by the separate "Sit or Start" column)
+const TABLE_FALLBACK_HTML = `
+<!DOCTYPE html>
+<html>
+<body>
+<article>
+  <h1>Sit/Start Week 1</h1>
+  <table>
+    <tbody>
+      <tr>
+        <td colspan="6"><strong>Wednesday – 3/25</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Date</strong></td>
+        <td><strong>Game</strong></td>
+        <td><strong>Away Pitcher</strong></td>
+        <td><strong>Sit / Start</strong></td>
+        <td><strong>Home Pitcher</strong></td>
+        <td><strong>Sit / Start</strong></td>
+      </tr>
+      <tr>
+        <td>3/25</td>
+        <td>NYY at SFG</td>
+        <td><strong><a class="player-tag" href="/player/max-fried">M. Fried</a></strong></td>
+        <td><strong><span style="color: #008000;">Start-8</span></strong></td>
+        <td><strong><a class="player-tag" href="/player/logan-webb">L. Webb</a></strong></td>
+        <td><strong><span style="color: #008000;">Start-8</span></strong></td>
+      </tr>
+      <tr>
+        <td>3/25</td>
+        <td>WSN at CHC</td>
+        <td><strong>C. Cavalli</strong></td>
+        <td><strong><span style="color: #ff0000;">Sit-2</span></strong></td>
+        <td><strong>M. Boyd</strong></td>
+        <td><strong><span style="color: #3366ff;">Maybe-6</span></strong></td>
+      </tr>
+    </tbody>
+  </table>
+</article>
+</body>
+</html>
+`;
+
 describe("parsePitcherlistTiers", () => {
   it("extracts all 4 tiers with correct verdict mapping", () => {
     const entries = parsePitcherlistTiers(FIXTURE_HTML, "https://pitcherlist.com/sp-streamer-ranks-3-26/");
 
-    // Count by verdict
     const byVerdict: Record<string, number> = {};
     for (const e of entries) {
       byVerdict[e.verdict] = (byVerdict[e.verdict] || 0) + 1;
@@ -138,6 +168,24 @@ describe("parsePitcherlistTiers", () => {
     expect(result).toEqual([]);
   });
 
+  it("falls back to table parsing for sit/start table format", () => {
+    const entries = parsePitcherlistTiers(TABLE_FALLBACK_HTML, "https://pitcherlist.com/sit-start-week-1/");
+    expect(entries.length).toBe(4);
+
+    const starts = entries.filter(e => e.verdict === "start");
+    expect(starts.length).toBe(2);
+    expect(starts.map(e => e.playerName)).toContain("M. Fried");
+    expect(starts.map(e => e.playerName)).toContain("L. Webb");
+
+    const sits = entries.filter(e => e.verdict === "sit");
+    expect(sits.length).toBe(1);
+    expect(sits[0].playerName).toBe("C. Cavalli");
+
+    const maybes = entries.filter(e => e.verdict === "lean_start");
+    expect(maybes.length).toBe(1);
+    expect(maybes[0].playerName).toBe("M. Boyd");
+  });
+
   it("URL discovery selector pattern: fixture archive HTML yields article URL", async () => {
     const archiveHtml = `
       <html><body>
@@ -152,7 +200,6 @@ describe("parsePitcherlistTiers", () => {
       </body></html>
     `;
 
-    // Simulate the URL discovery logic used in PitcherlistAdapter
     const { load } = await import("cheerio");
     const $ = load(archiveHtml);
     const url = $("a[href*='starting-pitcher-streamer-rank']").first().attr("href");

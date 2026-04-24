@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "strict": true,
@@ -10,13 +14,24 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["chrome"],
+    "types": [
+      "chrome"
+    ],
     "jsx": "react-jsx",
     "outDir": "./dist",
     "rootDir": ".",
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["**/*.ts", "**/*.tsx", ".wxt/types/globals.d.ts"],
-  "exclude": ["node_modules", "dist", ".output"]
+  "include": [
+    ".plasmo/index.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".wxt/types/globals.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".output"
+  ]
 }

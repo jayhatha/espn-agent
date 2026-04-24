@@ -19,10 +19,10 @@ All endpoints below are relative to this base.
 
 Private leagues require two cookies:
 
-| Cookie     | Description                                       |
-| ---------- | ------------------------------------------------- |
-| `SWID`     | ESPN user GUID, format `{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}` |
-| `espn_s2`  | Session token (long opaque string, URL-encoded)   |
+| Cookie    | Description                                                     |
+| --------- | --------------------------------------------------------------- |
+| `SWID`    | ESPN user GUID, format `{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}` |
+| `espn_s2` | Session token (long opaque string, URL-encoded)                 |
 
 Pass as a single `Cookie` header:
 
@@ -48,35 +48,37 @@ Accept: application/json
 GET /seasons/{season}/segments/0/leagues/{leagueId}
 ```
 
-| Param         | Description                                      |
-| ------------- | ------------------------------------------------ |
-| `season`      | Year, e.g. `2026`                                |
-| `leagueId`    | ESPN league ID (visible in the URL on espn.com)  |
-| `view`        | Repeating: `?view=mTeam&view=mStandings&...`     |
+| Param             | Description                                           |
+| ----------------- | ----------------------------------------------------- |
+| `season`          | Year, e.g. `2026`                                     |
+| `leagueId`        | ESPN league ID (visible in the URL on espn.com)       |
+| `view`            | Repeating: `?view=mTeam&view=mStandings&...`          |
 | `scoringPeriodId` | Specific scoring period (day/week). Omit for current. |
 
 ### Views
 
 Views control which top-level keys are returned. **Combine freely — no documented limit.**
 
-| View            | Returns                                                   |
-| --------------- | --------------------------------------------------------- |
-| `mSettings`     | `settings` — league name, scoring categories, roster slots, acquisition rules |
+| View            | Returns                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `mSettings`     | `settings` — league name, scoring categories, roster slots, acquisition rules             |
 | `mTeam`         | `teams[]` — names, owners, `valuesByStat`, `points`, `pointsByStat`, `pointsDelta`, ranks |
-| `mStandings`    | `teams[]` — same as mTeam but with final standings data   |
-| `mRoster`       | `teams[].roster.entries[]` — full roster with player detail and stats |
+| `mStandings`    | `teams[]` — same as mTeam but with final standings data                                   |
+| `mRoster`       | `teams[].roster.entries[]` — full roster with player detail and stats                     |
 | `mLiveScoring`  | Intended for in-period live scoring. **In practice returns same `team.points` as mTeam.** |
-| `mMatchupScore` | `schedule[]` — matchup results for current/past periods   |
-| `mStatus`       | `status` — current scoring period, season metadata        |
-| `mNav`          | Navigation metadata (not useful for data)                 |
-| `modular`       | Modular display data (not useful for data)                |
+| `mMatchupScore` | `schedule[]` — matchup results for current/past periods                                   |
+| `mStatus`       | `status` — current scoring period, season metadata                                        |
+| `mNav`          | Navigation metadata (not useful for data)                                                 |
+| `modular`       | Modular display data (not useful for data)                                                |
 
 **ESPN website views** (from network trace, standings page):
+
 ```
 mLiveScoring, mMatchupScore, mRoster, mSettings, mStandings, mStatus, mTeam, modular, mNav
 ```
 
 **Our current live-poll views:**
+
 ```
 mSettings, mTeam, mStandings, mLiveScoring
 ```
@@ -94,15 +96,16 @@ JSON header that filters the `players` array inside rosters. **Does NOT affect `
 }
 ```
 
-| Field                      | Values                                              |
-| -------------------------- | --------------------------------------------------- |
-| `filterStatsForSourceIds`  | `0` = real-time, `1` = projected                   |
-| `filterStatsForSplitTypeIds` | `0` = season totals, `5` = current period        |
-| `filterStatsForExternalIds`  | `[scoringPeriodId]` — filter to specific period  |
-| `sortPercOwned`            | Sort by ownership % (useful for free agents)        |
-| `limit` / `offset`         | Pagination for player lists                         |
+| Field                        | Values                                          |
+| ---------------------------- | ----------------------------------------------- |
+| `filterStatsForSourceIds`    | `0` = real-time, `1` = projected                |
+| `filterStatsForSplitTypeIds` | `0` = season totals, `5` = current period       |
+| `filterStatsForExternalIds`  | `[scoringPeriodId]` — filter to specific period |
+| `sortPercOwned`              | Sort by ownership % (useful for free agents)    |
+| `limit` / `offset`           | Pagination for player lists                     |
 
 **Historical week fetch** uses:
+
 ```json
 {
   "players": {
@@ -124,32 +127,33 @@ The `filterStatsForExternalIds` + `splitTypeId=5` combination is what makes hist
 
 Fields present on every `teams[]` entry when using `mTeam` or `mStandings`:
 
-| Field                  | Type                     | Description                                       |
-| ---------------------- | ------------------------ | ------------------------------------------------- |
-| `id`                   | number                   | ESPN team ID within the league                    |
-| `name`                 | string                   | Team name                                         |
-| `abbrev`               | string                   | Team abbreviation                                 |
-| `primaryOwner`         | string                   | SWID of primary owner                             |
-| `owners`               | string[]                 | All owner SWIDs                                   |
-| `valuesByStat`         | `Record<statId, number>` | **Season-to-date accumulated stat values**        |
-| `points`               | number                   | ESPN pre-computed roto points total               |
-| `pointsAdjusted`       | number                   | Points after adjustments                          |
-| `pointsByStat`         | `Record<statId, number>` | Roto points per category (sums to `points`)       |
-| `pointsDelta`          | number                   | **In-game live scoring delta** (see note below)   |
-| `rankCalculatedFinal`  | number                   | ESPN's computed rank                              |
-| `currentProjectedRank` | number                   | ESPN's projected final rank                       |
-| `draftDayProjectedRank`| number                   | Rank projected on draft day                       |
-| `rankFinal`            | number                   | Final rank (end of season)                        |
-| `record`               | object                   | Win/loss record (H2H leagues)                     |
-| `playoffSeed`          | number                   | Playoff seeding                                   |
-| `waiverRank`           | number                   | Waiver priority rank                              |
-| `transactionCounter`   | object                   | Transaction counts including FAAB spent           |
+| Field                   | Type                     | Description                                     |
+| ----------------------- | ------------------------ | ----------------------------------------------- |
+| `id`                    | number                   | ESPN team ID within the league                  |
+| `name`                  | string                   | Team name                                       |
+| `abbrev`                | string                   | Team abbreviation                               |
+| `primaryOwner`          | string                   | SWID of primary owner                           |
+| `owners`                | string[]                 | All owner SWIDs                                 |
+| `valuesByStat`          | `Record<statId, number>` | **Season-to-date accumulated stat values**      |
+| `points`                | number                   | ESPN pre-computed roto points total             |
+| `pointsAdjusted`        | number                   | Points after adjustments                        |
+| `pointsByStat`          | `Record<statId, number>` | Roto points per category (sums to `points`)     |
+| `pointsDelta`           | number                   | **In-game live scoring delta** (see note below) |
+| `rankCalculatedFinal`   | number                   | ESPN's computed rank                            |
+| `currentProjectedRank`  | number                   | ESPN's projected final rank                     |
+| `draftDayProjectedRank` | number                   | Rank projected on draft day                     |
+| `rankFinal`             | number                   | Final rank (end of season)                      |
+| `record`                | object                   | Win/loss record (H2H leagues)                   |
+| `playoffSeed`           | number                   | Playoff seeding                                 |
+| `waiverRank`            | number                   | Waiver priority rank                            |
+| `transactionCounter`    | object                   | Transaction counts including FAAB spent         |
 
 ### `pointsDelta` — The Live Scoring Gap
 
 **Key finding from investigation (April 23, 2026):**
 
 ESPN's website shows different roto point totals than `team.points` during live game days. The discrepancy is **not** from any API parameter — we tested:
+
 - All ESPN's exact views (`mLiveScoring`, `mMatchupScore`, `mRoster`, etc.)
 - `X-Fantasy-Filter` with `splitTypeId=5` and `sourceId=0`
 - `statView=live` query parameter
@@ -206,38 +210,38 @@ Full mapping in `packages/backend/src/adapters/espn.ts` (`ESPN_STAT_MAP`). Key I
 
 ### Batting
 
-| ID | Key  | Name              | Type     |
-| -- | ---- | ----------------- | -------- |
-| 0  | AB   | At Bats           | COUNTING |
-| 1  | H    | Hits              | COUNTING |
-| 2  | AVG  | Batting Average   | RATE     |
-| 5  | HR   | Home Runs         | COUNTING |
-| 8  | TB   | Total Bases       | COUNTING |
-| 10 | BB   | Walks             | COUNTING |
-| 12 | HBP  | Hit By Pitch      | COUNTING |
-| 13 | SF   | Sacrifice Flies   | COUNTING |
-| 17 | OBP  | On Base Pct       | RATE     |
-| 18 | OPS  | OPS               | RATE     |
-| 20 | R    | Runs              | COUNTING |
-| 21 | RBI  | RBI               | COUNTING |
-| 23 | SB   | Stolen Bases      | COUNTING |
+| ID  | Key | Name            | Type     |
+| --- | --- | --------------- | -------- |
+| 0   | AB  | At Bats         | COUNTING |
+| 1   | H   | Hits            | COUNTING |
+| 2   | AVG | Batting Average | RATE     |
+| 5   | HR  | Home Runs       | COUNTING |
+| 8   | TB  | Total Bases     | COUNTING |
+| 10  | BB  | Walks           | COUNTING |
+| 12  | HBP | Hit By Pitch    | COUNTING |
+| 13  | SF  | Sacrifice Flies | COUNTING |
+| 17  | OBP | On Base Pct     | RATE     |
+| 18  | OPS | OPS             | RATE     |
+| 20  | R   | Runs            | COUNTING |
+| 21  | RBI | RBI             | COUNTING |
+| 23  | SB  | Stolen Bases    | COUNTING |
 
 ### Pitching
 
-| ID | Key  | Name              | Type     |
-| -- | ---- | ----------------- | -------- |
-| 33 | GS   | Games Started     | COUNTING |
-| 34 | OUTS | Outs Recorded     | COUNTING |
-| 37 | HA   | Hits Allowed      | COUNTING |
-| 39 | BBA  | Walks Allowed     | COUNTING |
-| 41 | WHIP | WHIP              | RATE     |
-| 45 | ER   | Earned Runs       | COUNTING |
-| 47 | ERA  | ERA               | RATE     |
-| 48 | K    | Strikeouts        | COUNTING |
-| 53 | W    | Wins              | COUNTING |
-| 57 | SV   | Saves             | COUNTING |
-| 60 | HLD  | Holds             | COUNTING |
-| 63 | QS   | Quality Starts    | COUNTING |
+| ID  | Key  | Name           | Type     |
+| --- | ---- | -------------- | -------- |
+| 33  | GS   | Games Started  | COUNTING |
+| 34  | OUTS | Outs Recorded  | COUNTING |
+| 37  | HA   | Hits Allowed   | COUNTING |
+| 39  | BBA  | Walks Allowed  | COUNTING |
+| 41  | WHIP | WHIP           | RATE     |
+| 45  | ER   | Earned Runs    | COUNTING |
+| 47  | ERA  | ERA            | RATE     |
+| 48  | K    | Strikeouts     | COUNTING |
+| 53  | W    | Wins           | COUNTING |
+| 57  | SV   | Saves          | COUNTING |
+| 60  | HLD  | Holds          | COUNTING |
+| 63  | QS   | Quality Starts | COUNTING |
 
 > Rate stats (`AVG`, `OBP`, `OPS`, `ERA`, `WHIP`) in `valuesByStat` are **computed from components** (see `packages/shared/src/formulas.ts`). Never average rates directly — combine components, then compute.
 
@@ -245,41 +249,41 @@ Full mapping in `packages/backend/src/adapters/espn.ts` (`ESPN_STAT_MAP`). Key I
 
 ## Lineup Slot IDs
 
-| ID | Slot | Description        |
-| -- | ---- | ------------------ |
-| 0  | C    | Catcher            |
-| 1  | 1B   | First Base         |
-| 2  | 2B   | Second Base        |
-| 3  | 3B   | Third Base         |
-| 4  | SS   | Shortstop          |
-| 5  | OF   | Outfield           |
-| 6  | MI   | Middle Infield     |
-| 7  | CI   | Corner Infield     |
-| 11 | DH   | Designated Hitter  |
-| 12 | UTIL | Utility            |
-| 13 | P    | Pitcher            |
-| 14 | SP   | Starting Pitcher   |
-| 15 | RP   | Relief Pitcher     |
-| 16 | BE   | Bench              |
-| 17 | IL   | Injured List       |
-| 19 | IF   | Infield            |
+| ID  | Slot | Description       |
+| --- | ---- | ----------------- |
+| 0   | C    | Catcher           |
+| 1   | 1B   | First Base        |
+| 2   | 2B   | Second Base       |
+| 3   | 3B   | Third Base        |
+| 4   | SS   | Shortstop         |
+| 5   | OF   | Outfield          |
+| 6   | MI   | Middle Infield    |
+| 7   | CI   | Corner Infield    |
+| 11  | DH   | Designated Hitter |
+| 12  | UTIL | Utility           |
+| 13  | P    | Pitcher           |
+| 14  | SP   | Starting Pitcher  |
+| 15  | RP   | Relief Pitcher    |
+| 16  | BE   | Bench             |
+| 17  | IL   | Injured List      |
+| 19  | IF   | Infield           |
 
 ---
 
 ## MLB Team IDs
 
-| ID | Abbr | ID | Abbr | ID | Abbr |
-| -- | ---- | -- | ---- | -- | ---- |
-| 1  | BAL  | 11 | OAK  | 21 | NYM  |
-| 2  | BOS  | 12 | SEA  | 22 | PHI  |
-| 3  | LAA  | 13 | TEX  | 23 | PIT  |
-| 4  | CWS  | 14 | TOR  | 24 | STL  |
-| 5  | CLE  | 15 | ATL  | 25 | SD   |
-| 6  | DET  | 16 | CHC  | 26 | SF   |
-| 7  | KC   | 17 | CIN  | 27 | COL  |
-| 8  | MIL  | 18 | HOU  | 28 | MIA  |
-| 9  | MIN  | 19 | LAD  | 29 | ARI  |
-| 10 | NYY  | 20 | WSH  | 30 | TB   |
+| ID  | Abbr | ID  | Abbr | ID  | Abbr |
+| --- | ---- | --- | ---- | --- | ---- |
+| 1   | BAL  | 11  | OAK  | 21  | NYM  |
+| 2   | BOS  | 12  | SEA  | 22  | PHI  |
+| 3   | LAA  | 13  | TEX  | 23  | PIT  |
+| 4   | CWS  | 14  | TOR  | 24  | STL  |
+| 5   | CLE  | 15  | ATL  | 25  | SD   |
+| 6   | DET  | 16  | CHC  | 26  | SF   |
+| 7   | KC   | 17  | CIN  | 27  | COL  |
+| 8   | MIL  | 18  | HOU  | 28  | MIA  |
+| 9   | MIN  | 19  | LAD  | 29  | ARI  |
+| 10  | NYY  | 20  | WSH  | 30  | TB   |
 
 ---
 
@@ -340,11 +344,11 @@ const normalized = adapter.normalizeLeagueData(raw.data);
 
 Key methods:
 
-| Method                  | Purpose                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| `fetchLeague()`         | Fetch current league data with caching                   |
-| `fetchHistoricalWeek()` | Fetch a specific scoring period (throttled, no cache)    |
-| `getFinalScoringPeriod()` | Get last period ID for a season                        |
-| `normalizeLeagueData()` | Raw ESPN response → `ESPNLeagueData` canonical shape     |
-| `fetchFreeAgents()`     | Stub — returns empty array (not implemented)             |
-| `fetchTransactions()`   | Activity feed transactions                               |
+| Method                    | Purpose                                               |
+| ------------------------- | ----------------------------------------------------- |
+| `fetchLeague()`           | Fetch current league data with caching                |
+| `fetchHistoricalWeek()`   | Fetch a specific scoring period (throttled, no cache) |
+| `getFinalScoringPeriod()` | Get last period ID for a season                       |
+| `normalizeLeagueData()`   | Raw ESPN response → `ESPNLeagueData` canonical shape  |
+| `fetchFreeAgents()`       | Stub — returns empty array (not implemented)          |
+| `fetchTransactions()`     | Activity feed transactions                            |

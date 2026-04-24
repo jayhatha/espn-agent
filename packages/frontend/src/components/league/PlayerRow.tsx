@@ -20,16 +20,16 @@ interface PlayerRowProps {
 
 const variantStyles = {
   default: {
-    hover: "hover:bg-surface-secondary",
-    selectedBg: "bg-accent-light border-l-4 border-accent",
+    hover: "hover:bg-surface-secondary dark:hover:bg-shell-panel",
+    selectedBg: "bg-accent-light dark:bg-shell-accent/20 border-l-4 border-accent dark:border-shell-accent",
   },
   add: {
-    hover: "hover:bg-positive-light",
-    selectedBg: "bg-positive-light border-l-4 border-positive",
+    hover: "hover:bg-positive-light dark:hover:bg-positive-dark-bg/20",
+    selectedBg: "bg-positive-light dark:bg-positive-dark-bg/20 border-l-4 border-positive dark:border-positive-dark-border",
   },
   drop: {
-    hover: "hover:bg-negative-light",
-    selectedBg: "bg-negative-light border-l-4 border-negative",
+    hover: "hover:bg-negative-light dark:hover:bg-negative-dark-bg/20",
+    selectedBg: "bg-negative-light dark:bg-negative-dark-bg/20 border-l-4 border-negative dark:border-negative-dark-border",
   },
 };
 
@@ -57,12 +57,12 @@ export function PlayerRow({
             {player.name}
           </div>
           {player.rosterSlot && (
-            <span className="text-data text-content-tertiary ml-2">
+            <span className="text-data text-content-tertiary dark:text-shell-muted ml-2">
               {player.rosterSlot}
             </span>
           )}
         </div>
-        <div className="text-data text-content-secondary">
+        <div className="text-data text-content-secondary dark:text-shell-muted">
           {player.position}
           {player.team && ` \u2022 ${player.team}`}
         </div>

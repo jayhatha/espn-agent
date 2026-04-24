@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "@/lib/cn";
-import { CHART_THEME } from "@/lib/chart-theme";
+import { useChartTheme } from "@/lib/useChartTheme";
 
 interface CategoryMiniChartProps {
   data: Array<{ date: string; rank: number }>;
@@ -23,13 +23,15 @@ interface CategoryMiniChartProps {
 export function CategoryMiniChart({
   data,
   height = 120,
-  teamColor = CHART_THEME.colors[0],
+  teamColor,
   label,
   className,
 }: CategoryMiniChartProps) {
+  const chartTheme = useChartTheme();
+  const resolvedTeamColor = teamColor ?? chartTheme.colors[0];
   if (data.length === 0) {
     return (
-      <div className={cn("text-center py-4 text-body-sm text-content-tertiary", className)}>
+      <div className={cn("text-center py-4 text-body-sm text-content-tertiary dark:text-shell-muted", className)}>
         No trend data available
       </div>
     );
@@ -46,28 +48,28 @@ export function CategoryMiniChart({
           margin={{ top: 5, right: 5, left: 0, bottom: 5 }}
         >
           <CartesianGrid
-            strokeDasharray={CHART_THEME.grid.strokeDasharray}
-            stroke={CHART_THEME.grid.stroke}
+            strokeDasharray={chartTheme.grid.strokeDasharray}
+            stroke={chartTheme.grid.stroke}
             opacity={0.3}
           />
           <XAxis
             dataKey="date"
             hide
             tick={false}
-            axisLine={{ stroke: CHART_THEME.grid.stroke }}
+            axisLine={{ stroke: chartTheme.grid.stroke }}
           />
           <YAxis
             reversed
             domain={[1, "dataMax"]}
-            tick={CHART_THEME.axis.tick}
-            axisLine={{ stroke: CHART_THEME.grid.stroke }}
-            tickLine={{ stroke: CHART_THEME.grid.stroke }}
+            tick={chartTheme.axis.tick}
+            axisLine={{ stroke: chartTheme.grid.stroke }}
+            tickLine={{ stroke: chartTheme.grid.stroke }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: CHART_THEME.tooltip.backgroundColor,
-              border: `1px solid ${CHART_THEME.tooltip.borderColor}`,
-              borderRadius: `${CHART_THEME.tooltip.borderRadius}px`,
+              backgroundColor: chartTheme.tooltip.backgroundColor,
+              border: `1px solid ${chartTheme.tooltip.borderColor}`,
+              borderRadius: `${chartTheme.tooltip.borderRadius}px`,
               padding: "8px 12px",
             }}
             labelFormatter={(date) =>
@@ -81,7 +83,7 @@ export function CategoryMiniChart({
           <Line
             type="monotone"
             dataKey="rank"
-            stroke={teamColor}
+            stroke={resolvedTeamColor}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}

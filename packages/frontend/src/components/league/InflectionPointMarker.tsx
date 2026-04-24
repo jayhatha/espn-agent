@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CHART_THEME } from "@/lib/chart-theme";
+import { useChartTheme } from "@/lib/useChartTheme";
 
 interface PlayerDetail {
   id: number;
@@ -43,6 +43,7 @@ interface InflectionPointMarkerProps {
 }
 
 export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerProps) {
+  const chartTheme = useChartTheme();
   const [showTooltip, setShowTooltip] = useState(false);
 
   if (!viewBox) return null;
@@ -52,7 +53,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
   const isCategoryMode = point.categoryId != null;
   const isPositive = isCategoryMode ? (point.rankDelta ?? 0) > 0 : (point.pointsDelta ?? 0) > 0;
-  const color = isPositive ? CHART_THEME.colors[3] : CHART_THEME.colors[4]; // positive/negative from theme
+  const color = isPositive ? chartTheme.colors[3] : chartTheme.colors[4]; // positive/negative from theme
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -117,9 +118,9 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
           <div
             className="rounded-lg p-3 text-xs"
             style={{
-              backgroundColor: CHART_THEME.tooltip.backgroundColor,
-              border: `1px solid ${CHART_THEME.tooltip.borderColor}`,
-              borderRadius: CHART_THEME.tooltip.borderRadius,
+              backgroundColor: chartTheme.tooltip.backgroundColor,
+              border: `1px solid ${chartTheme.tooltip.borderColor}`,
+              borderRadius: chartTheme.tooltip.borderRadius,
             }}
           >
             <div className="font-bold mb-2 text-content dark:text-shell-text">
@@ -130,12 +131,12 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
             {point.categoryChanges && point.categoryChanges.length > 0 && (
               <div className="mb-2">
-                <div className="font-semibold text-content-secondary mb-1">Category Changes:</div>
-                {point.categoryChanges.map((cat, idx) => {
+                <div className="font-semibold text-content-secondary dark:text-shell-muted mb-1">Category Changes:</div>
+                {point.categoryChanges.map((cat) => {
                   const catColorClass = cat.deltaPts > 0 ? "text-positive" : "text-negative";
                   const catLabel = cat.deltaPts > 0 ? `+${cat.deltaPts}` : String(cat.deltaPts);
                   return (
-                    <div key={idx} className={catColorClass}>
+                    <div key={cat.categoryId} className={catColorClass}>
                       {cat.categoryId}: {catLabel} pts ({cat.rankBefore}{rankSuffix(cat.rankBefore)} → {cat.rankAfter}{rankSuffix(cat.rankAfter)})
                     </div>
                   );
@@ -145,9 +146,9 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
 
             {point.transactions.length > 0 ? (
               <div>
-                <div className="font-semibold text-content-secondary mb-1">Roster Moves:</div>
-                {point.transactions.map((tx, idx) => (
-                  <div key={idx} className="mb-1">
+                <div className="font-semibold text-content-secondary dark:text-shell-muted mb-1">Roster Moves:</div>
+                {point.transactions.map((tx) => (
+                  <div key={tx.id} className="mb-1">
                     {tx.playersAdded.length > 0 && (
                       <div className="text-positive">
                         + {tx.playersAdded.map((p) => p.name).join(", ")}
@@ -162,7 +163,7 @@ export function InflectionPointMarker({ viewBox, point }: InflectionPointMarkerP
                 ))}
               </div>
             ) : (
-              <div className="text-content-tertiary italic">No roster moves in this period</div>
+              <div className="text-content-tertiary dark:text-shell-muted italic">No roster moves in this period</div>
             )}
           </div>
         </foreignObject>

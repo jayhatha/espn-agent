@@ -19,8 +19,8 @@ export default function ImpactBadge({ impact, size = "md", isUncertain = false, 
   // Uncertain moves show muted dashed border
   if (isUncertain) {
     const title = ciLow != null && ciHigh != null
-      ? `95% CI: [${ciLow.toFixed(1)}, ${ciHigh.toFixed(1)}]`
-      : "Uncertain estimate";
+      ? `Projected change in roto standings points — 95% CI: [${ciLow.toFixed(1)}, ${ciHigh.toFixed(1)}]`
+      : "Projected change in overall roto standings points (uncertain estimate)";
 
     return (
       <span
@@ -38,14 +38,14 @@ export default function ImpactBadge({ impact, size = "md", isUncertain = false, 
 
   // Normal styling with optional CI tooltip
   const colorClass = isNeutral
-    ? "bg-accent-light text-content-secondary"
+    ? "bg-accent-light text-content-secondary dark:bg-shell-panel dark:text-shell-muted"
     : isPositive
-    ? "bg-positive-light text-positive border border-positive-border"
-    : "bg-negative-light text-negative border border-negative-border";
+    ? "bg-positive-light text-positive border border-positive-border dark:bg-positive-dark-bg/30 dark:text-positive-dark dark:border-positive-dark-border"
+    : "bg-negative-light text-negative border border-negative-border dark:bg-negative-dark-bg/30 dark:text-negative-dark dark:border-negative-dark-border";
 
   const title = ciLow != null && ciHigh != null
     ? `95% CI: [${ciLow.toFixed(1)}, ${ciHigh.toFixed(1)}]`
-    : undefined;
+    : "Projected change in overall roto standings points";
 
   return (
     <span

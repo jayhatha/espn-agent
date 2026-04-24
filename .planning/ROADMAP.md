@@ -177,14 +177,14 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
 **Execution Order:**
 Phase 65 (shell) → Phase 66 (roto math) → Phase 67 (waiver delta + category map). Phases 68 and 70 depend only on Phase 65 and can run after it. Phase 69 depends on Phase 67.
 
-| Phase                                          | Milestone | Plans Complete | Status      | Completed |
-| ---------------------------------------------- | --------- | -------------- | ----------- | --------- |
-| 65. Dark Mode Shell                            | 4/4       | Complete       | 2026-03-23  | -         |
-| 66. Roto Math Foundation                       | v6.0      | 2/2            | Complete    | 2026-03-23 |
-| 67. Net Waiver Analysis + Category Opportunity | 2/2       | Complete       | 2026-03-23  | -         |
-| 68. FAAB Tracking + Pitching Usage             | 2/2       | Complete       | 2026-03-23  | -         |
-| 69. Trade Finder                               | 2/2       | Complete       | 2026-03-23  | -         |
-| 70. Trends and Efficiency                      | 2/2       | Complete       | 2026-03-23  | -         |
+| Phase                                          | Milestone | Plans Complete | Status     | Completed  |
+| ---------------------------------------------- | --------- | -------------- | ---------- | ---------- |
+| 65. Dark Mode Shell                            | 4/4       | Complete       | 2026-03-23 | -          |
+| 66. Roto Math Foundation                       | v6.0      | 2/2            | Complete   | 2026-03-23 |
+| 67. Net Waiver Analysis + Category Opportunity | 2/2       | Complete       | 2026-03-23 | -          |
+| 68. FAAB Tracking + Pitching Usage             | 2/2       | Complete       | 2026-03-23 | -          |
+| 69. Trade Finder                               | 2/2       | Complete       | 2026-03-23 | -          |
+| 70. Trends and Efficiency                      | 2/2       | Complete       | 2026-03-23 | -          |
 
 ### Phase 71: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 

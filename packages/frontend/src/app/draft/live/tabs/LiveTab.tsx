@@ -45,26 +45,26 @@ export function LiveTab({
 
         {/* Pre-connection states */}
         {!wsUrl && (
-          <div className="bg-[#22252b] border border-[#2d3139] rounded-xl p-4">
-            <p className="text-[#99a5bc] text-center py-4">
+          <div className="bg-grafana-panel border border-grafana-border rounded-xl p-4">
+            <p className="text-grafana-muted text-center py-4">
               Enter a WebSocket URL above to connect.
             </p>
           </div>
         )}
 
         {wsUrl && !wsConnected && (
-          <div className="text-center py-6 text-[#99a5bc]">
+          <div className="text-center py-6 text-grafana-muted">
             <p className="text-lg">Connecting...</p>
-            <p className="text-xs mt-1 font-mono text-[#6b7a99]">{wsUrl}</p>
+            <p className="text-xs mt-1 font-mono text-grafana-muted/70">{wsUrl}</p>
           </div>
         )}
 
         {wsConnected && !hasData && (
-          <div className="bg-[#22252b] border border-[#2d3139] rounded-xl p-4">
-            <p className="text-[#99a5bc] text-center py-4">
+          <div className="bg-grafana-panel border border-grafana-border rounded-xl p-4">
+            <p className="text-grafana-muted text-center py-4">
               Waiting for draft data...
             </p>
-            <p className="text-xs text-center text-[#6b7a99] mt-1">
+            <p className="text-xs text-center text-grafana-muted/70 mt-1">
               Make sure the ESPN extension is open and a draft is in progress.
             </p>
           </div>
@@ -89,7 +89,7 @@ export function LiveTab({
 
       {/* Sticky control bar — bottom */}
       {hasData && (
-        <div className="sticky bottom-0 z-40 bg-[#22252b] border-t border-[#2d3139] px-4 py-3">
+        <div className="sticky bottom-0 z-40 bg-grafana-panel border-t border-grafana-border px-4 py-3">
           <div className="max-w-lg mx-auto flex items-center gap-3">
 
             {/* Auto-bid toggle */}
@@ -98,8 +98,8 @@ export function LiveTab({
               onClick={() => sendControl("SET_AUTO_MODE", !(state?.autoMode ?? false))}
               className={`min-h-[44px] px-3 py-2 rounded-lg text-sm font-bold uppercase tracking-wide transition-colors ${
                 state?.autoMode
-                  ? "bg-[#37872d] text-white"
-                  : "bg-[#2d3139] text-[#99a5bc]"
+                  ? "bg-grafana-positive text-white"
+                  : "bg-grafana-border text-grafana-muted"
               }`}
               aria-label={state?.autoMode ? "Auto-bid ON" : "Auto-bid OFF"}
             >
@@ -111,7 +111,7 @@ export function LiveTab({
               type="button"
               onClick={() => sendControl("MANUAL_BID")}
               disabled={!(state?.currentAuctionPlayer && engineSignals?.optimization?.shouldBid)}
-              className="min-h-[44px] flex-1 px-4 py-2 rounded-lg bg-[#37872d] hover:bg-green-600 text-white font-bold disabled:opacity-40 disabled:pointer-events-none"
+              className="min-h-[44px] flex-1 px-4 py-2 rounded-lg bg-grafana-positive hover:bg-grafana-positive/80 text-white font-bold disabled:opacity-40 disabled:pointer-events-none"
               aria-label="Place manual bid +$1"
             >
               BID +$1
@@ -124,7 +124,7 @@ export function LiveTab({
             <button
               type="button"
               onClick={() => setNominateOpen(true)}
-              className="min-h-[44px] px-3 py-2 rounded-lg bg-[#2d3139] hover:bg-[#3a4150] text-[#d9dde6] font-semibold text-sm"
+              className="min-h-[44px] px-3 py-2 rounded-lg bg-grafana-border hover:bg-grafana-border/80 text-grafana-text font-semibold text-sm"
               aria-label="Nominate a player"
             >
               Nominate

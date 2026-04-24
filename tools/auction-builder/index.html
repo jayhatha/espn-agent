@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>$260 Auction Builder</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <h1>$260 Auction Builder</h1>
+    <div class="budget-display">
+      Budget: <span id="budget-amount" class="amount">$260</span> / $260
+      &nbsp;|&nbsp; Slots: <span id="slots-filled">0</span>/28
+    </div>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="main">
+    <!-- Left: Roster Panel -->
+    <div class="roster-panel" id="roster-panel"></div>
+
+    <!-- Right: Player Pool -->
+    <div class="pool-panel">
+      <div class="pool-controls">
+        <input type="text" id="search-input" placeholder="Search players...">
+        <select id="pos-filter">
+          <option value="ALL">All Positions</option>
+          <option value="C">C</option>
+          <option value="1B">1B</option>
+          <option value="2B">2B</option>
+          <option value="3B">3B</option>
+          <option value="SS">SS</option>
+          <option value="OF">OF</option>
+          <option value="SP">SP</option>
+          <option value="RP">RP</option>
+        </select>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-pool="all">All</button>
+          <button class="toggle-btn" data-pool="hitters">Hit</button>
+          <button class="toggle-btn" data-pool="pitchers">Pitch</button>
+        </div>
+        <span class="pool-count" id="pool-count"></span>
+      </div>
+      <div class="pool-table-wrap">
+        <table class="pool-table">
+          <thead id="pool-thead"></thead>
+          <tbody id="pool-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom: Stat Targets -->
+  <div class="targets-bar">
+    <div class="targets-grid" id="targets-grid"></div>
+  </div>
+
+  <!-- Slot Picker Modal -->
+  <div class="modal-overlay hidden" id="modal-overlay">
+    <div class="modal" id="modal">
+      <h3 id="modal-title">Assign Player</h3>
+      <div id="modal-slots"></div>
+      <div class="cost-input-row">
+        <label>Cost: $</label>
+        <input type="number" id="modal-cost" min="1" max="260" value="1">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">Cancel</button>
+        <button class="btn-confirm" id="modal-confirm">Assign</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">Loading data...</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

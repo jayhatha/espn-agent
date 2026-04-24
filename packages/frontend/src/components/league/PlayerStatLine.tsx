@@ -47,7 +47,7 @@ export function PlayerStatLine({
     label === "Proj RoS"
       ? "text-shell-accent"
       : label === "On Team"
-        ? "text-cyan-400"
+        ? "text-shell-accent"
         : "text-content-tertiary dark:text-shell-muted";
 
   if (pitcher) {

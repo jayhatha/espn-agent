@@ -46,8 +46,8 @@ function tierize(items: ActionItem[]): TierGroup[] {
   }
 
   const tiers: TierGroup[] = [];
-  if (high.length > 0) tiers.push({ label: "High Impact", items: high, borderColor: "border-l-orange-500" });
-  if (medium.length > 0) tiers.push({ label: "Medium", items: medium, borderColor: "border-l-yellow-500" });
+  if (high.length > 0) tiers.push({ label: "High Impact", items: high, borderColor: "border-l-warning" });
+  if (medium.length > 0) tiers.push({ label: "Medium", items: medium, borderColor: "border-l-warning" });
   if (speculative.length > 0) tiers.push({ label: "Speculative", items: speculative, borderColor: "border-l-neutral-300 dark:border-l-shell-border" });
   return tiers;
 }
@@ -58,7 +58,7 @@ function ActionItemRow({ item, borderColor }: { item: ActionItem; borderColor: s
   const getImpactClasses = (impact: string) => {
     if (impact.startsWith("+")) return "text-positive";
     if (impact.startsWith("-")) return "text-negative";
-    return "text-content-secondary";
+    return "text-content-secondary dark:text-shell-muted";
   };
 
   const getTypeBadgeVariant = (type: "waiver" | "trade"): "info" | "default" => {
@@ -71,7 +71,16 @@ function ActionItemRow({ item, borderColor }: { item: ActionItem; borderColor: s
         "py-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6 border-l-4 pl-4 cursor-pointer",
         borderColor
       )}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
     >
       {/* Impact number */}
       <div className="sm:w-20 sm:text-right flex-shrink-0 pt-1">
@@ -86,16 +95,16 @@ function ActionItemRow({ item, borderColor }: { item: ActionItem; borderColor: s
           <Badge variant={getTypeBadgeVariant(item.type)} className="uppercase tracking-wide">
             {item.type}
           </Badge>
-          <span className="text-caption uppercase tracking-wide text-content-tertiary">
+          <span className="text-caption uppercase tracking-wide text-content-tertiary dark:text-shell-muted">
             {item.priority} priority
           </span>
         </div>
         <p className="text-body font-semibold text-content dark:text-shell-text mb-0.5">{item.title}</p>
         {expanded && (
-          <p className="text-body-sm text-content-secondary mt-1">{item.description}</p>
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">{item.description}</p>
         )}
         {!expanded && (
-          <p className="text-body-sm text-content-secondary truncate">{item.description}</p>
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted truncate">{item.description}</p>
         )}
       </div>
 
@@ -131,17 +140,18 @@ function TierSection({ tier }: { tier: TierGroup }) {
     <div className="mb-4">
       <button
         onClick={() => setCollapsed(!collapsed)}
+        aria-expanded={!collapsed}
         className="flex items-center gap-2 mb-2 w-full text-left"
       >
         {collapsed ? (
-          <ChevronRightIcon className="h-4 w-4 text-content-tertiary" />
+          <ChevronRightIcon className="h-4 w-4 text-content-tertiary dark:text-shell-muted" />
         ) : (
-          <ChevronDownIcon className="h-4 w-4 text-content-tertiary" />
+          <ChevronDownIcon className="h-4 w-4 text-content-tertiary dark:text-shell-muted" />
         )}
         <span className="text-body-sm font-semibold text-content dark:text-shell-text uppercase tracking-wide">
           {tier.label}
         </span>
-        <span className="text-caption text-content-tertiary font-mono">({tier.items.length})</span>
+        <span className="text-caption text-content-tertiary dark:text-shell-muted font-mono">({tier.items.length})</span>
       </button>
 
       {!collapsed && (
@@ -155,7 +165,7 @@ function TierSection({ tier }: { tier: TierGroup }) {
       {!collapsed && !showMore && belowFold.length > 0 && (
         <button
           onClick={() => setShowMore(true)}
-          className="mt-2 text-body-sm text-content-secondary hover:text-content transition-colors"
+          className="mt-2 text-body-sm text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text transition-colors"
         >
           Show {belowFold.length} more...
         </button>
@@ -168,9 +178,9 @@ export function ActionItemsList({ items }: ActionItemsListProps) {
   if (items.length === 0) {
     return (
       <div className="py-12 text-center">
-        <ClockIcon className="w-10 h-10 text-content-tertiary mx-auto mb-3" />
-        <p className="text-body font-medium text-content-secondary dark:text-shell-muted mb-1">No Recommended Actions</p>
-        <p className="text-body-sm text-content-tertiary">Your team is performing well!</p>
+        <ClockIcon aria-hidden="true" className="w-10 h-10 text-content-tertiary dark:text-shell-muted mx-auto mb-3" />
+        <p className="text-body font-medium text-content-secondary dark:text-shell-muted mb-1">All quiet on the waiver wire</p>
+        <p className="text-body-sm text-content-tertiary dark:text-shell-muted">No high-impact moves available right now. Check back after the next snapshot.</p>
       </div>
     );
   }

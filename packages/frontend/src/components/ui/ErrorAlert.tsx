@@ -15,34 +15,34 @@ interface ErrorAlertProps {
 const variantStyles = {
   error: {
     container:
-      "bg-negative-light border border-negative-border dark:bg-red-900/20 dark:border-red-800",
-    title: "text-negative dark:text-red-400",
-    message: "text-negative dark:text-red-400",
+      "bg-negative-light border border-negative-border dark:bg-negative-dark-bg/20 dark:border-negative-dark-border",
+    title: "text-negative dark:text-negative-dark",
+    message: "text-negative dark:text-negative-dark",
     button:
-      "text-negative hover:text-negative border-negative-border hover:bg-negative-light dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30",
-    icon: "text-negative dark:text-red-400",
+      "text-negative hover:text-negative border-negative-border hover:bg-negative-light dark:text-negative-dark dark:border-negative-dark-border dark:hover:bg-negative-dark-bg/30",
+    icon: "text-negative dark:text-negative-dark",
     actionButton:
-      "bg-negative text-white hover:bg-red-700 dark:bg-red-800 dark:hover:bg-red-700",
+      "bg-negative text-white hover:bg-red-700 dark:bg-negative-dark-border dark:hover:bg-negative-dark-bg",
   },
   warning: {
     container:
-      "bg-warning-light border border-warning-border dark:bg-amber-900/20 dark:border-amber-800",
-    title: "text-warning dark:text-amber-400",
-    message: "text-warning dark:text-amber-400",
+      "bg-warning-light border border-warning-border dark:bg-warning-dark-bg/20 dark:border-warning-dark-border",
+    title: "text-warning dark:text-warning-dark",
+    message: "text-warning dark:text-warning-dark",
     button:
-      "text-warning hover:text-warning border-warning-border hover:bg-warning-light dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-900/30",
-    icon: "text-warning dark:text-amber-400",
+      "text-warning hover:text-warning border-warning-border hover:bg-warning-light dark:text-warning-dark dark:border-warning-dark-border dark:hover:bg-warning-dark-bg/30",
+    icon: "text-warning dark:text-warning-dark",
     actionButton:
-      "bg-warning text-white hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700",
+      "bg-warning text-white hover:bg-amber-600 dark:bg-warning-dark-border dark:hover:bg-warning-dark-bg",
   },
   info: {
     container:
-      "bg-info-light border border-info-border dark:bg-blue-900/20 dark:border-blue-800",
-    title: "text-info dark:text-blue-400",
-    message: "text-info dark:text-blue-400",
+      "bg-info-light border border-info-border dark:bg-info-dark-bg/20 dark:border-info-dark-border",
+    title: "text-info dark:text-info-dark",
+    message: "text-info dark:text-info-dark",
     button:
-      "text-info hover:text-info border-info-border hover:bg-info-light dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/30",
-    icon: "text-info dark:text-blue-400",
+      "text-info hover:text-info border-info-border hover:bg-info-light dark:text-info-dark dark:border-info-dark-border dark:hover:bg-info-dark-bg/30",
+    icon: "text-info dark:text-info-dark",
     actionButton:
       "bg-accent text-content-inverse hover:bg-accent-hover dark:bg-shell-accent dark:hover:bg-shell-accent/90",
   },

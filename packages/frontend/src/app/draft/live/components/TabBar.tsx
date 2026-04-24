@@ -14,7 +14,7 @@ export function TabBar({
   onTabChange: (tab: string) => void;
 }) {
   return (
-    <nav className="sticky bottom-0 z-50 bg-neutral-900 border-t border-neutral-800">
+    <nav className="sticky bottom-0 z-50 bg-grafana-bg border-t border-grafana-border">
       <div className="max-w-lg mx-auto flex">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -25,8 +25,8 @@ export function TabBar({
               onClick={() => onTabChange(tab.key)}
               className={`flex-1 min-h-[44px] text-sm font-semibold uppercase tracking-wide transition-colors ${
                 isActive
-                  ? "bg-neutral-800 text-white border-t-2 border-blue-500"
-                  : "bg-neutral-900 text-neutral-500 border-t-2 border-transparent"
+                  ? "bg-grafana-panel text-white border-t-2 border-info"
+                  : "bg-grafana-bg text-grafana-muted border-t-2 border-transparent"
               }`}
               aria-label={`${tab.label} tab`}
               aria-selected={isActive}

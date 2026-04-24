@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CheckCircleIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Text } from "@/components/ui/Text";
@@ -30,9 +30,13 @@ export function TeamSelector({
   loading = false,
   error = false,
 }: TeamSelectorProps) {
+  // Ref to hold latest onSelect callback to avoid re-render loops
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
   // Sync with localStorage on selection
   const handleSelect = (teamId: number) => {
-    onSelect(teamId);
+    onSelectRef.current(teamId);
     localStorage.setItem(`league_${leagueId}_team`, teamId.toString());
   };
 
@@ -46,9 +50,9 @@ export function TeamSelector({
     const stored = localStorage.getItem(`league_${leagueId}_team`);
     if (stored) {
       const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) onSelect(parsed);
+      if (!isNaN(parsed)) onSelectRef.current(parsed);
     }
-  }, [leagueId, autoDetectedTeamId, onSelect]);
+  }, [leagueId, autoDetectedTeamId]);
 
   if (loading) {
     return (

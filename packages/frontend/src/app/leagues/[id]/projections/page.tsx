@@ -26,7 +26,6 @@ export default function ProjectionsUploadPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
-      alert("Projections uploaded successfully!");
       setFile(null);
     },
   });

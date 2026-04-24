@@ -47,7 +47,7 @@ export function AtRiskSummary({
           <span className="text-positive font-medium text-body-sm">
             No categories at immediate risk
           </span>
-          <span className="text-content-tertiary text-body-sm">
+          <span className="text-content-tertiary dark:text-shell-muted text-body-sm">
             -- Your leads are comfortable across all categories.
           </span>
         </div>
@@ -66,7 +66,7 @@ export function AtRiskSummary({
                 <div className="flex items-center gap-3">
                   <span
                     className={cn(
-                      "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide",
+                      "inline-flex items-center px-2 py-0.5 rounded-full text-caption font-semibold uppercase tracking-wide",
                       config.className,
                     )}
                   >
@@ -75,16 +75,16 @@ export function AtRiskSummary({
                   <span className="font-medium text-body-sm text-content dark:text-shell-text">
                     {risk.categoryName}
                   </span>
-                  <span className="text-content-tertiary text-body-sm font-mono">
+                  <span className="text-content-tertiary dark:text-shell-muted text-body-sm font-mono">
                     #{risk.currentRank}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-body-sm">
-                  <span className="font-mono text-data text-content-secondary">
+                  <span className="font-mono text-data text-content-secondary dark:text-shell-muted">
                     {formatStatValue(risk.gap, statType, risk.categoryName)} gap
                   </span>
                   {risk.teamBelow && (
-                    <span className="text-content-tertiary text-[10px] truncate max-w-[100px]">
+                    <span className="text-content-tertiary dark:text-shell-muted text-caption truncate max-w-[80px] sm:max-w-[120px]">
                       {risk.teamBelow.teamName} closing
                     </span>
                   )}

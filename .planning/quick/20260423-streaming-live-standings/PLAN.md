@@ -29,6 +29,7 @@ In `changelog/page.tsx`, the SSE `onmessage` handler processes `live_poll` event
 **File:** `packages/frontend/src/app/leagues/[id]/changelog/page.tsx`
 
 In the SSE `onmessage` handler, after processing a `live_poll` event, also call:
+
 ```ts
 queryClient.invalidateQueries({
   queryKey: ["standings-neighborhood", leagueId],
@@ -48,5 +49,5 @@ Also pass `snapshotDate` from the API response to show the data timestamp in the
 ## Verification
 
 - [ ] When a `live_poll` SSE event is received, the neighborhood panel refetches (network tab shows a new request)
-- [ ] The neighborhood label reads "Live Standings" (not "Standings — Today")  
+- [ ] The neighborhood label reads "Live Standings" (not "Standings — Today")
 - [ ] The 5-minute `refetchInterval` remains as a fallback when SSE is disconnected

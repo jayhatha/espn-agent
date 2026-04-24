@@ -41,10 +41,10 @@ function formatStatValue(
 
 function getRankColor(rank: number, total: number): string {
   const ratio = rank / total;
-  if (ratio <= 0.25) return "text-positive bg-positive-light";
-  if (ratio <= 0.5) return "text-positive bg-positive-light/50";
-  if (ratio <= 0.75) return "text-warning bg-warning-light";
-  return "text-negative bg-negative-light";
+  if (ratio <= 0.3) return "bg-positive/20 text-positive dark:bg-positive-dark/20 dark:text-positive-dark";
+  if (ratio <= 0.5) return "bg-positive/10 text-positive dark:bg-positive-dark/10 dark:text-positive-dark";
+  if (ratio <= 0.7) return "bg-warning/10 text-warning dark:bg-warning-dark/10 dark:text-warning-dark";
+  return "bg-negative/20 text-negative dark:bg-negative-dark/20 dark:text-negative-dark";
 }
 
 export function CategoryStatsTable({
@@ -55,7 +55,7 @@ export function CategoryStatsTable({
 }: CategoryStatsTableProps) {
   if (categories.length === 0) {
     return (
-      <p className="text-body-sm text-content-secondary">
+      <p className="text-body-sm text-content-secondary dark:text-shell-muted">
         No category data available for this snapshot.
       </p>
     );
@@ -70,24 +70,24 @@ export function CategoryStatsTable({
         <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
           <thead>
             <tr className="border-b-2 border-neutral-200 dark:border-shell-border">
-              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-left">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-left">
                 Category
               </th>
-              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-right">
                 Value
               </th>
-              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-center">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-center">
                 Rank
               </th>
-              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
+              <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-right">
                 Roto Pts
               </th>
               {showProjected && (
                 <>
-                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-right">
+                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-right">
                     Proj. Value
                   </th>
-                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary text-center">
+                  <th className="pb-3 pt-1 pr-4 text-caption font-semibold uppercase tracking-widest text-content-secondary dark:text-shell-muted text-center">
                     Proj. Rank
                   </th>
                 </>
@@ -118,7 +118,7 @@ export function CategoryStatsTable({
                 </td>
                 {showProjected && (
                   <>
-                    <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content-secondary">
+                    <td className="py-2.5 pr-4 whitespace-nowrap text-data text-right text-content-secondary dark:text-shell-muted">
                       {cat.projected_value != null
                         ? formatStatValue(
                             cat.projected_value,

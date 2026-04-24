@@ -13,4 +13,9 @@ export const GLOSSARY: Record<string, string> = {
   era: "ERA — Earned Run Average per 9 innings. Lower is better.",
   ops: "OPS — On-base Plus Slugging. Combines getting on base with hitting for power.",
   "shapley-impact": "Shapley Impact — a game theory metric measuring how much a player contributes to your team's marginal standings improvement across all categories.",
+  "marginal-gains": "Marginal Gains — categories where a small improvement yields the biggest standings gain. Sorted by smallest gap to overtake the next team.",
+  impact: "Projected change in overall roto standings points if you make this move.",
+  "proj-ros": "Projected rest-of-season stats based on FanGraphs Depth Charts projections.",
+  "category-opportunity": "Category Opportunity Map — all categories ranked by gap to next roto point with difficulty rating.",
+  "at-risk": "At Risk — categories where another team is close enough to overtake your current rank.",
 };

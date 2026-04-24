@@ -30,16 +30,16 @@ function AuthCallbackInner() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-surface-secondary dark:bg-shell-bg">
       <div className="text-center">
         {status === "loading" && (
           <>
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Completing authentication...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent dark:border-shell-muted mx-auto"></div>
+            <p className="mt-4 text-content-secondary dark:text-shell-muted">Completing authentication...</p>
           </>
         )}
         {status === "error" && (
-          <p className="text-gray-600">Redirecting to login...</p>
+          <p className="text-content-secondary dark:text-shell-muted">Redirecting to login...</p>
         )}
       </div>
     </div>
@@ -50,8 +50,8 @@ export default function AuthCallback() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="min-h-screen flex items-center justify-center bg-surface-secondary dark:bg-shell-bg">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent dark:border-shell-muted mx-auto"></div>
         </div>
       }
     >

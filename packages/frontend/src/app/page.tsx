@@ -25,11 +25,11 @@ export default function HomePage() {
   useEffect(() => {
     api
       .getLeagues()
-      .then((leagues: { id: number }[]) => {
-        if (leagues.length === 0) {
+      .then((data: { leagues: { id: number }[] }) => {
+        if (!data.leagues || data.leagues.length === 0) {
           router.push("/onboarding");
         } else {
-          router.push(`/leagues/${leagues[0].id}`);
+          router.push(`/leagues/${data.leagues[0].id}`);
         }
       })
       .catch(() => {
@@ -41,7 +41,7 @@ export default function HomePage() {
   if (redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" message="Loading..." />
+        <LoadingSpinner size="lg" quips />
       </div>
     );
   }

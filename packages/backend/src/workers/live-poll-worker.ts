@@ -35,7 +35,10 @@ const worker = new Worker<LivePollJobData>(
       return { skipped: true, reason: "LIVE_POLL_ENABLED not set" };
     }
     if (!LivePollAgent.isGameWindow()) {
-      logger.debug({ jobId: job.id }, "live-poll: outside game window, skipping");
+      logger.debug(
+        { jobId: job.id },
+        "live-poll: outside game window, skipping",
+      );
       return { skipped: true, reason: "not in game window" };
     }
 

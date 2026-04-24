@@ -30,9 +30,9 @@ interface StatsSectionProps {
 
 export function StatsSection({ categories, totalTeams, miniChartData }: StatsSectionProps) {
   return (
-    <section className="bg-white dark:bg-shell-panel py-10">
+    <section className="bg-white dark:bg-shell-panel py-8">
       <Container size="wide">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-grid-lg">
           <div className="lg:col-span-8">
             <Heading level={2} className="mb-6 text-content dark:text-shell-text">Team Health</Heading>
             <TeamHealthOverview

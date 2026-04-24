@@ -43,9 +43,9 @@ export default function LeaguesPage() {
   if (error) {
     return (
       <Container className="py-8">
-        <div className="bg-negative-light border border-negative-border rounded-lg p-4">
-          <h3 className="text-negative font-medium">Error loading leagues</h3>
-          <p className="text-body-sm text-content-secondary mt-1">
+        <div className="bg-negative-light dark:bg-negative-dark-bg/20 border border-negative-border dark:border-negative-dark-border rounded-lg p-4">
+          <h3 className="text-negative dark:text-negative-dark font-medium">Error loading leagues</h3>
+          <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
             {(error as Error).message}
           </p>
         </div>
@@ -76,14 +76,14 @@ export default function LeaguesPage() {
       {leagues.length === 0 ? (
         <Card className="text-center py-12 sm:py-16">
           <CardContent>
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-accent-light rounded-full flex items-center justify-center mx-auto mb-4">
-              <FolderOpenIcon className="w-8 h-8 sm:w-10 sm:h-10 text-content" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-accent-light dark:bg-shell-panel rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderOpenIcon className="w-8 h-8 sm:w-10 sm:h-10 text-content dark:text-shell-text" />
             </div>
             <Heading level={3} className="mb-2">
-              No leagues connected
+              Your dashboard is wide open
             </Heading>
             <Text size="sm" color="secondary" className="mb-6 px-4">
-              Get started by connecting your ESPN Fantasy Baseball league.
+              Connect an ESPN league and we&apos;ll start crunching the numbers.
             </Text>
             <Link
               href="/leagues/connect"
@@ -102,7 +102,7 @@ export default function LeaguesPage() {
               href={`/leagues/${league.id}`}
               className="block group"
             >
-              <Card className="transition-shadow hover:shadow-card-hover">
+              <Card className="transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5">
                 <CardContent className="py-4 sm:py-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0 pr-4">
@@ -140,8 +140,8 @@ export default function LeaguesPage() {
                       </div>
                     </div>
                     <div className="flex-shrink-0 self-center">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent-light group-hover:bg-accent flex items-center justify-center transition-colors">
-                        <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5 text-content group-hover:text-content-inverse transition-colors" />
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-accent-light dark:bg-shell-panel group-hover:bg-accent dark:group-hover:bg-shell-accent flex items-center justify-center transition-colors">
+                        <ChevronRightIcon className="w-4 h-4 sm:w-5 sm:h-5 text-content dark:text-shell-text group-hover:text-content-inverse transition-colors" />
                       </div>
                     </div>
                   </div>

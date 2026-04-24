@@ -12,9 +12,9 @@ function ConnectionDot({ connected }: { connected: boolean }) {
   return (
     <span className="flex items-center gap-1.5">
       <span
-        className={`inline-block w-2.5 h-2.5 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`}
+        className={`inline-block w-2.5 h-2.5 rounded-full ${connected ? "bg-grafana-positive" : "bg-grafana-negative"}`}
       />
-      <span className={`text-sm font-medium ${connected ? "text-green-400" : "text-red-400"}`}>
+      <span className={`text-sm font-medium ${connected ? "text-positive-dark" : "text-negative-dark"}`}>
         {connected ? "Connected" : "Disconnected"}
       </span>
     </span>
@@ -78,9 +78,9 @@ export default function DraftLivePage() {
   const hasData = state !== null;
 
   return (
-    <div className="min-h-screen bg-[#181b1f] text-[#d9dde6] flex flex-col">
+    <div className="min-h-screen bg-grafana-bg text-grafana-text flex flex-col">
       {/* ---- Sticky Header ---- */}
-      <header className="sticky top-0 z-50 bg-[#181b1f] border-b border-[#2d3139] px-4 py-3">
+      <header className="sticky top-0 z-50 bg-grafana-bg border-b border-grafana-border px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <span className="text-base font-bold tracking-tight">Draft Companion</span>
           <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ export default function DraftLivePage() {
             <button
               type="button"
               onClick={() => setUrlExpanded((v) => !v)}
-              className="text-xs text-neutral-500 underline min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="text-xs text-grafana-muted underline min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Edit connection URL"
             >
               {urlExpanded ? "Close" : "URL"}
@@ -103,12 +103,12 @@ export default function DraftLivePage() {
               type="text"
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
-              className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono text-neutral-100 min-h-[44px] focus:outline-none focus:border-neutral-500"
+              className="flex-1 bg-grafana-panel border border-grafana-border rounded-lg px-3 py-2 text-sm font-mono text-grafana-text min-h-[44px] focus-visible:outline-none focus-visible:border-grafana-muted"
               placeholder="ws://192.168.1.x:3001/draft/live?role=mobile"
             />
             <button
               type="submit"
-              className="bg-neutral-700 hover:bg-neutral-600 text-neutral-100 px-3 py-2 rounded-lg text-sm font-medium min-h-[44px] min-w-[44px]"
+              className="bg-grafana-border hover:bg-grafana-border/80 text-grafana-text px-3 py-2 rounded-lg text-sm font-medium min-h-[44px] min-w-[44px]"
             >
               Connect
             </button>

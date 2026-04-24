@@ -50,11 +50,16 @@ export function GsTracker({
           <span>0</span>
           <span>{gsCap} GS cap</span>
         </div>
-        <div className="relative h-3 rounded-full dark:bg-shell-border bg-gray-200 overflow-hidden">
+        <div className="relative h-3 rounded-full bg-neutral-200 dark:bg-shell-border overflow-hidden">
           {/* Actual usage fill */}
           <div
-            className={cn("h-full rounded-full transition-all", fillColor)}
-            style={{ width: `${Math.max(0, Math.min(100, pctUsed))}%` }}
+            className={cn("h-full w-full transition-transform duration-500 origin-left", fillColor)}
+            style={{ transform: `scaleX(${Math.max(0, Math.min(100, pctUsed)) / 100})` }}
+            role="progressbar"
+            aria-valuenow={gsUsed}
+            aria-valuemin={0}
+            aria-valuemax={gsCap}
+            aria-label="Games started usage"
           />
           {/* Projected pace marker */}
           {projectedFinal > 0 && (

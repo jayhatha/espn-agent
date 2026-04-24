@@ -25,20 +25,20 @@ interface QueueTabProps {
 function RiskBadge({ pressure }: { pressure: number }) {
   if (pressure > 0.75) {
     return (
-      <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-800 text-red-200">
+      <span className="ml-2 text-caption font-bold uppercase px-1.5 py-0.5 rounded bg-grafana-negative text-grafana-text">
         HIGH RISK
       </span>
     );
   }
   if (pressure > 0.5) {
     return (
-      <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-yellow-800 text-yellow-200">
+      <span className="ml-2 text-caption font-bold uppercase px-1.5 py-0.5 rounded bg-grafana-warning text-grafana-text">
         CAUTION
       </span>
     );
   }
   return (
-    <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-900 text-green-300">
+    <span className="ml-2 text-caption font-bold uppercase px-1.5 py-0.5 rounded bg-grafana-positive text-positive-dark">
       SAFE
     </span>
   );
@@ -76,7 +76,7 @@ export default function QueueTab({
           type="button"
           onClick={() => sendControl("FORCE_NOMINATE")}
           disabled={disabled}
-          className={`w-full min-h-[56px] rounded-xl bg-blue-700 hover:bg-blue-600 text-white text-lg font-bold uppercase tracking-wide transition-colors ${disabledClass}`}
+          className={`w-full min-h-[56px] rounded-xl bg-info hover:bg-info/80 text-white text-lg font-bold uppercase tracking-wide transition-colors ${disabledClass}`}
         >
           Force Nominate
         </button>
@@ -93,7 +93,7 @@ export default function QueueTab({
             }
           }}
           disabled={disabled || !hasCurrentPlayer}
-          className={`w-full min-h-[56px] rounded-xl bg-red-800 hover:bg-red-700 text-white text-lg font-bold uppercase tracking-wide transition-colors ${
+          className={`w-full min-h-[56px] rounded-xl bg-grafana-negative hover:bg-grafana-negative/80 text-white text-lg font-bold uppercase tracking-wide transition-colors ${
             disabled || !hasCurrentPlayer
               ? "opacity-50 pointer-events-none"
               : ""
@@ -106,8 +106,8 @@ export default function QueueTab({
       </div>
 
       {/* ---- 2. Autopilot Controls ---- */}
-      <div className="bg-neutral-900 rounded-xl p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-3">
+      <div className="bg-grafana-bg rounded-xl p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-grafana-muted mb-3">
           Autopilot Controls
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -118,8 +118,8 @@ export default function QueueTab({
             disabled={disabled}
             className={`min-h-[56px] rounded-xl text-sm font-bold uppercase tracking-wide transition-colors ${disabledClass} ${
               autoMode
-                ? "bg-red-700 hover:bg-red-600 text-white"
-                : "bg-neutral-700 hover:bg-neutral-600 text-neutral-300"
+                ? "bg-grafana-negative hover:bg-grafana-negative/80 text-white"
+                : "bg-grafana-border hover:bg-grafana-border/80 text-grafana-muted"
             }`}
           >
             <span className="flex flex-col items-center gap-1">
@@ -137,8 +137,8 @@ export default function QueueTab({
             disabled={disabled}
             className={`min-h-[56px] rounded-xl text-sm font-bold uppercase tracking-wide transition-colors ${disabledClass} ${
               autoNominateMode
-                ? "bg-blue-700 hover:bg-blue-600 text-white"
-                : "bg-neutral-700 hover:bg-neutral-600 text-neutral-300"
+                ? "bg-info hover:bg-info/80 text-white"
+                : "bg-grafana-border hover:bg-grafana-border/80 text-grafana-muted"
             }`}
           >
             Auto-Nominate {autoNominateMode ? "ON" : "OFF"}
@@ -148,31 +148,31 @@ export default function QueueTab({
 
       {/* ---- 3. Skipped Players ---- */}
       {skippedPlayerIds.length > 0 && (
-        <div className="bg-neutral-900 rounded-xl p-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-3">
+        <div className="bg-grafana-bg rounded-xl p-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-grafana-muted mb-3">
             Skipped Players ({skippedPlayerIds.length})
           </p>
           <div className="space-y-1">
             {skippedPlayerIds.map((id) => (
               <div
                 key={id}
-                className="flex items-center justify-between bg-neutral-800 rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-grafana-panel rounded-lg px-3 py-2"
               >
-                <span className="text-sm text-neutral-300 font-mono">
+                <span className="text-sm text-grafana-muted font-mono">
                   Player #{id}
                 </span>
               </div>
             ))}
           </div>
-          <p className="text-xs text-neutral-600 mt-2">
+          <p className="text-xs text-grafana-muted mt-2">
             Skipped players are excluded from engine recommendations.
           </p>
         </div>
       )}
 
       {/* ---- 4. Nomination Queue ---- */}
-      <div className="bg-neutral-900 rounded-xl p-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-3">
+      <div className="bg-grafana-bg rounded-xl p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-grafana-muted mb-3">
           Nomination Queue
         </p>
         {nominationQueue.length > 0 ? (
@@ -180,16 +180,16 @@ export default function QueueTab({
             {nominationQueue.map((entry, i) => (
               <div
                 key={entry.playerId}
-                className="flex items-center gap-3 bg-neutral-800 rounded-lg px-3 py-2"
+                className="flex items-center gap-3 bg-grafana-panel rounded-lg px-3 py-2"
               >
-                <span className="text-xs font-mono text-neutral-500 w-5 text-right">
+                <span className="text-xs font-mono text-grafana-muted w-5 text-right">
                   {i + 1}
                 </span>
-                <span className="text-sm text-neutral-100 flex-1">
+                <span className="text-sm text-grafana-text flex-1">
                   {entry.playerName}
                 </span>
                 {entry.position && (
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-grafana-muted">
                     {entry.position}
                   </span>
                 )}
@@ -197,7 +197,7 @@ export default function QueueTab({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-neutral-500 text-center py-3">
+          <p className="text-sm text-grafana-muted text-center py-3">
             No players in nomination queue. Use the ESPN draft page to add
             players to your queue.
           </p>

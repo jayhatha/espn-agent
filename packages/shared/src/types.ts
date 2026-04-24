@@ -380,10 +380,10 @@ export interface RosterValidationResult {
   issues: string[];
 }
 
-// External SP rankings (Pitcherlist, Rotoballer)
+// External SP rankings (Pitcherlist, Rotoballer, FanGraphs)
 export interface ExternalRankingEntry {
   playerName: string;
-  source: "pitcherlist" | "rotoballer";
+  source: "pitcherlist" | "rotoballer" | "fangraphs";
   verdict: "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
   tier?: string;
   grade?: number;

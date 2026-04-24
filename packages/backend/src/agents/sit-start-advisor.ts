@@ -311,16 +311,18 @@ export class SitStartAdvisor {
     const latestDate = latestSnapshotRow[0].snapshot_date;
 
     // Fetch rostered SP-eligible players at the latest snapshot date.
-    // Include SP and P (generic pitcher) slots, but exclude RP slots.
-    // Additionally filter by player.positions containing "SP" so that
-    // relievers slotted into a generic P slot are excluded.
+    // Include SP and P (generic pitcher) active slots, plus BE (bench) and IL
+    // so that SPs who are currently benched or on the injury list still appear.
+    // The positions guard (`'SP' = ANY(player.positions)`) ensures that bench
+    // relievers (slot = 'BE') are excluded — only genuine SP-eligible players
+    // are returned regardless of which slot they currently occupy.
     const rows = await this.db
       .selectFrom("team_roster_snapshot")
       .innerJoin("player", "player.id", "team_roster_snapshot.player_id")
       .where("team_roster_snapshot.league_id", "=", leagueId)
       .where("team_roster_snapshot.team_id", "=", teamId)
       .where("team_roster_snapshot.snapshot_date", "=", latestDate)
-      .where("team_roster_snapshot.roster_slot", "in", ["SP", "P"])
+      .where("team_roster_snapshot.roster_slot", "in", ["SP", "P", "BE", "IL"])
       .where(sql<boolean>`'SP' = ANY(player.positions)`)
       .select([
         "team_roster_snapshot.player_id",

@@ -47,15 +47,15 @@ export function Navigation() {
           <div className="flex items-center space-x-3">
             <Link href="/" className="flex items-center space-x-2">
               <span className="text-2xl">&#9918;</span>
-              <span className="text-lg sm:text-xl font-bold text-content hidden sm:inline">
+              <span className="text-lg sm:text-xl font-bold text-content dark:text-shell-text hidden sm:inline">
                 ESPN Fantasy Baseball Assistant
               </span>
-              <span className="text-lg font-bold text-content sm:hidden">
+              <span className="text-lg font-bold text-content dark:text-shell-text sm:hidden">
                 Fantasy BB
               </span>
             </Link>
             {isAdmin && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info-light text-info border border-info-border">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info-light dark:bg-info-dark-bg/30 text-info dark:text-info-dark border border-info-border dark:border-info-dark-border">
                 <Zap className="mr-1 h-3 w-3" />
                 Admin
               </span>
@@ -71,8 +71,8 @@ export function Navigation() {
                 className={cn(
                   "px-3 py-2 rounded-md text-sm font-medium transition-colors",
                   isActive(link.href)
-                    ? "bg-accent-light text-content font-semibold"
-                    : "text-content-secondary hover:text-content hover:bg-accent-light"
+                    ? "bg-accent-light dark:bg-shell-accent/20 text-content dark:text-shell-text font-semibold"
+                    : "text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:bg-accent-light dark:hover:bg-shell-panel"
                 )}
               >
                 {link.label}
@@ -80,13 +80,13 @@ export function Navigation() {
             ))}
             {isLoggedIn && (
               <>
-                <div className="border-l border-neutral-200"></div>
-                <span className="text-sm text-content-secondary">
+                <div className="border-l border-neutral-200 dark:border-shell-border"></div>
+                <span className="text-sm text-content-secondary dark:text-shell-muted">
                   {user?.displayName || user?.email}
                 </span>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-2 rounded-md text-sm font-medium text-content-secondary hover:text-negative hover:bg-negative-light transition-colors"
+                  className="px-3 py-2 rounded-md text-sm font-medium text-content-secondary dark:text-shell-muted hover:text-negative dark:hover:text-negative-dark hover:bg-negative-light dark:hover:bg-negative-dark-bg/20 transition-colors"
                 >
                   Sign Out
                 </button>
@@ -98,7 +98,7 @@ export function Navigation() {
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-content-secondary hover:text-content hover:bg-accent-light focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="inline-flex items-center justify-center p-2 rounded-md text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:bg-accent-light dark:hover:bg-shell-panel focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:focus-visible:ring-shell-accent"
               aria-expanded={mobileMenuOpen}
             >
               <span className="sr-only">Open main menu</span>
@@ -114,7 +114,7 @@ export function Navigation() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-neutral-200 bg-white">
+        <div className="md:hidden border-t border-neutral-200 dark:border-shell-border bg-white dark:bg-shell-panel">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navLinks.map((link) => (
               <Link
@@ -124,8 +124,8 @@ export function Navigation() {
                 className={cn(
                   "block px-3 py-2 rounded-md text-base font-medium transition-colors",
                   isActive(link.href)
-                    ? "bg-accent-light text-content font-semibold"
-                    : "text-content-secondary hover:text-content hover:bg-accent-light"
+                    ? "bg-accent-light dark:bg-shell-accent/20 text-content dark:text-shell-text font-semibold"
+                    : "text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:bg-accent-light dark:hover:bg-shell-panel"
                 )}
               >
                 {link.label}
@@ -133,7 +133,7 @@ export function Navigation() {
             ))}
             {isLoggedIn && (
               <>
-                <div className="px-3 py-2 border-t border-neutral-200 text-xs text-content-secondary">
+                <div className="px-3 py-2 border-t border-neutral-200 dark:border-shell-border text-xs text-content-secondary dark:text-shell-muted">
                   {user?.displayName || user?.email}
                 </div>
                 <button
@@ -141,7 +141,7 @@ export function Navigation() {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-content-secondary hover:text-negative hover:bg-negative-light transition-colors"
+                  className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-content-secondary dark:text-shell-muted hover:text-negative dark:hover:text-negative-dark hover:bg-negative-light dark:hover:bg-negative-dark-bg/20 transition-colors"
                 >
                   Sign Out
                 </button>

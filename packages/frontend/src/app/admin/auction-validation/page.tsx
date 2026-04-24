@@ -194,14 +194,14 @@ function AuctionValidationPageContent() {
   const getDeltaClass = (delta: number): string => {
     if (delta > 0) return "text-positive";
     if (delta < 0) return "text-negative";
-    return "text-content-secondary";
+    return "text-content-secondary dark:text-shell-muted";
   };
 
   return (
     <Container size="wide" className="py-8">
       <div className="mb-8">
         <Heading level={1}>Auction Value Validation</Heading>
-        <p className="text-body-sm text-content-secondary mt-2">
+        <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-2">
           Compare VBD-based auction values against ESPN's pre-draft baseline values
         </p>
       </div>
@@ -216,7 +216,7 @@ function AuctionValidationPageContent() {
             {/* Draft Settings */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Number of Teams
                 </label>
                 <Input
@@ -230,7 +230,7 @@ function AuctionValidationPageContent() {
               </div>
 
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Auction Budget ($)
                 </label>
                 <Input
@@ -244,7 +244,7 @@ function AuctionValidationPageContent() {
               </div>
 
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   Minimum Bid ($)
                 </label>
                 <Input
@@ -261,7 +261,7 @@ function AuctionValidationPageContent() {
             {/* ESPN Context */}
             <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
               <div>
-                <label className="block text-body-sm font-medium text-content mb-2">
+                <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                   ESPN Season
                 </label>
                 <Input
@@ -278,7 +278,7 @@ function AuctionValidationPageContent() {
 
             {/* Advanced Settings */}
             <div className="mb-6">
-              <label className="block text-body-sm font-medium text-content mb-2">
+              <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-2">
                 Maximum Players to Compare
               </label>
               <Input
@@ -298,8 +298,8 @@ function AuctionValidationPageContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Batting Categories */}
-                <div className="border border-neutral-200 rounded-card p-4">
-                  <h4 className="text-body-sm font-semibold text-content mb-3">
+                <div className="border border-neutral-200 dark:border-shell-border rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content dark:text-shell-text mb-3">
                     Batting Categories
                   </h4>
                   <div className="space-y-2">
@@ -311,9 +311,9 @@ function AuctionValidationPageContent() {
                             type="checkbox"
                             checked={selectedCategories.has(cat.stat_key)}
                             onChange={() => handleCategoryToggle(cat.stat_key)}
-                            className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
+                            className="h-4 w-4 text-accent focus:ring-accent dark:focus:ring-shell-accent border-neutral-300 dark:border-shell-border rounded"
                           />
-                          <span className="ml-2 text-body-sm text-content">
+                          <span className="ml-2 text-body-sm text-content dark:text-shell-text">
                             {cat.name} ({cat.type})
                           </span>
                         </label>
@@ -322,8 +322,8 @@ function AuctionValidationPageContent() {
                 </div>
 
                 {/* Pitching Categories */}
-                <div className="border border-neutral-200 rounded-card p-4">
-                  <h4 className="text-body-sm font-semibold text-content mb-3">
+                <div className="border border-neutral-200 dark:border-shell-border rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content dark:text-shell-text mb-3">
                     Pitching Categories
                   </h4>
                   <div className="space-y-2">
@@ -335,9 +335,9 @@ function AuctionValidationPageContent() {
                             type="checkbox"
                             checked={selectedCategories.has(cat.stat_key)}
                             onChange={() => handleCategoryToggle(cat.stat_key)}
-                            className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
+                            className="h-4 w-4 text-accent focus:ring-accent dark:focus:ring-shell-accent border-neutral-300 dark:border-shell-border rounded"
                           />
-                          <span className="ml-2 text-body-sm text-content">
+                          <span className="ml-2 text-body-sm text-content dark:text-shell-text">
                             {cat.name} ({cat.type})
                           </span>
                         </label>
@@ -359,8 +359,8 @@ function AuctionValidationPageContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Position Players */}
-                <div className="border border-neutral-200 rounded-card p-4">
-                  <h4 className="text-body-sm font-semibold text-content mb-3">
+                <div className="border border-neutral-200 dark:border-shell-border rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content dark:text-shell-text mb-3">
                     Position Players
                   </h4>
                   <div className="space-y-2">
@@ -373,9 +373,9 @@ function AuctionValidationPageContent() {
                               type="checkbox"
                               checked={selectedSlots.has(slot.key)}
                               onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
-                              className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
+                              className="h-4 w-4 text-accent focus:ring-accent dark:focus:ring-shell-accent border-neutral-300 dark:border-shell-border rounded"
                             />
-                            <span className="ml-2 text-body-sm text-content">
+                            <span className="ml-2 text-body-sm text-content dark:text-shell-text">
                               {slot.label}
                             </span>
                           </label>
@@ -395,8 +395,8 @@ function AuctionValidationPageContent() {
                 </div>
 
                 {/* Pitchers */}
-                <div className="border border-neutral-200 rounded-card p-4">
-                  <h4 className="text-body-sm font-semibold text-content mb-3">
+                <div className="border border-neutral-200 dark:border-shell-border rounded-card p-4">
+                  <h4 className="text-body-sm font-semibold text-content dark:text-shell-text mb-3">
                     Pitchers & Bench
                   </h4>
                   <div className="space-y-2">
@@ -409,9 +409,9 @@ function AuctionValidationPageContent() {
                               type="checkbox"
                               checked={selectedSlots.has(slot.key)}
                               onChange={() => handleSlotToggle(slot.key, slot.defaultCount)}
-                              className="h-4 w-4 text-accent focus:ring-accent border-neutral-300 rounded"
+                              className="h-4 w-4 text-accent focus:ring-accent dark:focus:ring-shell-accent border-neutral-300 dark:border-shell-border rounded"
                             />
-                            <span className="ml-2 text-body-sm text-content">
+                            <span className="ml-2 text-body-sm text-content dark:text-shell-text">
                               {slot.label}
                             </span>
                           </label>
@@ -482,59 +482,59 @@ function AuctionValidationPageContent() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">Players Compared</div>
-                  <div className="text-2xl font-bold text-content">
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">Players Compared</div>
+                  <div className="text-2xl font-bold text-content dark:text-shell-text">
                     {results.summary.totalCompared}
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">Mean Delta</div>
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">Mean Delta</div>
                   <div className={cn("text-2xl font-bold", getDeltaClass(results.summary.meanDelta))}>
                     ${results.summary.meanDelta.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">Median Delta</div>
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">Median Delta</div>
                   <div className={cn("text-2xl font-bold", getDeltaClass(results.summary.medianDelta))}>
                     ${results.summary.medianDelta.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">RMSE</div>
-                  <div className="text-2xl font-bold text-content">
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">RMSE</div>
+                  <div className="text-2xl font-bold text-content dark:text-shell-text">
                     ${results.summary.rmse.toFixed(2)}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">Correlation</div>
-                  <div className="text-2xl font-bold text-content">
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">Correlation</div>
+                  <div className="text-2xl font-bold text-content dark:text-shell-text">
                     {results.summary.correlation.toFixed(3)}
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">Our Top Player</div>
-                  <div className="text-lg font-semibold text-content">
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">Our Top Player</div>
+                  <div className="text-lg font-semibold text-content dark:text-shell-text">
                     {results.summary.ourTopPlayer.name}
                   </div>
-                  <div className="text-body-sm text-content-secondary mt-1">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
                     ${results.summary.ourTopPlayer.value}
                   </div>
                 </div>
 
-                <div className="bg-surface-secondary rounded-card p-4 border border-neutral-100">
-                  <div className="text-body-sm text-content-secondary mb-1">ESPN Top Player</div>
-                  <div className="text-lg font-semibold text-content">
+                <div className="bg-surface-secondary dark:bg-shell-bg rounded-card p-4 border border-neutral-100 dark:border-shell-border">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mb-1">ESPN Top Player</div>
+                  <div className="text-lg font-semibold text-content dark:text-shell-text">
                     {results.summary.espnTopPlayer.name}
                   </div>
-                  <div className="text-body-sm text-content-secondary mt-1">
+                  <div className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
                     ${results.summary.espnTopPlayer.value}
                   </div>
                 </div>
@@ -549,42 +549,42 @@ function AuctionValidationPageContent() {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-neutral-100">
-                  <thead className="bg-surface-secondary">
+                <table className="min-w-full divide-y divide-neutral-100 dark:divide-shell-border">
+                  <thead className="bg-surface-secondary dark:bg-shell-bg">
                     <tr>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Player
                       </th>
-                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Positions
                       </th>
-                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         ESPN Value
                       </th>
-                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Our Value
                       </th>
-                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Delta ($)
                       </th>
-                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-body-sm font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
                         Delta (%)
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-neutral-100">
+                  <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                     {results.comparisons.map((comp, idx) => (
-                      <tr key={idx} className="hover:bg-surface-secondary transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content">
+                      <tr key={idx} className="hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text">
                           {comp.playerName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content-secondary dark:text-shell-muted">
                           {comp.positions.join(", ")}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content dark:text-shell-text text-right">
                           ${comp.espnValue}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content text-right">
+                        <td className="px-6 py-4 whitespace-nowrap text-body-sm text-content dark:text-shell-text text-right">
                           ${comp.ourValue}
                         </td>
                         <td className={cn(
@@ -607,7 +607,7 @@ function AuctionValidationPageContent() {
 
               {results.comparisons.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-body-sm text-content-secondary">No players found to compare</p>
+                  <p className="text-body-sm text-content-secondary dark:text-shell-muted">No players found to compare</p>
                 </div>
               )}
             </CardContent>

@@ -43,7 +43,16 @@ function SignalItem({ item }: { item: ActionItem }) {
   return (
     <div
       className="py-3 px-3 border-b border-shell-border last:border-0 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
     >
       <div className="flex items-start gap-2">
         <Icon
@@ -106,7 +115,7 @@ export function SignalsPanel() {
   }, [id]);
 
   const { data: waiverData, isLoading: waiverLoading } = useQuery({
-    queryKey: ["signals-waivers", id, teamId],
+    queryKey: ["waivers-recommendations", id, teamId],
     queryFn: () =>
       api.getWaiverRecommendations(parseInt(id, 10), teamId!, {
         maxRecommendations: 5,
@@ -116,7 +125,7 @@ export function SignalsPanel() {
   });
 
   const { data: tradeData, isLoading: tradeLoading } = useQuery({
-    queryKey: ["signals-trades", id, teamId],
+    queryKey: ["trades-recommendations", id, teamId],
     queryFn: () => api.getTradeRecommendations(parseInt(id, 10), teamId!),
     enabled: !!teamId && !!id,
     staleTime: 5 * 60_000,
@@ -219,10 +228,12 @@ export function SignalsPanel() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-shell-border flex-shrink-0">
+      <div role="tablist" className="flex border-b border-shell-border flex-shrink-0">
         {tabs.map((tab) => (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={cn(
               "flex-1 px-2 py-2 text-xs font-medium transition-colors",
@@ -250,13 +261,13 @@ export function SignalsPanel() {
         ) : allSignals.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
-              {isLoadingSignals ? "Loading signals..." : "No signals at the moment"}
+              {isLoadingSignals ? "Loading signals..." : "Nothing urgent \u2014 enjoy the off-day"}
             </p>
           </div>
         ) : filteredSignals.visible.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
-              No {activeTab === "all" ? "" : activeTab} signals
+              {activeTab === "all" ? "All quiet on the waiver wire" : `No ${activeTab} signals right now`}
             </p>
           </div>
         ) : (

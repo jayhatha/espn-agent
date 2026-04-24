@@ -18,25 +18,54 @@ async function triggerDegradedLeagueResnapshots(
   db: any,
   log: any,
   today: string,
+  projectionsNowFresh: boolean = false,
 ) {
-  const degradedLeagues = await db
-    .selectFrom("league")
-    .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
-    .select([
-      "league.id",
-      "league.espn_swid_encrypted",
-      "league.espn_s2_encrypted",
-    ])
-    .where("league_daily_snapshot.is_degraded", "=", true)
-    .where(
-      sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
-    )
-    .groupBy([
-      "league.id",
-      "league.espn_swid_encrypted",
-      "league.espn_s2_encrypted",
-    ])
-    .execute();
+  // When projections just became fully fresh (both batters + pitchers uploaded), re-snapshot
+  // ALL leagues that have a snapshot for today — even ones previously marked non-degraded,
+  // because an earlier partial upload may have triggered a re-snapshot that computed
+  // projected standings with incomplete projections data.
+  //
+  // When projections are still partial (stale), only re-snapshot leagues that are
+  // explicitly marked degraded due to missing/stale projections.
+  let degradedLeagues: any[];
+
+  if (projectionsNowFresh) {
+    // Re-snapshot all leagues that have any snapshot for today
+    degradedLeagues = await db
+      .selectFrom("league")
+      .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
+      .select([
+        "league.id",
+        "league.espn_swid_encrypted",
+        "league.espn_s2_encrypted",
+      ])
+      .where("league_daily_snapshot.snapshot_date", "=", today)
+      .groupBy([
+        "league.id",
+        "league.espn_swid_encrypted",
+        "league.espn_s2_encrypted",
+      ])
+      .execute();
+  } else {
+    degradedLeagues = await db
+      .selectFrom("league")
+      .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
+      .select([
+        "league.id",
+        "league.espn_swid_encrypted",
+        "league.espn_s2_encrypted",
+      ])
+      .where("league_daily_snapshot.is_degraded", "=", true)
+      .where(
+        sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
+      )
+      .groupBy([
+        "league.id",
+        "league.espn_swid_encrypted",
+        "league.espn_s2_encrypted",
+      ])
+      .execute();
+  }
 
   if (degradedLeagues.length > 0) {
     log.info(
@@ -147,8 +176,18 @@ export async function projectionsRoutes(app: FastifyInstance) {
           asOfDate: today,
         });
 
-        // Re-snapshot degraded leagues
-        await triggerDegradedLeagueResnapshots(db, request.log, today);
+        // Check if this upload completed the projections run (both batters + pitchers present)
+        const updatedRun = await db
+          .selectFrom("projections_run")
+          .select(["staleness"])
+          .where("id", "=", result.projectionsRunId)
+          .executeTakeFirst();
+        const projectionsNowFresh = updatedRun?.staleness === "fresh";
+
+        // Re-snapshot leagues: if projections are now fully fresh, re-snapshot all leagues
+        // that have a snapshot today (not just degraded ones), to recompute projected standings
+        // with complete projections data. If still partial, only re-snapshot degraded leagues.
+        await triggerDegradedLeagueResnapshots(db, request.log, today, projectionsNowFresh);
 
         return {
           projectionsRunId: result.projectionsRunId,
@@ -242,8 +281,18 @@ export async function projectionsRoutes(app: FastifyInstance) {
           asOfDate: today,
         });
 
-        // Re-snapshot degraded leagues
-        await triggerDegradedLeagueResnapshots(db, request.log, today);
+        // Check if this upload completed the projections run (both batters + pitchers present)
+        const updatedBatchRun = await db
+          .selectFrom("projections_run")
+          .select(["staleness"])
+          .where("id", "=", result.projectionsRunId)
+          .executeTakeFirst();
+        const batchProjectionsNowFresh = updatedBatchRun?.staleness === "fresh";
+
+        // Re-snapshot leagues: if projections are now fully fresh, re-snapshot all leagues
+        // that have a snapshot today (not just degraded ones), to recompute projected standings
+        // with complete projections data. If still partial, only re-snapshot degraded leagues.
+        await triggerDegradedLeagueResnapshots(db, request.log, today, batchProjectionsNowFresh);
 
         return {
           projectionsRunId: result.projectionsRunId,

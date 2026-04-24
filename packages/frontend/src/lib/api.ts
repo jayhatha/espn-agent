@@ -622,9 +622,7 @@ export const api = {
   async getChangeLogHistory(leagueId: number, limit = 50, source?: string) {
     const params = new URLSearchParams({ limit: String(limit) });
     if (source) params.set("source", source);
-    return fetchAPI(
-      `/api/leagues/${leagueId}/standings/change-log?${params}`,
-    );
+    return fetchAPI(`/api/leagues/${leagueId}/standings/change-log?${params}`);
   },
 
   getChangeLogSSEUrl(leagueId: number): string {

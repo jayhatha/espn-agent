@@ -18,8 +18,8 @@ export function MobileBidVerdict({
 
   if (!currentPlayer) {
     return (
-      <div className="bg-[#22252b] border border-[#2d3139] rounded-xl p-4">
-        <p className="text-[#99a5bc] text-sm text-center py-2">
+      <div className="bg-grafana-panel border border-grafana-border rounded-xl p-4">
+        <p className="text-grafana-muted text-sm text-center py-2">
           Waiting for nomination...
         </p>
       </div>
@@ -48,16 +48,16 @@ export function MobileBidVerdict({
   // Border color: green for bid (not risky), amber for risky, red for pass
   const borderColor = shouldBid
     ? isRisky
-      ? "border-[#e0b400]"
-      : "border-[#37872d]"
-    : "border-[#c4162a]";
+      ? "border-grafana-warning"
+      : "border-grafana-positive"
+    : "border-grafana-negative";
 
   // Text color for verdict
   const verdictColor = shouldBid
     ? isRisky
-      ? "text-[#e0b400]"
-      : "text-[#37872d]"
-    : "text-[#c4162a]";
+      ? "text-grafana-warning"
+      : "text-grafana-positive"
+    : "text-grafana-negative";
 
   // Verdict text
   const verdictText = shouldBid ? `BID up to $${maxBid}` : "PASS";
@@ -84,22 +84,22 @@ export function MobileBidVerdict({
 
   return (
     <div
-      className={`bg-[#22252b] border-2 ${borderColor} rounded-xl p-4`}
+      className={`bg-grafana-panel border-2 ${borderColor} rounded-xl p-4`}
     >
       {/* Player header */}
       <div className="mb-2">
-        <p className="text-[#d9dde6] text-base font-bold leading-tight">
+        <p className="text-grafana-text text-base font-bold leading-tight">
           {currentPlayer.playerName}
         </p>
-        <p className="text-[#99a5bc] text-sm mt-0.5">
+        <p className="text-grafana-muted text-sm mt-0.5">
           {currentPlayer.positions?.join("/") ?? ""}
           {currentPlayer.nominatingTeam && (
-            <span className="ml-2 text-[#6b7a99]">
+            <span className="ml-2 text-grafana-muted/70">
               — {currentPlayer.nominatingTeam}
             </span>
           )}
           {currentPlayer.currentBid !== undefined && (
-            <span className="ml-2 font-mono text-[#d9dde6]">
+            <span className="ml-2 font-mono text-grafana-text">
               Current: <span className="font-bold">${currentPlayer.currentBid}</span>
             </span>
           )}
@@ -108,47 +108,57 @@ export function MobileBidVerdict({
 
       {/* Verdict — tap to toggle debug */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-label="Toggle bid reasoning details"
+        aria-expanded={showDebug}
         className="cursor-pointer"
         onClick={() => setShowDebug((prev) => !prev)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setShowDebug((prev) => !prev);
+          }
+        }}
         title="Tap for bid reasoning"
       >
         <div className={`text-2xl font-bold ${verdictColor}`}>{verdictText}</div>
         {passReason && (
-          <div className="text-sm text-[#99a5bc] mt-0.5">{passReason}</div>
+          <div className="text-sm text-grafana-muted mt-0.5">{passReason}</div>
         )}
       </div>
 
       {/* Stat pills */}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
-        <span className="text-xs bg-[#2d3139] text-[#99a5bc] rounded px-2 py-0.5">
+        <span className="text-xs bg-grafana-border text-grafana-muted rounded px-2 py-0.5">
           Market ${expectedMarketPrice}
         </span>
         <span
           className={`text-xs rounded px-2 py-0.5 ${
             valueSurplus >= 0
-              ? "bg-[#37872d]/20 text-[#37872d]"
-              : "bg-[#c4162a]/20 text-[#c4162a]"
+              ? "bg-grafana-positive/20 text-grafana-positive"
+              : "bg-grafana-negative/20 text-grafana-negative"
           }`}
         >
           {valueSurplus >= 0 ? "+" : ""}${valueSurplus} value
         </span>
         {isRisky && (
-          <span className="text-xs bg-[#e0b400]/20 text-[#e0b400] rounded px-2 py-0.5">
+          <span className="text-xs bg-grafana-warning/20 text-grafana-warning rounded px-2 py-0.5">
             Budget tight
           </span>
         )}
         {capSource?.includes("need ×0.7") && (
-          <span className="text-xs bg-[#e0b400]/20 text-[#e0b400] rounded px-2 py-0.5">
+          <span className="text-xs bg-grafana-warning/20 text-grafana-warning rounded px-2 py-0.5">
             UTIL slot
           </span>
         )}
         {capSource?.includes("need ×0.5") && (
-          <span className="text-xs bg-[#c4162a]/20 text-[#c4162a] rounded px-2 py-0.5">
+          <span className="text-xs bg-grafana-negative/20 text-grafana-negative rounded px-2 py-0.5">
             Bench only
           </span>
         )}
         {capSource?.includes("elite override") && (
-          <span className="text-xs bg-[#37872d]/20 text-[#37872d] rounded px-2 py-0.5">
+          <span className="text-xs bg-grafana-positive/20 text-grafana-positive rounded px-2 py-0.5">
             Elite override
           </span>
         )}
@@ -156,14 +166,14 @@ export function MobileBidVerdict({
 
       {/* Debug panel — toggled by tapping verdict */}
       {showDebug && (
-        <div className="mt-3 pt-3 border-t border-[#2d3139] text-sm text-[#99a5bc] space-y-2">
+        <div className="mt-3 pt-3 border-t border-grafana-border text-sm text-grafana-muted space-y-2">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             {sgpBreakeven != null && (
               <>
-                <span className="text-[#6b7a99]">FG$</span>
-                <span className="font-mono text-[#d9dde6]">
+                <span className="text-grafana-muted/70">FG$</span>
+                <span className="font-mono text-grafana-text">
                   ${sgpBreakeven}{" "}
-                  <span className="text-[#6b7a99] text-xs">
+                  <span className="text-grafana-muted/70 text-xs">
                     (mkt ${expectedMarketPrice})
                   </span>
                 </span>
@@ -171,10 +181,10 @@ export function MobileBidVerdict({
             )}
             {simulationEV != null && (
               <>
-                <span className="text-[#6b7a99]">EV</span>
+                <span className="text-grafana-muted/70">EV</span>
                 <span
                   className={`font-mono ${
-                    simulationEV >= 0 ? "text-[#37872d]" : "text-[#c4162a]"
+                    simulationEV >= 0 ? "text-grafana-positive" : "text-grafana-negative"
                   }`}
                 >
                   {simulationEV >= 0 ? "+" : ""}
@@ -184,40 +194,40 @@ export function MobileBidVerdict({
             )}
             {priorityScore != null && (
               <>
-                <span className="text-[#6b7a99]">Priority</span>
-                <span className="font-mono text-[#d9dde6]">
+                <span className="text-grafana-muted/70">Priority</span>
+                <span className="font-mono text-grafana-text">
                   {priorityScore.toFixed(1)}
                 </span>
               </>
             )}
             {evBuffer != null && (
               <>
-                <span className="text-[#6b7a99]">EV Buffer</span>
-                <span className="font-mono text-[#d9dde6]">
+                <span className="text-grafana-muted/70">EV Buffer</span>
+                <span className="font-mono text-grafana-text">
                   {evBuffer > 0 ? "+" : ""}${evBuffer}
                 </span>
               </>
             )}
             {categoryBonus != null && (
               <>
-                <span className="text-[#6b7a99]">Category Bonus</span>
-                <span className="font-mono text-[#d9dde6]">
+                <span className="text-grafana-muted/70">Category Bonus</span>
+                <span className="font-mono text-grafana-text">
                   {categoryBonus > 0 ? "+" : ""}${categoryBonus}
                 </span>
               </>
             )}
             {capSource && (
               <>
-                <span className="text-[#6b7a99]">Cap</span>
-                <span className="font-mono text-[#d9dde6] text-xs break-all">
+                <span className="text-grafana-muted/70">Cap</span>
+                <span className="font-mono text-grafana-text text-xs break-all">
                   {capSource}
                 </span>
               </>
             )}
             {sgpBreakeven != null && (
               <>
-                <span className="text-[#6b7a99]">SGP Break-even</span>
-                <span className="font-mono text-[#d9dde6]">${sgpBreakeven}</span>
+                <span className="text-grafana-muted/70">SGP Break-even</span>
+                <span className="font-mono text-grafana-text">${sgpBreakeven}</span>
               </>
             )}
           </div>
@@ -226,7 +236,7 @@ export function MobileBidVerdict({
               {playerTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-xs bg-[#2d3139] text-[#5b9cf6] rounded px-2 py-0.5"
+                  className="text-xs bg-grafana-border text-info-dark rounded px-2 py-0.5"
                 >
                   {tag}
                 </span>

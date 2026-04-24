@@ -65,7 +65,7 @@ function pct(n: number): string {
 
 function SectionCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-neutral-900 rounded-xl p-4 ${className}`}>
+    <div className={`bg-grafana-bg rounded-xl p-4 ${className}`}>
       {children}
     </div>
   );
@@ -73,7 +73,7 @@ function SectionCard({ children, className = "" }: { children: React.ReactNode; 
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-3">
+    <p className="text-xs font-semibold uppercase tracking-widest text-grafana-muted mb-3">
       {children}
     </p>
   );
@@ -110,26 +110,26 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
         {winProb ? (
           <div className="flex items-end gap-4">
             <div>
-              <p className="text-3xl font-bold font-mono text-green-400">
+              <p className="text-3xl font-bold font-mono text-positive-dark">
                 {pct(winProb.winProbability)}
               </p>
-              <p className="text-[10px] text-neutral-500 mt-0.5">Win prob</p>
+              <p className="text-caption text-grafana-muted mt-0.5">Win prob</p>
             </div>
             <div className="pb-0.5">
-              <p className="text-xl font-bold font-mono text-neutral-200">
+              <p className="text-xl font-bold font-mono text-grafana-text">
                 {ordinal(winProb.expectedFinish)}
               </p>
-              <p className="text-[10px] text-neutral-500">Finish</p>
+              <p className="text-caption text-grafana-muted">Finish</p>
             </div>
             <div className="pb-0.5">
-              <p className="text-lg font-mono text-neutral-300">
+              <p className="text-lg font-mono text-grafana-muted">
                 {pct(winProb.top3Probability)}
               </p>
-              <p className="text-[10px] text-neutral-500">Top-3</p>
+              <p className="text-caption text-grafana-muted">Top-3</p>
             </div>
           </div>
         ) : (
-          <p className="text-neutral-500 text-sm">No simulation data yet</p>
+          <p className="text-grafana-muted text-sm">No simulation data yet</p>
         )}
       </SectionCard>
 
@@ -140,15 +140,15 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
           <div className="flex items-center gap-2">
             <span
               className={`inline-block w-2.5 h-2.5 rounded-full ${
-                archetype.archetypeConfidence > 0.5 ? "bg-green-500" : "bg-yellow-500"
+                archetype.archetypeConfidence > 0.5 ? "bg-grafana-positive" : "bg-grafana-warning"
               }`}
             />
-            <span className="text-lg font-bold text-neutral-100">
+            <span className="text-lg font-bold text-grafana-text">
               {archetype.archetypeLabel}
             </span>
           </div>
         ) : (
-          <p className="text-neutral-500 text-sm">
+          <p className="text-grafana-muted text-sm">
             Archetype analysis available after 3+ picks
           </p>
         )}
@@ -164,7 +164,7 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
             ))}
           </div>
         ) : (
-          <p className="text-neutral-500 text-sm">
+          <p className="text-grafana-muted text-sm">
             Category targets available when ideal roster computes
           </p>
         )}
@@ -181,13 +181,13 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
               coreCount={idealRoster.coreCount}
               valueCount={idealRoster.valueCount}
             />
-            <div className="flex justify-between mt-3 text-xs text-neutral-500">
+            <div className="flex justify-between mt-3 text-xs text-grafana-muted">
               <span>Budget used: ${Math.round(idealRoster.budgetUsed)}</span>
               <span>Unfilled: {idealRoster.unfilledSlots}</span>
             </div>
           </>
         ) : (
-          <p className="text-neutral-500 text-sm">
+          <p className="text-grafana-muted text-sm">
             Ideal roster available after rankings load
           </p>
         )}
@@ -199,26 +199,26 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
         {sortedScarcity.length > 0 ? (
           <div className="space-y-1.5">
             {sortedScarcity.map((s) => {
-              let dotColor = "bg-green-500";
-              if (s.supply < s.demand) dotColor = "bg-red-500";
-              else if (s.supply === s.demand) dotColor = "bg-yellow-500";
+              let dotColor = "bg-grafana-positive";
+              if (s.supply < s.demand) dotColor = "bg-grafana-negative";
+              else if (s.supply === s.demand) dotColor = "bg-grafana-warning";
 
               return (
                 <div
                   key={s.position}
-                  className="flex items-center justify-between bg-neutral-800 rounded-lg px-3 py-2"
+                  className="flex items-center justify-between bg-grafana-panel rounded-lg px-3 py-2"
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                    <span className="text-sm text-neutral-200 font-medium">
+                    <span className="text-sm text-grafana-text font-medium">
                       {s.position}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-neutral-400">
+                    <span className="text-grafana-muted">
                       {s.supply}/{s.demand}
                     </span>
-                    <span className="font-mono text-neutral-300">
+                    <span className="font-mono text-grafana-muted">
                       ${Math.round(s.tierDropValue)} gap
                     </span>
                   </div>
@@ -227,7 +227,7 @@ export function StrategyTab({ engineSignals, simulation }: StrategyTabProps) {
             })}
           </div>
         ) : (
-          <p className="text-neutral-500 text-sm">No position scarcity alerts</p>
+          <p className="text-grafana-muted text-sm">No position scarcity alerts</p>
         )}
       </SectionCard>
     </div>

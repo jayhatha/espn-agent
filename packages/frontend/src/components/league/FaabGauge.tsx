@@ -35,10 +35,15 @@ export function FaabGauge({ spent, total, leagueAvg }: FaabGaugeProps) {
           <span>$0</span>
           <span>${total}</span>
         </div>
-        <div className="h-3 rounded-full dark:bg-shell-border bg-gray-200 overflow-hidden">
+        <div className="h-3 rounded-full bg-neutral-200 dark:bg-shell-border overflow-hidden">
           <div
-            className={cn("h-full rounded-full transition-all", fillColor)}
-            style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+            className={cn("h-full w-full transition-transform duration-500 origin-left", fillColor)}
+            style={{ transform: `scaleX(${Math.max(0, Math.min(100, pct)) / 100})` }}
+            role="progressbar"
+            aria-valuenow={remaining}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-label="FAAB remaining"
           />
         </div>
       </div>

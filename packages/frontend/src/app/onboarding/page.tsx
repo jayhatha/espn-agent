@@ -56,10 +56,10 @@ export default function OnboardingPage() {
                     className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors",
                       index < currentStep
-                        ? "bg-accent text-content-inverse"
+                        ? "bg-accent text-content-inverse dark:bg-shell-accent dark:text-white"
                         : index === currentStep
-                          ? "bg-accent text-content-inverse ring-4 ring-accent/20"
-                          : "bg-neutral-200 text-content-secondary"
+                          ? "bg-accent text-content-inverse ring-4 ring-accent/20 dark:bg-shell-accent dark:text-white dark:ring-shell-accent/20"
+                          : "bg-neutral-200 dark:bg-shell-border text-content-secondary dark:text-shell-muted"
                     )}
                   >
                     {index < currentStep ? (
@@ -72,7 +72,7 @@ export default function OnboardingPage() {
                     <div
                       className={cn(
                         "hidden sm:block w-12 md:w-20 h-0.5 mx-1 transition-colors",
-                        index < currentStep ? "bg-accent" : "bg-neutral-200"
+                        index < currentStep ? "bg-accent dark:bg-shell-accent" : "bg-neutral-200 dark:bg-shell-border"
                       )}
                     />
                   )}
@@ -176,7 +176,7 @@ function BulletPoint({ text }: { text: string }) {
   return (
     <div className="flex items-center space-x-3">
       <svg
-        className="w-5 h-5 text-accent flex-shrink-0"
+        className="w-5 h-5 text-accent dark:text-shell-accent flex-shrink-0"
         fill="currentColor"
         viewBox="0 0 20 20"
       >
@@ -246,7 +246,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         <div>
           <label
             htmlFor="espnLeagueId"
-            className="block text-body-sm font-medium text-content mb-1"
+            className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
           >
             ESPN League ID *
           </label>
@@ -267,7 +267,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         <div>
           <label
             htmlFor="season"
-            className="block text-body-sm font-medium text-content mb-1"
+            className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
           >
             Season *
           </label>
@@ -287,7 +287,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         <div>
           <label
             htmlFor="leagueName"
-            className="block text-body-sm font-medium text-content mb-1"
+            className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
           >
             League Name (Optional)
           </label>
@@ -301,13 +301,13 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
         </div>
 
         {/* Private League Toggle */}
-        <div className="border-t border-neutral-100 pt-4">
+        <div className="border-t border-neutral-100 dark:border-shell-border pt-4">
           <label className="flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-4 w-4 rounded border-neutral-300 text-accent focus:ring-accent"
+              className="h-4 w-4 rounded border-neutral-300 dark:border-shell-border text-accent dark:text-shell-accent focus:ring-accent dark:focus:ring-shell-accent"
             />
             <Text size="sm" className="ml-2 font-medium">
               Private league (requires ESPN cookies)
@@ -315,14 +315,14 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
           </label>
 
           {isPrivate && (
-            <div className="mt-4 space-y-4 bg-surface-secondary p-4 rounded-lg">
+            <div className="mt-4 space-y-4 bg-surface-secondary dark:bg-shell-bg p-4 rounded-lg">
               <Text size="sm" color="secondary">
                 Private leagues require your ESPN authentication cookies.{" "}
                 <a
                   href="https://github.com/cwendt94/espn-api/wiki/ESPN-Fantasy-Football-Cookies"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-accent hover:underline"
+                  className="text-accent dark:text-shell-accent hover:underline"
                 >
                   How to find these cookies
                 </a>
@@ -331,7 +331,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
               <div>
                 <label
                   htmlFor="swid"
-                  className="block text-body-sm font-medium text-content mb-1"
+                  className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
                 >
                   SWID Cookie
                 </label>
@@ -348,7 +348,7 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
               <div>
                 <label
                   htmlFor="espnS2"
-                  className="block text-body-sm font-medium text-content mb-1"
+                  className="block text-body-sm font-medium text-content dark:text-shell-text mb-1"
                 >
                   espn_s2 Cookie
                 </label>
@@ -367,12 +367,12 @@ function ConnectLeagueStep({ onNext }: { onNext: (league: League) => void }) {
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <Text size="sm" className="text-red-700">{error}</Text>
+          <div className="bg-negative-light dark:bg-negative-dark-bg/20 border border-negative-border dark:border-negative-dark-border rounded-lg p-4">
+            <Text size="sm" className="text-negative dark:text-negative-dark">{error}</Text>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="mt-2 text-body-sm text-red-600 hover:text-red-800 underline"
+              className="mt-2 text-body-sm text-negative dark:text-negative-dark hover:underline"
             >
               Dismiss
             </button>
@@ -524,7 +524,7 @@ function SelectTeamStep({
       </Text>
 
       {teams.length === 1 ? (
-        <div className="bg-surface-secondary border border-neutral-200 rounded-lg p-4 mb-6 text-center">
+        <div className="bg-surface-secondary dark:bg-shell-bg border border-neutral-200 dark:border-shell-border rounded-lg p-4 mb-6 text-center">
           <Text className="font-medium">
             Auto-selected: {teams[0].name}
           </Text>
@@ -541,8 +541,8 @@ function SelectTeamStep({
               className={cn(
                 "text-left p-4 rounded-lg border-2 transition-all",
                 selectedTeamId === team.id
-                  ? "border-accent bg-accent/5 ring-1 ring-accent"
-                  : "border-neutral-200 hover:border-neutral-300 hover:bg-surface-secondary"
+                  ? "border-accent dark:border-shell-accent bg-accent/5 dark:bg-shell-accent/10 ring-1 ring-accent dark:ring-shell-accent"
+                  : "border-neutral-200 dark:border-shell-border hover:border-neutral-300 dark:hover:border-shell-muted hover:bg-surface-secondary dark:hover:bg-shell-panel"
               )}
             >
               <Text className="font-semibold">{team.name}</Text>
@@ -583,9 +583,9 @@ function CompleteStep({
 
   return (
     <div className="text-center">
-      <div className="w-16 h-16 bg-surface-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="w-16 h-16 bg-surface-secondary dark:bg-shell-panel rounded-full flex items-center justify-center mx-auto mb-4">
         <svg
-          className="w-8 h-8 text-accent"
+          className="w-8 h-8 text-accent dark:text-shell-accent"
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -602,8 +602,8 @@ function CompleteStep({
       </Heading>
 
       <Text color="secondary" className="mb-2">
-        Connected to <span className="font-semibold text-content">{leagueName}</span> as{" "}
-        <span className="font-semibold text-content">{teamName}</span>
+        Connected to <span className="font-semibold text-content dark:text-shell-text">{leagueName}</span> as{" "}
+        <span className="font-semibold text-content dark:text-shell-text">{teamName}</span>
       </Text>
 
       <Text size="sm" color="tertiary" className="mb-8 max-w-md mx-auto">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CHART_THEME } from "@/lib/chart-theme";
+import { useChartTheme } from "@/lib/useChartTheme";
 
 interface PlayerDetail {
   id: number;
@@ -23,16 +23,17 @@ interface TransactionMarkerProps {
 }
 
 export function TransactionMarker({ viewBox, annotation }: TransactionMarkerProps) {
+  const chartTheme = useChartTheme();
   const [showTooltip, setShowTooltip] = useState(false);
 
   if (!viewBox) return null;
 
   // Determine color by event type using design tokens
   const getColor = (eventType: string): string => {
-    if (eventType === "trade") return CHART_THEME.colors[5]; // info blue
-    if (eventType === "add" || eventType === "waiver") return CHART_THEME.colors[3]; // positive green
-    if (eventType === "drop") return CHART_THEME.colors[4]; // negative red
-    return CHART_THEME.colors[1]; // neutral gray
+    if (eventType === "trade") return chartTheme.colors[5]; // info blue
+    if (eventType === "add" || eventType === "waiver") return chartTheme.colors[3]; // positive green
+    if (eventType === "drop") return chartTheme.colors[4]; // negative red
+    return chartTheme.colors[1]; // neutral gray
   };
 
   // Determine label character by event type
@@ -92,13 +93,13 @@ export function TransactionMarker({ viewBox, annotation }: TransactionMarkerProp
           <div
             className="rounded-lg p-2 text-xs pointer-events-none"
             style={{
-              backgroundColor: CHART_THEME.tooltip.backgroundColor,
-              border: `1px solid ${CHART_THEME.tooltip.borderColor}`,
-              borderRadius: CHART_THEME.tooltip.borderRadius,
+              backgroundColor: chartTheme.tooltip.backgroundColor,
+              border: `1px solid ${chartTheme.tooltip.borderColor}`,
+              borderRadius: chartTheme.tooltip.borderRadius,
             }}
           >
             <div className="font-bold uppercase mb-1 text-content dark:text-shell-text">{annotation.event_type}</div>
-            <div className="text-content-secondary mb-1">{formatDate(annotation.event_date)}</div>
+            <div className="text-content-secondary dark:text-shell-muted mb-1">{formatDate(annotation.event_date)}</div>
             {annotation.team_name && (
               <div className="text-content dark:text-shell-text mb-1">{annotation.team_name}</div>
             )}

@@ -13,14 +13,14 @@ interface StatCardProps {
 }
 
 const trendColors = {
-  up: "text-positive dark:text-emerald-400",
-  down: "text-negative dark:text-red-400",
+  up: "text-positive dark:text-positive-dark",
+  down: "text-negative dark:text-negative-dark",
   neutral: "text-content-secondary dark:text-shell-muted",
 };
 
 const trendIcons = {
-  up: <TrendingUp className="h-4 w-4 text-positive dark:text-emerald-400" />,
-  down: <TrendingDown className="h-4 w-4 text-negative dark:text-red-400" />,
+  up: <TrendingUp className="h-4 w-4 text-positive dark:text-positive-dark" />,
+  down: <TrendingDown className="h-4 w-4 text-negative dark:text-negative-dark" />,
   neutral: null,
 };
 

@@ -116,7 +116,7 @@ export default function ConnectLeaguePage() {
                   className={cn(
                     "w-full text-left px-4 py-3 rounded-lg border-2 transition-colors",
                     selectedTeamEspnId === team.espnTeamId
-                      ? "border-accent bg-accent-light dark:bg-shell-accent/10"
+                      ? "border-accent dark:border-shell-accent bg-accent-light dark:bg-shell-accent/20"
                       : "border-neutral-200 dark:border-shell-border hover:border-neutral-300 dark:hover:border-shell-muted"
                   )}
                 >
