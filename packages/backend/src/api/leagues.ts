@@ -8,6 +8,7 @@ import { ConnectLeagueSchema } from "../utils/validation.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
 import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID } from "../../../shared/dist/index.js";
+import { snapshotQueue } from "../workers/snapshot-worker.js";
 
 /**
  * Cached games played — one MLB API call per day max.
@@ -517,57 +518,78 @@ export async function leaguesRoutes(app: FastifyInstance) {
         return reply.code(404).send({ error: "League not found" });
       }
 
-      try {
-        // Import SnapshotOrchestratorAgent
-        const { SnapshotOrchestratorAgent } = await import(
-          "../agents/snapshot-orchestrator.js"
-        );
-        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
+      const today = new Date().toISOString().split("T")[0];
+      const jobId = `snapshot-${leagueId}-${today}`;
 
-        const today = new Date().toISOString().split("T")[0];
+      // Build auth cookies: env vars first, then encrypted DB fallback
+      let auth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
 
-        // Build auth cookies: env vars first, then encrypted DB fallback
-        let auth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
-
-        if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
-          if (!hasEncryptionKey()) {
-            return reply
-              .code(500)
-              .send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
-          }
-          try {
-            auth = {
-              SWID: decryptToken(league.espn_swid_encrypted as any),
-              espn_s2: decryptToken(league.espn_s2_encrypted as any),
-            };
-          } catch (error) {
-            request.log.error({ error }, "Failed to decrypt ESPN cookies");
-            return reply
-              .code(500)
-              .send({ error: "Failed to decrypt ESPN credentials" });
-          }
+      if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
+        if (!hasEncryptionKey()) {
+          return reply
+            .code(500)
+            .send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
         }
+        try {
+          auth = {
+            SWID: decryptToken(league.espn_swid_encrypted as any),
+            espn_s2: decryptToken(league.espn_s2_encrypted as any),
+          };
+        } catch (error) {
+          request.log.error({ error }, "Failed to decrypt ESPN cookies");
+          return reply
+            .code(500)
+            .send({ error: "Failed to decrypt ESPN credentials" });
+        }
+      }
 
-        // Manual snapshot triggers execute directly (not via queue)
-        // Queue-based deduplication in snapshot-worker.ts covers scheduled snapshots
-        await orchestrator.executeSnapshot({
+      // Route through BullMQ with deterministic jobId for deduplication.
+      // If a job with this ID already exists (same league + date), BullMQ returns null.
+      const job = await snapshotQueue.add(
+        jobId,
+        {
           leagueId,
           snapshotDate: today,
-          espnAuth: auth,
-          forceFresh: true,
-        });
+          auth: auth ? { SWID: auth.SWID, espn_s2: auth.espn_s2 } : undefined,
+        },
+        {
+          jobId,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5000 },
+          removeOnComplete: { age: 86400 },
+          removeOnFail: { age: 86400 },
+        },
+      );
 
-        return {
-          success: true,
-          message: "Snapshot created successfully",
-          snapshotDate: today,
-        };
-      } catch (error) {
-        request.log.error({ error, leagueId }, "Failed to create snapshot");
-        return reply
-          .code(500)
-          .send({ error: "Failed to create snapshot", details: String(error) });
+      if (!job) {
+        return reply.code(202).send({ queued: false, reason: "duplicate", jobId });
       }
+
+      request.log.info({ leagueId, jobId }, "Manual snapshot queued via BullMQ");
+      return reply.code(202).send({ queued: true, jobId });
+    },
+  );
+
+  // Get BullMQ job status for a snapshot job
+  app.get<{ Params: { leagueId: string; jobId: string } }>(
+    "/api/leagues/:leagueId/snapshot/status/:jobId",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const { jobId } = request.params;
+
+      const job = await snapshotQueue.getJob(jobId);
+      if (!job) {
+        return reply.code(404).send({ error: "Job not found", jobId });
+      }
+
+      const state = await job.getState();
+      const progress = job.progress;
+      const failedReason = job.failedReason ?? null;
+
+      return { jobId, state, progress, failedReason };
     },
   );
 
