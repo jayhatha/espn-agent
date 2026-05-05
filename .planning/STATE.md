@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v6.0
-milestone_name: In-Season Command Center
+milestone: v7.0
+milestone_name: Architectural Stabilization
 status: Complete
-stopped_at: v6.0 milestone complete — all 18 phases done, ROADMAP audit passed
-last_updated: "2026-04-23T00:00:00.000Z"
+stopped_at: v7.0 complete — Phase 88 shipped
+last_updated: "2026-05-05T00:00:00.000Z"
 progress:
-  total_phases: 18
-  completed_phases: 18
-  total_plans: 43
-  completed_plans: 43
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** Phase 84 complete — Streaming Results page: event_source field added to DB + API (live vs snapshot filter), frontend renamed to Streaming Results with stat abbreviation chips on EventCard and history filtered to live-only events
+**Current focus:** v6.0 complete — waiver page advanced stats columns shipped with Statcast enrichment and graceful degradation for unavailable public-source metrics
 
 ## Current Position
 
-Phase: 84 (final)
-Plan: Complete — v6.0 milestone finished
+Phase: 85 complete
+Plan: 01 complete — v6.0 milestone finished
 
 ## Performance Metrics
 
@@ -154,6 +154,7 @@ _Updated after each plan completion_
 - Phase 78 added: Streaming picks — merge Rotoballer verdicts and waiver pickup timing into streaming tab
 - Phase 81 added: Live Standings Change Log — Streaming activity feed with Slack-ready notification layer
 - Phase 84 added: Streaming Results — Live standings and category rankings with play-by-play event attribution
+- Phase 85 added: Waiver page advanced stats columns — K-BB%, K/9, FIP, xFIP, xERA, SIERA for pitchers; BABIP, xBA, xSLG, xwOBA, ISO for hitters
 
 ### Blockers/Concerns
 

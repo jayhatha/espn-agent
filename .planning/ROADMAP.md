@@ -7,7 +7,8 @@
 - ✅ **v3.0 Draft Automation & Mobile Command Center** - Phases 39-42 (shipped 2026-03-14)
 - ✅ **v4.0 Personal Season Setup** - Phases 43-46 (shipped 2026-03-15)
 - ✅ **v5.0 Draft Engine Spec Alignment** - Phases 48-64 (shipped 2026-03-23)
-- ✅ **v6.0 In-Season Command Center** - Phases 65-85 (shipped 2026-05-04)
+- ✅ **v6.0 In-Season Command Center** - Phases 65-86 (shipped 2026-05-05)
+- 🚧 **v7.0 Architectural Stabilization** - Phases 87-88 (in progress)
 
 ## Phases
 
@@ -378,3 +379,43 @@ Plans:
 Plans:
 
 - [x] 86-01-PLAN.md — All A1-A8 architecture and performance fixes
+
+---
+
+## v7.0 Architectural Stabilization — shipped 2026-05-05
+
+**Milestone Goal:** Close the remaining gaps surfaced by the May 2026 senior staff architectural audit: route manual snapshot triggers through BullMQ (eliminating the concurrency race between direct `executeSnapshot` calls and the scheduled worker), and refresh CLAUDE.md so its known-issues list accurately reflects the v6.0 codebase state.
+
+### Phase 87: Manual snapshot concurrency guard
+
+**Goal:** Manual snapshot triggers enqueue into BullMQ with a deterministic job ID instead of calling `executeSnapshot` directly, so concurrent user-triggered snapshots for the same league on the same day are deduplicated at the queue level — matching the deduplication already in place for scheduled snapshots.
+**Depends on:** Phase 86
+**Requirements:** SNAP-DEDUP-01, SNAP-DEDUP-02, SNAP-DEDUP-03
+**Success Criteria** (what must be TRUE):
+
+1. `POST /api/leagues/:leagueId/snapshot` enqueues a BullMQ job with `jobId: snapshot-${leagueId}-${today}` instead of calling `orchestrator.executeSnapshot()` directly
+2. Two simultaneous manual trigger requests for the same league on the same date result in exactly one BullMQ job being created (second returns 202 with `queued: false, reason: "duplicate"`)
+3. The manual endpoint returns `{ queued: true, jobId }` immediately (async) rather than blocking until snapshot completes
+4. Existing scheduled snapshot deduplication in `scheduleDailySnapshots()` is unchanged
+5. No change to snapshot execution logic — only the trigger path changes
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 87-01-PLAN.md — Route `POST /snapshot` through BullMQ with deterministic jobId; add job-status polling endpoint; update frontend to poll instead of awaiting
+
+### Phase 88: CLAUDE.md accuracy refresh
+
+**Goal:** CLAUDE.md `Known Issues / Technical Debt` section is updated to reflect actual v6.0 codebase state — items fixed across v1.0-v6.0 are removed or marked resolved, and the remaining genuinely-open items are accurate.
+**Depends on:** Phase 87
+**Requirements:** DOCS-01
+**Success Criteria** (what must be TRUE):
+
+1. Each item in the Known Issues list is verified against the codebase: removed if fixed, updated if partially fixed, or retained with an accurate description if still open
+2. Any new technical debt introduced in v6.0 not already tracked is added
+3. AGENTS.md `Known gaps` sections are updated to match
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 88-01-PLAN.md — Audit CLAUDE.md known issues against actual code; update AGENTS.md agent-level gap sections; commit
