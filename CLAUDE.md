@@ -24,7 +24,7 @@ packages/
     workers/           # BullMQ snapshot worker
   frontend/src/
     app/               # Next.js App Router pages
-    lib/api.ts         # API client (currently unused - pages hardcode localhost:3001)
+    lib/api.ts         # API client used by all pages
 ```
 
 ## Database (PostgreSQL via Kysely)
@@ -98,7 +98,7 @@ Each agent is an isolated class in `packages/backend/src/agents/`. Agents should
 
 ### Unimplemented Agents
 
-**DraftAssistantAgent** - Snake draft recommendations, auction valuations, scarcity analysis
+*(All core agents implemented — see Chrome extension package for draft assistance functionality)*
 
 ## API Endpoints
 
@@ -160,15 +160,9 @@ Projected values combine current-to-date components + remaining-season projected
 
 ## Known Issues / Technical Debt
 
-1. Free agent pool never fetched from ESPN
-2. PlayerIdentityResolution not wired into projections ingest
-3. Frontend `api.ts` client library exists but is never used (all pages hardcode localhost:3001)
-4. No shared frontend components - all UI duplicated per-page
-5. Recharts installed but not used (trends page renders tables)
-6. Home page links to `/projections`, `/waivers`, `/trends` which are 404s (correct routes are under `/leagues/[id]/...`)
-7. ESPN auth cookies stored in plaintext (design doc requires encrypted-at-rest)
-8. TradeRecommendationAgent doesn't handle rate stat adjustments (counting stats only)
-9. DraftAssistantAgent not implemented (Chrome extension built separately)
-10. **Chrome Extension**: No API token system - extension uses session-based auth via browser cookies (works for local dev, requires tokens for production)
-11. **Chrome Extension**: ESPN DOM selectors are placeholders - must be verified against real ESPN draft page
-12. **Chrome Extension**: User team ID detection not implemented - requires manual configuration
+1. **Chrome Extension**: No API token system — extension uses session-based auth via browser cookies (works for local dev, requires tokens for production)
+2. No shared frontend design system — shared components exist (Button, Card, Heading, Text, etc.) but no global theme tokens or Storybook catalog
+3. `category-total` and `projected-category` time series endpoints not yet implemented (see timeseries.ts)
+4. WaiverRecommendationAgent delta simulation returns hardcoded 0.5 (real delta calc not implemented)
+5. SnapshotOrchestratorAgent does not ingest transaction events (league_transaction_event table stays empty)
+6. Manual snapshot endpoint now returns 202 (async) — frontend should poll `GET /snapshot/status/:jobId` for completion rather than blocking

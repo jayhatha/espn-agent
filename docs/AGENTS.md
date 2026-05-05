@@ -111,7 +111,6 @@ Transforms the raw ESPN JSON into `ESPNLeagueData` with typed `settings`, `teams
 
 - No retry/backoff at the module level (relies on axios-retry at the HTTP layer only).
 - LRU cache is in-process memory — not shared across worker processes.
-- Free agents returned by `normalizeLeagueData` are often empty because ESPN's `kona_player_info` view does not always include them unless the `xFantasyFilter` is configured correctly.
 - No activity feed parsing — `transactions` field in `ESPNLeagueData` is a stub.
 
 ---
@@ -181,9 +180,7 @@ Steps executed in order:
 
 ### Known Gaps
 
-- No distributed job lock — concurrent runs for the same (leagueId, snapshotDate) can race.
 - Transaction ingestion from ESPN is not implemented (no `league_transaction_event` writes during snapshot).
-- ESPN auth cookies stored in plaintext in the `league` table (design doc requires encrypted-at-rest).
 
 ---
 
@@ -544,7 +541,6 @@ Returns top `maxRecommendations` (default 10) `WaiverRecommendation` objects wit
 ### Known Gaps
 
 - `StandingsProjectionAgent` is passed in but never called (annotated `@ts-expect-error reserved for future standings-based scoring`).
-- Free-agent pool quality depends on how well `league_free_agent_snapshot` is populated by the snapshot orchestrator — historically empty before `PlayerPoolSyncAgent` was added.
 
 ---
 
@@ -607,7 +603,6 @@ Simulates the post-trade roster and checks that all required position slots can 
 
 ### Known Gaps
 
-- Rate stat adjustments not fully implemented — trade delta simulation treats rate stats the same as counting stats, which over/understates impact when trade volume differs significantly.
 - `POSITION_SCARCITY` multipliers are hardcoded constants, not derived from live league data.
 
 ---
