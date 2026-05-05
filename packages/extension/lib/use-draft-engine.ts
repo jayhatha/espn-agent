@@ -45,7 +45,14 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   // Async bid state — updated when bid optimizer worker completes
   const [asyncBid, setAsyncBid] = useState<BidOptimizerWorkerResponse | null>(null);
 
-  // Reset async results when the cache key changes (new pick or new nomination)
+  // Pre-index rankings by normalized lowercase name for O(1) lookup during render
+  const rankingsMap = useMemo(() => {
+    const map = new Map<string, typeof rankings[0]>();
+    for (const r of rankings) {
+      map.set(r.playerName.toLowerCase(), r);
+    }
+    return map;
+  }, [rankings]);
   // so stale results don't persist after state transitions.
   // Include currentPlayerName — playerId may be a hash fallback that doesn't change.
   useEffect(() => {
@@ -135,9 +142,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
 
     // Apply strategy caps (SP tier, pitcher dampening, hitter budget, etc.)
     if (mergedOptimization && currentPlayerName) {
-      const ranking = rankings.find(
-        (r) => r.playerName.toLowerCase() === currentPlayerName.toLowerCase(),
-      );
+      const ranking = rankingsMap.get(currentPlayerName.toLowerCase());
 
       // Use ranking positions, falling back to DOM-detected positions from the auction player
       const playerPositions = ranking?.positions ?? currentAuctionPlayer?.positions ?? [];
@@ -151,7 +156,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       const spCount = draftedSPs.length;
       const draftedSpPrices = draftedSPs.map(p => p.cost ?? 0);
       const draftedSpTierCaps = draftedSPs.map(p => {
-        const spRanking = rankings.find(r => r.playerName.toLowerCase() === p.playerName.toLowerCase());
+        const spRanking = rankingsMap.get(p.playerName.toLowerCase());
         return getRankBasedTierCap(spRanking?.externalRank);
       });
 
@@ -305,5 +310,5 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       simulation: asyncSimulation ?? baseSignals.simulation,
     };
   }, [baseSignals, asyncSimulation, asyncBid, currentPlayerName,
-      rankings, myRoster, pitcherHitterSplit]);
+      rankingsMap, myRoster, pitcherHitterSplit]);
 }

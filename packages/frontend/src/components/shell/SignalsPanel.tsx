@@ -115,7 +115,7 @@ export function SignalsPanel() {
   }, [id]);
 
   const { data: waiverData, isLoading: waiverLoading } = useQuery({
-    queryKey: ["waivers-recommendations", id, teamId],
+    queryKey: ["waivers-recommendations", id, teamId, 5],
     queryFn: () =>
       api.getWaiverRecommendations(parseInt(id, 10), teamId!, {
         maxRecommendations: 5,

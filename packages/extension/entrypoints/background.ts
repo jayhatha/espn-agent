@@ -5,12 +5,19 @@ export default defineBackground(() => {
   logger.log('[ESPN Draft Assistant] Background service worker initialized');
 
   // ─── WebSocket Relay (mobile companion) ────────────────────────────────────
+  const DEFAULT_BACKEND_URL = 'http://localhost:3001';
+
   let draftWs: WebSocket | null = null;
   let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
   let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let reconnectDelay = 3000;
 
-  function connectDraftRelay() {
+  function deriveWsUrl(httpUrl: string): string {
+    const normalized = (httpUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+    return normalized.replace(/^http(s)?:\/\//, 'ws$1://') + '/draft/live?role=extension';
+  }
+
+  async function connectDraftRelay() {
     if (
       draftWs?.readyState === WebSocket.OPEN ||
       draftWs?.readyState === WebSocket.CONNECTING
@@ -18,7 +25,10 @@ export default defineBackground(() => {
       return;
     }
 
-    draftWs = new WebSocket('ws://localhost:3001/draft/live?role=extension');
+    const { backendUrl } = await chrome.storage.local.get(['backendUrl']);
+    const wsUrl = deriveWsUrl(backendUrl as string | undefined ?? DEFAULT_BACKEND_URL);
+
+    draftWs = new WebSocket(wsUrl);
 
     draftWs.addEventListener('open', () => {
       logger.log('[ESPN Draft Assistant] WS relay connected to hub');
@@ -68,7 +78,7 @@ export default defineBackground(() => {
         `[ESPN Draft Assistant] WS relay disconnected — reconnecting in ${reconnectDelay}ms`,
       );
 
-      reconnectTimeout = setTimeout(connectDraftRelay, reconnectDelay);
+      reconnectTimeout = setTimeout(() => { void connectDraftRelay(); }, reconnectDelay);
       reconnectDelay = Math.min(reconnectDelay * 1.5, 30_000);
     });
 
@@ -206,7 +216,7 @@ export default defineBackground(() => {
   // ─── End Storage Change Listener ──────────────────────────────────────────
 
   // Auto-connect WS relay on background SW startup
-  connectDraftRelay();
+  void connectDraftRelay();
 });
 
 async function handleGetRankings(payload: { leagueId: string }) {

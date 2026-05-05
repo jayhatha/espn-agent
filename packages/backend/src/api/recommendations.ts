@@ -2,12 +2,20 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
 import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
 import { StandingsProjectionAgent } from "../agents/standings-projection.js";
-import { TradeRecommendationAgent, type ProposedTrade } from "../agents/trade-recommendation.js";
+import {
+  TradeRecommendationAgent,
+  type ProposedTrade,
+} from "../agents/trade-recommendation.js";
 import { ESPNAdapter } from "../adapters/espn.js";
-import { PitcherlistAdapter, normalizePitcherName } from "../adapters/pitcherlist.js";
+import {
+  PitcherlistAdapter,
+  normalizePitcherName,
+} from "../adapters/pitcherlist.js";
+import { AdvancedStatsAdapter } from "../adapters/advanced-stats.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { authenticate } from "../middleware/auth.js";
 
 /**
  * Recommendations API Routes
@@ -17,13 +25,24 @@ import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 export async function recommendationsRoutes(app: FastifyInstance) {
   const db = getDb();
 
+  // Singleton adapters — created once per server startup so their LRU caches
+  // survive across requests instead of being discarded after every response.
+  const espnAdapter = new ESPNAdapter(app.log);
+  const pitcherlistAdapter = new PitcherlistAdapter(app.log);
+  const advancedStatsAdapter = new AdvancedStatsAdapter(app.log);
+
   // List available free agents
   app.get(
     "/api/leagues/:leagueId/free-agents",
+    { onRequest: [authenticate] },
     async (
       request: FastifyRequest<{
         Params: { leagueId: string };
-        Querystring: { snapshotDate?: string; limit?: string; position?: string };
+        Querystring: {
+          snapshotDate?: string;
+          limit?: string;
+          position?: string;
+        };
       }>,
       reply: FastifyReply,
     ) => {
@@ -34,7 +53,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       // Fetch league credentials (encrypted in DB)
       const league = await db
         .selectFrom("league")
-        .select(["id", "espn_league_id", "season", "espn_swid_encrypted", "espn_s2_encrypted"])
+        .select([
+          "id",
+          "espn_league_id",
+          "season",
+          "espn_swid_encrypted",
+          "espn_s2_encrypted",
+        ])
         .where("id", "=", leagueId)
         .executeTakeFirst();
 
@@ -52,7 +77,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
               espn_s2: decryptToken(league.espn_s2_encrypted as any),
             };
           } catch (error) {
-            request.log.error({ error }, "Failed to decrypt ESPN cookies for free agents");
+            request.log.error(
+              { error },
+              "Failed to decrypt ESPN cookies for free agents",
+            );
           }
         }
       }
@@ -71,11 +99,12 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const espnAdapter = new ESPNAdapter(request.log);
-
         // Build position filter from querystring
         const positions = position
-          ? position.split(",").map((p) => p.trim()).filter(Boolean)
+          ? position
+              .split(",")
+              .map((p) => p.trim())
+              .filter(Boolean)
           : undefined;
 
         // Fetch live free agents from ESPN (includes pctOwned, pctStarted)
@@ -104,6 +133,25 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         // ESPN player IDs — player.id IS the ESPN player ID (migration 016)
         const espnPlayerIds = freeAgentData.map((fa) => fa.playerId);
 
+        const playerStats =
+          espnPlayerIds.length > 0
+            ? await db
+                .selectFrom("player")
+                .select(["id", "current_season_stats_json"])
+                .where("id", "in", espnPlayerIds)
+                .execute()
+            : [];
+
+        const currentStatsMap = new Map(
+          playerStats.map((player) => [
+            player.id,
+            (player.current_season_stats_json as Record<
+              string,
+              number
+            > | null) ?? null,
+          ]),
+        );
+
         let projMap = new Map<number, unknown>();
         if (snapshot?.projections_run_id && espnPlayerIds.length > 0) {
           // After migration 016, player.id IS the ESPN player ID
@@ -120,11 +168,25 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         }
 
         // Fetch PitcherList Top 100 SP rankings (6-hour cache, graceful degradation)
-        const plAdapter = new PitcherlistAdapter(request.log);
-        const top100 = await plAdapter.getTop100Rankings().catch(() => []);
+        const top100 = await pitcherlistAdapter.getTop100Rankings().catch(() => []);
         const plRankMap = new Map(
-          top100.map((entry) => [normalizePitcherName(entry.playerName), entry.rank]),
+          top100.map((entry) => [
+            normalizePitcherName(entry.playerName),
+            entry.rank,
+          ]),
         );
+
+        const advancedStatsMap =
+          await advancedStatsAdapter.getAdvancedStatsForPlayers(
+            league.season,
+            freeAgentData.map((player) => ({
+              playerId: player.playerId,
+              playerName: player.name,
+              mlbTeam: player.mlbTeam,
+              positions: player.positions,
+              currentStats: currentStatsMap.get(player.playerId) ?? null,
+            })),
+          );
 
         const enriched = freeAgentData.map((fa) => ({
           playerId: fa.playerId,
@@ -135,6 +197,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           pctOwned: fa.pctOwned,
           pctStarted: fa.pctStarted,
           projections: projMap.get(fa.playerId) || null,
+          currentStats: currentStatsMap.get(fa.playerId) ?? null,
+          advancedStats: advancedStatsMap.get(fa.playerId) ?? null,
           pitcherlistRank: plRankMap.get(normalizePitcherName(fa.name)) ?? null,
         }));
 
@@ -209,7 +273,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           playerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.projections_run_id", "run.id")
+                .innerJoin(
+                  "projections_run as run",
+                  "proj.projections_run_id",
+                  "run.id",
+                )
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",
@@ -258,6 +326,22 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           tenureMap.set(row.player_id, existing);
         }
 
+        const advancedStatsMap =
+          await advancedStatsAdapter.getAdvancedStatsForPlayers(
+            new Date(date).getFullYear(),
+            roster.map((player) => ({
+              playerId: player.player_id,
+              playerName: player.player_name,
+              mlbTeam: player.mlb_team,
+              positions: player.positions,
+              currentStats:
+                ((player as any).current_season_stats_json as Record<
+                  string,
+                  number
+                > | null) ?? null,
+            })),
+          );
+
         // Enrich roster with projection and tenure data (player.id IS ESPN ID after migration 016)
         const enrichedRoster = roster.map((player) => ({
           playerId: player.player_id,
@@ -269,6 +353,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           rosterSlot: player.roster_slot,
           projections: projectionMap.get(player.player_id) || null,
           currentStats: (player as any).current_season_stats_json || null,
+          advancedStats: advancedStatsMap.get(player.player_id) ?? null,
           tenureStats: (() => {
             const agg = tenureMap.get(player.player_id);
             return agg && Object.keys(agg).length > 0 ? agg : null;
@@ -292,7 +377,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
-        Body: { addPlayerId: number; dropPlayerId: number; snapshotDate?: string };
+        Body: {
+          addPlayerId: number;
+          dropPlayerId: number;
+          snapshotDate?: string;
+        };
       }>,
       reply: FastifyReply,
     ) => {
@@ -319,7 +408,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const espnAdapter = new ESPNAdapter(request.log);
         const standingsAgent = new StandingsProjectionAgent(db, request.log);
         const waiverAgent = new WaiverRecommendationAgent(
           db,
@@ -357,7 +445,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         if (!baseline) {
           return reply.code(404).send({
-            error: "No projected standings found. Please upload projections and run a snapshot first.",
+            error:
+              "No projected standings found. Please upload projections and run a snapshot first.",
           });
         }
 
@@ -375,7 +464,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
         // Find the specific recommendation for this swap
         const recommendation = recommendations.find(
-          (r) => r.addPlayerId === addPlayerId && r.dropPlayerId === dropPlayerId,
+          (r) =>
+            r.addPlayerId === addPlayerId && r.dropPlayerId === dropPlayerId,
         );
 
         if (recommendation) {
@@ -412,7 +502,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             },
             deltaOverallPoints: 0,
             categoryImpacts: [],
-            explanation: "This swap would not improve your projected standings.",
+            explanation:
+              "This swap would not improve your projected standings.",
             isLegal: true,
             snapshotDate: date,
           };
@@ -459,7 +550,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const espnAdapter = new ESPNAdapter(request.log);
       const standingsAgent = new StandingsProjectionAgent(db, request.log);
       const waiverAgent = new WaiverRecommendationAgent(
         db,
@@ -509,7 +599,8 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
       if (!trade || !trade.givePlayers || !trade.receivePlayers) {
         return reply.code(400).send({
-          error: "Invalid trade format. Must include givePlayers and receivePlayers.",
+          error:
+            "Invalid trade format. Must include givePlayers and receivePlayers.",
         });
       }
 
@@ -711,7 +802,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           allPlayerIds.length > 0
             ? await db
                 .selectFrom("player_projection as proj")
-                .innerJoin("projections_run as run", "proj.projections_run_id", "run.id")
+                .innerJoin(
+                  "projections_run as run",
+                  "proj.projections_run_id",
+                  "run.id",
+                )
                 .select([
                   "proj.player_id",
                   "proj.stat_components_json",

@@ -7,7 +7,7 @@
 - ✅ **v3.0 Draft Automation & Mobile Command Center** - Phases 39-42 (shipped 2026-03-14)
 - ✅ **v4.0 Personal Season Setup** - Phases 43-46 (shipped 2026-03-15)
 - ✅ **v5.0 Draft Engine Spec Alignment** - Phases 48-64 (shipped 2026-03-23)
-- 🚧 **v6.0 In-Season Command Center** - Phases 65-70 (in progress)
+- ✅ **v6.0 In-Season Command Center** - Phases 65-85 (shipped 2026-05-04)
 
 ## Phases
 
@@ -46,7 +46,7 @@ Phases 48-64: Nomination strategy rework, positional weights and SP tiers, infla
 
 </details>
 
-### v6.0 In-Season Command Center (Complete — 2026-04-23)
+### v6.0 In-Season Command Center (Complete — 2026-05-04)
 
 **Milestone Goal:** Transform the in-season dashboard into a Linear-style dark trading terminal — on-pace roto tracker, category opportunity map, FAAB pacing, GS pacing with SP start planner, roto-point-aware waiver and trade analysis, and automatic trade finder.
 
@@ -356,3 +356,25 @@ Plans:
 
 - [x] 84-01-PLAN.md — Backend: add event_source column to standings_change_event; filter change-log API endpoint to live-only events via ?source=live param; tag live-poll events vs snapshot events at write time
 - [x] 84-02-PLAN.md — Frontend: rename Change Log → Streaming Results (nav + page); history feed filtered to live events only; stat abbreviation chips on EventCard (HR/SB/ERA etc.) with full category name alongside
+
+### Phase 85: Waiver page advanced stats columns
+
+**Goal:** Add advanced hitter and pitcher stat columns to the waiver page, including K-BB%, K/9, FIP, xFIP, xERA, SIERA, BABIP, xBA, xSLG, xwOBA, and ISO
+**Depends on:** Phase 84
+**Requirements:** WAIVER-ADV-01, WAIVER-ADV-02, WAIVER-ADV-03
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 85-01-PLAN.md — Backend/API advanced-stats enrichment + waiver UI columns
+
+### Phase 86: Architecture and Performance — address A1-A8 findings from review
+
+**Goal:** Resolve all 8 architectural and performance findings from the May 2026 codebase review: unify extension endpoint config, promote adapters to singletons, batch standings projection reads, fix React Query key collisions, batch snapshot team writes, pre-index draft board rankings, and centralize query-key factories.
+**Depends on:** Phase 85
+**Requirements:** ARCH-A1, ARCH-A2, ARCH-A3, ARCH-A4, ARCH-A5, ARCH-A6, ARCH-A7, ARCH-A8
+**Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 86-01-PLAN.md — All A1-A8 architecture and performance fixes

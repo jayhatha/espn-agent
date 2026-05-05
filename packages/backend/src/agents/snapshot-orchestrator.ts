@@ -238,25 +238,28 @@ export class SnapshotOrchestratorAgent {
           )
           .execute();
 
-        // Write teams and collect DB team IDs
+        // Write teams in a single batch upsert and collect DB team IDs
         const espnTeamIdToDbId = new Map<number, number>();
-        for (const team of normalized.teams) {
-          const result = await trx
+        if (normalized.teams.length > 0) {
+          const teamRows = normalized.teams.map((team) => ({
+            league_id: leagueId,
+            espn_team_id: team.id,
+            name: team.name,
+            created_at: new Date(),
+          }));
+          const upsertedTeams = await trx
             .insertInto("team")
-            .values({
-              league_id: leagueId,
-              espn_team_id: team.id,
-              name: team.name,
-              created_at: new Date(),
-            })
+            .values(teamRows)
             .onConflict((oc) =>
-              oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
-                name: team.name,
-              }),
+              oc.columns(["league_id", "espn_team_id"]).doUpdateSet((eb) => ({
+                name: eb.ref("excluded.name"),
+              })),
             )
-            .returning("id")
-            .executeTakeFirstOrThrow();
-          espnTeamIdToDbId.set(team.id, result.id);
+            .returning(["id", "espn_team_id"])
+            .execute();
+          for (const row of upsertedTeams) {
+            espnTeamIdToDbId.set(row.espn_team_id, row.id);
+          }
         }
 
         // Write players and roster snapshots

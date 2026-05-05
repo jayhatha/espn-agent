@@ -152,24 +152,17 @@ function LeagueDetailPageContent() {
       return api.triggerSnapshot(parseInt(leagueId, 10));
     },
     onSuccess: () => {
-      // Invalidate all queries that depend on snapshot data
-      queryClient.invalidateQueries({ queryKey: ["league", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["league-teams", leagueId] });
+      // Invalidate all queries carrying this leagueId so the dashboard refreshes
+      // atomically rather than in separate waves.
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey as unknown[];
+          // Match any query whose key includes leagueId (string or number) at any position
+          return key.some((k) => k === leagueId || k === parseInt(leagueId, 10));
+        },
+      });
+      // team-overview doesn't carry leagueId — invalidate by prefix
       queryClient.invalidateQueries({ queryKey: ["team-overview"] });
-      queryClient.invalidateQueries({ queryKey: ["standings", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-timeseries", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["timeseries-overall", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["timeseries-projected", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["timeseries-category", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["timeseries-category-total", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["roster", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["waivers", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["sit-start", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["streaming-pitchers", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["gs-summary", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["gs-weekly", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["topbar-projected", leagueId] });
-      queryClient.invalidateQueries({ queryKey: ["faab-summary", leagueId] });
     },
   });
 
@@ -190,7 +183,7 @@ function LeagueDetailPageContent() {
 
   // Waiver recommendations for dashboard
   const { data: waiverRecs } = useQuery({
-    queryKey: ['waivers-recommendations', leagueId, selectedTeamId],
+    queryKey: ['waivers-recommendations', leagueId, selectedTeamId, 3],
     queryFn: () => api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId!, { maxRecommendations: 3 }),
     enabled: !!selectedTeamId,
   });

@@ -84,7 +84,7 @@ export class StandingsProjectionAgent {
       .execute();
 
     // Fetch shared data once for all teams (parallel)
-    const [projectionAsOfDate, gsCap, latestPayload, teamEspnIds] = await Promise.all([
+    const [projectionAsOfDate, gsCap, latestPayload, teamEspnIds, allCategoryTotals, allRosterEntries, allProjections] = await Promise.all([
       this.getProjectionAsOfDate(projectionsRunId),
       this.getGsCap(leagueId),
       this.db
@@ -98,7 +98,56 @@ export class StandingsProjectionAgent {
         .select(["id", "espn_team_id"])
         .where("league_id", "=", leagueId)
         .execute(),
+      // Pre-fetch ALL category totals for the league+date in one query
+      this.db
+        .selectFrom("team_daily_category_totals")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", snapshotDate)
+        .execute(),
+      // Pre-fetch ALL roster entries for the league+date in one query
+      this.db
+        .selectFrom("team_roster_snapshot as r")
+        .innerJoin("player as p", "p.id", "r.player_id")
+        .select([
+          "r.team_id",
+          "r.player_id",
+          "r.roster_status",
+          "r.roster_slot",
+          "p.positions",
+        ])
+        .where("r.league_id", "=", leagueId)
+        .where("r.snapshot_date", "=", snapshotDate)
+        .execute(),
+      // Pre-fetch ALL player projections for this run in one query
+      this.db
+        .selectFrom("player_projection")
+        .select(["player_id", "stat_components_json"])
+        .where("projections_run_id", "=", projectionsRunId)
+        .execute(),
     ]);
+
+    // Group category totals by team_id
+    const categoryTotalsByTeam = new Map<number, typeof allCategoryTotals>();
+    for (const row of allCategoryTotals) {
+      const existing = categoryTotalsByTeam.get(row.team_id) ?? [];
+      existing.push(row);
+      categoryTotalsByTeam.set(row.team_id, existing);
+    }
+
+    // Group roster entries by team_id
+    const rosterByTeam = new Map<number, typeof allRosterEntries>();
+    for (const row of allRosterEntries) {
+      const existing = rosterByTeam.get(row.team_id) ?? [];
+      existing.push(row);
+      rosterByTeam.set(row.team_id, existing);
+    }
+
+    // Index all projections by player_id
+    const projectionsByPlayerId = new Map<number, StatComponents>();
+    for (const proj of allProjections) {
+      projectionsByPlayerId.set(proj.player_id, proj.stat_components_json as StatComponents);
+    }
 
     // Batch extract GS used per team from single ESPN payload (0 extra queries)
     const espnIdMap = new Map(teamEspnIds.map((t) => [t.id, t.espn_team_id]));
@@ -111,19 +160,20 @@ export class StandingsProjectionAgent {
       gsUsedByTeam.set(team.id, typeof gs === "number" && gs >= 0 ? gs : 0);
     }
 
-    // Compute projections for each team in parallel
+    // Compute projections for each team in parallel (pure — no DB calls per team)
     const teamProjections = await Promise.all(
       teams.map((team) =>
         this.computeTeamProjection(
-          leagueId,
-          snapshotDate,
           team.id,
-          projectionsRunId,
           categories,
           rosterSlots,
           gsUsedByTeam.get(team.id) ?? 0,
           gsCap,
           projectionAsOfDate,
+          snapshotDate,
+          categoryTotalsByTeam,
+          rosterByTeam,
+          projectionsByPlayerId,
         ),
       ),
     );
@@ -143,59 +193,29 @@ export class StandingsProjectionAgent {
   }
 
   /**
-   * Compute projected totals for a single team using allocateProjections
+   * Compute projected totals for a single team using pre-fetched league data.
+   * Pure over pre-loaded structures — makes no DB calls.
    */
   private async computeTeamProjection(
-    leagueId: number,
-    snapshotDate: string,
     teamId: number,
-    projectionsRunId: number,
     categories: Category[],
     rosterSlots: Record<string, number>,
     gsUsed: number,
     gsCap: number,
     projectionAsOfDate: string,
+    snapshotDate: string,
+    categoryTotalsByTeam: Map<number, Array<{ team_id: number; category_id: string; value: unknown; components_json: unknown }>>,
+    rosterByTeam: Map<number, Array<{ team_id: number; player_id: number; roster_status: string | null; roster_slot: string | null; positions: unknown }>>,
+    allProjectionsByPlayerId: Map<number, StatComponents>,
   ): Promise<TeamProjection> {
-    // Parallel fetch: current totals + roster (independent queries)
-    const [currentTotals, roster] = await Promise.all([
-      this.db
-        .selectFrom("team_daily_category_totals")
-        .selectAll()
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", snapshotDate)
-        .where("team_id", "=", teamId)
-        .execute(),
-      this.db
-        .selectFrom("team_roster_snapshot as r")
-        .innerJoin("player as p", "p.id", "r.player_id")
-        .select([
-          "r.player_id",
-          "r.roster_status",
-          "r.roster_slot",
-          "p.positions",
-        ])
-        .where("r.league_id", "=", leagueId)
-        .where("r.snapshot_date", "=", snapshotDate)
-        .where("r.team_id", "=", teamId)
-        .execute(),
-    ]);
+    const currentTotals = categoryTotalsByTeam.get(teamId) ?? [];
+    const roster = rosterByTeam.get(teamId) ?? [];
 
-    // Get projections for roster players (depends on roster result)
-    const playerIds = roster.map((r) => r.player_id);
-    const projections =
-      playerIds.length > 0
-        ? await this.db
-            .selectFrom("player_projection")
-            .selectAll()
-            .where("projections_run_id", "=", projectionsRunId)
-            .where("player_id", "in", playerIds)
-            .execute()
-        : [];
-
-    // Build projectionsByPlayerId map for the allocator
+    // Slice projections for this team's roster from the league-wide map
     const projectionsByPlayerId = new Map<number, StatComponents>();
-    for (const proj of projections) {
-      projectionsByPlayerId.set(proj.player_id, proj.stat_components_json as StatComponents);
+    for (const r of roster) {
+      const proj = allProjectionsByPlayerId.get(r.player_id);
+      if (proj) projectionsByPlayerId.set(r.player_id, proj);
     }
 
     // Build RosteredPlayer array for the allocator
@@ -281,42 +301,57 @@ export class StandingsProjectionAgent {
         const currentComponents = (currentTotal?.components_json ||
           {}) as StatComponents;
 
-        try {
-          const finalValue = calculateFinalRate(
-            category.formula_id || category.stat_key.toLowerCase(),
-            currentComponents,
-            projectedComponents,
-          );
+        // If no projected denominator data exists, fall back to current ESPN rate value.
+        // Batting rates need AB > 0; pitching rates need IP > 0.
+        // Without a denominator, the formula returns 0 which is misleading.
+        const denominatorKey = isPitchingCat ? "IP" : "AB";
+        const projectedDenominator = (projectedComponents[denominatorKey] as number) ?? 0;
 
-          const combinedComponents = combineComponents(currentComponents, projectedComponents);
-
-          // Compute rate stat confidence by varying components
-          const formulaId = category.formula_id || category.stat_key.toLowerCase();
-          const rateFn = (c: StatComponents) => {
-            try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
-          };
-          const componentKeys = Object.keys(projectedComponents).filter(
-            (k) => typeof projectedComponents[k] === "number" && (projectedComponents[k] as number) > 0,
-          );
-          const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
-
+        if (projectedDenominator <= 0) {
+          // No projected components available — use current ESPN rate to avoid showing 0
           categoryProjections.set(category.category_id, {
-            value: finalValue,
-            components: combinedComponents,
-            isDegraded: false,
-            confidence: rateCI,
-          });
-        } catch (error) {
-          this.logger?.warn(
-            { category: category.category_id, error },
-            "Failed to calculate rate stat, marking degraded",
-          );
-
-          categoryProjections.set(category.category_id, {
-            value: Number(currentTotal?.value || 0),
+            value: Number(currentTotal?.value ?? 0),
             components: currentComponents,
             isDegraded: true,
           });
+        } else {
+          try {
+            const finalValue = calculateFinalRate(
+              category.formula_id || category.stat_key.toLowerCase(),
+              currentComponents,
+              projectedComponents,
+            );
+
+            const combinedComponents = combineComponents(currentComponents, projectedComponents);
+
+            // Compute rate stat confidence by varying components
+            const formulaId = category.formula_id || category.stat_key.toLowerCase();
+            const rateFn = (c: StatComponents) => {
+              try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
+            };
+            const componentKeys = Object.keys(projectedComponents).filter(
+              (k) => typeof projectedComponents[k] === "number" && (projectedComponents[k] as number) > 0,
+            );
+            const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
+
+            categoryProjections.set(category.category_id, {
+              value: finalValue,
+              components: combinedComponents,
+              isDegraded: false,
+              confidence: rateCI,
+            });
+          } catch (error) {
+            this.logger?.warn(
+              { category: category.category_id, error },
+              "Failed to calculate rate stat, marking degraded",
+            );
+
+            categoryProjections.set(category.category_id, {
+              value: Number(currentTotal?.value || 0),
+              components: currentComponents,
+              isDegraded: true,
+            });
+          }
         }
       }
     }

@@ -113,7 +113,7 @@ export function LeagueNav() {
   const leagueId = id ? parseInt(id, 10) : 0;
 
   const { data: waiverData } = useQuery({
-    queryKey: ["waivers-recommendations", id, teamId],
+    queryKey: ["waivers-recommendations", id, teamId, 5],
     queryFn: () =>
       api.getWaiverRecommendations(leagueId, teamId!, {
         maxRecommendations: 5,
