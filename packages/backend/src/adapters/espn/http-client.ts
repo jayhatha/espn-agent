@@ -30,29 +30,29 @@ import {
   ESPN_STAT_MAP,
 } from "./constants.js";
 
-// Serialize all ESPN API calls through a single-concurrency queue
-// to prevent concurrent callers from bypassing the 2-second throttle.
-const espnThrottle = pLimit(1);
-let lastEspnCall = 0;
-
-async function throttledEspnCall<T>(fn: () => Promise<T>): Promise<T> {
-  return espnThrottle(async () => {
-    const now = Date.now();
-    const timeSinceLastCall = now - lastEspnCall;
-    if (timeSinceLastCall < 2000) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, 2000 - timeSinceLastCall),
-      );
-    }
-    lastEspnCall = Date.now();
-    return fn();
-  });
-}
-
 export class EspnHttpClient {
   private client: AxiosInstance;
   private cache: LRUCache<string, { data: unknown; expiresAt: number }>;
   private lastRequestTime: number = 0;
+  // Serialize all ESPN API calls through a single-concurrency queue
+  // to prevent concurrent callers from bypassing the 2-second throttle.
+  // Instance-level so each adapter instance has isolated state (safe for tests).
+  private espnThrottle = pLimit(1);
+  private lastEspnCall = 0;
+
+  private async throttledEspnCall<T>(fn: () => Promise<T>): Promise<T> {
+    return this.espnThrottle(async () => {
+      const now = Date.now();
+      const timeSinceLastCall = now - this.lastEspnCall;
+      if (timeSinceLastCall < 2000) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 2000 - timeSinceLastCall),
+        );
+      }
+      this.lastEspnCall = Date.now();
+      return fn();
+    });
+  }
   private validator: EspnResponseValidator;
 
   constructor(private logger?: BaseLogger) {
@@ -278,7 +278,7 @@ export class EspnHttpClient {
         "Fetching ESPN league data",
       );
 
-      const response = await throttledEspnCall(() =>
+      const response = await this.throttledEspnCall(() =>
         this.client.get(url, { params, headers }),
       );
 
@@ -410,7 +410,7 @@ export class EspnHttpClient {
         "Fetching ESPN free agents",
       );
 
-      const response = await throttledEspnCall(() =>
+      const response = await this.throttledEspnCall(() =>
         this.client.get(url, { params, headers }),
       );
 
@@ -481,7 +481,7 @@ export class EspnHttpClient {
 
       this.logger?.info({ leagueId, season }, "Fetching ESPN transactions");
 
-      const response = await throttledEspnCall(() =>
+      const response = await this.throttledEspnCall(() =>
         this.client.get(url, { params, headers }),
       );
 
@@ -634,7 +634,7 @@ export class EspnHttpClient {
           "Fetching ESPN pre-draft auction values batch",
         );
 
-        const response = await throttledEspnCall(() =>
+        const response = await this.throttledEspnCall(() =>
           this.client.get(url, { params, headers }),
         );
 
@@ -826,7 +826,7 @@ export class EspnHttpClient {
           "Fetching global draft data batch",
         );
 
-        const response = await throttledEspnCall(() =>
+        const response = await this.throttledEspnCall(() =>
           this.client.get(url, { params, headers }),
         );
 

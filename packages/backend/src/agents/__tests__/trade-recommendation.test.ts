@@ -641,7 +641,7 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
   // stat_components_json must be a plain object (Postgres JSONB auto-parses in production)
   // Player 101 (traded away): H=50, AB=200
   // Player 102 (acquired): H=70, AB=200
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 101,
       projections_run_id: 1,
@@ -699,7 +699,7 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 201, player_name: "Traded Pitcher", positions: ["SP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 201,
       projections_run_id: 2,
@@ -757,7 +757,7 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
     { player_id: 301, player_name: "Player Out", positions: ["1B"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 301,
       projections_run_id: 3,
@@ -814,7 +814,7 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
     { player_id: 401, player_name: "Pitcher Out", positions: ["RP"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 401,
       projections_run_id: 4,
@@ -870,7 +870,7 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
     { player_id: 501, player_name: "Same Player", positions: ["OF"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 501,
       projections_run_id: 5,
@@ -987,7 +987,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     { player_id: 702, player_name: "Player B", positions: ["1B"], roster_status: "active" },
   ]);
 
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 701,
       projections_run_id: 7,
@@ -1062,7 +1062,7 @@ function setupMockForSVTest(mockDb: any, leagueId: number, teamId: number, snaps
   // Closer (player 801): 25 projected saves, 55 IP
   // SP (player 802): 0 projected saves, 180 IP
   // When projections_run_id is set, primary path uses player_projection_player_list
-  mockDb._setMockResult("player_projection_player_list", [
+  mockDb._setMockResult("player_projection_list", [
     {
       player_id: 801,
       projections_run_id: 8,
