@@ -59,7 +59,7 @@ export class LivePollAgent {
       .where("id", "=", leagueId)
       .executeTakeFirstOrThrow();
 
-    // 2. Fetch ESPN — lightweight views only (no rosters, no free agents)
+    // 2. Fetch ESPN — first call for overall roto points and settings (no roster filter)
     // Auth: env vars take priority; fall back to DB-stored encrypted credentials
     const auth = getEspnAuthFromEnv() ?? getEspnAuthFromLeague(league);
     if (!auth) {
@@ -74,16 +74,7 @@ export class LivePollAgent {
       leagueId: league.espn_league_id,
       season: league.season,
       auth,
-      views: ["mSettings", "mTeam", "mStandings", "mLiveScoring"],
-      // filterStatsForSplitTypeIds: [5] = current scoring period (live/today)
-      // filterStatsForSourceIds: [0] = real-time source
-      // This is what ESPN's own standings page sends to get live stats
-      xFantasyFilter: {
-        players: {
-          filterStatsForSourceIds: { value: [0] },
-          filterStatsForSplitTypeIds: { value: [5] },
-        },
-      },
+      views: ["mSettings", "mTeam", "mLiveScoring"],
     });
     const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
     const { teams, settings } = normalized;
@@ -110,16 +101,77 @@ export class LivePollAgent {
       dbTeams.map((t) => [t.espn_team_id, t.id]),
     );
 
-    // 3a. Build ESPN live point totals: dbTeamId → (espnPoints + espnPointsDelta).
-    // During active game windows, pointsDelta carries the live delta for in-progress
-    // games that haven't been baked into the batch-cached espnPoints yet.
-    // ESPN's website displays espnPoints + espnPointsDelta as the live roto total.
+    // 3a. Build ESPN live point totals from the aggregate call
     const espnLivePoints = new Map<number, number>();
     for (const team of teams) {
       const dbTeamId = espnTeamIdToDbId.get(team.id);
       if (!dbTeamId) continue;
       if (team.espnPoints !== undefined) {
-        espnLivePoints.set(dbTeamId, team.espnPoints + (team.espnPointsDelta ?? 0));
+        espnLivePoints.set(
+          dbTeamId,
+          team.espnPoints + (team.espnPointsDelta ?? 0),
+        );
+      }
+    }
+
+    // 3b. Load most recent prior-day category totals from DB as season-to-date base.
+    //     ESPN computes live standings as: cumulativeScoreDelayed (prev period season totals)
+    //     + today's live player stats from rosterForCurrentScoringPeriod.
+    //     We replicate this by using our DB snapshots (through yesterday) as the base.
+    const recentSnapshotDate = await this.db
+      .selectFrom("team_daily_category_totals")
+      .select("snapshot_date")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "<", today)
+      .orderBy("snapshot_date", "desc")
+      .executeTakeFirst();
+
+    // dbTeamId → categoryId (statKey) → season-to-date value through last snapshot
+    const baselineTotals = new Map<number, Record<string, number>>();
+    if (recentSnapshotDate) {
+      const baseRows = await this.db
+        .selectFrom("team_daily_category_totals")
+        .select(["team_id", "category_id", "value"])
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", recentSnapshotDate.snapshot_date)
+        .execute();
+      for (const row of baseRows) {
+        if (!baselineTotals.has(row.team_id)) {
+          baselineTotals.set(row.team_id, {});
+        }
+        baselineTotals.get(row.team_id)![row.category_id] = row.value;
+      }
+    }
+
+    // 3c. Per-team: fetch rosterForCurrentScoringPeriod to get today's live per-player stats.
+    //     These are added on top of the season-to-date baseline to produce current live totals.
+    const todayLiveStats = new Map<number, Record<number, number>>(); // dbTeamId → espnStatId → value
+
+    for (const team of teams) {
+      const dbTeamId = espnTeamIdToDbId.get(team.id);
+      if (!dbTeamId) continue;
+
+      try {
+        const rosterResp = await this.espnAdapter.fetchLeague({
+          leagueId: league.espn_league_id,
+          season: league.season,
+          auth,
+          views: ["mLiveScoring", "mRoster"],
+          rosterForTeamId: team.id,
+        });
+        const rosterStats = this.espnAdapter.parseRosterCurrentScoringPeriod(
+          rosterResp.data,
+        );
+        // Only use rosterForCurrentScoringPeriod if we got meaningful data
+        if (Object.keys(rosterStats).length > 0) {
+          todayLiveStats.set(dbTeamId, rosterStats);
+        }
+        // No fallback to statValues here — if empty, today's delta is 0 (no active games yet)
+      } catch (err) {
+        log.warn(
+          { err, leagueId, espnTeamId: team.id },
+          "LivePollAgent: rosterForCurrentScoringPeriod fetch failed — today's delta treated as 0",
+        );
       }
     }
 
@@ -190,13 +242,17 @@ export class LivePollAgent {
       for (const team of teams) {
         const dbTeamId = espnTeamIdToDbId.get(team.id);
         if (!dbTeamId) continue;
+        const todayStats = todayLiveStats.get(dbTeamId) ?? {};
+        const baseline = baselineTotals.get(dbTeamId) ?? {};
         for (const cat of categories) {
+          const baseValue = baseline[cat.statKey] ?? 0;
+          const todayValue = todayStats[cat.espnStatId] ?? 0;
           totalsRows.push({
             league_id: leagueId,
             snapshot_date: today,
             team_id: dbTeamId,
             category_id: cat.statKey,
-            value: team.statValues[cat.espnStatId] ?? 0,
+            value: baseValue + todayValue,
             components_json: null,
           });
         }
@@ -223,10 +279,14 @@ export class LivePollAgent {
 
       for (const cat of categories) {
         const teamValues = teams
-          .map((t) => ({
-            dbTeamId: espnTeamIdToDbId.get(t.id)!,
-            value: t.statValues[cat.espnStatId] ?? 0,
-          }))
+          .map((t) => {
+            const dbTeamId = espnTeamIdToDbId.get(t.id)!;
+            const todayStats = todayLiveStats.get(dbTeamId) ?? {};
+            const baseline = baselineTotals.get(dbTeamId) ?? {};
+            const baseValue = baseline[cat.statKey] ?? 0;
+            const todayValue = todayStats[cat.espnStatId] ?? 0;
+            return { dbTeamId, value: baseValue + todayValue };
+          })
           .filter((tv) => tv.dbTeamId != null);
 
         teamValues.sort((a, b) =>

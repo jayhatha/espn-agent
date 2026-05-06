@@ -7,15 +7,15 @@ import {
   type ProposedTrade,
 } from "../agents/trade-recommendation.js";
 import { ESPNAdapter } from "../adapters/espn.js";
-import {
-  PitcherlistAdapter,
-  normalizePitcherName,
-} from "../adapters/pitcherlist.js";
+import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
 import { AdvancedStatsAdapter } from "../adapters/advanced-stats.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
+import type { StatComponents } from "../../../shared/dist/index.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
+import { FreeAgentView } from "./views/free-agent-view.js";
+import { TradeView } from "./views/trade-view.js";
 
 /**
  * Recommendations API Routes
@@ -31,59 +31,66 @@ export async function recommendationsRoutes(app: FastifyInstance) {
   const pitcherlistAdapter = new PitcherlistAdapter(app.log);
   const advancedStatsAdapter = new AdvancedStatsAdapter(app.log);
 
+  // Domain views — own query orchestration, adapters remain singleton
+  const freeAgentView = new FreeAgentView(
+    db,
+    espnAdapter,
+    pitcherlistAdapter,
+    advancedStatsAdapter,
+  );
+  const tradeView = new TradeView(db);
+
+  const getLeagueEspnContext = async (leagueId: number) => {
+    const league = await db
+      .selectFrom("league")
+      .select([
+        "id",
+        "espn_league_id",
+        "season",
+        "espn_swid_encrypted",
+        "espn_s2_encrypted",
+      ])
+      .where("id", "=", leagueId)
+      .executeTakeFirst();
+
+    if (!league) {
+      return null;
+    }
+
+    let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
+    if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
+      if (hasEncryptionKey()) {
+        try {
+          espnAuth = {
+            SWID: decryptToken(league.espn_swid_encrypted as any),
+            espn_s2: decryptToken(league.espn_s2_encrypted as any),
+          };
+        } catch (error) {
+          app.log.error({ error, leagueId }, "Failed to decrypt ESPN cookies");
+        }
+      }
+    }
+
+    return { league, espnAuth };
+  };
+
   // List available free agents
-  app.get(
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { snapshotDate?: string; limit?: string; position?: string };
+  }>(
     "/api/leagues/:leagueId/free-agents",
     { onRequest: [authenticate] },
-    async (
-      request: FastifyRequest<{
-        Params: { leagueId: string };
-        Querystring: {
-          snapshotDate?: string;
-          limit?: string;
-          position?: string;
-        };
-      }>,
-      reply: FastifyReply,
-    ) => {
+    async (request, reply) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const { snapshotDate, limit, position } = request.query;
       const maxPlayers = limit ? parseInt(limit, 10) : 300;
 
-      // Fetch league credentials (encrypted in DB)
-      const league = await db
-        .selectFrom("league")
-        .select([
-          "id",
-          "espn_league_id",
-          "season",
-          "espn_swid_encrypted",
-          "espn_s2_encrypted",
-        ])
-        .where("id", "=", leagueId)
-        .executeTakeFirst();
-
-      if (!league) {
+      const context = await getLeagueEspnContext(leagueId);
+      if (!context) {
         return reply.code(404).send({ error: "League not found" });
       }
-
-      // Build auth: env vars first, then encrypted DB fallback
-      let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
-      if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
-        if (hasEncryptionKey()) {
-          try {
-            espnAuth = {
-              SWID: decryptToken(league.espn_swid_encrypted as any),
-              espn_s2: decryptToken(league.espn_s2_encrypted as any),
-            };
-          } catch (error) {
-            request.log.error(
-              { error },
-              "Failed to decrypt ESPN cookies for free agents",
-            );
-          }
-        }
-      }
+      const { league, espnAuth } = context;
 
       // Get latest snapshot date if not provided
       let date = snapshotDate;
@@ -99,7 +106,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Build position filter from querystring
         const positions = position
           ? position
               .split(",")
@@ -107,102 +113,15 @@ export async function recommendationsRoutes(app: FastifyInstance) {
               .filter(Boolean)
           : undefined;
 
-        // Fetch live free agents from ESPN (includes pctOwned, pctStarted)
-        const freeAgentData = await espnAdapter.fetchFreeAgents({
-          leagueId: league.espn_league_id,
+        return await freeAgentView.fetch({
+          leagueId,
+          espnLeagueId: league.espn_league_id,
           season: league.season,
-          auth: espnAuth,
-          limit: maxPlayers,
+          espnAuth,
+          snapshotDate: date,
+          maxPlayers,
           positions,
         });
-
-        if (freeAgentData.length === 0) {
-          return { freeAgents: [], snapshotDate: date ?? null };
-        }
-
-        // Enrich with projections from DB if snapshot available
-        const snapshot = date
-          ? await db
-              .selectFrom("league_daily_snapshot")
-              .selectAll()
-              .where("league_id", "=", leagueId)
-              .where("snapshot_date", "=", date)
-              .executeTakeFirst()
-          : undefined;
-
-        // ESPN player IDs — player.id IS the ESPN player ID (migration 016)
-        const espnPlayerIds = freeAgentData.map((fa) => fa.playerId);
-
-        const playerStats =
-          espnPlayerIds.length > 0
-            ? await db
-                .selectFrom("player")
-                .select(["id", "current_season_stats_json"])
-                .where("id", "in", espnPlayerIds)
-                .execute()
-            : [];
-
-        const currentStatsMap = new Map(
-          playerStats.map((player) => [
-            player.id,
-            (player.current_season_stats_json as Record<
-              string,
-              number
-            > | null) ?? null,
-          ]),
-        );
-
-        let projMap = new Map<number, unknown>();
-        if (snapshot?.projections_run_id && espnPlayerIds.length > 0) {
-          // After migration 016, player.id IS the ESPN player ID
-          const projections = await db
-            .selectFrom("player_projection as pp")
-            .select(["pp.player_id", "pp.stat_components_json"])
-            .where("pp.projections_run_id", "=", snapshot.projections_run_id)
-            .where("pp.player_id", "in", espnPlayerIds)
-            .execute();
-
-          projMap = new Map(
-            projections.map((p) => [p.player_id, p.stat_components_json]),
-          );
-        }
-
-        // Fetch PitcherList Top 100 SP rankings (6-hour cache, graceful degradation)
-        const top100 = await pitcherlistAdapter.getTop100Rankings().catch(() => []);
-        const plRankMap = new Map(
-          top100.map((entry) => [
-            normalizePitcherName(entry.playerName),
-            entry.rank,
-          ]),
-        );
-
-        const advancedStatsMap =
-          await advancedStatsAdapter.getAdvancedStatsForPlayers(
-            league.season,
-            freeAgentData.map((player) => ({
-              playerId: player.playerId,
-              playerName: player.name,
-              mlbTeam: player.mlbTeam,
-              positions: player.positions,
-              currentStats: currentStatsMap.get(player.playerId) ?? null,
-            })),
-          );
-
-        const enriched = freeAgentData.map((fa) => ({
-          playerId: fa.playerId,
-          espnPlayerId: fa.playerId,
-          playerName: fa.name,
-          mlbTeam: fa.mlbTeam,
-          positions: fa.positions,
-          pctOwned: fa.pctOwned,
-          pctStarted: fa.pctStarted,
-          projections: projMap.get(fa.playerId) || null,
-          currentStats: currentStatsMap.get(fa.playerId) ?? null,
-          advancedStats: advancedStatsMap.get(fa.playerId) ?? null,
-          pitcherlistRank: plRankMap.get(normalizePitcherName(fa.name)) ?? null,
-        }));
-
-        return { freeAgents: enriched, snapshotDate: date ?? null };
       } catch (error) {
         request.log.error({ error }, "Failed to fetch free agents");
         return reply.code(500).send({
@@ -559,6 +478,120 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       );
 
       try {
+        let freeAgentPlayerIds: number[] | undefined;
+        const fallbackFreeAgentPlayers = new Map<
+          number,
+          { id: number; name: string; positions: string[] }
+        >();
+        const fallbackFreeAgentProjections = new Map<number, StatComponents>();
+
+        const snapshot = await db
+          .selectFrom("league_daily_snapshot")
+          .select("projections_run_id")
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", date)
+          .executeTakeFirst();
+
+        const filterToProjectedFreeAgents = async (playerIds: number[]) => {
+          if (playerIds.length === 0 || !snapshot?.projections_run_id) {
+            return playerIds;
+          }
+
+          const projectedFreeAgents = await db
+            .selectFrom("player_projection")
+            .select("player_id")
+            .where("projections_run_id", "=", snapshot.projections_run_id)
+            .where("player_id", "in", playerIds)
+            .execute();
+
+          return projectedFreeAgents.map((player) => player.player_id);
+        };
+
+        const addEspnFallbackProjections = async (playerIds: number[]) => {
+          if (playerIds.length === 0 || !context) {
+            return;
+          }
+
+          const liveIdSet = new Set(playerIds);
+          const draftData = await espnAdapter.fetchGlobalDraftData({
+            season: context.league.season,
+            limit: 1500,
+          });
+
+          for (const player of draftData) {
+            if (!liveIdSet.has(player.playerId) || !player.espnProjectedStats) {
+              continue;
+            }
+
+            fallbackFreeAgentPlayers.set(player.playerId, {
+              id: player.playerId,
+              name: player.playerName,
+              positions: player.positions,
+            });
+            fallbackFreeAgentProjections.set(
+              player.playerId,
+              player.espnProjectedStats as StatComponents,
+            );
+          }
+        };
+
+        const context = await getLeagueEspnContext(leagueId);
+        if (context) {
+          try {
+            const liveFreeAgents = await espnAdapter.fetchFreeAgents({
+              leagueId: context.league.espn_league_id,
+              season: context.league.season,
+              auth: context.espnAuth,
+              limit: 1500,
+            });
+            if (liveFreeAgents.length > 0) {
+              const liveIds = liveFreeAgents.map((player) => player.playerId);
+              const projectedLiveIds = await filterToProjectedFreeAgents(liveIds);
+              await addEspnFallbackProjections(liveIds);
+              freeAgentPlayerIds =
+                projectedLiveIds.length > 0
+                  ? [...new Set([...projectedLiveIds, ...fallbackFreeAgentProjections.keys()])]
+                  : [...new Set([...liveIds, ...fallbackFreeAgentProjections.keys()])];
+            }
+          } catch (error) {
+            request.log.warn(
+              { error, leagueId, snapshotDate: date },
+              "Failed to fetch live ESPN free agents for waiver recommendations",
+            );
+          }
+        }
+
+        if (!freeAgentPlayerIds || freeAgentPlayerIds.length === 0) {
+          const snapshotFreeAgents = await db
+            .selectFrom("league_free_agent_snapshot")
+            .select("player_id")
+            .where("league_id", "=", leagueId)
+            .where("snapshot_date", "=", date)
+            .execute();
+
+          if (snapshotFreeAgents.length > 0) {
+            const snapshotIds = snapshotFreeAgents.map((player) => player.player_id);
+            const projectedSnapshotIds = await filterToProjectedFreeAgents(
+              snapshotIds,
+            );
+            await addEspnFallbackProjections(snapshotIds);
+            freeAgentPlayerIds =
+              projectedSnapshotIds.length > 0
+                ? [
+                    ...new Set([
+                      ...projectedSnapshotIds,
+                      ...fallbackFreeAgentProjections.keys(),
+                    ]),
+                  ]
+                : [
+                    ...new Set([
+                      ...snapshotIds,
+                      ...fallbackFreeAgentProjections.keys(),
+                    ]),
+                  ];
+          }
+        }
+
         const recommendations = await waiverAgent.getRecommendations(
           leagueId,
           teamId,
@@ -567,6 +600,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             maxRecommendations: maxRecommendations
               ? parseInt(maxRecommendations, 10)
               : 10,
+            freeAgentPlayerIds,
+            fallbackPlayers: [...fallbackFreeAgentPlayers.values()],
+            fallbackProjections: Object.fromEntries(
+              fallbackFreeAgentProjections.entries(),
+            ),
           },
         );
         return { recommendations, snapshotDate: date };
@@ -734,134 +772,18 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        // Get team info
-        const [userTeam, partnerTeam] = await Promise.all([
-          db
-            .selectFrom("team")
-            .selectAll()
-            .where("league_id", "=", leagueId)
-            .where("id", "=", teamId)
-            .executeTakeFirst(),
-          db
-            .selectFrom("team")
-            .selectAll()
-            .where("league_id", "=", leagueId)
-            .where("id", "=", partnerTeamId)
-            .executeTakeFirst(),
-        ]);
+        const result = await tradeView.getRosterPair(
+          leagueId,
+          teamId,
+          partnerTeamId,
+          date,
+        );
 
-        if (!userTeam || !partnerTeam) {
+        if (!result) {
           return reply.code(404).send({ error: "Team not found" });
         }
 
-        // Get rosters for both teams
-        const [userRoster, partnerRoster] = await Promise.all([
-          db
-            .selectFrom("team_roster_snapshot as roster")
-            .innerJoin("player", "roster.player_id", "player.id")
-            .select([
-              "roster.player_id",
-              "player.name as player_name",
-              "player.mlb_team",
-              "player.positions",
-              "roster.roster_status",
-              "roster.roster_slot",
-            ])
-            .where("roster.league_id", "=", leagueId)
-            .where("roster.team_id", "=", teamId)
-            .where("roster.snapshot_date", "=", date)
-            .where("roster.roster_status", "in", ["active", "bench"])
-            .orderBy("player.name", "asc")
-            .execute(),
-          db
-            .selectFrom("team_roster_snapshot as roster")
-            .innerJoin("player", "roster.player_id", "player.id")
-            .select([
-              "roster.player_id",
-              "player.name as player_name",
-              "player.mlb_team",
-              "player.positions",
-              "roster.roster_status",
-              "roster.roster_slot",
-            ])
-            .where("roster.league_id", "=", leagueId)
-            .where("roster.team_id", "=", partnerTeamId)
-            .where("roster.snapshot_date", "=", date)
-            .where("roster.roster_status", "in", ["active", "bench"])
-            .orderBy("player.name", "asc")
-            .execute(),
-        ]);
-
-        // Get projections for all players involved
-        const allPlayerIds = [
-          ...userRoster.map((p) => p.player_id),
-          ...partnerRoster.map((p) => p.player_id),
-        ];
-
-        const projections =
-          allPlayerIds.length > 0
-            ? await db
-                .selectFrom("player_projection as proj")
-                .innerJoin(
-                  "projections_run as run",
-                  "proj.projections_run_id",
-                  "run.id",
-                )
-                .select([
-                  "proj.player_id",
-                  "proj.stat_components_json",
-                  "run.as_of_date",
-                ])
-                .where("run.as_of_date", "<=", date)
-                .where("proj.player_id", "in", allPlayerIds)
-                .orderBy("run.as_of_date", "desc")
-                .execute()
-            : [];
-
-        // Create projection map (most recent per player)
-        const projectionMap = new Map();
-        for (const proj of projections) {
-          if (!projectionMap.has(proj.player_id)) {
-            projectionMap.set(proj.player_id, proj.stat_components_json);
-          }
-        }
-
-        // Enrich rosters with projection data
-        const enrichedUserRoster = userRoster.map((player) => ({
-          playerId: player.player_id,
-          espnPlayerId: player.player_id,
-          playerName: player.player_name,
-          mlbTeam: player.mlb_team,
-          positions: player.positions,
-          rosterStatus: player.roster_status,
-          rosterSlot: player.roster_slot,
-          projections: projectionMap.get(player.player_id) || null,
-        }));
-
-        const enrichedPartnerRoster = partnerRoster.map((player) => ({
-          playerId: player.player_id,
-          espnPlayerId: player.player_id,
-          playerName: player.player_name,
-          mlbTeam: player.mlb_team,
-          positions: player.positions,
-          rosterStatus: player.roster_status,
-          rosterSlot: player.roster_slot,
-          projections: projectionMap.get(player.player_id) || null,
-        }));
-
-        return {
-          snapshotDate: date,
-          userTeam: {
-            id: userTeam.id,
-            name: userTeam.name,
-            roster: enrichedUserRoster,
-          },
-          partnerTeam: {
-            id: partnerTeam.id,
-            name: partnerTeam.name,
-            roster: enrichedPartnerRoster,
-          },
-        };
+        return result;
       } catch (error) {
         request.log.error({ error }, "Failed to get trade partner rosters");
         return reply.code(500).send({

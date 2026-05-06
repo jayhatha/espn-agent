@@ -17,37 +17,45 @@ declare module "@fastify/jwt" {
 // =============================================================================
 
 // Mock user for single-user mode — routes reference request.user.userId / request.user.role
-const MOCK_USER = { userId: 1, email: "local@localhost", role: "admin" as const };
+const MOCK_USER = {
+  userId: 1,
+  email: "local@localhost",
+  role: "admin" as const,
+};
 
-// Authenticate middleware (bypassed — injects mock user)
+// Authenticate middleware — no-op in single-user mode (v4.0)
 export async function authenticate(
   request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // Populate request.user so downstream handlers don't crash
   (request as any).user = MOCK_USER;
 }
 
-// Require admin role (bypassed)
+// Require admin role
 export async function requireAdmin(
-  _request: FastifyRequest,
-  _reply: FastifyReply,
+  request: FastifyRequest,
+  reply: FastifyReply,
 ) {
-  // No-op: auth bypassed for single-user mode
+  if (process.env.NODE_ENV !== "development") {
+    const user = (request as any).user;
+    if (!user || user.role !== "admin") {
+      return reply.code(403).send({ error: "Admin access required" });
+    }
+  }
 }
 
-// Require league access (bypassed)
+// Require league access (bypassed — single-user tool owns all leagues)
 export async function requireLeagueAccess(
   _request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // No-op: auth bypassed for single-user mode
+  // Single-user: user owns all leagues. Extend here if multi-user is added.
 }
 
-// Require specific team ownership (bypassed)
+// Require specific team ownership (bypassed — single-user tool owns all teams)
 export async function requireTeamOwnership(
   _request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // No-op: auth bypassed for single-user mode
+  // Single-user: user owns all teams. Extend here if multi-user is added.
 }

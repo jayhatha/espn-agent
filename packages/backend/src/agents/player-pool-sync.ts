@@ -1,7 +1,8 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import { ESPNAdapter, ESPN_STAT_MAP } from "../adapters/espn.js";
+import { ESPNAdapter } from "../adapters/espn.js";
+import { ESPN_STAT_MAP } from "../adapters/espn/constants.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 /**
@@ -51,11 +52,7 @@ export class PlayerPoolSyncAgent {
       // Look up an actual connected league for this season to use for player data
       const league = await this.db
         .selectFrom("league")
-        .select([
-          "espn_league_id",
-          "espn_swid_encrypted",
-          "espn_s2_encrypted",
-        ])
+        .select(["espn_league_id", "espn_swid_encrypted", "espn_s2_encrypted"])
         .where("season", "=", season)
         .orderBy("created_at", "asc")
         .executeTakeFirst();
@@ -77,15 +74,16 @@ export class PlayerPoolSyncAgent {
       );
 
       // ESPN auth: env vars first, then encrypted DB fallback
-      let espnAuth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
+      let espnAuth: { SWID: string; espn_s2: string } | undefined =
+        getEspnAuthFromEnv();
       if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         // Import decryption utilities
-        const { decryptToken, hasEncryptionKey } = await import(
-          "../utils/encryption.js"
-        );
+        const { decryptToken, hasEncryptionKey } =
+          await import("../utils/encryption.js");
 
         if (!hasEncryptionKey()) {
-          const msg = "ENCRYPTION_KEY not configured - cannot decrypt credentials";
+          const msg =
+            "ENCRYPTION_KEY not configured - cannot decrypt credentials";
           this.logger?.error(msg);
           return {
             success: false,
@@ -225,9 +223,7 @@ export class PlayerPoolSyncAgent {
               .execute()
           : [];
 
-      const existingIdSet = new Set(
-        existingPlayers.map((p) => p.id),
-      );
+      const existingIdSet = new Set(existingPlayers.map((p) => p.id));
 
       // Separate into inserts and updates
       const playersToInsert = playerDataList.filter(

@@ -61,10 +61,7 @@ export class SnapshotRepository {
    * When playerIds is provided and non-empty, filters to those players.
    * When playerIds is an empty array, returns [] immediately (avoids invalid IN () SQL).
    */
-  async getPlayerProjections(
-    projectionsRunId: number,
-    playerIds?: number[],
-  ) {
+  async getPlayerProjections(projectionsRunId: number, playerIds?: number[]) {
     if (playerIds !== undefined && playerIds.length === 0) {
       return [];
     }

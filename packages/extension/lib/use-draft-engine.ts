@@ -6,7 +6,10 @@ import type { BidOptimizerWorkerResponse } from "./engine/bid-optimizer-worker";
 import { computeStrategyBidCap } from "./engine/strategy-caps";
 import { getRankBasedTierCap } from "./engine/draft-constants";
 import { getEspnAsvLookup } from "./espn-asv-data";
-import { buildBoardPlayers, computeDraftBoardState } from "./engine/draft-board-engine";
+import {
+  buildBoardPlayers,
+  computeDraftBoardState,
+} from "./engine/draft-board-engine";
 import type { DraftBoardState } from "./engine/draft-board-engine";
 import { normalizeName } from "./engine/normalizer";
 import { fgAuctionHittersData, fgAuctionPitchersData } from "./fangraphs-data";
@@ -40,14 +43,17 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   const currentPlayerName = currentAuctionPlayer?.playerName;
 
   // Async simulation state — updated when worker completes
-  const [asyncSimulation, setAsyncSimulation] = useState<ForwardSimulationSignal | null>(null);
+  const [asyncSimulation, setAsyncSimulation] =
+    useState<ForwardSimulationSignal | null>(null);
 
   // Async bid state — updated when bid optimizer worker completes
-  const [asyncBid, setAsyncBid] = useState<BidOptimizerWorkerResponse | null>(null);
+  const [asyncBid, setAsyncBid] = useState<BidOptimizerWorkerResponse | null>(
+    null,
+  );
 
   // Pre-index rankings by normalized lowercase name for O(1) lookup during render
   const rankingsMap = useMemo(() => {
-    const map = new Map<string, typeof rankings[0]>();
+    const map = new Map<string, (typeof rankings)[0]>();
     for (const r of rankings) {
       map.set(r.playerName.toLowerCase(), r);
     }
@@ -122,40 +128,48 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
   return useMemo(() => {
     if (!baseSignals) return null;
 
-    let mergedOptimization = baseSignals.optimization && asyncBid
-      ? {
-          ...baseSignals.optimization,
-          maxBid: asyncBid.maxBid,
-          rawBlendedValue: asyncBid.rawBlendedValue,
-          sgpBreakeven: asyncBid.sgpBreakeven,
-          expectedMarketPrice: asyncBid.expectedMarketPrice,
-          valueSurplus: asyncBid.valueSurplus,
-          shouldBid: asyncBid.shouldBid,
-          simulationEV: asyncBid.simulationEV,
-          simulationStdDev: asyncBid.simulationStdDev,
-          priorityScore: asyncBid.priorityScore,
-          evBuffer: asyncBid.evBuffer,
-          categoryBonus: asyncBid.categoryBonus,
-          playerTags: asyncBid.playerTags,
-        }
-      : baseSignals.optimization;
+    let mergedOptimization =
+      baseSignals.optimization && asyncBid
+        ? {
+            ...baseSignals.optimization,
+            maxBid: asyncBid.maxBid,
+            rawBlendedValue: asyncBid.rawBlendedValue,
+            sgpBreakeven: asyncBid.sgpBreakeven,
+            expectedMarketPrice: asyncBid.expectedMarketPrice,
+            valueSurplus: asyncBid.valueSurplus,
+            shouldBid: asyncBid.shouldBid,
+            simulationEV: asyncBid.simulationEV,
+            simulationStdDev: asyncBid.simulationStdDev,
+            priorityScore: asyncBid.priorityScore,
+            evBuffer: asyncBid.evBuffer,
+            categoryBonus: asyncBid.categoryBonus,
+            playerTags: asyncBid.playerTags,
+          }
+        : baseSignals.optimization;
 
     // Apply strategy caps (SP tier, pitcher dampening, hitter budget, etc.)
     if (mergedOptimization && currentPlayerName) {
       const ranking = rankingsMap.get(currentPlayerName.toLowerCase());
 
       // Use ranking positions, falling back to DOM-detected positions from the auction player
-      const playerPositions = ranking?.positions ?? currentAuctionPlayer?.positions ?? [];
-      const positionsUpper = playerPositions.map((p: string) => p.toUpperCase());
-      const isSP = ranking?.primaryPosition === "SP" || positionsUpper.includes("SP");
-      const isRP = ranking?.primaryPosition === "RP" || (!isSP && (positionsUpper.includes("RP") || positionsUpper.includes("P")));
+      const playerPositions =
+        ranking?.positions ?? currentAuctionPlayer?.positions ?? [];
+      const positionsUpper = playerPositions.map((p: string) =>
+        p.toUpperCase(),
+      );
+      const isSP =
+        ranking?.primaryPosition === "SP" || positionsUpper.includes("SP");
+      const isRP =
+        ranking?.primaryPosition === "RP" ||
+        (!isSP &&
+          (positionsUpper.includes("RP") || positionsUpper.includes("P")));
 
-      const draftedSPs = myRoster.filter(
-        (p) => p.positions.some((pos) => pos.toUpperCase() === "SP"),
+      const draftedSPs = myRoster.filter((p) =>
+        p.positions.some((pos) => pos.toUpperCase() === "SP"),
       );
       const spCount = draftedSPs.length;
-      const draftedSpPrices = draftedSPs.map(p => p.cost ?? 0);
-      const draftedSpTierCaps = draftedSPs.map(p => {
+      const draftedSpPrices = draftedSPs.map((p) => p.cost ?? 0);
+      const draftedSpTierCaps = draftedSPs.map((p) => {
         const spRanking = rankingsMap.get(p.playerName.toLowerCase());
         return getRankBasedTierCap(spRanking?.externalRank);
       });
@@ -165,7 +179,8 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         isPitcher: isSP || isRP,
         isSP,
         positions: playerPositions,
-        primaryPosition: ranking?.primaryPosition ?? (isSP ? "SP" : isRP ? "RP" : null),
+        primaryPosition:
+          ranking?.primaryPosition ?? (isSP ? "SP" : isRP ? "RP" : null),
         spCount,
         draftedSpPrices,
         draftedSpTierCaps,
@@ -177,7 +192,7 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         pitcherSpent: baseSignals.budgetCurve?.pitcherSpent ?? 0,
         remainingSlots: baseSignals.remainingSlots ?? undefined,
         playerName: currentPlayerName ?? undefined,
-        myRosterNames: myRoster.map(p => p.playerName),
+        myRosterNames: myRoster.map((p) => p.playerName),
       });
 
       // Use the strategy cap result directly — it starts from rawMaxBid and
@@ -188,8 +203,11 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
 
       // Override shouldBid: if strategy-caps applied a draft board boost
       // (TARGET or REACH), force shouldBid=true even for negative-EV players.
-      const hasBoardBoost = capResult.capSource.includes("TARGET") || capResult.capSource.includes("REACH ×");
-      const finalShouldBid = cappedMaxBid > 0 && (mergedOptimization.shouldBid || hasBoardBoost);
+      const hasBoardBoost =
+        capResult.capSource.includes("TARGET") ||
+        capResult.capSource.includes("REACH ×");
+      const finalShouldBid =
+        cappedMaxBid > 0 && (mergedOptimization.shouldBid || hasBoardBoost);
 
       mergedOptimization = {
         ...mergedOptimization,
@@ -220,14 +238,21 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       );
 
       const boardPlayers = buildBoardPlayers(fgLookup, asvLookup);
-      const totalSpent = (baseSignals.budgetCurve?.hitterSpent ?? 0) + (baseSignals.budgetCurve?.pitcherSpent ?? 0);
+      const totalSpent =
+        (baseSignals.budgetCurve?.hitterSpent ?? 0) +
+        (baseSignals.budgetCurve?.pitcherSpent ?? 0);
       const slotsLeft = baseSignals.remainingSlots
-        ? Object.values(baseSignals.remainingSlots).reduce((s, v) => s + v, 0) : 28;
+        ? Object.values(baseSignals.remainingSlots).reduce((s, v) => s + v, 0)
+        : 28;
       const avgPerSlot = slotsLeft > 0 ? (260 - totalSpent) / slotsLeft : 0;
 
       const boardState = computeDraftBoardState(
         boardPlayers,
-        myRoster.map(p => ({ playerName: p.playerName, cost: p.cost, positions: p.positions })),
+        myRoster.map((p) => ({
+          playerName: p.playerName,
+          cost: p.cost,
+          positions: p.positions,
+        })),
         remainingBudget,
         currentPlayerName,
         avgPerSlot,
@@ -240,30 +265,44 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       const reserveNeeded = slotsAfterThis * RESERVE_PER_SLOT;
       const maxAffordable = Math.max(1, remainingBudget - reserveNeeded);
 
-      if (boardState.nominatedPlayerOnBoard && boardState.recommendedMaxBid > 0) {
+      if (
+        boardState.nominatedPlayerOnBoard &&
+        boardState.recommendedMaxBid > 0
+      ) {
         // ON BOARD: use board's recommended bid
-        const finalBoardBid = Math.min(boardState.recommendedMaxBid, maxAffordable);
+        const finalBoardBid = Math.min(
+          boardState.recommendedMaxBid,
+          maxAffordable,
+        );
 
         mergedOptimization = {
           ...mergedOptimization,
           maxBid: finalBoardBid,
           shouldBid: finalBoardBid > 0,
           valueSurplus: finalBoardBid - mergedOptimization.expectedMarketPrice,
-          capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason} (max $${finalBoardBid})`,
+          capSource:
+            (mergedOptimization.capSource ?? "") +
+            ` → BOARD: ${boardState.bidReason} (max $${finalBoardBid})`,
         };
-      } else if (boardState.nominatedPlayerOnBoard && !boardState.nominatedPositionNeeded) {
+      } else if (
+        boardState.nominatedPlayerOnBoard &&
+        !boardState.nominatedPositionNeeded
+      ) {
         // ON BOARD but position filled — reduce bid
         mergedOptimization = {
           ...mergedOptimization,
-          capSource: (mergedOptimization.capSource ?? '') + ` → BOARD: ${boardState.bidReason}`,
+          capSource:
+            (mergedOptimization.capSource ?? "") +
+            ` → BOARD: ${boardState.bidReason}`,
         };
       } else {
         // NOT ON BOARD — only bid if:
         // 1) Board is exhausted (no more board players at unfilled positions), OR
         // 2) Elite hitter falling 15%+ below FG$ (opportunistic steal)
-        const boardExhausted = boardState.positionsNeeded.length === 0
-          || boardState.availablePlayers.filter(p =>
-            p.positions.some(pos => boardState.positionsNeeded.includes(pos))
+        const boardExhausted =
+          boardState.positionsNeeded.length === 0 ||
+          boardState.availablePlayers.filter((p) =>
+            p.positions.some((pos) => boardState.positionsNeeded.includes(pos)),
           ).length === 0;
 
         const fgDollars = mergedOptimization.sgpBreakeven ?? 0; // FG$ stored here
@@ -271,15 +310,21 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
         // Steal: current auction price is 15%+ below our FG$ valuation
         // AND it's a meaningful player (FG$ >= $15) AND there's a roster slot
         const hasSlot = slotsLeft > 0;
-        const isSteal = fgDollars >= 15 && currentBid > 0 && hasSlot
-          && currentBid <= fgDollars * 0.85;
-        const discount = fgDollars > 0 ? Math.round((1 - currentBid / fgDollars) * 100) : 0;
+        const isSteal =
+          fgDollars >= 15 &&
+          currentBid > 0 &&
+          hasSlot &&
+          currentBid <= fgDollars * 0.85;
+        const discount =
+          fgDollars > 0 ? Math.round((1 - currentBid / fgDollars) * 100) : 0;
 
         if (boardExhausted) {
           // Board exhausted — fall back to standard EV bidding
           mergedOptimization = {
             ...mergedOptimization,
-            capSource: (mergedOptimization.capSource ?? '') + ` → board exhausted, EV fallback`,
+            capSource:
+              (mergedOptimization.capSource ?? "") +
+              ` → board exhausted, EV fallback`,
           };
         } else if (isSteal) {
           // Current auction price is well below our valuation — opportunistic bid
@@ -288,14 +333,18 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
             ...mergedOptimization,
             maxBid: stealBid,
             shouldBid: stealBid > 0,
-            capSource: (mergedOptimization.capSource ?? '') + ` → STEAL: FG$${fgDollars} going for $${currentBid} (-${discount}%)`,
+            capSource:
+              (mergedOptimization.capSource ?? "") +
+              ` → STEAL: FG$${fgDollars} going for $${currentBid} (-${discount}%)`,
           };
         } else {
           // Not on board, board has targets left — PASS
           mergedOptimization = {
             ...mergedOptimization,
             shouldBid: false,
-            capSource: (mergedOptimization.capSource ?? '') + ` → PASS (not on board, ${boardState.availablePlayers.length} board players remain)`,
+            capSource:
+              (mergedOptimization.capSource ?? "") +
+              ` → PASS (not on board, ${boardState.availablePlayers.length} board players remain)`,
           };
         }
       }
@@ -309,6 +358,13 @@ export function useDraftEngineSignals(): DraftEngineSignals | null {
       optimization: mergedOptimization,
       simulation: asyncSimulation ?? baseSignals.simulation,
     };
-  }, [baseSignals, asyncSimulation, asyncBid, currentPlayerName,
-      rankingsMap, myRoster, pitcherHitterSplit]);
+  }, [
+    baseSignals,
+    asyncSimulation,
+    asyncBid,
+    currentPlayerName,
+    rankingsMap,
+    myRoster,
+    pitcherHitterSplit,
+  ]);
 }

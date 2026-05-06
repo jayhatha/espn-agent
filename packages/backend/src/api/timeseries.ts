@@ -120,8 +120,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("snapshot_date", "<=", to);
       }
       if (teamIds) {
-        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
-        query = query.where("team_id", "in", ids);
+        const ids = teamIds
+          .split(",")
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id));
+        if (ids.length > 0) query = query.where("team_id", "in", ids);
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
@@ -175,8 +178,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("snapshot_date", "<=", to);
       }
       if (teamIds) {
-        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
-        query = query.where("team_id", "in", ids);
+        const ids = teamIds
+          .split(",")
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id));
+        if (ids.length > 0) query = query.where("team_id", "in", ids);
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
@@ -236,8 +242,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("snapshot_date", "<=", to);
       }
       if (teamIds) {
-        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
-        query = query.where("team_id", "in", ids);
+        const ids = teamIds
+          .split(",")
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id));
+        if (ids.length > 0) query = query.where("team_id", "in", ids);
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
@@ -286,8 +295,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("snapshot_date", "<=", to);
       }
       if (teamIds) {
-        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
-        query = query.where("team_id", "in", ids);
+        const ids = teamIds
+          .split(",")
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id));
+        if (ids.length > 0) query = query.where("team_id", "in", ids);
       }
 
       const queryLimit = limit ? parseInt(limit, 10) : 1000;
@@ -743,8 +755,11 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
         query = query.where("event_date", "<=", to);
       }
       if (teamIds) {
-        const ids = teamIds.split(",").map((id) => parseInt(id, 10));
-        query = query.where("team_id", "in", ids);
+        const ids = teamIds
+          .split(",")
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id));
+        if (ids.length > 0) query = query.where("team_id", "in", ids);
       }
 
       const annotations = await query.orderBy("event_date", "asc").execute();

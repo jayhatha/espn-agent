@@ -400,7 +400,7 @@ Plans:
 4. Existing `ESPNAdapter` public interface (fetchLeague, fetchFreeAgents, normalizeLeagueData, etc.) is unchanged — all callers continue to compile without changes
 5. The 7 constant maps (ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP, etc.) are implementation details of EspnDataNormalizer, not exported from the adapter facade
 6. Tests can instantiate EspnDataNormalizer and EspnResponseValidator without mocking HTTP
-**Plans:** 0/0 plans complete
+   **Plans:** 0/0 plans complete
 
 ### Phase 90: SnapshotRepository Centralization
 
@@ -414,9 +414,9 @@ Plans:
 3. The `team_roster_snapshot → player` join is written exactly once (in SnapshotRepository)
 4. All existing tests continue to pass
 5. SnapshotRepository is injectable (accepts `db: Kysely<Database>`) and testable without a running PostgreSQL instance via mocking
-**Plans:** 0/0 plans complete
+   **Plans:** 0/0 plans complete
 
-### Phase 91: RosterSimulator Extraction
+### Phase 91: RosterSimulator Extraction ✅ COMPLETE
 
 **Goal:** Extract a RosterSimulator module from the shared simulation logic in TradeRecommendationAgent and WaiverRecommendationAgent — covering roster-change simulation, post-change gap detection, and standing-delta ranking — so both agents call one interface instead of maintaining parallel implementations.
 **Depends on:** Phase 90
@@ -429,7 +429,7 @@ Plans:
 4. Explanation generation (`generateTradeExplanation`, `generateExplanation`) is unified — one function in RosterSimulator used by both agents
 5. TradeRecommendationAgent shrinks from ~1700 lines to ≤900 lines; WaiverRecommendationAgent shrinks from ~800 lines to ≤500 lines
 6. All existing recommendation endpoints return identical outputs to pre-refactor
-**Plans:** 0/0 plans complete
+   **Plans:** 0/0 plans complete
 
 ### Phase 92: Stat Component Consolidation
 
@@ -443,7 +443,7 @@ Plans:
 3. No agent file defines its own component extraction logic — all import from shared/formulas.ts
 4. A single change to the component field list in shared/formulas.ts propagates correctly to all callers
 5. All existing projection calculations produce identical numerical outputs to pre-refactor
-**Plans:** 0/0 plans complete
+   **Plans:** 0/0 plans complete
 
 ### Phase 93: AgentFactory Centralization
 
@@ -457,7 +457,7 @@ Plans:
 3. All worker files construct agents via factory functions — no `new SnapshotOrchestratorAgent(...)` calls remain in worker files
 4. Adding a new dependency to any agent requires editing exactly one file (the factory) — no route or worker file changes needed
 5. Integration tests can swap factories that inject test doubles without modifying route or worker code
-**Plans:** 0/0 plans complete
+   **Plans:** 0/0 plans complete
 
 ---
 
@@ -477,7 +477,7 @@ Plans:
 3. The manual endpoint returns `{ queued: true, jobId }` immediately (async) rather than blocking until snapshot completes
 4. Existing scheduled snapshot deduplication in `scheduleDailySnapshots()` is unchanged
 5. No change to snapshot execution logic — only the trigger path changes
-**Plans:** 1/1 plans complete
+   **Plans:** 1/1 plans complete
 
 Plans:
 
@@ -493,7 +493,7 @@ Plans:
 1. Each item in the Known Issues list is verified against the codebase: removed if fixed, updated if partially fixed, or retained with an accurate description if still open
 2. Any new technical debt introduced in v6.0 not already tracked is added
 3. AGENTS.md `Known gaps` sections are updated to match
-**Plans:** 1/1 plans complete
+   **Plans:** 1/1 plans complete
 
 Plans:
 

@@ -8,26 +8,34 @@ import { isSlackEnabled } from "../utils/feature-flags.js";
  */
 
 /**
- * Verify internal job token
- * If INTERNAL_JOB_TOKEN is not set, authentication is skipped (development mode)
+ * Verify internal job token (C3)
+ * Outside development, INTERNAL_JOB_TOKEN is required — startup fails if absent.
+ * In development, the token is optional; when set it is still enforced.
  */
+if (
+  process.env.NODE_ENV !== "development" &&
+  !process.env.INTERNAL_JOB_TOKEN
+) {
+  throw new Error(
+    "INTERNAL_JOB_TOKEN environment variable is required outside development mode",
+  );
+}
+
 async function verifyInternalToken(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
   const INTERNAL_JOB_TOKEN = process.env.INTERNAL_JOB_TOKEN;
 
-  // Development mode: skip authentication if token not set
   if (!INTERNAL_JOB_TOKEN) {
+    // Development only (guaranteed by startup check above)
     request.log.warn(
-      "INTERNAL_JOB_TOKEN not set - internal API authentication disabled (development mode)",
+      "INTERNAL_JOB_TOKEN not set — internal API unauthenticated (development only)",
     );
-    return; // Allow request to proceed
+    return;
   }
 
-  // Production mode: verify token
   const authHeader = request.headers.authorization;
-
   if (!authHeader || authHeader !== `Bearer ${INTERNAL_JOB_TOKEN}`) {
     request.log.warn(
       { hasAuth: !!authHeader },

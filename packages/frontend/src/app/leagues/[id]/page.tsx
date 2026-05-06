@@ -3,9 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import {
-  XIcon,
-} from "lucide-react";
+import { XIcon } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
@@ -102,9 +100,9 @@ function LeagueDetailPageContent() {
   const [showSnapshotBanner, setShowSnapshotBanner] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      setShowSnapshotBanner(params.get('snapshotting') === 'true');
+      setShowSnapshotBanner(params.get("snapshotting") === "true");
     }
   }, []);
 
@@ -158,7 +156,9 @@ function LeagueDetailPageContent() {
         predicate: (query) => {
           const key = query.queryKey as unknown[];
           // Match any query whose key includes leagueId (string or number) at any position
-          return key.some((k) => k === leagueId || k === parseInt(leagueId, 10));
+          return key.some(
+            (k) => k === leagueId || k === parseInt(leagueId, 10),
+          );
         },
       });
       // team-overview doesn't carry leagueId — invalidate by prefix
@@ -183,21 +183,25 @@ function LeagueDetailPageContent() {
 
   // Waiver recommendations for dashboard
   const { data: waiverRecs } = useQuery({
-    queryKey: ['waivers-recommendations', leagueId, selectedTeamId, 3],
-    queryFn: () => api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId!, { maxRecommendations: 3 }),
+    queryKey: ["waivers-recommendations", leagueId, selectedTeamId, 3],
+    queryFn: () =>
+      api.getWaiverRecommendations(parseInt(leagueId, 10), selectedTeamId!, {
+        maxRecommendations: 3,
+      }),
     enabled: !!selectedTeamId,
   });
 
   // Trade candidates for dashboard
   const { data: tradeCandidates } = useQuery({
-    queryKey: ['trades-recommendations', leagueId, selectedTeamId],
-    queryFn: () => api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!),
+    queryKey: ["trades-recommendations", leagueId, selectedTeamId],
+    queryFn: () =>
+      api.getTradeRecommendations(parseInt(leagueId, 10), selectedTeamId!),
     enabled: !!selectedTeamId,
   });
 
   // Overall timeseries for mini chart
   const { data: overallTimeseries } = useQuery({
-    queryKey: ['dashboard-timeseries', leagueId],
+    queryKey: ["dashboard-timeseries", leagueId],
     queryFn: () => api.getOverallTimeSeries(parseInt(leagueId, 10)),
     enabled: !!leagueId,
   });
@@ -213,12 +217,20 @@ function LeagueDetailPageContent() {
       for (const rec of waiverRecs.recommendations.slice(0, 3)) {
         items.push({
           id: `waiver-${rec.addPlayerId}-${rec.dropPlayerId}`,
-          type: 'waiver',
-          priority: rec.deltaOverallPoints >= 2 ? 'high' : rec.deltaOverallPoints >= 1 ? 'medium' : 'low',
+          type: "waiver",
+          priority:
+            rec.deltaOverallPoints >= 2
+              ? "high"
+              : rec.deltaOverallPoints >= 1
+                ? "medium"
+                : "low",
           title: `Add ${rec.addPlayerName}, Drop ${rec.dropPlayerName}`,
           description: rec.explanation,
           impact: `+${rec.deltaOverallPoints.toFixed(1)} pts`,
-          espnLink: espnLeagueId && season ? getESPNFreeAgentsUrl(espnLeagueId, season) : undefined,
+          espnLink:
+            espnLeagueId && season
+              ? getESPNFreeAgentsUrl(espnLeagueId, season)
+              : undefined,
           internalLink: `/leagues/${leagueId}/waivers`,
         });
       }
@@ -227,16 +239,28 @@ function LeagueDetailPageContent() {
     // Add top trade candidates
     if (tradeCandidates?.candidates) {
       for (const cand of tradeCandidates.candidates.slice(0, 2)) {
-        const giveName = cand.trade.givePlayers.map((p: any) => p.playerName).join(', ');
-        const getName = cand.trade.receivePlayers.map((p: any) => p.playerName).join(', ');
+        const giveName = cand.trade.givePlayers
+          .map((p: any) => p.playerName)
+          .join(", ");
+        const getName = cand.trade.receivePlayers
+          .map((p: any) => p.playerName)
+          .join(", ");
         items.push({
           id: `trade-${cand.partnerTeamId}-${giveName}`,
-          type: 'trade',
-          priority: cand.deltaOverallPoints >= 3 ? 'high' : cand.deltaOverallPoints >= 1.5 ? 'medium' : 'low',
+          type: "trade",
+          priority:
+            cand.deltaOverallPoints >= 3
+              ? "high"
+              : cand.deltaOverallPoints >= 1.5
+                ? "medium"
+                : "low",
           title: `Trade ${giveName} for ${getName}`,
           description: `${cand.partnerTeamName}: ${cand.explanation}`,
           impact: `+${cand.deltaOverallPoints.toFixed(1)} pts`,
-          espnLink: espnLeagueId && season ? getESPNTradeUrl(espnLeagueId, season) : undefined,
+          espnLink:
+            espnLeagueId && season
+              ? getESPNTradeUrl(espnLeagueId, season)
+              : undefined,
           internalLink: `/leagues/${leagueId}/trades`,
         });
       }
@@ -301,9 +325,7 @@ function LeagueDetailPageContent() {
           const bIdx = SLOT_ORDER.indexOf(b.roster_slot || "");
           return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
         }),
-        bench: teamOverview.roster.filter(
-          (p) => p.roster_status === "bench",
-        ),
+        bench: teamOverview.roster.filter((p) => p.roster_status === "bench"),
         il: teamOverview.roster.filter((p) => p.roster_status === "il"),
       }
     : null;
@@ -330,9 +352,7 @@ function LeagueDetailPageContent() {
   if (teamOverviewError) {
     return (
       <Container size="wide" className="py-8">
-        <ErrorAlert
-          message={(teamOverviewError as Error).message}
-        />
+        <ErrorAlert message={(teamOverviewError as Error).message} />
       </Container>
     );
   }
@@ -365,10 +385,7 @@ function LeagueDetailPageContent() {
       {selectedTeamId && teamOverview && (
         <>
           <FadeIn>
-            <ActionsSection
-              actionItems={actionItems}
-              leagueId={leagueId}
-            />
+            <ActionsSection actionItems={actionItems} leagueId={leagueId} />
           </FadeIn>
 
           <FadeIn delay={80}>
@@ -400,9 +417,7 @@ function LeagueDetailPageContent() {
         <div className="fixed inset-0 bg-neutral-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-shell-panel rounded-card max-w-lg w-full p-6 shadow-card dark:shadow-none">
             <div className="flex items-center justify-between mb-4">
-              <Heading level={3}>
-                Update ESPN Authentication
-              </Heading>
+              <Heading level={3}>Update ESPN Authentication</Heading>
               <button
                 onClick={() => setShowAuthModal(false)}
                 className="text-content-tertiary dark:text-shell-muted hover:text-content-secondary transition-colors"
@@ -413,8 +428,8 @@ function LeagueDetailPageContent() {
 
             <div className="mb-4">
               <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-4">
-                For private leagues, you&apos;ll need to provide your ESPN cookies.
-                Find these in your browser&apos;s DevTools:
+                For private leagues, you&apos;ll need to provide your ESPN
+                cookies. Find these in your browser&apos;s DevTools:
               </p>
               <ol className="text-body-sm text-content-secondary dark:text-shell-muted space-y-1 ml-5 list-decimal">
                 <li>Log into ESPN Fantasy Baseball</li>
@@ -427,9 +442,7 @@ function LeagueDetailPageContent() {
             {updateAuthMutation.isError && (
               <div className="mb-4">
                 <ErrorAlert
-                  message={
-                    (updateAuthMutation.error as Error).message
-                  }
+                  message={(updateAuthMutation.error as Error).message}
                 />
               </div>
             )}
@@ -486,9 +499,7 @@ function LeagueDetailPageContent() {
                     espn_s2: authS2,
                   })
                 }
-                disabled={
-                  updateAuthMutation.isPending || !authSwid || !authS2
-                }
+                disabled={updateAuthMutation.isPending || !authSwid || !authS2}
               >
                 {updateAuthMutation.isPending ? "Updating..." : "Update"}
               </Button>

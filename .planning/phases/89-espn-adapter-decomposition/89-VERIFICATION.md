@@ -8,21 +8,21 @@ Split `packages/backend/src/adapters/espn.ts` (~1380 lines) into focused sub-mod
 
 ### Files Created
 
-| File | Purpose |
-|------|---------|
-| `packages/backend/src/adapters/espn/constants.ts` | 7 constant maps (ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP, ESPN_POSITION_MAP, ESPN_PRO_TEAM_MAP, ESPN_POSITION_TO_SLOT, ALL_POSITION_SLOT_IDS, ESPN_TRANSACTION_TYPE_MAP) |
-| `packages/backend/src/adapters/espn/types.ts` | All 11 exported interfaces — zero runtime deps |
-| `packages/backend/src/adapters/espn/validator.ts` | EspnResponseValidator with computeSchemaFingerprint + extractStructure |
-| `packages/backend/src/adapters/espn/normalizer.ts` | EspnDataNormalizer — pure normalization, zero HTTP deps |
-| `packages/backend/src/adapters/espn/http-client.ts` | EspnHttpClient — all 7 fetch methods, throttle, LRU cache, axios |
+| File                                                | Purpose                                                                                                                                                              |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/backend/src/adapters/espn/constants.ts`   | 7 constant maps (ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP, ESPN_POSITION_MAP, ESPN_PRO_TEAM_MAP, ESPN_POSITION_TO_SLOT, ALL_POSITION_SLOT_IDS, ESPN_TRANSACTION_TYPE_MAP) |
+| `packages/backend/src/adapters/espn/types.ts`       | All 11 exported interfaces — zero runtime deps                                                                                                                       |
+| `packages/backend/src/adapters/espn/validator.ts`   | EspnResponseValidator with computeSchemaFingerprint + extractStructure                                                                                               |
+| `packages/backend/src/adapters/espn/normalizer.ts`  | EspnDataNormalizer — pure normalization, zero HTTP deps                                                                                                              |
+| `packages/backend/src/adapters/espn/http-client.ts` | EspnHttpClient — all 7 fetch methods, throttle, LRU cache, axios                                                                                                     |
 
 ### Files Modified
 
-| File | Change |
-|------|--------|
-| `packages/backend/src/adapters/espn.ts` | Rewritten as ~78-line facade; re-exports all types, delegates all methods |
-| `packages/backend/src/agents/player-pool-sync.ts` | Import ESPN_STAT_MAP from `../adapters/espn/constants.js` |
-| `packages/backend/src/api/admin.ts` | Import ESPN_STAT_MAP + ESPN_LINEUP_SLOT_MAP from `../adapters/espn/constants.js` |
+| File                                                   | Change                                                                                                                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/backend/src/adapters/espn.ts`                | Rewritten as ~78-line facade; re-exports all types, delegates all methods                                                                                         |
+| `packages/backend/src/agents/player-pool-sync.ts`      | Import ESPN_STAT_MAP from `../adapters/espn/constants.js`                                                                                                         |
+| `packages/backend/src/api/admin.ts`                    | Import ESPN_STAT_MAP + ESPN_LINEUP_SLOT_MAP from `../adapters/espn/constants.js`                                                                                  |
 | `packages/backend/src/adapters/__tests__/espn.test.ts` | Updated internal access from `adapter["client"]`→`adapter["http"]["client"]`, `adapter["cache"]`→`adapter["http"]["cache"]`; fixed cache.max assertion (500→2000) |
 
 ## TypeScript Compile Result

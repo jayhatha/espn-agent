@@ -1,0 +1,29 @@
+# Development Dockerfile for Scraper
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm and tsx globally (tsx needed for dev CMD)
+RUN npm install -g pnpm@10 tsx
+
+# Install dependencies
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+COPY turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/scraper/package.json ./packages/scraper/
+
+RUN pnpm install --frozen-lockfile
+
+# Copy source
+COPY packages/shared ./packages/shared
+COPY packages/scraper ./packages/scraper
+
+# Build shared package (needed for imports)
+WORKDIR /app/packages/shared
+RUN pnpm build
+
+WORKDIR /app/packages/scraper
+
+EXPOSE 3002
+
+CMD ["tsx", "watch", "src/index.ts"]

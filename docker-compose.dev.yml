@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: espn_fantasy
       POSTGRES_USER: espn_user
-      POSTGRES_PASSWORD: espn_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-espn_local_dev_password}
     ports:
       - "5432:5432"
     volumes:
@@ -43,15 +43,16 @@ services:
       dockerfile: packages/backend/Dockerfile.dev
     container_name: espn-backend
     env_file:
-      - ./packages/backend/.env
+      - ./.env
     environment:
       NODE_ENV: development
       PORT: 3001
       HOST: 0.0.0.0
-      DATABASE_URL: postgresql://espn_user:espn_password@postgres:5432/espn_fantasy
+      DATABASE_URL: postgresql://espn_user:${POSTGRES_PASSWORD:-espn_local_dev_password}@postgres:5432/espn_fantasy
       REDIS_URL: redis://redis:6379
       LOG_LEVEL: info
       FRONTEND_URL: http://localhost:3000
+      SCRAPER_URL: http://scraper:3002
     ports:
       - "3001:3001"
     volumes:
@@ -65,6 +66,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      scraper:
+        condition: service_healthy
     networks:
       - espn-network
     restart: unless-stopped
@@ -76,10 +79,10 @@ services:
       dockerfile: packages/backend/Dockerfile.dev
     container_name: espn-worker
     env_file:
-      - ./packages/backend/.env
+      - ./.env
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://espn_user:espn_password@postgres:5432/espn_fantasy
+      DATABASE_URL: postgresql://espn_user:${POSTGRES_PASSWORD:-espn_local_dev_password}@postgres:5432/espn_fantasy
       REDIS_URL: redis://redis:6379
       LOG_LEVEL: info
     volumes:
@@ -96,6 +99,38 @@ services:
     networks:
       - espn-network
     restart: unless-stopped
+
+  # Data Scraper (headless browser + HTTP API)
+  scraper:
+    build:
+      context: .
+      dockerfile: packages/scraper/Dockerfile.dev
+    container_name: espn-scraper
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      HOST: 0.0.0.0
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./packages/scraper:/app/packages/scraper
+      - ./packages/shared:/app/packages/shared
+      - scraper-node-modules:/app/node_modules
+      - scraper-package-node-modules:/app/packages/scraper/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - espn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # Frontend
   frontend:
@@ -131,5 +166,7 @@ volumes:
   backend-package-node-modules:
   worker-node-modules:
   worker-package-node-modules:
+  scraper-node-modules:
+  scraper-package-node-modules:
   frontend-node-modules:
   frontend-package-node-modules:

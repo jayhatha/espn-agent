@@ -96,7 +96,8 @@ export function TopBar() {
     if (!id) return;
     const stored = localStorage.getItem(`league_${id}_team`);
     if (stored) {
-      setTeamId(parseInt(stored, 10));
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed)) setTeamId(parsed);
     }
   }, [id]);
 

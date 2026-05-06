@@ -5,12 +5,11 @@ import { requireAdmin } from "../middleware/auth.js";
 import { backfillQueue } from "../workers/backfill-worker.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
 import {
-  ESPNAdapter,
-  type ESPNAuthCookies,
   ESPN_STAT_MAP,
   ESPN_LINEUP_SLOT_MAP,
-} from "../adapters/espn.js";
+} from "../adapters/espn/constants.js";
 
 /**
  * Admin API Routes
@@ -33,8 +32,11 @@ export async function adminRoutes(app: FastifyInstance) {
       },
     },
     async (request: any) => {
-      const page = parseInt(request.query.page || "1", 10);
-      const limit = parseInt(request.query.limit || "50", 10);
+      const page = Math.max(parseInt(request.query.page || "1", 10) || 1, 1);
+      const limit = Math.min(
+        Math.max(parseInt(request.query.limit || "50", 10) || 50, 1),
+        100,
+      );
       const offset = (page - 1) * limit;
 
       // Get total count
@@ -341,10 +343,16 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       // ESPN auth: env vars first, then encrypted DB fallback
-      let espnAuth: { SWID?: string; espn_s2?: string } | undefined = getEspnAuthFromEnv();
+      let espnAuth: { SWID?: string; espn_s2?: string } | undefined =
+        getEspnAuthFromEnv();
       if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
-          return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+          return reply
+            .code(500)
+            .send({
+              error:
+                "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+            });
         }
         try {
           espnAuth = {
@@ -353,7 +361,9 @@ export async function adminRoutes(app: FastifyInstance) {
           };
         } catch (error) {
           request.log.error({ error }, "Failed to decrypt ESPN cookies");
-          return reply.code(500).send({ error: "Failed to decrypt ESPN credentials" });
+          return reply
+            .code(500)
+            .send({ error: "Failed to decrypt ESPN credentials" });
         }
       }
 
@@ -759,7 +769,9 @@ export async function adminRoutes(app: FastifyInstance) {
       }
 
       if (typeof finalized !== "boolean") {
-        return reply.status(400).send({ error: "Body must include { finalized: boolean }" });
+        return reply
+          .status(400)
+          .send({ error: "Body must include { finalized: boolean }" });
       }
 
       await db
@@ -867,7 +879,12 @@ export async function adminRoutes(app: FastifyInstance) {
       let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
       if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
-          return reply.code(500).send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+          return reply
+            .code(500)
+            .send({
+              error:
+                "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+            });
         }
         try {
           espnAuth = {
@@ -876,7 +893,9 @@ export async function adminRoutes(app: FastifyInstance) {
           };
         } catch (error) {
           request.log.error({ error }, "Failed to decrypt ESPN cookies");
-          return reply.code(500).send({ error: "Failed to decrypt ESPN credentials" });
+          return reply
+            .code(500)
+            .send({ error: "Failed to decrypt ESPN credentials" });
         }
       }
 

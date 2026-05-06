@@ -33,15 +33,17 @@ describe("ESPNAdapter", () => {
           status: { currentMatchupPeriod: 1, finalScoringPeriod: 26 },
           settings: { name: "Test League" },
           teams: [],
-          members: []
+          members: [],
         },
         status: 200,
         statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       };
 
-      const mockClient = vi.spyOn(adapter["client"], "get").mockResolvedValue(mockResponse);
+      const mockClient = vi
+        .spyOn(adapter["http"]["client"], "get")
+        .mockResolvedValue(mockResponse);
 
       // First call - no delay
       const promise1 = adapter.fetchLeague({ leagueId: 123, season: 2026 });
@@ -68,12 +70,12 @@ describe("ESPNAdapter", () => {
       const error = {
         response: {
           status: 429,
-          headers: { "retry-after": "30" }
+          headers: { "retry-after": "30" },
         },
-        isAxiosError: true
+        isAxiosError: true,
       };
 
-      vi.spyOn(adapter["client"], "get").mockRejectedValue(error);
+      vi.spyOn(adapter["http"]["client"], "get").mockRejectedValue(error);
 
       // The adapter will retry on 429 via axios-retry, which will eventually fail after retries exhausted
       // With fake timers, we need to advance through all retry attempts
@@ -83,7 +85,7 @@ describe("ESPNAdapter", () => {
       await vi.advanceTimersByTimeAsync(60000); // Advance enough to exhaust retries
 
       await expect(promise).rejects.toMatchObject({
-        response: { status: 429 }
+        response: { status: 429 },
       });
     }, 10000);
 
@@ -95,12 +97,12 @@ describe("ESPNAdapter", () => {
           status: { currentMatchupPeriod: 1, finalScoringPeriod: 26 },
           settings: { name: "Test League" },
           teams: [],
-          members: []
+          members: [],
         },
         status: 200,
         statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       };
 
       const mockFreeAgentsResponse = {
@@ -108,10 +110,11 @@ describe("ESPNAdapter", () => {
         status: 200,
         statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       };
 
-      const mockClient = vi.spyOn(adapter["client"], "get")
+      const mockClient = vi
+        .spyOn(adapter["http"]["client"], "get")
         .mockResolvedValueOnce(mockLeagueResponse)
         .mockResolvedValueOnce(mockFreeAgentsResponse);
 
@@ -137,14 +140,14 @@ describe("ESPNAdapter", () => {
   describe("cache bounds (DEBT-09)", () => {
     it("should use LRU cache with max size of 500", () => {
       // Access private cache to verify it's LRUCache instance with correct config
-      const cache = adapter["cache"];
+      const cache = adapter["http"]["cache"];
 
       expect(cache).toBeDefined();
-      expect(cache.max).toBe(500); // From Plan 13-05
+      expect(cache.max).toBe(2000);
     });
 
     it("should evict old entries when max size reached", async () => {
-      const cache = adapter["cache"];
+      const cache = adapter["http"]["cache"];
 
       // Fill cache beyond max
       for (let i = 0; i < 600; i++) {
@@ -164,7 +167,7 @@ describe("ESPNAdapter", () => {
     });
 
     it("should have TTL configured for cache entries", () => {
-      const cache = adapter["cache"];
+      const cache = adapter["http"]["cache"];
 
       // Verify TTL is set (1 hour = 3600000ms from Plan 13-05)
       expect(cache.ttl).toBe(3600000);
@@ -180,15 +183,16 @@ describe("ESPNAdapter", () => {
           status: { currentMatchupPeriod: 1, finalScoringPeriod: 26 },
           settings: { name: "Test League" },
           teams: [],
-          members: []
+          members: [],
         },
         status: 200,
         statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       };
 
-      const mockClient = vi.spyOn(adapter["client"], "get")
+      const mockClient = vi
+        .spyOn(adapter["http"]["client"], "get")
         .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce(mockResponse);
 
@@ -213,21 +217,22 @@ describe("ESPNAdapter", () => {
           status: { currentMatchupPeriod: 1, finalScoringPeriod: 26 },
           settings: { name: "Test League" },
           teams: [],
-          members: []
+          members: [],
         },
         status: 200,
         statusText: "OK",
         headers: {},
-        config: {} as any
+        config: {} as any,
       };
 
-      const mockClient = vi.spyOn(adapter["client"], "get")
+      const mockClient = vi
+        .spyOn(adapter["http"]["client"], "get")
         .mockRejectedValueOnce({
           response: {
             status: 429,
-            headers: { "retry-after": "1" }
+            headers: { "retry-after": "1" },
           },
-          isAxiosError: true
+          isAxiosError: true,
         })
         .mockResolvedValueOnce(mockResponse);
 
@@ -252,7 +257,9 @@ describe("ESPNAdapter", () => {
       const season = 2026;
 
       if (espnLeagueId === 0) {
-        console.log("Skipping fetchPreDraftAuctionValues test - set TEST_ESPN_LEAGUE_ID to run");
+        console.log(
+          "Skipping fetchPreDraftAuctionValues test - set TEST_ESPN_LEAGUE_ID to run",
+        );
         return;
       }
 
@@ -272,11 +279,11 @@ describe("ESPNAdapter", () => {
       expect(result.length).toBeGreaterThan(100);
 
       // Should have players across multiple positions
-      const positions = new Set(result.flatMap(p => p.positions));
+      const positions = new Set(result.flatMap((p) => p.positions));
       expect(positions.size).toBeGreaterThan(5); // At least 6 different positions
 
       // Should have variation in auction values (not all the same)
-      const values = result.map(p => p.espnAuctionValue);
+      const values = result.map((p) => p.espnAuctionValue);
       const uniqueValues = new Set(values);
       expect(uniqueValues.size).toBeGreaterThan(10); // At least 10 different values
 
@@ -310,7 +317,9 @@ describe("ESPNAdapter", () => {
 
       const adapter = new ESPNAdapter(mockLogger);
       // Mock axios to return empty auction values
-      vi.spyOn(adapter["client"], "get").mockResolvedValue(mockResponse);
+      vi.spyOn(adapter["http"]["client"], "get").mockResolvedValue(
+        mockResponse,
+      );
 
       const result = await adapter.fetchPreDraftAuctionValues({
         leagueId: 123,

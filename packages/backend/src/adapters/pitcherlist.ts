@@ -1,8 +1,14 @@
-import axios from "axios";
 import { load } from "cheerio";
-import { LRUCache } from "lru-cache";
 import type { BaseLogger } from "pino";
 import type { ExternalRankingEntry } from "../../../shared/dist/index.js";
+import { normalizePlayerName } from "../../../shared/dist/index.js";
+import { CachedHttpClient } from "../utils/cached-http-client.js";
+
+/**
+ * Canonical pitcher name normalizer — re-exported from shared for backward compat.
+ * Callers should prefer importing `normalizePlayerName` from the shared package directly.
+ */
+export const normalizePitcherName = normalizePlayerName;
 
 /**
  * Pitcherlist Adapter
@@ -36,16 +42,6 @@ const TIER_KEYS = [
 ];
 
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-
-type CacheEntry = { data: ExternalRankingEntry[]; expiresAt: number };
-
-export function normalizePitcherName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z]/g, "");
-}
 
 /**
  * Parse tier-grouped HTML from a Pitcherlist article into ExternalRankingEntry[].
@@ -148,7 +144,10 @@ export function parsePitcherlistTiers(
 
               let verdict: ExternalRankingEntry["verdict"] = "neutral";
               let tier = verdictText;
-              if (verdictText.includes("start") && !verdictText.includes("sit")) {
+              if (
+                verdictText.includes("start") &&
+                !verdictText.includes("sit")
+              ) {
                 verdict = "start";
                 tier = "Start";
               } else if (verdictText.includes("maybe")) {
@@ -194,14 +193,20 @@ export interface Top100Entry {
  * Table structure: Rank | Pitcher (link) | Team | Badges | Change
  * The rankings table is identified by having a header row with "Rank" and "Pitcher" columns.
  */
-export function parseTop100Rankings(html: string, sourceUrl: string): Top100Entry[] {
+export function parseTop100Rankings(
+  html: string,
+  sourceUrl: string,
+): Top100Entry[] {
   try {
     const $ = load(html);
     const entries: Top100Entry[] = [];
 
     $("table").each((_i, table) => {
       const headerRow = $(table).find("tr").first();
-      const headers = headerRow.find("td, th").map((_j, cell) => $(cell).text().trim().toLowerCase()).get();
+      const headers = headerRow
+        .find("td, th")
+        .map((_j, cell) => $(cell).text().trim().toLowerCase())
+        .get();
 
       // Identify the Top 100 table by its header columns
       if (!headers.includes("rank") || !headers.includes("pitcher")) return;
@@ -210,22 +215,27 @@ export function parseTop100Rankings(html: string, sourceUrl: string): Top100Entr
       const pitcherIdx = headers.indexOf("pitcher");
       const teamIdx = headers.indexOf("team");
 
-      $(table).find("tr").slice(1).each((_j, row) => {
-        const cells = $(row).find("td");
-        if (cells.length < 3) return;
+      $(table)
+        .find("tr")
+        .slice(1)
+        .each((_j, row) => {
+          const cells = $(row).find("td");
+          if (cells.length < 3) return;
 
-        const rankText = cells.eq(rankIdx).text().trim();
-        const rank = parseInt(rankText, 10);
-        if (isNaN(rank) || rank < 1 || rank > 200) return;
+          const rankText = cells.eq(rankIdx).text().trim();
+          const rank = parseInt(rankText, 10);
+          if (isNaN(rank) || rank < 1 || rank > 200) return;
 
-        const playerLink = cells.eq(pitcherIdx).find("a").first();
-        const playerName = playerLink.length ? playerLink.text().trim() : cells.eq(pitcherIdx).text().trim();
-        if (!playerName || playerName.length <= 1) return;
+          const playerLink = cells.eq(pitcherIdx).find("a").first();
+          const playerName = playerLink.length
+            ? playerLink.text().trim()
+            : cells.eq(pitcherIdx).text().trim();
+          if (!playerName || playerName.length <= 1) return;
 
-        const team = teamIdx >= 0 ? cells.eq(teamIdx).text().trim() : "";
+          const team = teamIdx >= 0 ? cells.eq(teamIdx).text().trim() : "";
 
-        entries.push({ rank, playerName, team, sourceUrl });
-      });
+          entries.push({ rank, playerName, team, sourceUrl });
+        });
     });
 
     return entries;
@@ -235,10 +245,14 @@ export function parseTop100Rankings(html: string, sourceUrl: string): Top100Entr
 }
 
 export class PitcherlistAdapter {
-  private cache: LRUCache<string, CacheEntry>;
+  private readonly httpClient: CachedHttpClient;
 
-  constructor(private logger?: BaseLogger) {
-    this.cache = new LRUCache<string, CacheEntry>({ max: 10 });
+  constructor(
+    private readonly logger?: BaseLogger,
+    httpClient?: CachedHttpClient,
+  ) {
+    this.httpClient =
+      httpClient ?? new CachedHttpClient({ maxEntries: 10, logger });
   }
 
   /**
@@ -247,46 +261,45 @@ export class PitcherlistAdapter {
    * Results are cached for 6 hours.
    */
   async getTop100Rankings(): Promise<Top100Entry[]> {
-    const cacheKey = "pitcherlist:top100";
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      this.logger?.debug("PitcherList Top 100 served from cache");
-      return cached.data as unknown as Top100Entry[];
-    }
-
     try {
-      // Discover latest Top 100 article from homepage
+      // Discover latest Top 100 article from homepage (not cached — URL discovery)
       this.logger?.debug("Discovering PitcherList Top 100 article URL");
-      const homepageResp = await axios.get<string>(HOMEPAGE_URL, {
+      const homepageHtml = await this.httpClient.get<string>(HOMEPAGE_URL, {
         headers: { "User-Agent": USER_AGENT },
-        timeout: 15000,
         responseType: "text",
+        ttlMs: 60 * 60 * 1000, // 1 hour for homepage
+        cacheKey: "pitcherlist:homepage",
       });
 
-      const $home = load(homepageResp.data);
-      const top100Url = $home("a[href*='top-100-starting-pitchers']").first().attr("href");
+      const $home = load(homepageHtml);
+      const top100Url = $home("a[href*='top-100-starting-pitchers']")
+        .first()
+        .attr("href");
 
       if (!top100Url) {
-        this.logger?.warn("Could not find Top 100 article link on PitcherList homepage");
+        this.logger?.warn(
+          "Could not find Top 100 article link on PitcherList homepage",
+        );
         return [];
       }
 
-      // Fetch and parse the article
-      this.logger?.debug({ url: top100Url }, "Fetching PitcherList Top 100 article");
-      const articleResp = await axios.get<string>(top100Url, {
+      // Fetch and parse the article (cached for full TTL)
+      this.logger?.debug(
+        { url: top100Url },
+        "Fetching PitcherList Top 100 article",
+      );
+      const articleHtml = await this.httpClient.get<string>(top100Url, {
         headers: { "User-Agent": USER_AGENT },
-        timeout: 15000,
         responseType: "text",
+        ttlMs: CACHE_TTL_MS,
+        cacheKey: "pitcherlist:top100",
       });
 
-      const entries = parseTop100Rankings(articleResp.data, top100Url);
-      this.logger?.info({ count: entries.length, url: top100Url }, "PitcherList Top 100 parsed");
-
-      this.cache.set(cacheKey, {
-        data: entries as unknown as ExternalRankingEntry[],
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      });
-
+      const entries = parseTop100Rankings(articleHtml, top100Url);
+      this.logger?.info(
+        { count: entries.length, url: top100Url },
+        "PitcherList Top 100 parsed",
+      );
       return entries;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -306,16 +319,16 @@ export class PitcherlistAdapter {
   private async getRankingsFromScraper(): Promise<ExternalRankingEntry[]> {
     try {
       this.logger?.debug("Fetching Pitcherlist rankings from scraper service");
-      const response = await axios.post<{
+      const data = await this.httpClient.post<{
         entries: ExternalRankingEntry[];
         count: number;
-      }>(`${SCRAPER_URL}/scrape/pitcherlist`, {}, { timeout: 20000 });
+      }>(`${SCRAPER_URL}/scrape/pitcherlist`, {});
 
       this.logger?.info(
-        { count: response.data.count },
+        { count: data.count },
         "Pitcherlist rankings from scraper",
       );
-      return response.data.entries;
+      return data.entries;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger?.warn(
@@ -327,33 +340,29 @@ export class PitcherlistAdapter {
   }
 
   private async getRankingsDirect(): Promise<ExternalRankingEntry[]> {
-    const cacheKey = "pitcherlist:latest";
-
-    // Check cache first
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      this.logger?.debug("Pitcherlist rankings served from cache");
-      return cached.data;
-    }
-
     try {
-      // Step 1: Discover the latest article URL from the archive page
+      // Step 1: Discover the latest article URL from the archive page (short TTL)
       this.logger?.debug(
         { url: ARCHIVE_URL },
         "Fetching Pitcherlist archive page",
       );
 
-      const archiveResponse = await axios.get<string>(ARCHIVE_URL, {
+      const archiveHtml = await this.httpClient.get<string>(ARCHIVE_URL, {
         headers: { "User-Agent": USER_AGENT },
-        timeout: 15000,
         responseType: "text",
+        ttlMs: 60 * 60 * 1000, // 1 hour for archive discovery
+        cacheKey: "pitcherlist:archive",
       });
 
-      const $archive = load(archiveResponse.data);
+      const $archive = load(archiveHtml);
       const articleUrl =
-        $archive("a[href*='starting-pitcher-streamer-rank']").first().attr("href") ||
+        $archive("a[href*='starting-pitcher-streamer-rank']")
+          .first()
+          .attr("href") ||
         $archive("a[href*='sp-streamer-rank']").first().attr("href") ||
-        $archive("a[href*='streamer-ranks-fantasy-baseball']").first().attr("href") ||
+        $archive("a[href*='streamer-ranks-fantasy-baseball']")
+          .first()
+          .attr("href") ||
         $archive(".entry-title a, h2 a, h3 a").first().attr("href");
 
       if (!articleUrl) {
@@ -363,30 +372,22 @@ export class PitcherlistAdapter {
         return [];
       }
 
-      // Step 2: Fetch and parse the article
-      this.logger?.debug(
-        { url: articleUrl },
-        "Fetching Pitcherlist article",
-      );
+      // Step 2: Fetch and parse the article (full TTL cache)
+      this.logger?.debug({ url: articleUrl }, "Fetching Pitcherlist article");
 
-      const articleResponse = await axios.get<string>(articleUrl, {
+      const articleHtml = await this.httpClient.get<string>(articleUrl, {
         headers: { "User-Agent": USER_AGENT },
-        timeout: 15000,
         responseType: "text",
+        ttlMs: CACHE_TTL_MS,
+        cacheKey: "pitcherlist:latest",
       });
 
-      const entries = parsePitcherlistTiers(articleResponse.data, articleUrl);
+      const entries = parsePitcherlistTiers(articleHtml, articleUrl);
 
       this.logger?.info(
         { count: entries.length, articleUrl },
         "Pitcherlist rankings parsed",
       );
-
-      // Cache the result
-      this.cache.set(cacheKey, {
-        data: entries,
-        expiresAt: Date.now() + CACHE_TTL_MS,
-      });
 
       return entries;
     } catch (error: unknown) {

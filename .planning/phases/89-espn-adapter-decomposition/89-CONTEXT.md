@@ -21,28 +21,34 @@ The existing `ESPNAdapter` class becomes a thin facade that composes these three
 ## Implementation Decisions
 
 ### Module Structure
+
 - New files live in `packages/backend/src/adapters/espn/` subdirectory: `http-client.ts`, `normalizer.ts`, `validator.ts`, `constants.ts`, `types.ts`
 - `packages/backend/src/adapters/espn.ts` becomes the facade that re-exports the `ESPNAdapter` class (backward compat)
 - All 7 constant maps move to `adapters/espn/constants.ts`, imported by normalizer only
 
 ### Interface Preservation
+
 - All public methods on `ESPNAdapter` remain unchanged: `fetchLeague`, `fetchFreeAgents`, `fetchHistoricalWeek`, `getFinalScoringPeriod`, `normalizeLeagueData`
 - All exported interfaces (ESPNAuthCookies, ESPNFetchOptions, ESPNRawResponse, etc.) remain exported from `adapters/espn.ts` for backward compat
 
 ### Testing Seams
+
 - `EspnDataNormalizer` and `EspnResponseValidator` are pure classes (no HTTP dependency) — testable without mocking
 - `EspnHttpClient` wraps the HTTP concern; tests for it use nock or mock the axios instance
 
 ### the agent's Discretion
+
 - Exact internal method split between EspnHttpClient and ESPNAdapter facade
 - Whether to expose EspnHttpClient/EspnDataNormalizer/EspnResponseValidator as named exports from the facade for direct testing use
 
 </decisions>
 
 <code_context>
+
 ## Existing Code Insights
 
 ### Reusable Assets
+
 - `packages/backend/src/adapters/espn.ts` — the full source to be split (~1200 lines)
 - Throttle wrapper: `throttledEspnCall()` global function + instance-level `lastRequestTime`
 - LRU cache: 2000-slot cache with `getCacheKey()`, `getCached()` methods
@@ -51,11 +57,13 @@ The existing `ESPNAdapter` class becomes a thin facade that composes these three
 - Validation: `validateEspnResponse()`, `assertEspnCriticalShape()`, `logUnexpectedFields()`
 
 ### Established Patterns
+
 - Backend uses class-based modules with constructor injection: `constructor(private logger: BaseLogger)`
 - Kysely db passed to agents; adapters receive logger only
 - No IoC container — manual construction in routes/workers
 
 ### Integration Points
+
 - `SnapshotOrchestratorAgent` imports `ESPNAdapter` from `adapters/espn.ts`
 - `WaiverRecommendationAgent` imports `ESPNAdapter`
 - `FreeAgentView` imports `ESPNAdapter`

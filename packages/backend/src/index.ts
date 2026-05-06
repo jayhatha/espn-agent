@@ -31,6 +31,13 @@ import type { FastifyInstance } from "fastify";
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 
+// Fail fast in non-development environments if critical secrets are absent (C2)
+if (process.env.NODE_ENV !== "development" && !process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required outside development mode",
+  );
+}
+
 export async function buildServer(): Promise<FastifyInstance> {
   const server = Fastify({
     logger: {
@@ -70,8 +77,17 @@ export async function buildServer(): Promise<FastifyInstance> {
         // Allow private LAN IP origins for mobile draft companion
         callback(null, true);
       } else if (/^chrome-extension:\/\//.test(origin)) {
-        // Allow Chrome extension WebSocket connections
-        callback(null, true);
+        // Allow Chrome extension — restrict to specific ID in production (W1)
+        const allowedExtId = process.env.CHROME_EXTENSION_ID;
+        if (
+          !allowedExtId ||
+          process.env.NODE_ENV === "development" ||
+          origin === `chrome-extension://${allowedExtId}`
+        ) {
+          callback(null, true);
+        } else {
+          callback(new Error("Not allowed by CORS"), false);
+        }
       } else if (/^http:\/\/localhost:\d+$/.test(origin)) {
         // Allow any localhost port — personal local tool, no production deployment risk.
         // Port shifts when e.g. Docker occupies :3000 or Next.js falls back to :3002.
@@ -84,16 +100,17 @@ export async function buildServer(): Promise<FastifyInstance> {
   });
 
   // Register cookie plugin (must be before JWT)
-  await server.register(cookie, {
-    secret:
-      process.env.COOKIE_SECRET ||
-      process.env.JWT_SECRET ||
-      "development-secret",
-  });
+  const cookieSecret =
+    process.env.COOKIE_SECRET ??
+    process.env.JWT_SECRET ??
+    "development-secret";
+  await server.register(cookie, { secret: cookieSecret });
 
   // Register JWT plugin for authentication (reads from accessToken cookie or Authorization header)
+  const jwtSecret =
+    process.env.JWT_SECRET ?? "development-secret-change-in-production";
   await server.register(fastifyJwt, {
-    secret: process.env.JWT_SECRET || "development-secret-change-in-production",
+    secret: jwtSecret,
     sign: {
       expiresIn: "15m",
     },

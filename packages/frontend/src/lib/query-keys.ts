@@ -18,21 +18,28 @@ export const queryKeys = {
   team: {
     overview: (leagueId: string | number, teamId: number) =>
       ["team-overview", leagueId, teamId] as const,
-    roster: (leagueId: string | number, teamId: number, snapshotDate?: string) =>
-      ["roster", leagueId, teamId, snapshotDate] as const,
+    roster: (
+      leagueId: string | number,
+      teamId: number,
+      snapshotDate?: string,
+    ) => ["roster", leagueId, teamId, snapshotDate] as const,
   },
 
   // ── Standings ────────────────────────────────────────────────────────────
   standings: {
     all: (leagueId: string | number) => ["standings", leagueId] as const,
-    projected: (leagueId: string | number) => ["standings-projected", leagueId] as const,
-    swing: (leagueId: string | number) => ["standings-swing", leagueId] as const,
+    projected: (leagueId: string | number) =>
+      ["standings-projected", leagueId] as const,
+    swing: (leagueId: string | number) =>
+      ["standings-swing", leagueId] as const,
   },
 
   // ── Timeseries ───────────────────────────────────────────────────────────
   timeseries: {
-    overall: (leagueId: string | number) => ["timeseries-overall", leagueId] as const,
-    projected: (leagueId: string | number) => ["timeseries-projected", leagueId] as const,
+    overall: (leagueId: string | number) =>
+      ["timeseries-overall", leagueId] as const,
+    projected: (leagueId: string | number) =>
+      ["timeseries-projected", leagueId] as const,
     categoryRank: (leagueId: string | number, categoryId?: string) =>
       ["timeseries-category", leagueId, categoryId] as const,
     categoryTotal: (leagueId: string | number) =>
@@ -48,7 +55,13 @@ export const queryKeys = {
       leagueId: string | number,
       teamId: number,
       maxRecommendations: number,
-    ) => ["waivers-recommendations", leagueId, teamId, maxRecommendations] as const,
+    ) =>
+      [
+        "waivers-recommendations",
+        leagueId,
+        teamId,
+        maxRecommendations,
+      ] as const,
   },
 
   // ── Trades ───────────────────────────────────────────────────────────────
@@ -82,6 +95,7 @@ export const queryKeys = {
 
   // ── Change Log / Streaming Results ───────────────────────────────────────
   changelog: {
-    events: (leagueId: string | number) => ["changelog-events", leagueId] as const,
+    events: (leagueId: string | number) =>
+      ["changelog-events", leagueId] as const,
   },
 } as const;

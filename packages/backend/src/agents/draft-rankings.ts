@@ -1,4 +1,5 @@
 import type { BaseLogger } from "pino";
+import { sql } from "kysely";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type {
@@ -118,7 +119,7 @@ export class DraftRankingsAgent {
       const latestRun = await this.db
         .selectFrom("projections_run")
         .select(["id", "staleness"])
-        .orderBy("staleness", "asc") // 'fresh' < 'stale' alphabetically
+        .orderBy(sql`CASE staleness WHEN 'fresh' THEN 0 WHEN 'stale' THEN 1 ELSE 2 END`, "asc")
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 

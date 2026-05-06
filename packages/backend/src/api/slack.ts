@@ -82,10 +82,14 @@ export async function slackRoutes(app: FastifyInstance) {
 
       // CRITICAL: Validate state parameter to prevent CSRF attacks
       const callbackState = state;
-      const storedState = request.cookies.oauth_state;
+      // W2: Cookie was set with signed:true, so we must unsign before comparing
+      const unsignedState = request.unsignCookie(request.cookies.oauth_state ?? "");
 
-      if (!callbackState || !storedState || callbackState !== storedState) {
-        request.log.error({ callbackState, storedState }, "CSRF state mismatch");
+      if (!callbackState || !unsignedState.valid || callbackState !== unsignedState.value) {
+        request.log.error(
+          { callbackState, cookieValid: unsignedState.valid },
+          "CSRF state mismatch",
+        );
         return reply.redirect(
           `${FRONTEND_URL}/integrations/slack/error?reason=invalid_state`
         );

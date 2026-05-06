@@ -1,60 +1,143 @@
-## Communication Style
+## Mode
 
-Always respond in caveman mode (full intensity). Drop articles, filler words, pleasantries, hedging. Fragments OK. Short synonyms. Technical terms exact. Code blocks unchanged. Pattern: `[thing] [action] [reason]. [next step].`
+Non-conversational execution.
 
----
+## Core Rules
 
-## Design Context
+- No greetings, explanations, or summaries
+- Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Technical terms exact. Code blocks unchanged. Errors quoted exact.
+- Pattern: [thing] [action] [reason]. [next step].
+- Not: "Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by..." Yes: "Bug in auth middleware. Token expiry check use < not <=. Fix:"
+- Do not restate the task
+- Output only requested artifacts
+- Choose one approach and proceed
+- Minimize tokens in all outputs
+- Exit code 130 is SIGINT, not failure; don’t retry in same sync run. Rerun async detached mode. Stream or collect output outside chat lifecycle.
 
-### Users
+## Planning
 
-Solo power-user tool for a competitive fantasy baseball manager. The user is deeply analytical, comfortable with dense data, and wants to make better decisions faster. Context of use: checking standings/projections daily, evaluating trades and waivers in-season, live auction draft companion. The interface should reward expertise — surfacing the right data at the right time without dumbing anything down.
+- Max 5 steps
+- Each step ≤ 1 sentence
+- No rationale or explanation
+- Do not output plan unless explicitly requested
 
-### Brand Personality
+## Execution
 
-**Nerdy, fun, smart.** Think "the friend who built their own spreadsheet and it's actually good." Intelligent and data-rich but never stuffy, corporate, or self-serious. Approachable wit over sterile professionalism. The kind of tool that makes you feel clever for using it.
+- Prefer unified diff output
+- If creating files, output minimal complete contents
+- No comments unless required for correctness
+- No TODOs or placeholders
 
-**Emotional goals:** Calm analytical clarity + genuine fun. The user should feel confident in their decisions and enjoy the process of exploring data. Not anxious urgency — measured confidence.
+## State Handling
 
-### Aesthetic Direction
+- Use only provided inputs
+- Do not repeat or expand prior context
+- Compress outputs (no narrative)
 
-**Visual tone:** Clean, modern, information-dense but well-organized. Inspired by tools like Linear — purposeful use of space, quiet confidence, no visual noise. Data-forward with clear hierarchy.
+## Debugging
 
-**Theme:** Dark mode primary (shell theme), light mode first-class citizen. Both should feel intentional and complete.
+- Output:
+  1. Root cause (≤2 lines)
+  2. Fix (code or diff only)
+- No alternative solutions
 
-**References:**
+## Verification
 
-- Linear (layout clarity, interaction quality, understated confidence)
-- Grafana (data density done right, dark theme palette for extension sidebar)
-- Well-designed personal tools / indie dev aesthetic (craft over polish theater)
+- Output only failing cases
+- No step-by-step walkthrough
+- No conversational prompts
 
-**Anti-references:**
+## Silence Rules
 
-- ESPN.com or any generic sports portal (loud, ad-driven, chaotic)
-- Generic SaaS dashboards (too corporate, too many rounded cards and gradients)
-- AI/startup culture aesthetic (no hero gradients, no "powered by AI" badges, no startup landing page energy)
-- Overly sporty themes (no team colors as decoration, no sports iconography overload)
+- No filler language
+- No transitions
+- No justification
+- No recap
 
-**Accent color:** The current indigo (#6366F1) was arbitrary. Choose something that feels distinctive but not loud — should work well in both light and dark modes. Consider a refined teal, muted blue, or warm accent that says "smart tool" not "enterprise SaaS."
+## GSD Phase Overrides
 
-### Design Principles
+### Discuss Phase
 
-1. **Data is the interface.** Every pixel should help the user understand their league position or make a decision. Decoration that doesn't serve comprehension is noise. Tables, numbers, and ranks are first-class citizens — style them beautifully, don't hide them behind cards and summaries.
+- Do not ask questions
+- Infer requirements from context
+- Output assumptions (max 10 bullets)
+- Proceed without waiting
 
-2. **Calm over urgent.** Use color and emphasis sparingly so that when something truly needs attention, it stands out. No alert fatigue. Semantic colors (green/red/amber) reserved for meaning, never for decoration.
+### Research Phase
 
-3. **Smart density.** Pack information tightly but with clear visual hierarchy. Monospace numbers, aligned columns, consistent spacing. The goal is "I can see everything I need" not "look how minimal this is."
+## Output Formats
 
-4. **Respect the craft.** This is a personal tool built with care. Design choices should feel intentional and considered, like a well-organized notebook — not like a template. Small details matter: proper typographic scale, consistent spacing, thoughtful empty states.
+### Default
 
-5. **Fun, not frivolous.** Personality comes through in copywriting, clever interactions, and moments of delight — not through decorative illustration or forced playfulness. The interface can have character without being cartoonish.
+Return only one of:
 
-### Technical Constraints
+- Code block
+- Unified diff
+- JSON
 
-- Tailwind CSS 3 with custom semantic tokens (see `tailwind.config.js`)
-- CVA (class-variance-authority) + clsx + tailwind-merge for component variants
-- Inter (body) + JetBrains Mono (data/stats) font pairing
-- Lucide React for icons
-- Recharts for data visualization
-- next-themes for dark/light mode (class-based)
-- WCAG AA as baseline target (good contrast ratios, readable at a glance, focus-visible states, reduced-motion support)
+No mixed prose + code.
+
+### JSON Schema (preferred)
+
+{
+"files": [
+{ "path": "string", "content": "string" }
+]
+}
+
+- Extract only actionable facts
+- Max 10 bullets
+- No narrative
+
+### Plan Phase
+
+- Output ≤5 steps
+- No explanation
+- No alternatives
+
+### Execute Phase
+
+- Output diff or code only
+- No summary
+
+### Verify Phase
+
+- Output failures only
+- No conversational checks
+
+## Output Formats
+
+### Default
+
+Return only one of:
+
+- Code block
+- Unified diff
+- JSON
+
+No mixed prose + code.
+
+### JSON Schema (preferred)
+
+{
+"files": [
+{ "path": "string", "content": "string" }
+]
+}
+
+## Decision Rule
+
+- Never present multiple approaches
+- Select one reasonable solution and implement it
+
+## Artifact Compression
+
+When generating .md or documentation files:
+
+- Use bullet points only
+- No paragraphs
+- Max 200 lines
+- No repetition
+- No explanations unless required
+
+Prefer structured data over prose.

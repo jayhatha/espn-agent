@@ -43,6 +43,7 @@ SnapshotRepository with 5 query methods centralizes the duplicated `team_roster_
 ## What Was Done
 
 Created `SnapshotRepository` in `packages/backend/src/db/snapshot-repository.ts` with:
+
 - `getRosterForSnapshot` — single `team_roster_snapshot` innerJoin `player` join in the entire codebase
 - `getLeagueCategoryTotals` — shared category totals query
 - `getPlayerProjections` — projection fetch with empty-array guard
@@ -56,18 +57,21 @@ Migrated all 5 callers. Each agent received a `private readonly repo: SnapshotRe
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Constructor field initialization order**
+
 - **Found during:** Task 1 design
 - **Issue:** TypeScript ES2022 target uses native class fields; field initializers run before constructor body, so `private repo = new SnapshotRepository(this.db)` would access `this.db` before it's assigned by the parameter property
 - **Fix:** Declared `private readonly repo: SnapshotRepository;` as a typed field and assigned `this.repo = new SnapshotRepository(db)` at the start of the constructor body
 - **Files modified:** standings-projection.ts, waiver-recommendation.ts, trade-recommendation.ts
 
 **2. [Rule 1 - Bug] Stale `allTeamIds` variable in generateTradeCandidates**
+
 - **Found during:** Task 2 TypeScript compile
 - **Issue:** After replacing the allRosters query with `repo.getRosterForSnapshot` (which fetches the whole league), `allTeamIds` was declared but never used, causing `noUnusedLocals` error
 - **Fix:** Removed the `allTeamIds` declaration
 - **Commit:** a3f1ac8
 
 **3. [Rule 1 - Bug] Syntax error from partial constructor replacement**
+
 - **Found during:** Task 2 TypeScript compile
 - **Issue:** `replace_string_in_file` matched only part of the original constructor, leaving a dangling `) {}` token
 - **Fix:** Removed the orphaned `) {}` with a second targeted replacement

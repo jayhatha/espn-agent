@@ -53,6 +53,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       SCRAPER_URL: http://scraper:3002
+      INTERNAL_JOB_TOKEN: ${INTERNAL_JOB_TOKEN:?INTERNAL_JOB_TOKEN is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
     ports:
       - "3001:3001"
     depends_on:

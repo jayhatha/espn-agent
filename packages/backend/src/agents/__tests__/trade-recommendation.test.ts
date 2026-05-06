@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { TradeRecommendationAgent } from "../trade-recommendation.js";
+import {
+  TradeRecommendationAgent,
+  calculateEquivalentTradeValue,
+  extractDraftCostsFromDraftDetail,
+} from "../trade-recommendation.js";
 import { createMockProjection } from "../../__tests__/test-helpers.js";
 
 /**
@@ -7,6 +11,55 @@ import { createMockProjection } from "../../__tests__/test-helpers.js";
  *
  * Tests projection field access fixes (DEBT-01) and rate stat component math
  */
+
+describe("TradeRecommendationAgent - Equivalent Value Signals", () => {
+  it("extracts league draft prices from nested draft detail payloads", () => {
+    const draftDetail = {
+      picks: [
+        { playerId: 101, bidAmount: 27 },
+        {
+          results: [
+            {
+              player: { id: 102 },
+              auctionValue: 19,
+            },
+          ],
+        },
+      ],
+    };
+
+    const draftCosts = extractDraftCostsFromDraftDetail(draftDetail);
+
+    expect(draftCosts.get(101)).toBe(27);
+    expect(draftCosts.get(102)).toBe(19);
+  });
+
+  it("weights ESPN ASV at 80 percent and league draft cost at 20 percent", () => {
+    const result = calculateEquivalentTradeValue({
+      giveAsv: 20,
+      receiveAsv: 22,
+      giveDraftCost: 10,
+      receiveDraftCost: 14,
+    });
+
+    expect(result.usesDraftCost).toBe(true);
+    expect(result.giveCompositeValue).toBeCloseTo(18, 5);
+    expect(result.receiveCompositeValue).toBeCloseTo(20.4, 5);
+    expect(result.ratio).toBeCloseTo(18 / 20.4, 5);
+  });
+
+  it("marks equal-ASV trades as lopsided when league draft cost diverges", () => {
+    const result = calculateEquivalentTradeValue({
+      giveAsv: 25,
+      receiveAsv: 25,
+      giveDraftCost: 40,
+      receiveDraftCost: 10,
+    });
+
+    expect(result.usesDraftCost).toBe(true);
+    expect(result.ratio).toBeLessThan(0.8);
+  });
+});
 
 describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () => {
   describe("stat_components_json parsing", () => {

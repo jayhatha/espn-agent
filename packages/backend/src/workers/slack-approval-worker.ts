@@ -1,19 +1,12 @@
 import { Queue, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import pino from "pino";
+import { fileURLToPath } from "url";
 import { getDb } from "../db/connection.js";
 import { isSlackEnabled } from "../utils/feature-flags.js";
 import axios from "axios";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
-
-// Check if Slack is enabled before starting worker
-if (!isSlackEnabled()) {
-  logger.warn(
-    "Slack integration disabled - approval worker will not start. Set FEATURE_SLACK_ENABLED=true to enable.",
-  );
-  process.exit(0);
-}
 
 const connection = new IORedis(
   process.env.REDIS_URL || "redis://localhost:6379",
@@ -32,6 +25,19 @@ interface SlackApprovalJobData {
   messageTs: string;
   channelId: string;
 }
+
+/**
+ * Start the Slack approval worker. Called when this module runs as an entry point.
+ * Safe to import as a module without calling this function — only `slackApprovalQueue`
+ * will be initialized (queue producer only, no worker consumer).
+ */
+export function startWorker(): void {
+  if (!isSlackEnabled()) {
+    logger.warn(
+      "Slack integration disabled - approval worker will not start. Set FEATURE_SLACK_ENABLED=true to enable.",
+    );
+    process.exit(0);
+  }
 
 const worker = new Worker<SlackApprovalJobData>(
   "slack-approvals",
@@ -270,3 +276,10 @@ process.on("SIGTERM", async () => {
 });
 
 logger.info("Slack approval worker started");
+}
+
+// Auto-start when executed directly as entry point (not when imported as a module)
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  startWorker();
+}

@@ -6,6 +6,7 @@ import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
 import { RotoballerAdapter } from "../adapters/rotoballer.js";
 import { FangraphsAdapter } from "../adapters/fangraphs.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
+import { normalizePlayerName } from "../../../shared/dist/index.js";
 
 /**
  * Sit/Start Advisor Agent
@@ -19,20 +20,10 @@ import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
 export type Verdict = "start" | "lean_start" | "neutral" | "lean_sit" | "sit";
 
 /**
- * Normalize a pitcher name for matching:
- * - Strip diacritics (NFD decomposition + remove combining marks)
- * - Lowercase
- * - Remove non-alpha characters
- *
- * This handles cases like "Cristopher Sánchez" matching "Cristopher Sanchez".
+ * Normalize a pitcher name — delegates to shared normalizePlayerName.
+ * Alias kept for local readability.
  */
-export function normalizeName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z]/g, "");
-}
+export const normalizeName = normalizePlayerName;
 
 const VERDICT_NUMERIC: Record<Verdict, number> = {
   start: 5,
@@ -141,7 +132,10 @@ export class SitStartAdvisor {
     // Use a single getSchedule() call for the date range (more efficient than 7 separate calls).
     // Graceful degradation: if the MLB API fails, scheduledStartMap stays empty and sit/start
     // verdicts still display without dates.
-    const scheduledStartMap = new Map<string, { gameDate: string; opponent: string }>();
+    const scheduledStartMap = new Map<
+      string,
+      { gameDate: string; opponent: string }
+    >();
     try {
       const today = new Date();
       const startDate = today.toISOString().slice(0, 10);
@@ -229,64 +223,62 @@ export class SitStartAdvisor {
     }
 
     // Step 4: Match each rostered SP to external rankings
-    const recommendations: SitStartRecommendation[] = rosteredSPs.map(
-      (sp) => {
-        const normalizedSpName = normalizeName(sp.name);
+    const recommendations: SitStartRecommendation[] = rosteredSPs.map((sp) => {
+      const normalizedSpName = normalizeName(sp.name);
 
-        const plMatch = pitcherlistRankings.find(
-          (e) => normalizeName(e.playerName) === normalizedSpName,
-        );
-        const rbMatch = rotoballerRankings.find(
-          (e) => normalizeName(e.playerName) === normalizedSpName,
-        );
-        const fgMatch = fangraphsRankings.find(
-          (e) => normalizeName(e.playerName) === normalizedSpName,
-        );
+      const plMatch = pitcherlistRankings.find(
+        (e) => normalizeName(e.playerName) === normalizedSpName,
+      );
+      const rbMatch = rotoballerRankings.find(
+        (e) => normalizeName(e.playerName) === normalizedSpName,
+      );
+      const fgMatch = fangraphsRankings.find(
+        (e) => normalizeName(e.playerName) === normalizedSpName,
+      );
 
-        // Build verdict array for consensus
-        const verdicts: Verdict[] = [];
-        if (plMatch) verdicts.push(plMatch.verdict);
-        if (rbMatch) verdicts.push(rbMatch.verdict);
-        if (fgMatch) verdicts.push(fgMatch.verdict);
+      // Build verdict array for consensus
+      const verdicts: Verdict[] = [];
+      if (plMatch) verdicts.push(plMatch.verdict);
+      if (rbMatch) verdicts.push(rbMatch.verdict);
+      if (fgMatch) verdicts.push(fgMatch.verdict);
 
-        const recommendation: SitStartRecommendation = {
-          playerId: sp.player_id,
-          playerName: sp.name,
-          sourceUrl: {},
-        };
+      const recommendation: SitStartRecommendation = {
+        playerId: sp.player_id,
+        playerName: sp.name,
+        sourceUrl: {},
+      };
 
-        if (plMatch) {
-          recommendation.pitcherlistVerdict = plMatch.verdict;
-          recommendation.pitcherlistTier = plMatch.tier;
-          recommendation.sourceUrl.pitcherlist = plMatch.sourceUrl;
-        }
+      if (plMatch) {
+        recommendation.pitcherlistVerdict = plMatch.verdict;
+        recommendation.pitcherlistTier = plMatch.tier;
+        recommendation.sourceUrl.pitcherlist = plMatch.sourceUrl;
+      }
 
-        if (rbMatch) {
-          recommendation.rotoballerVerdict = rbMatch.verdict;
-          recommendation.rotoballerGrade = rbMatch.grade;
-          recommendation.sourceUrl.rotoballer = rbMatch.sourceUrl;
-        }
+      if (rbMatch) {
+        recommendation.rotoballerVerdict = rbMatch.verdict;
+        recommendation.rotoballerGrade = rbMatch.grade;
+        recommendation.sourceUrl.rotoballer = rbMatch.sourceUrl;
+      }
 
-        if (fgMatch) {
-          recommendation.fangraphsVerdict = fgMatch.verdict;
-          recommendation.fangraphsTier = fgMatch.tier;
-          recommendation.sourceUrl.fangraphs = fgMatch.sourceUrl;
-        }
+      if (fgMatch) {
+        recommendation.fangraphsVerdict = fgMatch.verdict;
+        recommendation.fangraphsTier = fgMatch.tier;
+        recommendation.sourceUrl.fangraphs = fgMatch.sourceUrl;
+      }
 
-        const consensus = mergeVerdicts(verdicts);
-        if (consensus !== undefined) {
-          recommendation.consensus = consensus;
-        }
+      const consensus = mergeVerdicts(verdicts);
+      if (consensus !== undefined) {
+        recommendation.consensus = consensus;
+      }
 
-        const scheduled = scheduledStartMap.get(normalizedSpName);
-        if (scheduled) {
-          recommendation.gameDate = scheduled.gameDate;
-          recommendation.opponent = scheduled.opponent;
-        }
+      const scheduled = scheduledStartMap.get(normalizedSpName);
+      if (scheduled) {
+        recommendation.gameDate = scheduled.gameDate;
+        recommendation.opponent = scheduled.opponent;
+      }
 
-        return recommendation;
-      },
-    );
+      return recommendation;
+    });
 
     return { recommendations, sources };
   }
@@ -324,10 +316,7 @@ export class SitStartAdvisor {
       .where("team_roster_snapshot.snapshot_date", "=", latestDate)
       .where("team_roster_snapshot.roster_slot", "in", ["SP", "P", "BE", "IL"])
       .where(sql<boolean>`'SP' = ANY(player.positions)`)
-      .select([
-        "team_roster_snapshot.player_id",
-        "player.name",
-      ])
+      .select(["team_roster_snapshot.player_id", "player.name"])
       .execute();
 
     return rows.map((row) => ({

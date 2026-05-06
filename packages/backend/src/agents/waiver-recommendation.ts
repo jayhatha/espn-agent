@@ -3,16 +3,10 @@ import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import { SnapshotRepository } from "../db/snapshot-repository.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
-import {
-  calculateFinalRate,
-  PITCHING_STAT_KEYS,
-  isPitcherProjection,
-} from "../../../shared/dist/index.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
+import { RosterSimulator, type AddDropSimContext } from "./roster-simulator.js";
 import { ESPNAdapter } from "../adapters/espn.js";
-import { allocateProjections } from "../projection/allocator.js";
 import type {
-  AllocationInput,
   RosteredPlayer,
   RosterGap,
 } from "../projection/types.js";
@@ -45,6 +39,7 @@ export interface WaiverRecommendation {
 
 export class WaiverRecommendationAgent {
   private readonly repo: SnapshotRepository;
+  private readonly simulator: RosterSimulator;
 
   constructor(
     private db: Kysely<Database>,
@@ -54,6 +49,7 @@ export class WaiverRecommendationAgent {
     private logger?: BaseLogger,
   ) {
     this.repo = new SnapshotRepository(db);
+    this.simulator = new RosterSimulator();
   }
 
   /**
@@ -66,7 +62,11 @@ export class WaiverRecommendationAgent {
     options?: {
       maxRecommendations?: number;
       freeAgentPlayerIds?: number[];
-      fallbackPlayers?: Array<{ id: number; name: string; positions: string[] }>;
+      fallbackPlayers?: Array<{
+        id: number;
+        name: string;
+        positions: string[];
+      }>;
       fallbackProjections?: Record<number, StatComponents>;
     },
   ): Promise<WaiverRecommendation[]> {
@@ -83,7 +83,11 @@ export class WaiverRecommendationAgent {
     );
 
     // Get current roster
-    const roster = await this.repo.getRosterForSnapshot(leagueId, snapshotDate, teamId);
+    const roster = await this.repo.getRosterForSnapshot(
+      leagueId,
+      snapshotDate,
+      teamId,
+    );
 
     // Get free agents using four-tier strategy
     let freeAgents: number[];
@@ -179,7 +183,6 @@ export class WaiverRecommendationAgent {
       return [];
     }
 
-
     const settings = await this.db
       .selectFrom("league_settings_version")
       .selectAll()
@@ -227,7 +230,10 @@ export class WaiverRecommendationAgent {
           .select(["id", "name", "positions"])
           .where("id", "in", allPlayerIds)
           .execute(),
-        this.repo.getPlayerProjections(snapshot.projections_run_id, allPlayerIds),
+        this.repo.getPlayerProjections(
+          snapshot.projections_run_id,
+          allPlayerIds,
+        ),
       ]);
 
       for (const player of players) {
@@ -276,6 +282,14 @@ export class WaiverRecommendationAgent {
     const recommendations: WaiverRecommendation[] = [];
     const TARGET_RECS = maxRecommendations * 3; // Collect 3x target to allow filtering
 
+    const addDropCtx: AddDropSimContext = {
+      categories,
+      currentProjections,
+      allTeamsProjections,
+      numTeams,
+      teamId,
+    };
+
     for (const { id: addPlayerId } of scoredFreeAgents) {
       if (recommendations.length >= TARGET_RECS) break; // Early exit
 
@@ -286,15 +300,10 @@ export class WaiverRecommendationAgent {
         if (addPlayerId === dropPlayerId) continue;
 
         // Simulate swap and compute delta
-        const delta = this.simulateSwapFromCache(
+        const delta = this.simulator.simulateAddDrop(
+          addDropCtx,
           addPlayerId,
           dropPlayerId,
-          baseline.projected_overall_points,
-          categories,
-          currentProjections,
-          allTeamsProjections,
-          numTeams,
-          teamId,
           projectionMap,
         );
 
@@ -323,8 +332,8 @@ export class WaiverRecommendationAgent {
               dropPlayerName: dropPlayer.name,
               deltaOverallPoints: delta.deltaOverallPoints,
               categoryImpacts: delta.categoryImpacts,
-              explanation: this.generateExplanation(delta),
-              topCategoryLabel: this.generateTopCategoryLabel(
+              explanation: this.simulator.generateAddDropExplanation(delta),
+              topCategoryLabel: this.simulator.generateTopCategoryLabel(
                 delta.categoryImpacts,
               ),
               isLegal,
@@ -364,346 +373,47 @@ export class WaiverRecommendationAgent {
     ]);
 
     for (const rec of topN) {
-      const rosterGaps = this.detectPostSwapGaps(
-        rec.addPlayerId,
-        rec.dropPlayerId,
-        roster,
-        playerMap,
-        projectionMap,
+      const postSwapPlayerIds = roster
+        .map((r) => r.player_id)
+        .filter((id) => id !== rec.dropPlayerId);
+      postSwapPlayerIds.push(rec.addPlayerId);
+
+      const projectionsByPlayerId = new Map<number, StatComponents>();
+      for (const playerId of postSwapPlayerIds) {
+        const proj = projectionMap.get(playerId);
+        if (proj) {
+          projectionsByPlayerId.set(
+            playerId,
+            proj.stat_components_json as StatComponents,
+          );
+        }
+      }
+
+      const rosterPlayers: RosteredPlayer[] = postSwapPlayerIds.map(
+        (playerId) => {
+          const player = playerMap.get(playerId);
+          return {
+            playerId,
+            positions: player?.positions || [],
+            rosterStatus: "active" as const,
+            rosterSlot: null,
+            projectedComponents: null,
+          };
+        },
+      );
+
+      rec.rosterGaps = this.simulator.detectGaps({
+        roster: rosterPlayers,
         rosterSlots,
+        projectionsByPlayerId,
         gsUsed,
         gsCap,
         projectionAsOfDate,
         snapshotDate,
-      );
-      rec.rosterGaps = rosterGaps;
+      });
     }
 
     return topN;
-  }
-
-
-  /**
-   * Simulate a swap using pre-fetched data (no DB queries).
-   * All invariant data is fetched once in getRecommendations and passed in.
-   */
-  private simulateSwapFromCache(
-    addPlayerId: number,
-    dropPlayerId: number,
-    _baselinePoints: number,
-    categories: Category[],
-    currentProjections: any[],
-    allTeamsProjections: any[],
-    numTeams: number,
-    teamId: number,
-    projectionMap: Map<number, any>,
-  ): {
-    deltaOverallPoints: number;
-    categoryImpacts: Array<{
-      categoryId: string;
-      categoryName: string;
-      deltaRank: number;
-      deltaPoints: number;
-    }>;
-  } | null {
-    const addProjection = projectionMap.get(addPlayerId);
-    const dropProjection = projectionMap.get(dropPlayerId);
-
-    if (!addProjection || !dropProjection) {
-      return null;
-    }
-
-    // Get components
-    const addComponents = addProjection.stat_components_json as StatComponents;
-    const dropComponents =
-      dropProjection.stat_components_json as StatComponents;
-
-    // Detect player types
-    const addIsPitcher = isPitcherProjection(addComponents);
-    const dropIsPitcher = isPitcherProjection(dropComponents);
-
-    // Simulate new values per category
-    const categoryImpacts: Array<{
-      categoryId: string;
-      categoryName: string;
-      deltaRank: number;
-      deltaPoints: number;
-    }> = [];
-
-    let totalDeltaPoints = 0;
-
-    for (const category of categories) {
-      const currentProj = currentProjections.find(
-        (p) => p.category_id === category.category_id,
-      );
-
-      if (!currentProj) {
-        continue;
-      }
-
-      // Check if category type matches player types
-      const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-      const categoryMatchesAdd = isPitchingCat ? addIsPitcher : !addIsPitcher;
-      const categoryMatchesDrop = isPitchingCat
-        ? dropIsPitcher
-        : !dropIsPitcher;
-
-      // If neither player contributes to this category, no change (delta = 0)
-      if (!categoryMatchesAdd && !categoryMatchesDrop) {
-        // No change - include with deltaRank: 0, deltaPoints: 0
-        categoryImpacts.push({
-          categoryId: category.category_id,
-          categoryName: category.name,
-          deltaRank: 0,
-          deltaPoints: 0,
-        });
-        continue;
-      }
-
-      let newValue: number;
-
-      if (category.type === "COUNTING") {
-        // Simple addition/subtraction for counting stats
-        const delta =
-          (addComponents[category.stat_key] || 0) -
-          (dropComponents[category.stat_key] || 0);
-        newValue = Number(currentProj.projected_value) + delta;
-
-        if (isPitchingCat && Math.abs(delta) > 0) {
-          this.logger?.info(
-            {
-              category: category.stat_key,
-              oldValue: Number(currentProj.projected_value),
-              delta,
-              newValue,
-            },
-            "Counting stat delta",
-          );
-        }
-      } else if (category.type === "RATE" && category.formula_id) {
-        // Component-based recalculation for rate stats
-        const currentComponents = (currentProj.projected_components_json ||
-          {}) as StatComponents;
-
-        // Remove dropped player's components
-        const withoutDrop: StatComponents = {};
-        for (const key of Object.keys(currentComponents)) {
-          withoutDrop[key] =
-            (currentComponents[key] || 0) - (dropComponents[key] || 0);
-        }
-
-        // Add new player's components
-        const withAdd: StatComponents = {};
-        const allKeys = new Set([
-          ...Object.keys(withoutDrop),
-          ...Object.keys(addComponents),
-        ]);
-        for (const key of allKeys) {
-          withAdd[key] = (withoutDrop[key] || 0) + (addComponents[key] || 0);
-        }
-
-        if (isPitchingCat) {
-          this.logger?.info(
-            {
-              category: category.stat_key,
-              oldValue: Number(currentProj.projected_value),
-              newComponents: withAdd,
-            },
-            "Rate stat calculation",
-          );
-        }
-
-        // Calculate new rate value
-        try {
-          newValue = calculateFinalRate(category.formula_id, {}, withAdd);
-
-          if (isPitchingCat) {
-            this.logger?.info(
-              {
-                category: category.stat_key,
-                oldValue: Number(currentProj.projected_value),
-                newValue,
-              },
-              "Calculated new rate value",
-            );
-          }
-        } catch (err) {
-          this.logger?.warn(
-            { categoryId: category.category_id, error: err },
-            "Failed to calculate rate stat, skipping",
-          );
-          continue;
-        }
-      } else {
-        continue;
-      }
-
-      // Re-rank this category with new value
-      const categoryValues = allTeamsProjections
-        .filter((p) => p.category_id === category.category_id)
-        .map((p) => ({
-          teamId: p.team_id,
-          value: p.team_id === teamId ? newValue : Number(p.projected_value),
-        }));
-
-      // Sort by direction
-      categoryValues.sort((a, b) => {
-        if (category.direction === "HIGHER_BETTER") {
-          return b.value - a.value;
-        } else {
-          return a.value - b.value;
-        }
-      });
-
-      // Find old and new ranks
-      const oldRank = currentProj.projected_rank;
-      const newRank = categoryValues.findIndex((v) => v.teamId === teamId) + 1;
-
-      const oldPoints = numTeams - oldRank + 1;
-      const newPoints = numTeams - newRank + 1;
-      const deltaPoints = newPoints - oldPoints;
-
-      if (isPitchingCat && deltaPoints !== 0) {
-        this.logger?.info(
-          {
-            category: category.stat_key,
-            oldRank,
-            newRank,
-            deltaPoints,
-          },
-          "Rank change for pitching category",
-        );
-      }
-
-      totalDeltaPoints += deltaPoints;
-
-      categoryImpacts.push({
-        categoryId: category.category_id,
-        categoryName: category.name,
-        deltaRank: newRank - oldRank, // Negative = improvement
-        deltaPoints: deltaPoints,
-      });
-    }
-
-    return {
-      deltaOverallPoints: totalDeltaPoints,
-      categoryImpacts,
-    };
-  }
-
-  private generateExplanation(delta: {
-    deltaOverallPoints: number;
-    categoryImpacts: Array<{
-      categoryId: string;
-      categoryName: string;
-      deltaRank: number;
-      deltaPoints: number;
-    }>;
-  }): string {
-    const sorted = delta.categoryImpacts
-      .filter((i) => Math.abs(i.deltaPoints) > 0)
-      .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints));
-
-    if (sorted.length === 0) {
-      return `Net ${delta.deltaOverallPoints.toFixed(1)} projected roto points. Minimal category changes.`;
-    }
-
-    const top = sorted[0];
-    const topLabel = `This move gets you ${top.deltaPoints > 0 ? "+" : ""}${top.deltaPoints.toFixed(0)} roto point${Math.abs(top.deltaPoints) !== 1 ? "s" : ""} in ${top.categoryName}.`;
-
-    const others = sorted.slice(1, 3);
-    const othersLabel =
-      others.length > 0
-        ? " Also impacts: " +
-          others
-            .map(
-              (i) =>
-                `${i.categoryName} (${i.deltaPoints > 0 ? "+" : ""}${i.deltaPoints.toFixed(1)})`,
-            )
-            .join(", ") +
-          "."
-        : "";
-
-    return `${topLabel}${othersLabel} Net ${delta.deltaOverallPoints > 0 ? "+" : ""}${delta.deltaOverallPoints.toFixed(1)} projected roto points overall.`;
-  }
-
-  private generateTopCategoryLabel(
-    categoryImpacts: Array<{
-      categoryId: string;
-      categoryName: string;
-      deltaRank: number;
-      deltaPoints: number;
-    }>,
-  ): string | undefined {
-    const top = categoryImpacts
-      .filter((i) => Math.abs(i.deltaPoints) > 0)
-      .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
-
-    if (!top) return undefined;
-
-    return `This move gets you ${top.deltaPoints > 0 ? "+" : ""}${top.deltaPoints.toFixed(0)} roto point${Math.abs(top.deltaPoints) !== 1 ? "s" : ""} in ${top.categoryName}`;
-  }
-
-  /**
-   * Detect roster gaps after an add/drop swap using allocateProjections.
-   * Called synchronously (no DB queries) using already-fetched data.
-   */
-  private detectPostSwapGaps(
-    addPlayerId: number,
-    dropPlayerId: number,
-    currentRoster: Array<{ player_id: number }>,
-    playerMap: Map<number, { id: number; name: string; positions: string[] }>,
-    projectionMap: Map<number, any>,
-    rosterSlots: Record<string, number>,
-    gsUsed: number,
-    gsCap: number,
-    projectionAsOfDate: string,
-    snapshotDate: string,
-  ): RosterGap[] {
-    // Build post-swap roster player list
-    const postSwapPlayerIds = currentRoster
-      .map((r) => r.player_id)
-      .filter((id) => id !== dropPlayerId);
-    postSwapPlayerIds.push(addPlayerId);
-
-    // Build projectionsByPlayerId map from cached data
-    const projectionsByPlayerId = new Map<number, StatComponents>();
-    for (const playerId of postSwapPlayerIds) {
-      const proj = projectionMap.get(playerId);
-      if (proj) {
-        projectionsByPlayerId.set(
-          playerId,
-          proj.stat_components_json as StatComponents,
-        );
-      }
-    }
-
-    // Build RosteredPlayer array
-    const rosterPlayers: RosteredPlayer[] = postSwapPlayerIds.map(
-      (playerId) => {
-        const player = playerMap.get(playerId);
-        return {
-          playerId,
-          positions: player?.positions || [],
-          rosterStatus: "active" as const,
-          rosterSlot: null,
-          projectedComponents: null,
-        };
-      },
-    );
-
-    const allocationInput: AllocationInput = {
-      roster: rosterPlayers,
-      rosterSlots,
-      projectionsByPlayerId,
-      gsUsed,
-      gsCap,
-      projectionAsOfDate,
-      snapshotDate,
-    };
-
-    const result = allocateProjections(allocationInput);
-    return result.gaps;
   }
 
   /**

@@ -55,25 +55,24 @@ function SignalItem({ item }: { item: ActionItem }) {
       }}
     >
       <div className="flex items-start gap-2">
-        <Icon
-          size={14}
-          className="mt-0.5 flex-shrink-0 text-shell-muted"
-        />
+        <Icon size={14} className="mt-0.5 flex-shrink-0 text-shell-muted" />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-shell-text leading-tight truncate">
             {item.title}
           </p>
-          <p className={cn(
-            "text-xs text-shell-muted mt-0.5",
-            expanded ? "" : "line-clamp-2"
-          )}>
+          <p
+            className={cn(
+              "text-xs text-shell-muted mt-0.5",
+              expanded ? "" : "line-clamp-2",
+            )}
+          >
             {item.description}
           </p>
           <div className="flex items-center justify-between mt-1">
             <span
               className={cn(
                 "text-xs font-mono font-semibold",
-                isPositive ? "text-positive" : "text-negative"
+                isPositive ? "text-positive" : "text-negative",
               )}
             >
               {item.impact}
@@ -138,7 +137,10 @@ export function SignalsPanel() {
     const signals: ActionItem[] = [];
 
     if (waiverData?.recommendations) {
-      for (const rec of (waiverData.recommendations as WaiverRec[]).slice(0, 5)) {
+      for (const rec of (waiverData.recommendations as WaiverRec[]).slice(
+        0,
+        5,
+      )) {
         signals.push({
           id: `waiver-${rec.addPlayerId}-${rec.dropPlayerId}`,
           type: "waiver",
@@ -146,8 +148,8 @@ export function SignalsPanel() {
             rec.deltaOverallPoints >= 2
               ? "high"
               : rec.deltaOverallPoints >= 1
-              ? "medium"
-              : "low",
+                ? "medium"
+                : "low",
           title: `Add ${rec.addPlayerName}, Drop ${rec.dropPlayerName}`,
           description: rec.explanation,
           impact: `+${rec.deltaOverallPoints.toFixed(1)} pts`,
@@ -157,7 +159,10 @@ export function SignalsPanel() {
     }
 
     if (tradeData?.candidates) {
-      for (const cand of (tradeData.candidates as TradeCandidate[]).slice(0, 3)) {
+      for (const cand of (tradeData.candidates as TradeCandidate[]).slice(
+        0,
+        3,
+      )) {
         const giveName = cand.trade.givePlayers
           .map((p) => p.playerName)
           .join(", ");
@@ -171,8 +176,8 @@ export function SignalsPanel() {
             cand.deltaOverallPoints >= 3
               ? "high"
               : cand.deltaOverallPoints >= 1.5
-              ? "medium"
-              : "low",
+                ? "medium"
+                : "low",
           title: `Trade ${giveName} for ${getName}`,
           description: `${cand.partnerTeamName}: ${cand.explanation}`,
           impact: `+${cand.deltaOverallPoints.toFixed(1)} pts`,
@@ -190,18 +195,27 @@ export function SignalsPanel() {
   const tradeCount = allSignals.filter((s) => s.type === "trade").length;
 
   const filteredSignals = useMemo(() => {
-    let filtered = activeTab === "all"
-      ? allSignals
-      : allSignals.filter((s) => s.type === activeTab);
+    let filtered =
+      activeTab === "all"
+        ? allSignals
+        : allSignals.filter((s) => s.type === activeTab);
 
     // Separate high and low impact
     const highImpact = filtered.filter((s) => parseFloat(s.impact) >= 0.5);
     const lowImpact = filtered.filter((s) => parseFloat(s.impact) < 0.5);
 
     if (!showLowImpact) {
-      return { visible: highImpact.slice(0, 3), hidden: highImpact.slice(3).length + lowImpact.length, lowCount: lowImpact.length };
+      return {
+        visible: highImpact.slice(0, 3),
+        hidden: highImpact.slice(3).length + lowImpact.length,
+        lowCount: lowImpact.length,
+      };
     }
-    return { visible: filtered.slice(0, 6), hidden: filtered.length - Math.min(filtered.length, 6), lowCount: 0 };
+    return {
+      visible: filtered.slice(0, 6),
+      hidden: filtered.length - Math.min(filtered.length, 6),
+      lowCount: 0,
+    };
   }, [allSignals, activeTab, showLowImpact]);
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
@@ -228,7 +242,10 @@ export function SignalsPanel() {
       </div>
 
       {/* Tabs */}
-      <div role="tablist" className="flex border-b border-shell-border flex-shrink-0">
+      <div
+        role="tablist"
+        className="flex border-b border-shell-border flex-shrink-0"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -239,7 +256,7 @@ export function SignalsPanel() {
               "flex-1 px-2 py-2 text-xs font-medium transition-colors",
               activeTab === tab.key
                 ? "border-b-2 border-shell-accent text-shell-accent"
-                : "text-shell-muted hover:text-shell-text"
+                : "text-shell-muted hover:text-shell-text",
             )}
           >
             {tab.label}
@@ -261,13 +278,17 @@ export function SignalsPanel() {
         ) : allSignals.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
-              {isLoadingSignals ? "Loading signals..." : "Nothing urgent \u2014 enjoy the off-day"}
+              {isLoadingSignals
+                ? "Loading signals..."
+                : "Nothing urgent \u2014 enjoy the off-day"}
             </p>
           </div>
         ) : filteredSignals.visible.length === 0 ? (
           <div className="px-3 py-6 text-center">
             <p className="text-xs text-shell-muted">
-              {activeTab === "all" ? "All quiet on the waiver wire" : `No ${activeTab} signals right now`}
+              {activeTab === "all"
+                ? "All quiet on the waiver wire"
+                : `No ${activeTab} signals right now`}
             </p>
           </div>
         ) : (

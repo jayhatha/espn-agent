@@ -73,10 +73,14 @@ export class TradeView {
     ]);
 
     const userRoster = userRosterRaw
-      .filter((r) => r.roster_status === "active" || r.roster_status === "bench")
+      .filter(
+        (r) => r.roster_status === "active" || r.roster_status === "bench",
+      )
       .sort((a, b) => a.player_name.localeCompare(b.player_name));
     const partnerRoster = partnerRosterRaw
-      .filter((r) => r.roster_status === "active" || r.roster_status === "bench")
+      .filter(
+        (r) => r.roster_status === "active" || r.roster_status === "bench",
+      )
       .sort((a, b) => a.player_name.localeCompare(b.player_name));
 
     // Fetch projections for all players on both rosters

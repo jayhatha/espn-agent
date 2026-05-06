@@ -3,19 +3,31 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
-import { ArrowRight, ExternalLink, AlertTriangle, ChevronDown } from "lucide-react";
+import {
+  ArrowRight,
+  ExternalLink,
+  AlertTriangle,
+  ChevronDown,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Heading } from "@/components/ui/Heading";
-import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
+import {
+  LoadingSpinner,
+  LoadingSkeleton,
+} from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import ImpactBadge from "@/components/league/ImpactBadge";
 import { getESPNFreeAgentsUrl } from "@/lib/espn-links";
 import { cn } from "@/lib/cn";
 import { Term } from "@/components/ui/Term";
-import { calculateAVG, calculateERA, calculateWHIP } from "@espn-fantasy/shared";
+import {
+  calculateAVG,
+  calculateERA,
+  calculateWHIP,
+} from "@espn-fantasy/shared";
 
 interface WaiverRecommendation {
   addPlayerId: number;
@@ -46,6 +58,19 @@ interface FreeAgent {
   currentStats: {
     [key: string]: number;
   } | null;
+  advancedStats: {
+    babip: number | null;
+    xba: number | null;
+    xslg: number | null;
+    xwoba: number | null;
+    iso: number | null;
+    kBbPct: number | null;
+    k9: number | null;
+    fip: number | null;
+    xfip: number | null;
+    xera: number | null;
+    siera: number | null;
+  } | null;
   pctOwned: number;
   pctStarted: number;
   pitcherlistRank: number | null;
@@ -64,6 +89,19 @@ interface RosterPlayer {
   } | null;
   currentStats: {
     [key: string]: number;
+  } | null;
+  advancedStats: {
+    babip: number | null;
+    xba: number | null;
+    xslg: number | null;
+    xwoba: number | null;
+    iso: number | null;
+    kBbPct: number | null;
+    k9: number | null;
+    fip: number | null;
+    xfip: number | null;
+    xera: number | null;
+    siera: number | null;
   } | null;
   tenureStats: {
     [key: string]: number;
@@ -99,7 +137,7 @@ type ViewMode = "ai" | "manual";
 // ── Helpers ──────────────────────────────────────────
 
 function groupByTopCategory(
-  recs: WaiverRecommendation[]
+  recs: WaiverRecommendation[],
 ): { category: string; recs: WaiverRecommendation[] }[] {
   const groups: Record<string, WaiverRecommendation[]> = {};
 
@@ -121,14 +159,14 @@ function groupByTopCategory(
       const avgA =
         a.recs.reduce((sum, r) => {
           const top = r.categoryImpacts?.sort(
-            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints)
+            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints),
           )[0];
           return sum + (top?.deltaPoints ?? 0);
         }, 0) / a.recs.length;
       const avgB =
         b.recs.reduce((sum, r) => {
           const top = r.categoryImpacts?.sort(
-            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints)
+            (x, y) => Math.abs(y.deltaPoints) - Math.abs(x.deltaPoints),
           )[0];
           return sum + (top?.deltaPoints ?? 0);
         }, 0) / b.recs.length;
@@ -150,8 +188,15 @@ function fmtRate(v: number | null | undefined, decimals: number): string {
   return v.toFixed(decimals);
 }
 
-const TH_CLASS = "px-2 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider whitespace-nowrap";
-const TH_RIGHT = "px-2 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider whitespace-nowrap";
+function fmtPercent(v: number | null | undefined, decimals = 1): string {
+  if (v == null || isNaN(v) || !isFinite(v)) return "--";
+  return `${v.toFixed(decimals)}%`;
+}
+
+const TH_CLASS =
+  "px-2 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider whitespace-nowrap";
+const TH_RIGHT =
+  "px-2 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider whitespace-nowrap";
 
 function SortHeader({
   label,
@@ -201,7 +246,9 @@ function sortRows<T extends Record<string, any>>(
     if (typeof av === "string" && typeof bv === "string") {
       return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
     }
-    return dir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    return dir === "asc"
+      ? (av as number) - (bv as number)
+      : (bv as number) - (av as number);
   });
 }
 
@@ -227,9 +274,14 @@ export default function WaiversPage() {
   const leagueId = params.id as string;
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("ai");
-  const [selectedFreeAgentId, setSelectedFreeAgentId] = useState<number | null>(null);
-  const [selectedRosterPlayerId, setSelectedRosterPlayerId] = useState<number | null>(null);
-  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [selectedFreeAgentId, setSelectedFreeAgentId] = useState<number | null>(
+    null,
+  );
+  const [selectedRosterPlayerId, setSelectedRosterPlayerId] = useState<
+    number | null
+  >(null);
+  const [evaluationResult, setEvaluationResult] =
+    useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [positionFilter, setPositionFilter] = useState<string[]>([]);
@@ -252,7 +304,7 @@ export default function WaiversPage() {
 
   // Fetch league status for ESPN links
   const { data: leagueStatus } = useQuery({
-    queryKey: ['league', leagueId],
+    queryKey: ["league", leagueId],
     queryFn: () => api.getLeagueStatus(parseInt(leagueId, 10)),
   });
   const espnLeagueId = leagueStatus?.league?.espn_league_id;
@@ -317,6 +369,7 @@ export default function WaiversPage() {
     return freeAgentsData.freeAgents.map((p) => {
       const pitcher = isPitcherPosition(p.positions);
       const proj = p.projections ?? {};
+      const advanced = p.advancedStats ?? null;
       const ab = proj.AB ?? 0;
       const ip = proj.IP ?? 0;
       return {
@@ -336,6 +389,17 @@ export default function WaiversPage() {
         K: pitcher ? (proj.K ?? 0) : null,
         ERA: pitcher && ip > 0 ? calculateERA(proj) : null,
         WHIP: pitcher && ip > 0 ? calculateWHIP(proj) : null,
+        BABIP: !pitcher ? (advanced?.babip ?? null) : null,
+        xBA: !pitcher ? (advanced?.xba ?? null) : null,
+        xSLG: !pitcher ? (advanced?.xslg ?? null) : null,
+        xwOBA: !pitcher ? (advanced?.xwoba ?? null) : null,
+        ISO: !pitcher ? (advanced?.iso ?? null) : null,
+        KBBPct: pitcher ? (advanced?.kBbPct ?? null) : null,
+        K9: pitcher ? (advanced?.k9 ?? null) : null,
+        FIP: pitcher ? (advanced?.fip ?? null) : null,
+        xFIP: pitcher ? (advanced?.xfip ?? null) : null,
+        xERA: pitcher ? (advanced?.xera ?? null) : null,
+        SIERA: pitcher ? (advanced?.siera ?? null) : null,
         plRank: p.pitcherlistRank,
         _isPitcher: pitcher,
       };
@@ -348,6 +412,7 @@ export default function WaiversPage() {
     return rosterData.roster.map((p) => {
       const pitcher = isPitcherPosition(p.positions);
       const proj = p.projections ?? {};
+      const advanced = p.advancedStats ?? null;
       const ab = proj.AB ?? 0;
       const ip = proj.IP ?? 0;
       return {
@@ -366,19 +431,32 @@ export default function WaiversPage() {
         K: pitcher ? (proj.K ?? 0) : null,
         ERA: pitcher && ip > 0 ? calculateERA(proj) : null,
         WHIP: pitcher && ip > 0 ? calculateWHIP(proj) : null,
+        BABIP: !pitcher ? (advanced?.babip ?? null) : null,
+        xBA: !pitcher ? (advanced?.xba ?? null) : null,
+        xSLG: !pitcher ? (advanced?.xslg ?? null) : null,
+        xwOBA: !pitcher ? (advanced?.xwoba ?? null) : null,
+        ISO: !pitcher ? (advanced?.iso ?? null) : null,
+        KBBPct: pitcher ? (advanced?.kBbPct ?? null) : null,
+        K9: pitcher ? (advanced?.k9 ?? null) : null,
+        FIP: pitcher ? (advanced?.fip ?? null) : null,
+        xFIP: pitcher ? (advanced?.xfip ?? null) : null,
+        xERA: pitcher ? (advanced?.xera ?? null) : null,
+        SIERA: pitcher ? (advanced?.siera ?? null) : null,
         _isPitcher: pitcher,
       };
     });
   }, [rosterData]);
 
   // Determine which stat columns to show based on position filter
-  const showPitcherStats = positionFilter.length > 0 && ["SP", "RP"].includes(positionFilter[0]);
+  const showPitcherStats =
+    positionFilter.length > 0 && ["SP", "RP"].includes(positionFilter[0]);
   const showHitterStats = positionFilter.length > 0 && !showPitcherStats;
   const showAllStats = positionFilter.length === 0;
 
   // Evaluate add/drop
   const handleEvaluate = async () => {
-    if (!selectedTeamId || !selectedFreeAgentId || !selectedRosterPlayerId) return;
+    if (!selectedTeamId || !selectedFreeAgentId || !selectedRosterPlayerId)
+      return;
     setIsEvaluating(true);
     setEvaluationResult(null);
     setEvaluationError(null);
@@ -386,7 +464,10 @@ export default function WaiversPage() {
       const result = (await api.evaluateWaiver(
         parseInt(leagueId, 10),
         selectedTeamId,
-        { addPlayerId: selectedFreeAgentId, dropPlayerId: selectedRosterPlayerId },
+        {
+          addPlayerId: selectedFreeAgentId,
+          dropPlayerId: selectedRosterPlayerId,
+        },
       )) as EvaluationResult;
       setEvaluationResult(result);
     } catch (error) {
@@ -401,31 +482,60 @@ export default function WaiversPage() {
     <span
       className={cn(
         "font-semibold text-data",
-        value < 0 ? "text-positive" : value > 0 ? "text-negative" : "text-content-secondary dark:text-shell-muted",
+        value < 0
+          ? "text-positive"
+          : value > 0
+            ? "text-negative"
+            : "text-content-secondary dark:text-shell-muted",
       )}
     >
-      {value === 0 ? "\u2014" : value < 0 ? `\u2191${Math.abs(value)}` : `\u2193${value}`}
+      {value === 0
+        ? "\u2014"
+        : value < 0
+          ? `\u2191${Math.abs(value)}`
+          : `\u2193${value}`}
     </span>
   );
 
   const renderCategoryImpactTable = (
-    impacts: Array<{ categoryId: string; categoryName: string; deltaRank: number; deltaPoints: number }>,
+    impacts: Array<{
+      categoryId: string;
+      categoryName: string;
+      deltaRank: number;
+      deltaPoints: number;
+    }>,
   ) => (
     <div className="mt-2 overflow-x-auto">
       <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
         <thead>
           <tr>
-            <th className="px-2 py-1.5 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Category</th>
-            <th className="px-2 py-1.5 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Rank</th>
-            <th className="px-2 py-1.5 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Pts</th>
+            <th className="px-2 py-1.5 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+              Category
+            </th>
+            <th className="px-2 py-1.5 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+              Rank
+            </th>
+            <th className="px-2 py-1.5 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+              Pts
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
           {[...impacts]
             .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
             .map((impact) => (
-              <tr key={impact.categoryId} className={impact.deltaPoints === 0 ? "opacity-40" : ""}>
-                <td className={cn("px-2 py-1.5 text-data font-medium whitespace-nowrap", impact.deltaPoints === 0 ? "text-content-tertiary dark:text-shell-muted" : "text-content dark:text-shell-text")}>
+              <tr
+                key={impact.categoryId}
+                className={impact.deltaPoints === 0 ? "opacity-40" : ""}
+              >
+                <td
+                  className={cn(
+                    "px-2 py-1.5 text-data font-medium whitespace-nowrap",
+                    impact.deltaPoints === 0
+                      ? "text-content-tertiary dark:text-shell-muted"
+                      : "text-content dark:text-shell-text",
+                  )}
+                >
                   {impact.categoryName}
                 </td>
                 <td className="px-2 py-1.5 text-data text-center whitespace-nowrap">
@@ -433,11 +543,21 @@ export default function WaiversPage() {
                 </td>
                 <td className="px-2 py-1.5 text-data text-right whitespace-nowrap">
                   {impact.deltaPoints !== 0 ? (
-                    <span className={cn("font-semibold text-data", impact.deltaPoints > 0 ? "text-positive" : "text-negative")}>
-                      {impact.deltaPoints > 0 ? "+" : ""}{impact.deltaPoints.toFixed(1)}
+                    <span
+                      className={cn(
+                        "font-semibold text-data",
+                        impact.deltaPoints > 0
+                          ? "text-positive"
+                          : "text-negative",
+                      )}
+                    >
+                      {impact.deltaPoints > 0 ? "+" : ""}
+                      {impact.deltaPoints.toFixed(1)}
                     </span>
                   ) : (
-                    <span className="text-content-tertiary dark:text-shell-muted text-data">{"\u2014"}</span>
+                    <span className="text-content-tertiary dark:text-shell-muted text-data">
+                      {"\u2014"}
+                    </span>
                   )}
                 </td>
               </tr>
@@ -452,7 +572,9 @@ export default function WaiversPage() {
       <div className="flex">
         <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
         <div className="ml-3 flex-1">
-          <h4 className="text-body-sm font-medium text-warning dark:text-warning-dark">Roster Constraints</h4>
+          <h4 className="text-body-sm font-medium text-warning dark:text-warning-dark">
+            Roster Constraints
+          </h4>
           <ul className="mt-1 text-data text-warning dark:text-warning-dark list-disc list-inside space-y-1">
             {issues.map((issue, i) => (
               <li key={i}>{issue}</li>
@@ -471,40 +593,239 @@ export default function WaiversPage() {
   ) => (
     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-        <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">Drop</div>
-        <div className="text-sm font-medium text-content dark:text-shell-text truncate">{dropName}</div>
-        {dropPositions && <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">{dropPositions.join(", ")}</div>}
+        <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">
+          Drop
+        </div>
+        <div className="text-sm font-medium text-content dark:text-shell-text truncate">
+          {dropName}
+        </div>
+        {dropPositions && (
+          <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">
+            {dropPositions.join(", ")}
+          </div>
+        )}
       </div>
       <div className="flex items-center justify-center">
         <ArrowRight className="w-5 h-5 text-shell-muted rotate-90 sm:rotate-0" />
       </div>
       <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-        <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">Add</div>
-        <div className="text-sm font-medium text-content dark:text-shell-text truncate">{addName}</div>
-        {addPositions && <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">{addPositions.join(", ")}</div>}
+        <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">
+          Add
+        </div>
+        <div className="text-sm font-medium text-content dark:text-shell-text truncate">
+          {addName}
+        </div>
+        {addPositions && (
+          <div className="text-xs text-content-secondary dark:text-shell-muted mt-1">
+            {addPositions.join(", ")}
+          </div>
+        )}
       </div>
     </div>
   );
 
   // ── Render stat columns for player tables ──
-  const renderStatHeaders = (sortKey: string, sortDir: "asc" | "desc", onSort: (k: string) => void) => {
+  const renderStatHeaders = (
+    sortKey: string,
+    sortDir: "asc" | "desc",
+    onSort: (k: string) => void,
+  ) => {
     const cols: JSX.Element[] = [];
     if (showHitterStats || showAllStats) {
       cols.push(
-        <SortHeader key="HR" label="HR" sortKey="HR" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="R" label="R" sortKey="R" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="RBI" label="RBI" sortKey="RBI" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="SB" label="SB" sortKey="SB" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="AVG" label="AVG" sortKey="AVG" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
+        <SortHeader
+          key="HR"
+          label="HR"
+          sortKey="HR"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="R"
+          label="R"
+          sortKey="R"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="RBI"
+          label="RBI"
+          sortKey="RBI"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="SB"
+          label="SB"
+          sortKey="SB"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="AVG"
+          label="AVG"
+          sortKey="AVG"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="BABIP"
+          label="BABIP"
+          sortKey="BABIP"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="xBA"
+          label="xBA"
+          sortKey="xBA"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="xSLG"
+          label="xSLG"
+          sortKey="xSLG"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="xwOBA"
+          label="xwOBA"
+          sortKey="xwOBA"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="ISO"
+          label="ISO"
+          sortKey="ISO"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
       );
     }
     if (showPitcherStats || showAllStats) {
       cols.push(
-        <SortHeader key="W" label="W" sortKey="W" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="SV" label="SV" sortKey="SV" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="K" label="K" sortKey="K" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="ERA" label="ERA" sortKey="ERA" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
-        <SortHeader key="WHIP" label="WHIP" sortKey="WHIP" currentKey={sortKey} currentDir={sortDir} onSort={onSort} align="right" />,
+        <SortHeader
+          key="W"
+          label="W"
+          sortKey="W"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="SV"
+          label="SV"
+          sortKey="SV"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="K"
+          label="K"
+          sortKey="K"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="ERA"
+          label="ERA"
+          sortKey="ERA"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="WHIP"
+          label="WHIP"
+          sortKey="WHIP"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="KBBPct"
+          label="K-BB%"
+          sortKey="KBBPct"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="K9"
+          label="K/9"
+          sortKey="K9"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="FIP"
+          label="FIP"
+          sortKey="FIP"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="xFIP"
+          label="xFIP"
+          sortKey="xFIP"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="xERA"
+          label="xERA"
+          sortKey="xERA"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
+        <SortHeader
+          key="SIERA"
+          label="SIERA"
+          sortKey="SIERA"
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />,
       );
     }
     return cols;
@@ -514,20 +835,136 @@ export default function WaiversPage() {
     const cells: JSX.Element[] = [];
     if (showHitterStats || showAllStats) {
       cells.push(
-        <td key="HR" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.HR)}</td>,
-        <td key="R" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.R)}</td>,
-        <td key="RBI" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.RBI)}</td>,
-        <td key="SB" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.SB)}</td>,
-        <td key="AVG" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtRate(row.AVG, 3)}</td>,
+        <td
+          key="HR"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.HR)}
+        </td>,
+        <td
+          key="R"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.R)}
+        </td>,
+        <td
+          key="RBI"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.RBI)}
+        </td>,
+        <td
+          key="SB"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.SB)}
+        </td>,
+        <td
+          key="AVG"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.AVG, 3)}
+        </td>,
+        <td
+          key="BABIP"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.BABIP, 3)}
+        </td>,
+        <td
+          key="xBA"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.xBA, 3)}
+        </td>,
+        <td
+          key="xSLG"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.xSLG, 3)}
+        </td>,
+        <td
+          key="xwOBA"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.xwOBA, 3)}
+        </td>,
+        <td
+          key="ISO"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.ISO, 3)}
+        </td>,
       );
     }
     if (showPitcherStats || showAllStats) {
       cells.push(
-        <td key="W" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.W)}</td>,
-        <td key="SV" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.SV)}</td>,
-        <td key="K" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtInt(row.K)}</td>,
-        <td key="ERA" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtRate(row.ERA, 2)}</td>,
-        <td key="WHIP" className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">{fmtRate(row.WHIP, 2)}</td>,
+        <td
+          key="W"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.W)}
+        </td>,
+        <td
+          key="SV"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.SV)}
+        </td>,
+        <td
+          key="K"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtInt(row.K)}
+        </td>,
+        <td
+          key="ERA"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.ERA, 2)}
+        </td>,
+        <td
+          key="WHIP"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.WHIP, 2)}
+        </td>,
+        <td
+          key="KBBPct"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtPercent(row.KBBPct)}
+        </td>,
+        <td
+          key="K9"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.K9, 1)}
+        </td>,
+        <td
+          key="FIP"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.FIP, 2)}
+        </td>,
+        <td
+          key="xFIP"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.xFIP, 2)}
+        </td>,
+        <td
+          key="xERA"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.xERA, 2)}
+        </td>,
+        <td
+          key="SIERA"
+          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
+        >
+          {fmtRate(row.SIERA, 2)}
+        </td>,
       );
     }
     return cells;
@@ -538,9 +975,13 @@ export default function WaiversPage() {
       {/* Compact header with inline mode toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-h3 font-semibold text-content dark:text-shell-text">Waivers</h1>
+          <h1 className="text-h3 font-semibold text-content dark:text-shell-text">
+            Waivers
+          </h1>
           <p className="text-body-sm text-content-secondary dark:text-shell-muted">
-            {viewMode === "ai" ? "AI-generated add/drop recommendations" : "Evaluate any add/drop move"}
+            {viewMode === "ai"
+              ? "AI-generated add/drop recommendations"
+              : "Evaluate any add/drop move"}
           </p>
         </div>
         {selectedTeamId && (
@@ -551,7 +992,7 @@ export default function WaiversPage() {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 viewMode === "ai"
                   ? "bg-shell-accent text-white"
-                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text",
               )}
             >
               AI Picks
@@ -562,7 +1003,7 @@ export default function WaiversPage() {
                 "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 viewMode === "manual"
                   ? "bg-shell-accent text-white"
-                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+                  : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text",
               )}
             >
               Manual Eval
@@ -575,7 +1016,10 @@ export default function WaiversPage() {
         <ErrorAlert
           variant="warning"
           message="Please go back to the league page and select your team to view waiver recommendations."
-          backLink={{ href: `/leagues/${leagueId}`, label: "Go to League Page" }}
+          backLink={{
+            href: `/leagues/${leagueId}`,
+            label: "Go to League Page",
+          }}
         />
       ) : viewMode === "ai" ? (
         /* ═══════════════════════════════════════════════════
@@ -583,9 +1027,13 @@ export default function WaiversPage() {
            ═══════════════════════════════════════════════════ */
         <Card>
           {aiLoading ? (
-            <CardContent><LoadingSkeleton lines={3} /></CardContent>
+            <CardContent>
+              <LoadingSkeleton lines={3} />
+            </CardContent>
           ) : aiError ? (
-            <CardContent><ErrorAlert message={(aiError as Error).message} /></CardContent>
+            <CardContent>
+              <ErrorAlert message={(aiError as Error).message} />
+            </CardContent>
           ) : aiData && aiData.recommendations.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full">
@@ -597,14 +1045,19 @@ export default function WaiversPage() {
                     <th className={TH_CLASS}>Drop</th>
                     <th className={TH_CLASS}>Add</th>
                     <th className={TH_CLASS}>Top Category</th>
-                    {espnLeagueId && season && <th className={cn(TH_CLASS, "w-12")}></th>}
+                    {espnLeagueId && season && (
+                      <th className={cn(TH_CLASS, "w-12")}></th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {groupByTopCategory(aiData.recommendations).map((group) => (
                     <>
                       {/* Group header */}
-                      <tr key={`group-${group.category}`} className="bg-surface-secondary/50 dark:bg-shell-bg/50">
+                      <tr
+                        key={`group-${group.category}`}
+                        className="bg-surface-secondary/50 dark:bg-shell-bg/50"
+                      >
                         <td
                           colSpan={espnLeagueId && season ? 5 : 4}
                           className="px-2 py-2 text-data font-semibold text-content dark:text-shell-text uppercase tracking-wider"
@@ -621,21 +1074,30 @@ export default function WaiversPage() {
                         const isExpanded = expandedRecKey === key;
                         const topImpact = rec.categoryImpacts
                           ?.filter((ci) => Math.abs(ci.deltaPoints) > 0)
-                          .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))[0];
+                          .sort(
+                            (a, b) =>
+                              Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints),
+                          )[0];
 
                         return (
                           <>
                             <tr
                               key={key}
-                              onClick={() => setExpandedRecKey(isExpanded ? null : key)}
+                              onClick={() =>
+                                setExpandedRecKey(isExpanded ? null : key)
+                              }
                               className={cn(
                                 "border-b border-neutral-100 dark:border-shell-border cursor-pointer transition-colors",
                                 "hover:bg-surface-secondary dark:hover:bg-shell-bg",
-                                isExpanded && "bg-surface-secondary/50 dark:bg-shell-bg/50",
+                                isExpanded &&
+                                  "bg-surface-secondary/50 dark:bg-shell-bg/50",
                               )}
                             >
                               <td className="px-2 py-2.5">
-                                <ImpactBadge impact={rec.deltaOverallPoints} size="sm" />
+                                <ImpactBadge
+                                  impact={rec.deltaOverallPoints}
+                                  size="sm"
+                                />
                               </td>
                               <td className="px-2 py-2.5 text-body-sm font-medium text-negative whitespace-nowrap">
                                 {rec.dropPlayerName}
@@ -646,15 +1108,22 @@ export default function WaiversPage() {
                               <td className="px-2 py-2.5 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
                                 {topImpact ? (
                                   <span>
-                                    <span className="text-positive font-semibold">+{topImpact.deltaPoints.toFixed(1)}</span>
-                                    {" "}in {topImpact.categoryName}
+                                    <span className="text-positive font-semibold">
+                                      +{topImpact.deltaPoints.toFixed(1)}
+                                    </span>{" "}
+                                    in {topImpact.categoryName}
                                   </span>
-                                ) : "\u2014"}
+                                ) : (
+                                  "\u2014"
+                                )}
                               </td>
                               {espnLeagueId && season && (
                                 <td className="px-2 py-2.5">
                                   <a
-                                    href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                                    href={getESPNFreeAgentsUrl(
+                                      espnLeagueId,
+                                      season,
+                                    )}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-shell-muted hover:text-shell-text"
@@ -667,13 +1136,25 @@ export default function WaiversPage() {
                             </tr>
                             {/* Expanded detail row */}
                             {isExpanded && (
-                              <tr key={`${key}-detail`} className="bg-surface-secondary/30 dark:bg-shell-bg/30">
-                                <td colSpan={espnLeagueId && season ? 5 : 4} className="px-4 py-3">
+                              <tr
+                                key={`${key}-detail`}
+                                className="bg-surface-secondary/30 dark:bg-shell-bg/30"
+                              >
+                                <td
+                                  colSpan={espnLeagueId && season ? 5 : 4}
+                                  className="px-4 py-3"
+                                >
                                   <p className="text-body-sm text-content-secondary dark:text-shell-muted leading-relaxed mb-2">
                                     {rec.explanation}
                                   </p>
-                                  {rec.categoryImpacts.length > 0 && renderCategoryImpactTable(rec.categoryImpacts)}
-                                  {!rec.isLegal && rec.legalityIssues && rec.legalityIssues.length > 0 && renderLegalityWarning(rec.legalityIssues)}
+                                  {rec.categoryImpacts.length > 0 &&
+                                    renderCategoryImpactTable(
+                                      rec.categoryImpacts,
+                                    )}
+                                  {!rec.isLegal &&
+                                    rec.legalityIssues &&
+                                    rec.legalityIssues.length > 0 &&
+                                    renderLegalityWarning(rec.legalityIssues)}
                                 </td>
                               </tr>
                             )}
@@ -690,7 +1171,10 @@ export default function WaiversPage() {
               <ErrorAlert
                 variant="info"
                 message="No waiver recommendations available. Recommendations require a daily snapshot and uploaded FanGraphs projections. Upload projections from the league dashboard to get started."
-                action={{ label: "Go to Dashboard", href: `/leagues/${leagueId}` }}
+                action={{
+                  label: "Go to Dashboard",
+                  href: `/leagues/${leagueId}`,
+                }}
               />
             </CardContent>
           )}
@@ -706,15 +1190,26 @@ export default function WaiversPage() {
                 <Heading level={3}>Select Add/Drop</Heading>
                 <select
                   value={positionFilter.length > 0 ? positionFilter[0] : ""}
-                  onChange={(e) => setPositionFilter(e.target.value ? [e.target.value] : [])}
+                  onChange={(e) =>
+                    setPositionFilter(e.target.value ? [e.target.value] : [])
+                  }
                   className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 text-content dark:text-shell-text dark:bg-shell-bg"
                 >
                   <option value="">All Positions</option>
-                  {["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"].map((pos) => (
-                    <option key={pos} value={pos}>{pos}</option>
-                  ))}
+                  {["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"].map(
+                    (pos) => (
+                      <option key={pos} value={pos}>
+                        {pos}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
+              <p className="mt-2 text-body-sm text-content-secondary dark:text-shell-muted">
+                Advanced columns use current-season Statcast and ESPN component
+                data. xFIP and SIERA show -- when a reliable public source is
+                unavailable.
+              </p>
             </CardHeader>
             <CardContent>
               {freeAgentsLoading || rosterLoading ? (
@@ -730,12 +1225,79 @@ export default function WaiversPage() {
                       <table className="min-w-full">
                         <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
                           <tr className="border-b border-neutral-200 dark:border-shell-border">
-                            <SortHeader label="Name" sortKey="name" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} />
+                            <SortHeader
+                              label="Name"
+                              sortKey="name"
+                              currentKey={faSortKey}
+                              currentDir={faSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  faSortKey,
+                                  faSortDir,
+                                  setFaSortKey,
+                                  setFaSortDir,
+                                )
+                              }
+                            />
                             <th className={TH_CLASS}>Pos</th>
-                            <SortHeader label="% Own" sortKey="pctOwned" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
-                            <SortHeader label="% Start" sortKey="pctStarted" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
-                            <SortHeader label="PL" sortKey="plRank" currentKey={faSortKey} currentDir={faSortDir} onSort={(k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir)} align="right" />
-                            {renderStatHeaders(faSortKey, faSortDir, (k) => toggleSort(k, faSortKey, faSortDir, setFaSortKey, setFaSortDir))}
+                            <SortHeader
+                              label="% Own"
+                              sortKey="pctOwned"
+                              currentKey={faSortKey}
+                              currentDir={faSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  faSortKey,
+                                  faSortDir,
+                                  setFaSortKey,
+                                  setFaSortDir,
+                                )
+                              }
+                              align="right"
+                            />
+                            <SortHeader
+                              label="% Start"
+                              sortKey="pctStarted"
+                              currentKey={faSortKey}
+                              currentDir={faSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  faSortKey,
+                                  faSortDir,
+                                  setFaSortKey,
+                                  setFaSortDir,
+                                )
+                              }
+                              align="right"
+                            />
+                            <SortHeader
+                              label="PL"
+                              sortKey="plRank"
+                              currentKey={faSortKey}
+                              currentDir={faSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  faSortKey,
+                                  faSortDir,
+                                  setFaSortKey,
+                                  setFaSortDir,
+                                )
+                              }
+                              align="right"
+                            />
+                            {renderStatHeaders(faSortKey, faSortDir, (k) =>
+                              toggleSort(
+                                k,
+                                faSortKey,
+                                faSortDir,
+                                setFaSortKey,
+                                setFaSortDir,
+                              ),
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -764,16 +1326,22 @@ export default function WaiversPage() {
                               </td>
                               <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
                                 {row.plRank != null ? (
-                                  <span className={cn(
-                                    "inline-flex items-center justify-center min-w-[1.5rem] px-1 py-0.5 rounded text-caption font-medium",
-                                    row.plRank <= 20 ? "bg-positive-light text-positive dark:bg-positive-dark-bg/30 dark:text-positive" :
-                                    row.plRank <= 50 ? "bg-info-light text-info dark:bg-info-dark-bg/30 dark:text-info" :
-                                    "text-content-secondary dark:text-shell-muted"
-                                  )}>
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center justify-center min-w-[1.5rem] px-1 py-0.5 rounded text-caption font-medium",
+                                      row.plRank <= 20
+                                        ? "bg-positive-light text-positive dark:bg-positive-dark-bg/30 dark:text-positive"
+                                        : row.plRank <= 50
+                                          ? "bg-info-light text-info dark:bg-info-dark-bg/30 dark:text-info"
+                                          : "text-content-secondary dark:text-shell-muted",
+                                    )}
+                                  >
                                     {row.plRank}
                                   </span>
                                 ) : (
-                                  <span className="text-content-tertiary dark:text-shell-muted">--</span>
+                                  <span className="text-content-tertiary dark:text-shell-muted">
+                                    --
+                                  </span>
                                 )}
                               </td>
                               {renderStatCells(row)}
@@ -781,7 +1349,10 @@ export default function WaiversPage() {
                           ))}
                           {faRows.length === 0 && (
                             <tr>
-                              <td colSpan={20} className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted">
+                              <td
+                                colSpan={20}
+                                className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                              >
                                 No free agents available
                               </td>
                             </tr>
@@ -800,14 +1371,57 @@ export default function WaiversPage() {
                       <table className="min-w-full">
                         <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
                           <tr className="border-b border-neutral-200 dark:border-shell-border">
-                            <SortHeader label="Slot" sortKey="slot" currentKey={rosterSortKey} currentDir={rosterSortDir} onSort={(k) => toggleSort(k, rosterSortKey, rosterSortDir, setRosterSortKey, setRosterSortDir)} />
-                            <SortHeader label="Name" sortKey="name" currentKey={rosterSortKey} currentDir={rosterSortDir} onSort={(k) => toggleSort(k, rosterSortKey, rosterSortDir, setRosterSortKey, setRosterSortDir)} />
+                            <SortHeader
+                              label="Slot"
+                              sortKey="slot"
+                              currentKey={rosterSortKey}
+                              currentDir={rosterSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  rosterSortKey,
+                                  rosterSortDir,
+                                  setRosterSortKey,
+                                  setRosterSortDir,
+                                )
+                              }
+                            />
+                            <SortHeader
+                              label="Name"
+                              sortKey="name"
+                              currentKey={rosterSortKey}
+                              currentDir={rosterSortDir}
+                              onSort={(k) =>
+                                toggleSort(
+                                  k,
+                                  rosterSortKey,
+                                  rosterSortDir,
+                                  setRosterSortKey,
+                                  setRosterSortDir,
+                                )
+                              }
+                            />
                             <th className={TH_CLASS}>Pos</th>
-                            {renderStatHeaders(rosterSortKey, rosterSortDir, (k) => toggleSort(k, rosterSortKey, rosterSortDir, setRosterSortKey, setRosterSortDir))}
+                            {renderStatHeaders(
+                              rosterSortKey,
+                              rosterSortDir,
+                              (k) =>
+                                toggleSort(
+                                  k,
+                                  rosterSortKey,
+                                  rosterSortDir,
+                                  setRosterSortKey,
+                                  setRosterSortDir,
+                                ),
+                            )}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
-                          {sortRows(rosterRows, rosterSortKey, rosterSortDir).map((row) => (
+                          {sortRows(
+                            rosterRows,
+                            rosterSortKey,
+                            rosterSortDir,
+                          ).map((row) => (
                             <tr
                               key={row.id}
                               onClick={() => setSelectedRosterPlayerId(row.id)}
@@ -832,7 +1446,10 @@ export default function WaiversPage() {
                           ))}
                           {rosterRows.length === 0 && (
                             <tr>
-                              <td colSpan={20} className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted">
+                              <td
+                                colSpan={20}
+                                className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                              >
                                 No roster players available
                               </td>
                             </tr>
@@ -849,13 +1466,24 @@ export default function WaiversPage() {
                 <Button
                   variant="primary"
                   onClick={handleEvaluate}
-                  disabled={!selectedFreeAgentId || !selectedRosterPlayerId || isEvaluating}
+                  disabled={
+                    !selectedFreeAgentId ||
+                    !selectedRosterPlayerId ||
+                    isEvaluating
+                  }
                 >
                   {isEvaluating ? "Evaluating..." : "Evaluate Impact"}
                 </Button>
                 {(selectedFreeAgentId || selectedRosterPlayerId) && (
                   <span className="text-data text-content-secondary dark:text-shell-muted">
-                    {selectedFreeAgentId ? faRows.find(r => r.id === selectedFreeAgentId)?.name : "..."} for {selectedRosterPlayerId ? rosterRows.find(r => r.id === selectedRosterPlayerId)?.name : "..."}
+                    {selectedFreeAgentId
+                      ? faRows.find((r) => r.id === selectedFreeAgentId)?.name
+                      : "..."}{" "}
+                    for{" "}
+                    {selectedRosterPlayerId
+                      ? rosterRows.find((r) => r.id === selectedRosterPlayerId)
+                          ?.name
+                      : "..."}
                   </span>
                 )}
               </div>
@@ -863,7 +1491,10 @@ export default function WaiversPage() {
                 <ErrorAlert
                   message={evaluationError}
                   variant="error"
-                  onRetry={() => { setEvaluationError(null); handleEvaluate(); }}
+                  onRetry={() => {
+                    setEvaluationError(null);
+                    handleEvaluate();
+                  }}
                 />
               )}
             </CardContent>
@@ -912,7 +1543,9 @@ export default function WaiversPage() {
                       <span>Category Breakdown</span>
                       <ChevronDown className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" />
                     </summary>
-                    {renderCategoryImpactTable(evaluationResult.categoryImpacts)}
+                    {renderCategoryImpactTable(
+                      evaluationResult.categoryImpacts,
+                    )}
                   </details>
                 )}
 
