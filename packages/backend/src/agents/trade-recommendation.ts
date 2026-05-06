@@ -1,6 +1,7 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
+import { SnapshotRepository } from "../db/snapshot-repository.js";
 import {
   calculateFinalRate,
   type RosterValidationResult,
@@ -41,6 +42,200 @@ const POSITION_SCARCITY: Record<string, number> = {
   P: 1.0,    // Generic pitcher slot
   UTIL: 0.5, // Not position-specific
 };
+
+const EQUIVALENT_VALUE_WEIGHTS = {
+  asv: 0.8,
+  draftCost: 0.2,
+} as const;
+const MIN_EQUIVALENT_VALUE_RATIO = 0.8;
+const DRAFT_PRICE_CONTEXT_PATTERN = /(draft|auction|pick|bid)/i;
+const DRAFT_PRICE_KEYS = [
+  "bidAmount",
+  "bid",
+  "price",
+  "cost",
+  "salary",
+  "auctionValue",
+  "amount",
+  "value",
+];
+
+function toPositiveNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function extractDraftPlayerId(entry: Record<string, unknown>): number | null {
+  const directId = toPositiveNumber(entry.playerId ?? entry.player_id);
+  if (directId != null) {
+    return directId;
+  }
+
+  const nestedPlayer = toRecord(entry.player);
+  if (!nestedPlayer) {
+    return null;
+  }
+
+  return toPositiveNumber(nestedPlayer.id ?? nestedPlayer.playerId ?? nestedPlayer.player_id);
+}
+
+function extractDraftPrice(entry: Record<string, unknown>): number | null {
+  for (const key of DRAFT_PRICE_KEYS) {
+    const direct = toPositiveNumber(entry[key]);
+    if (direct != null) {
+      return direct;
+    }
+  }
+
+  for (const value of Object.values(entry)) {
+    const nested = toRecord(value);
+    if (!nested) {
+      continue;
+    }
+
+    for (const key of DRAFT_PRICE_KEYS) {
+      const nestedPrice = toPositiveNumber(nested[key]);
+      if (nestedPrice != null) {
+        return nestedPrice;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function extractDraftCostsFromDraftDetail(
+  draftDetail: unknown,
+): Map<number, number> {
+  const draftCosts = new Map<number, number>();
+
+  const visit = (value: unknown, path: string[]): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        visit(item, path);
+      }
+      return;
+    }
+
+    const entry = toRecord(value);
+    if (!entry) {
+      return;
+    }
+
+    const hasDraftContext =
+      path.some((segment) => DRAFT_PRICE_CONTEXT_PATTERN.test(segment)) ||
+      Object.keys(entry).some((key) => DRAFT_PRICE_CONTEXT_PATTERN.test(key));
+
+    if (hasDraftContext) {
+      const playerId = extractDraftPlayerId(entry);
+      const draftCost = extractDraftPrice(entry);
+
+      if (playerId != null && draftCost != null) {
+        const current = draftCosts.get(playerId);
+        if (current == null || draftCost > current) {
+          draftCosts.set(playerId, draftCost);
+        }
+      }
+    }
+
+    for (const [key, nested] of Object.entries(entry)) {
+      visit(nested, [...path, key]);
+    }
+  };
+
+  visit(draftDetail, ["draftDetail"]);
+  return draftCosts;
+}
+
+function calculateCompositeTradeValue(
+  asv: number | null,
+  draftCost: number | null,
+): number | null {
+  const weightedSignals: Array<{ value: number; weight: number }> = [];
+
+  const safeAsv = toPositiveNumber(asv);
+  if (safeAsv != null) {
+    weightedSignals.push({ value: safeAsv, weight: EQUIVALENT_VALUE_WEIGHTS.asv });
+  }
+
+  const safeDraftCost = toPositiveNumber(draftCost);
+  if (safeDraftCost != null) {
+    weightedSignals.push({ value: safeDraftCost, weight: EQUIVALENT_VALUE_WEIGHTS.draftCost });
+  }
+
+  if (weightedSignals.length === 0) {
+    return null;
+  }
+
+  const totalWeight = weightedSignals.reduce((sum, signal) => sum + signal.weight, 0);
+
+  return weightedSignals.reduce(
+    (sum, signal) => sum + signal.value * (signal.weight / totalWeight),
+    0,
+  );
+}
+
+export function calculateEquivalentTradeValue(options: {
+  giveAsv: number | null;
+  receiveAsv: number | null;
+  giveDraftCost: number | null;
+  receiveDraftCost: number | null;
+}): {
+  giveCompositeValue: number | null;
+  receiveCompositeValue: number | null;
+  ratio: number | null;
+  usesDraftCost: boolean;
+} {
+  const usesDraftCost =
+    toPositiveNumber(options.giveDraftCost) != null &&
+    toPositiveNumber(options.receiveDraftCost) != null;
+
+  const giveCompositeValue = calculateCompositeTradeValue(
+    options.giveAsv,
+    usesDraftCost ? options.giveDraftCost : null,
+  );
+  const receiveCompositeValue = calculateCompositeTradeValue(
+    options.receiveAsv,
+    usesDraftCost ? options.receiveDraftCost : null,
+  );
+
+  if (giveCompositeValue == null || receiveCompositeValue == null) {
+    return {
+      giveCompositeValue,
+      receiveCompositeValue,
+      ratio: null,
+      usesDraftCost,
+    };
+  }
+
+  const expensiveValue = Math.max(giveCompositeValue, receiveCompositeValue);
+  const cheaperValue = Math.min(giveCompositeValue, receiveCompositeValue);
+
+  return {
+    giveCompositeValue,
+    receiveCompositeValue,
+    ratio: expensiveValue > 0 ? cheaperValue / expensiveValue : null,
+    usesDraftCost,
+  };
+}
 
 export interface TradePlayer {
   playerId: number;
@@ -95,13 +290,20 @@ export interface TradeCandidate {
   positionalContext?: PositionalContext;
   givePlayerAsv?: number | null;
   receivePlayerAsv?: number | null;
+  givePlayerDraftCost?: number | null;
+  receivePlayerDraftCost?: number | null;
+  equivalentValueRatio?: number | null;
 }
 
 export class TradeRecommendationAgent {
+  private readonly repo: SnapshotRepository;
+
   constructor(
     private db: Kysely<Database>,
     private logger?: BaseLogger,
-  ) {}
+  ) {
+    this.repo = new SnapshotRepository(db);
+  }
 
   /**
    * Validate trade size (1-3 players per side)
@@ -147,17 +349,7 @@ export class TradeRecommendationAgent {
     }
 
     // Get league settings to fetch roster slots
-    const settingsVersion = await this.db
-      .selectFrom("league_daily_snapshot")
-      .innerJoin(
-        "league_settings_version",
-        "league_daily_snapshot.settings_version_id",
-        "league_settings_version.id",
-      )
-      .select(["league_settings_version.settings_json"])
-      .where("league_daily_snapshot.league_id", "=", leagueId)
-      .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
-      .executeTakeFirst();
+    const settingsVersion = await this.repo.getLeagueSettings(leagueId, snapshotDate);
 
     if (!settingsVersion) {
       return {
@@ -368,7 +560,6 @@ export class TradeRecommendationAgent {
       "Generating trade candidates",
     );
 
-    // Verify snapshot exists
     const snapshot = await this.db
       .selectFrom("league_daily_snapshot")
       .selectAll()
@@ -378,11 +569,10 @@ export class TradeRecommendationAgent {
 
     if (!snapshot) {
       throw new Error(
-        `No snapshot found for league ${leagueId} on ${snapshotDate}. Please trigger a snapshot first.`,
+`No snapshot found for league ${leagueId} on ${snapshotDate}. Please trigger a snapshot first.`,
       );
     }
 
-    // Get all teams in the league
     const allTeams = await this.db
       .selectFrom("team")
       .selectAll()
@@ -395,29 +585,9 @@ export class TradeRecommendationAgent {
       return [];
     }
 
-    // OPTIMIZATION 1: Fetch all rosters in a single batch query
-    const allTeamIds = [teamId, ...allTeams.map((t) => t.id)];
-    const allRosters = await this.db
-      .selectFrom("team_roster_snapshot as roster")
-      .innerJoin("player", "roster.player_id", "player.id")
-      .select([
-        "roster.team_id",
-        "roster.player_id",
-        "player.name as player_name",
-        "player.id as espn_player_id",
-        "player.mlb_team",
-        "player.positions",
-        "roster.roster_status",
-        "roster.roster_slot",
-        "player.espn_asv",
-      ])
-      .where("roster.league_id", "=", leagueId)
-      .where("roster.snapshot_date", "=", snapshotDate)
-      .where("roster.team_id", "in", allTeamIds)
-      .where("roster.roster_status", "in", ["active", "bench"])
-      .execute();
+    const allRosters = (await this.repo.getRosterForSnapshot(leagueId, snapshotDate))
+      .filter((r) => r.roster_status === "active" || r.roster_status === "bench");
 
-    // Group rosters by team
     const rostersByTeam = new Map<number, typeof allRosters>();
     for (const player of allRosters) {
       if (!rostersByTeam.has(player.team_id)) {
@@ -429,36 +599,24 @@ export class TradeRecommendationAgent {
     const userRoster = rostersByTeam.get(teamId) || [];
     if (userRoster.length === 0) {
       throw new Error(
-        `No roster data found for team ${teamId}. Please ensure a snapshot has been run for this league.`,
+`No roster data found for team ${teamId}. Please ensure a snapshot has been run for this league.`,
       );
     }
 
-    // Fetch league settings for roster slots (for positional depth analysis)
-    const settingsVersion = await this.db
-      .selectFrom("league_daily_snapshot")
-      .innerJoin(
-        "league_settings_version",
-        "league_daily_snapshot.settings_version_id",
-        "league_settings_version.id",
-      )
-      .select(["league_settings_version.settings_json"])
-      .where("league_daily_snapshot.league_id", "=", leagueId)
-      .where("league_daily_snapshot.snapshot_date", "=", snapshotDate)
-      .executeTakeFirst();
+    const settingsVersion = await this.repo.getLeagueSettings(leagueId, snapshotDate);
 
     const rosterSlots =
       settingsVersion && settingsVersion.settings_json.roster_slots
         ? settingsVersion.settings_json.roster_slots
         : {};
 
-    // Analyze roster depth for positional scoring
     const userRosterForDepth = userRoster.map((p) => ({
       player_id: p.player_id,
       positions: p.positions,
     }));
     const depthMap = this.analyzeRosterDepth(userRosterForDepth, rosterSlots);
+    const draftCostsByPlayerId = await this.getLatestLeagueDraftCosts(leagueId);
 
-    // OPTIMIZATION 2: Get projections for all players upfront
     const allPlayerIds = allRosters.map((p) => p.player_id);
     const projectionsMap = new Map<number, Record<string, number>>();
 
@@ -478,26 +636,20 @@ export class TradeRecommendationAgent {
       }
     }
 
-    // OPTIMIZATION 3: Pre-compute simple value scores for quick filtering
     const getPlayerValue = (playerId: number): number => {
       const proj = projectionsMap.get(playerId);
       if (!proj) return 0;
 
-      // Simple heuristic: sum of key counting stats (not perfect but fast)
-      // For batters: HR, RBI, R, SB
-      // For pitchers: W, K, SV
       const batterValue = (proj.HR || 0) + (proj.RBI || 0) + (proj.R || 0) + (proj.SB || 0);
       const pitcherValue = (proj.W || 0) + ((proj.K || 0) / 10) + ((proj.SV || 0) * 2);
 
       return Math.max(batterValue, pitcherValue);
     };
 
-    // Track candidates with bounded size for memory efficiency
     const candidates: TradeCandidate[] = [];
     let simulationsRun = 0;
-    const maxSimulations = 500; // Limit total detailed analyses
+    const maxSimulations = 500;
 
-    // For each partner team, generate 1-for-1 trade candidates
     for (const partnerTeam of allTeams) {
       const partnerRoster = rostersByTeam.get(partnerTeam.id) || [];
 
@@ -509,73 +661,92 @@ export class TradeRecommendationAgent {
         continue;
       }
 
-      // OPTIMIZATION 4: Create candidate pairs with value pre-filtering and positional scoring
       const tradePairs: Array<{
         give: typeof userRoster[0];
         receive: typeof partnerRoster[0];
         valueDelta: number;
         positionalBonus: number;
         positionalContext: PositionalContext;
+        equivalentValueRatio: number;
+        giveCompositeValue: number | null;
+        receiveCompositeValue: number | null;
+        giveDraftCost: number | null;
+        receiveDraftCost: number | null;
+        usesDraftCost: boolean;
       }> = [];
 
       for (const givePlayer of userRoster) {
-        // Skip players with no trade value — $0 players are untradeable
-        const giveAsv = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 0;
-        if (giveAsv < 1) continue;
-
+        const giveAsv =
+          givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
+        const giveDraftCost = draftCostsByPlayerId.get(givePlayer.player_id) ?? null;
         const giveValue = getPlayerValue(givePlayer.player_id);
 
         for (const receivePlayer of partnerRoster) {
-          const receiveAsv = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 0;
+          const receiveAsv =
+            receivePlayer.espn_asv != null
+              ? Number(receivePlayer.espn_asv)
+              : null;
+          const receiveDraftCost =
+            draftCostsByPlayerId.get(receivePlayer.player_id) ?? null;
 
-          // Skip untradeable receive targets too
-          if (receiveAsv < 1) continue;
+          if (giveAsv != null && giveAsv < 1) continue;
+          if (receiveAsv != null && receiveAsv < 1) continue;
 
-          // ASV realism: the other manager must see this as reasonable.
-          // Rule: the cheaper player must be worth at least 80% of the expensive player.
-          // Examples: $18 for $22 = 82% → OK. $10 for $25 = 40% → blocked. $20 for $24 = 83% → OK.
-          const cheaperAsv = Math.min(giveAsv, receiveAsv);
-          const expensiveAsv = Math.max(giveAsv, receiveAsv);
-          if (expensiveAsv > 0 && cheaperAsv / expensiveAsv < 0.80) {
-            continue; // Too lopsided — won't be accepted
+          const equivalentValue = calculateEquivalentTradeValue({
+            giveAsv,
+            receiveAsv,
+            giveDraftCost,
+            receiveDraftCost,
+          });
+
+          if (
+            equivalentValue.ratio == null ||
+            equivalentValue.ratio < MIN_EQUIVALENT_VALUE_RATIO
+          ) {
+            continue;
           }
 
           const receiveValue = getPlayerValue(receivePlayer.player_id);
           const valueDelta = receiveValue - giveValue;
-
-          // Compute positional bonus for this trade pair
           const positionalContext = this.computePositionalBonus(
             [givePlayer.positions],
             [receivePlayer.positions],
             depthMap,
           );
 
-          // Include if: projection value improves, fills positional need,
-          // OR we're giving up ASV (other side gets the better "name" — likely accepted)
-          if (valueDelta > 0 || positionalContext.fillsNeed || giveAsv > receiveAsv) {
-            tradePairs.push({
-              give: givePlayer,
-              receive: receivePlayer,
-              valueDelta,
-              positionalBonus: positionalContext.positionalBonus,
-              positionalContext,
-            });
-          }
+          tradePairs.push({
+            give: givePlayer,
+            receive: receivePlayer,
+            valueDelta,
+            positionalBonus: positionalContext.positionalBonus,
+            positionalContext,
+            equivalentValueRatio: equivalentValue.ratio,
+            giveCompositeValue: equivalentValue.giveCompositeValue,
+            receiveCompositeValue: equivalentValue.receiveCompositeValue,
+            giveDraftCost,
+            receiveDraftCost,
+            usesDraftCost: equivalentValue.usesDraftCost,
+          });
         }
       }
 
-      // Sort by combined value delta + positional bonus (most promising first)
       tradePairs.sort(
         (a, b) =>
+          b.equivalentValueRatio - a.equivalentValueRatio ||
           b.valueDelta + b.positionalBonus - (a.valueDelta + a.positionalBonus),
       );
-      const topPairsForTeam = tradePairs.slice(0, 20); // Only analyze top 20 per team
+      const topPairsForTeam = tradePairs.slice(0, 20);
 
-      // Analyze top candidates
       for (const {
         give: givePlayer,
         receive: receivePlayer,
         positionalContext,
+        equivalentValueRatio,
+        giveCompositeValue,
+        receiveCompositeValue,
+        giveDraftCost,
+        receiveDraftCost,
+        usesDraftCost,
       } of topPairsForTeam) {
         if (simulationsRun >= maxSimulations) {
           this.logger?.info(
@@ -603,7 +774,6 @@ export class TradeRecommendationAgent {
         try {
           simulationsRun++;
 
-          // Analyze impact for user's team
           const impact = await this.analyzeTradeImpact(
             leagueId,
             teamId,
@@ -611,15 +781,23 @@ export class TradeRecommendationAgent {
             trade,
           );
 
-          // Only consider trades that improve the team
           if (impact.deltaOverallPoints > 0.5) {
-            const giveAsvVal = givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : 1;
-            const receiveAsvVal = receivePlayer.espn_asv != null ? Number(receivePlayer.espn_asv) : 1;
-            const asvNote = giveAsvVal > receiveAsvVal
-              ? ` You overpay on ASV ($${Math.round(giveAsvVal)} → $${Math.round(receiveAsvVal)}) but gain roto points.`
-              : giveAsvVal === receiveAsvVal
-                ? ` Even ASV ($${Math.round(giveAsvVal)}).`
-                : ` You get more ASV ($${Math.round(receiveAsvVal)} vs $${Math.round(giveAsvVal)}).`;
+            const giveAsvVal =
+              givePlayer.espn_asv != null ? Number(givePlayer.espn_asv) : null;
+            const receiveAsvVal =
+              receivePlayer.espn_asv != null
+                ? Number(receivePlayer.espn_asv)
+                : null;
+            const equivalentValueNote = this.generateEquivalentValueNote({
+              giveAsv: giveAsvVal,
+              receiveAsv: receiveAsvVal,
+              giveDraftCost,
+              receiveDraftCost,
+              giveCompositeValue,
+              receiveCompositeValue,
+              equivalentValueRatio,
+              usesDraftCost,
+            });
 
             candidates.push({
               trade,
@@ -628,19 +806,25 @@ export class TradeRecommendationAgent {
               deltaOverallPoints: impact.deltaOverallPoints,
               categoryImpacts: impact.categoryImpacts,
               fairnessScore: impact.fairnessScore,
-              likelihood: this.assessTradeLikelihood(impact.fairnessScore, giveAsvVal, receiveAsvVal),
+              likelihood: this.assessTradeLikelihood(
+                impact.fairnessScore,
+                giveCompositeValue ?? undefined,
+                receiveCompositeValue ?? undefined,
+              ),
               explanation: this.generateTradeExplanation(
                 trade,
                 impact.deltaOverallPoints,
                 impact.categoryImpacts,
                 positionalContext,
-              ) + asvNote,
+              ) + equivalentValueNote,
               positionalContext,
               givePlayerAsv: giveAsvVal,
               receivePlayerAsv: receiveAsvVal,
+              givePlayerDraftCost: giveDraftCost,
+              receivePlayerDraftCost: receiveDraftCost,
+              equivalentValueRatio,
             });
 
-            // OPTIMIZATION 5: Early termination if we have enough good candidates
             if (candidates.length >= maxCandidates * 3) {
               this.logger?.info(
                 { candidatesFound: candidates.length },
@@ -668,11 +852,12 @@ export class TradeRecommendationAgent {
       "Trade candidate generation complete",
     );
 
-    // Sort by delta overall points
-    candidates.sort((a, b) => b.deltaOverallPoints - a.deltaOverallPoints);
+    candidates.sort(
+      (a, b) =>
+        (b.equivalentValueRatio ?? 0) - (a.equivalentValueRatio ?? 0) ||
+        b.deltaOverallPoints - a.deltaOverallPoints,
+    );
 
-    // Diversify: limit each give player to max 2 appearances in final results
-    // so recommendations aren't all "trade Player X for various targets"
     const MAX_PER_GIVE_PLAYER = 2;
     const givePlayerCounts = new Map<number, number>();
     const diversified: TradeCandidate[] = [];
@@ -767,20 +952,10 @@ export class TradeRecommendationAgent {
     teamId: number,
     snapshotDate: string,
   ) {
-    return this.db
-      .selectFrom("team_roster_snapshot as roster")
-      .innerJoin("player", "roster.player_id", "player.id")
-      .select([
-        "roster.player_id",
-        "player.name as player_name",
-        "player.positions",
-        "roster.roster_status",
-      ])
-      .where("roster.league_id", "=", leagueId)
-      .where("roster.team_id", "=", teamId)
-      .where("roster.snapshot_date", "=", snapshotDate)
-      .where("roster.roster_status", "in", ["active", "bench"])
-      .execute();
+    const rows = await this.repo.getRosterForSnapshot(leagueId, snapshotDate, teamId);
+    return rows.filter(
+      (r) => r.roster_status === "active" || r.roster_status === "bench",
+    );
   }
 
   private async getPlayerProjections(
@@ -808,13 +983,7 @@ export class TradeRecommendationAgent {
     let projections: any[];
     if (projectionsRunId != null) {
       // Primary path: use the exact same run linked to the snapshot
-      projections = await this.db
-        .selectFrom("player_projection as proj")
-        .innerJoin("player", "player.id", "proj.player_id")
-        .selectAll("proj")
-        .where("proj.projections_run_id", "=", projectionsRunId)
-        .where("proj.player_id", "in", filteredIds)
-        .execute();
+      projections = await this.repo.getPlayerProjections(projectionsRunId, filteredIds) as any[];
     } else {
       // Fallback path: most recent run <= asOfDate (legacy snapshots)
       const allRows = await this.db
@@ -1117,23 +1286,81 @@ export class TradeRecommendationAgent {
     return Math.max(-1, Math.min(1, delta / 5));
   }
 
+  private async getLatestLeagueDraftCosts(
+    leagueId: number,
+  ): Promise<Map<number, number>> {
+    const latestPayload = await this.db
+      .selectFrom("league_raw_payload")
+      .select("response_json")
+      .where("league_id", "=", leagueId)
+      .orderBy("fetched_at", "desc")
+      .executeTakeFirst();
+
+    const responseJson = latestPayload?.response_json;
+    if (!responseJson || typeof responseJson !== "object") {
+      return new Map();
+    }
+
+    const draftDetail = (responseJson as Record<string, unknown>).draftDetail;
+    const draftCosts = extractDraftCostsFromDraftDetail(draftDetail);
+
+    this.logger?.debug(
+      { leagueId, draftCostCount: draftCosts.size },
+      "Resolved draft costs from latest ESPN raw payload",
+    );
+
+    return draftCosts;
+  }
+
+  private generateEquivalentValueNote(options: {
+    giveAsv: number | null;
+    receiveAsv: number | null;
+    giveDraftCost: number | null;
+    receiveDraftCost: number | null;
+    giveCompositeValue: number | null;
+    receiveCompositeValue: number | null;
+    equivalentValueRatio: number;
+    usesDraftCost: boolean;
+  }): string {
+    if (
+      options.giveCompositeValue == null ||
+      options.receiveCompositeValue == null
+    ) {
+      return "";
+    }
+
+    const signalLabel = options.usesDraftCost
+      ? "80/20 ESPN ASV + league draft cost"
+      : "ESPN ASV";
+    let note =
+` Equivalent value match ${(options.equivalentValueRatio * 100).toFixed(0)}% using ${signalLabel}` +
+` (${options.giveCompositeValue.toFixed(1)} vs ${options.receiveCompositeValue.toFixed(1)}).`;
+
+    if (options.usesDraftCost) {
+      note +=
+` Draft cost ${Math.round(options.giveDraftCost ?? 0)} vs ${Math.round(options.receiveDraftCost ?? 0)}.`;
+    } else if (options.giveAsv != null && options.receiveAsv != null) {
+      note += ` ASV ${Math.round(options.giveAsv)} vs ${Math.round(options.receiveAsv)}.`;
+    }
+
+    return note;
+  }
+
   private assessTradeLikelihood(
     fairnessScore: number,
-    giveAsv?: number,
-    receiveAsv?: number,
+    giveMarketValue?: number,
+    receiveMarketValue?: number,
   ): "high" | "medium" | "low" {
-    // If you're giving more ASV than receiving, the other side is getting
-    // the better "name" — they're more likely to accept
-    const youOverpayAsv = giveAsv != null && receiveAsv != null && giveAsv > receiveAsv;
+    const youOverpayMarket =
+      giveMarketValue != null &&
+      receiveMarketValue != null &&
+      giveMarketValue > receiveMarketValue;
 
-    if (youOverpayAsv) {
-      // You're overpaying on ASV — high likelihood the other side accepts
-      // Only downgrade if the roto gain is extreme (looks suspicious)
+    if (youOverpayMarket) {
       if (fairnessScore > 0.8) return "medium";
       return "high";
     }
 
-    // Standard assessment based on roto fairness
     if (fairnessScore > 0.6 || fairnessScore < -0.3) {
       return "low";
     } else if (fairnessScore > 0.3) {

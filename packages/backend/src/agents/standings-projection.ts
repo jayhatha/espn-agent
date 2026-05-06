@@ -1,12 +1,21 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
+import { SnapshotRepository } from "../db/snapshot-repository.js";
 import type { Category, StatComponents } from "../../../shared/dist/index.js";
-import { calculateFinalRate, combineComponents } from "../../../shared/dist/index.js";
+import {
+  calculateFinalRate,
+  combineComponents,
+  PITCHING_STAT_KEYS,
+} from "../../../shared/dist/index.js";
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
 import { allocateProjections } from "../projection/allocator.js";
 import { computeRateConfidence } from "../projection/variance.js";
-import type { AllocationInput, RosteredPlayer, ConfidenceInterval } from "../projection/types.js";
+import type {
+  AllocationInput,
+  RosteredPlayer,
+  ConfidenceInterval,
+} from "../projection/types.js";
 
 /**
  * Standings Projection Agent
@@ -29,22 +38,17 @@ interface TeamProjection {
   >;
 }
 
-/** Stat keys that belong to pitching categories */
-const PITCHING_STAT_KEYS = new Set([
-  // Pitching counting stats
-  "K", "W", "L", "SV", "HLD", "QS", "CG", "BLSV", "SVO",
-  "ER", "OUTS", "HA", "BBA", "HRA",
-  // Pitching rate stats
-  "ERA", "WHIP", "K9", "WPCT",
-]);
-
 const DEFAULT_GS_CAP = 200;
 
 export class StandingsProjectionAgent {
+  private readonly repo: SnapshotRepository;
+
   constructor(
     private db: Kysely<Database>,
     private logger?: BaseLogger,
-  ) {}
+  ) {
+    this.repo = new SnapshotRepository(db);
+  }
 
   /**
    * Compute projected standings for a snapshot
@@ -74,7 +78,11 @@ export class StandingsProjectionAgent {
       .executeTakeFirstOrThrow();
 
     const categories = settings.settings_json.categories as Category[];
-    const rosterSlots = (settings.settings_json as any).roster_slots as Record<string, number> || {};
+    const rosterSlots =
+      ((settings.settings_json as any).roster_slots as Record<
+        string,
+        number
+      >) || {};
 
     // Get all teams
     const teams = await this.db
@@ -84,7 +92,15 @@ export class StandingsProjectionAgent {
       .execute();
 
     // Fetch shared data once for all teams (parallel)
-    const [projectionAsOfDate, gsCap, latestPayload, teamEspnIds, allCategoryTotals, allRosterEntries, allProjections] = await Promise.all([
+    const [
+      projectionAsOfDate,
+      gsCap,
+      latestPayload,
+      teamEspnIds,
+      allCategoryTotals,
+      allRosterEntries,
+      allProjections,
+    ] = await Promise.all([
       this.getProjectionAsOfDate(projectionsRunId),
       this.getGsCap(leagueId),
       this.db
@@ -99,32 +115,11 @@ export class StandingsProjectionAgent {
         .where("league_id", "=", leagueId)
         .execute(),
       // Pre-fetch ALL category totals for the league+date in one query
-      this.db
-        .selectFrom("team_daily_category_totals")
-        .selectAll()
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", snapshotDate)
-        .execute(),
+      this.repo.getLeagueCategoryTotals(leagueId, snapshotDate),
       // Pre-fetch ALL roster entries for the league+date in one query
-      this.db
-        .selectFrom("team_roster_snapshot as r")
-        .innerJoin("player as p", "p.id", "r.player_id")
-        .select([
-          "r.team_id",
-          "r.player_id",
-          "r.roster_status",
-          "r.roster_slot",
-          "p.positions",
-        ])
-        .where("r.league_id", "=", leagueId)
-        .where("r.snapshot_date", "=", snapshotDate)
-        .execute(),
+      this.repo.getRosterForSnapshot(leagueId, snapshotDate),
       // Pre-fetch ALL player projections for this run in one query
-      this.db
-        .selectFrom("player_projection")
-        .select(["player_id", "stat_components_json"])
-        .where("projections_run_id", "=", projectionsRunId)
-        .execute(),
+      this.repo.getPlayerProjections(projectionsRunId),
     ]);
 
     // Group category totals by team_id
@@ -146,7 +141,10 @@ export class StandingsProjectionAgent {
     // Index all projections by player_id
     const projectionsByPlayerId = new Map<number, StatComponents>();
     for (const proj of allProjections) {
-      projectionsByPlayerId.set(proj.player_id, proj.stat_components_json as StatComponents);
+      projectionsByPlayerId.set(
+        proj.player_id,
+        proj.stat_components_json as StatComponents,
+      );
     }
 
     // Batch extract GS used per team from single ESPN payload (0 extra queries)
@@ -204,8 +202,25 @@ export class StandingsProjectionAgent {
     gsCap: number,
     projectionAsOfDate: string,
     snapshotDate: string,
-    categoryTotalsByTeam: Map<number, Array<{ team_id: number; category_id: string; value: unknown; components_json: unknown }>>,
-    rosterByTeam: Map<number, Array<{ team_id: number; player_id: number; roster_status: string | null; roster_slot: string | null; positions: unknown }>>,
+    categoryTotalsByTeam: Map<
+      number,
+      Array<{
+        team_id: number;
+        category_id: string;
+        value: unknown;
+        components_json: unknown;
+      }>
+    >,
+    rosterByTeam: Map<
+      number,
+      Array<{
+        team_id: number;
+        player_id: number;
+        roster_status: string | null;
+        roster_slot: string | null;
+        positions: unknown;
+      }>
+    >,
     allProjectionsByPlayerId: Map<number, StatComponents>,
   ): Promise<TeamProjection> {
     const currentTotals = categoryTotalsByTeam.get(teamId) ?? [];
@@ -287,7 +302,11 @@ export class StandingsProjectionAgent {
         // Build confidence interval: current (fixed) + projected range
         const ci = confidenceMap[category.stat_key];
         const confidence: ConfidenceInterval | undefined = ci
-          ? { p10: currentValue + ci.p10, p50: finalValue, p90: currentValue + ci.p90 }
+          ? {
+              p10: currentValue + ci.p10,
+              p50: finalValue,
+              p90: currentValue + ci.p90,
+            }
           : undefined;
 
         categoryProjections.set(category.category_id, {
@@ -305,7 +324,8 @@ export class StandingsProjectionAgent {
         // Batting rates need AB > 0; pitching rates need IP > 0.
         // Without a denominator, the formula returns 0 which is misleading.
         const denominatorKey = isPitchingCat ? "IP" : "AB";
-        const projectedDenominator = (projectedComponents[denominatorKey] as number) ?? 0;
+        const projectedDenominator =
+          (projectedComponents[denominatorKey] as number) ?? 0;
 
         if (projectedDenominator <= 0) {
           // No projected components available — use current ESPN rate to avoid showing 0
@@ -322,17 +342,31 @@ export class StandingsProjectionAgent {
               projectedComponents,
             );
 
-            const combinedComponents = combineComponents(currentComponents, projectedComponents);
+            const combinedComponents = combineComponents(
+              currentComponents,
+              projectedComponents,
+            );
 
             // Compute rate stat confidence by varying components
-            const formulaId = category.formula_id || category.stat_key.toLowerCase();
+            const formulaId =
+              category.formula_id || category.stat_key.toLowerCase();
             const rateFn = (c: StatComponents) => {
-              try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
+              try {
+                return calculateFinalRate(formulaId, {}, c);
+              } catch {
+                return 0;
+              }
             };
             const componentKeys = Object.keys(projectedComponents).filter(
-              (k) => typeof projectedComponents[k] === "number" && (projectedComponents[k] as number) > 0,
+              (k) =>
+                typeof projectedComponents[k] === "number" &&
+                (projectedComponents[k] as number) > 0,
             );
-            const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
+            const rateCI = computeRateConfidence(
+              combinedComponents,
+              rateFn,
+              componentKeys,
+            );
 
             categoryProjections.set(category.category_id, {
               value: finalValue,
@@ -485,7 +519,9 @@ export class StandingsProjectionAgent {
 
     if (settings?.settings_json) {
       const json = settings.settings_json as unknown as Record<string, unknown>;
-      const rosterSlots = json.roster_slots as Record<string, number> | undefined;
+      const rosterSlots = json.roster_slots as
+        | Record<string, number>
+        | undefined;
       if (rosterSlots?.GS_LIMIT !== undefined) {
         return rosterSlots.GS_LIMIT;
       }
@@ -497,7 +533,9 @@ export class StandingsProjectionAgent {
   /**
    * Get the as_of_date for a projections run (for staleness prorating)
    */
-  private async getProjectionAsOfDate(projectionsRunId: number): Promise<string> {
+  private async getProjectionAsOfDate(
+    projectionsRunId: number,
+  ): Promise<string> {
     const run = await this.db
       .selectFrom("projections_run")
       .select("as_of_date")
