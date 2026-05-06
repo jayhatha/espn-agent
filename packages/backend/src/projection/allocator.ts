@@ -1,25 +1,14 @@
 import type { StatComponents } from "../../../shared/dist/index.js";
-import { combineComponents } from "../../../shared/dist/index.js";
+import {
+  combineComponents,
+  extractBatterComponents,
+  extractPitcherComponents,
+} from "../../../shared/dist/index.js";
 import { computeProrateFactor, prorateComponents } from "./staleness.js";
 import { allocateLineup } from "./hitter-allocation.js";
 import { applyGsCap } from "./pitcher-scaling.js";
 import { computeConfidenceIntervals } from "./variance.js";
 import type { AllocationInput, AllocationResult, RosteredPlayer, RosterGap } from "./types.js";
-
-/**
- * Stat keys that belong to batting statistics.
- */
-const BATTER_COMPONENT_KEYS = new Set([
-  "AB", "H", "R", "HR", "RBI", "SB", "BB", "HBP", "SF", "TB",
-  "1B", "2B", "3B", "CS", "PA", "G",
-]);
-
-/**
- * Stat keys that belong to pitching statistics.
- */
-const PITCHER_COMPONENT_KEYS = new Set([
-  "IP", "ER", "HA", "BBA", "K", "SO", "W", "SV", "HLD", "QS", "GS", "G",
-]);
 
 /**
  * Non-contributing slot types (bench/injured list).
@@ -42,28 +31,6 @@ function isPitcherOnly(components: StatComponents | null): boolean {
 function isTwoWayPlayer(components: StatComponents | null): boolean {
   if (!components) return false;
   return (components.IP ?? 0) > 0 && (components.AB ?? 0) > 0;
-}
-
-/**
- * Extract only batter-relevant components from a stat object.
- */
-function extractBatterComponents(components: StatComponents): StatComponents {
-  const result: StatComponents = {};
-  for (const key of BATTER_COMPONENT_KEYS) {
-    if (components[key] !== undefined) result[key] = components[key];
-  }
-  return result;
-}
-
-/**
- * Extract only pitcher-relevant components from a stat object.
- */
-function extractPitcherComponents(components: StatComponents): StatComponents {
-  const result: StatComponents = {};
-  for (const key of PITCHER_COMPONENT_KEYS) {
-    if (components[key] !== undefined) result[key] = components[key];
-  }
-  return result;
 }
 
 /**

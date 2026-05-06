@@ -299,6 +299,43 @@ export function calculateAuctionDollarValue(
   return Math.max(minBid, dollarValue);
 }
 
+/**
+ * Stat keys that belong to batting statistics.
+ */
+export const BATTER_COMPONENT_KEYS = new Set([
+  "AB", "H", "R", "HR", "RBI", "SB", "BB", "HBP", "SF", "TB",
+  "1B", "2B", "3B", "CS", "PA", "G",
+]);
+
+/**
+ * Stat keys that belong to pitching statistics.
+ */
+export const PITCHER_COMPONENT_KEYS = new Set([
+  "IP", "ER", "HA", "BBA", "K", "SO", "W", "SV", "HLD", "QS", "GS", "G",
+]);
+
+/**
+ * Extract only batter-relevant components from a stat object.
+ */
+export function extractBatterComponents(components: StatComponents): StatComponents {
+  const result: StatComponents = {};
+  for (const key of BATTER_COMPONENT_KEYS) {
+    if (components[key] !== undefined) result[key] = components[key];
+  }
+  return result;
+}
+
+/**
+ * Extract only pitcher-relevant components from a stat object.
+ */
+export function extractPitcherComponents(components: StatComponents): StatComponents {
+  const result: StatComponents = {};
+  for (const key of PITCHER_COMPONENT_KEYS) {
+    if (components[key] !== undefined) result[key] = components[key];
+  }
+  return result;
+}
+
 // ─── Roto Math Functions ───────────────────────────────────────────────
 
 export interface TeamCategoryProjection {

@@ -431,7 +431,7 @@ Plans:
 6. All existing recommendation endpoints return identical outputs to pre-refactor
    **Plans:** 0/0 plans complete
 
-### Phase 92: Stat Component Consolidation
+### Phase 92: Stat Component Consolidation ✅ COMPLETE
 
 **Goal:** Make shared/formulas.ts the single source of truth for stat component extraction — move extractBatterComponents and extractPitcherComponents from allocator.ts (and any inline agent copies) into shared/formulas.ts alongside the rate-stat formulas they feed.
 **Depends on:** Phase 91
