@@ -37,15 +37,41 @@ async function ensureMigrationsTable(pool: pg.Pool): Promise<void> {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id SERIAL PRIMARY KEY,
-      version INTEGER NOT NULL UNIQUE,
-      filename TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      filename TEXT NOT NULL UNIQUE,
       applied_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `);
+  // Migrate old schema (UNIQUE on version) to new schema (UNIQUE on filename)
+  await pool
+    .query(
+      `
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'schema_migrations_version_key'
+          AND conrelid = 'schema_migrations'::regclass
+      ) THEN
+        ALTER TABLE schema_migrations DROP CONSTRAINT schema_migrations_version_key;
+      END IF;
+    END $$;
+  `,
+    )
+    .catch(() => {});
   console.log("✓ Migrations tracking table ready");
 }
 
 /**
+ * Gets set of applied migration filenames
+ */
+async function getAppliedFilenames(pool: pg.Pool): Promise<Set<string>> {
+  const result = await pool.query<{ filename: string }>(
+    "SELECT filename FROM schema_migrations ORDER BY version, filename",
+  );
+  return new Set(result.rows.map((row) => row.filename));
+}
+
+ /**
  * Gets set of applied migration versions
  */
 async function getAppliedVersions(pool: pg.Pool): Promise<Set<number>> {
@@ -111,7 +137,7 @@ async function applyMigration(
 
     // Record migration as applied
     await client.query(
-      "INSERT INTO schema_migrations (version, filename) VALUES ($1, $2)",
+      "INSERT INTO schema_migrations (version, filename) VALUES ($1, $2) ON CONFLICT (filename) DO NOTHING",
       [migration.version, migration.filename],
     );
 
@@ -142,8 +168,8 @@ async function runMigrations(): Promise<void> {
     await ensureMigrationsTable(pool);
 
     // Get applied migrations
-    const appliedVersions = await getAppliedVersions(pool);
-    console.log(`✓ Found ${appliedVersions.size} applied migration(s)\n`);
+    const appliedFilenames = await getAppliedFilenames(pool);
+    console.log(`✓ Found ${appliedFilenames.size} applied migration(s)\n`);
 
     // Get migration files
     const migrationFiles = getMigrationFiles();
@@ -156,7 +182,7 @@ async function runMigrations(): Promise<void> {
 
     // Find pending migrations
     const pendingMigrations = migrationFiles.filter(
-      (m) => !appliedVersions.has(m.version),
+      (m) => !appliedFilenames.has(m.filename),
     );
 
     if (pendingMigrations.length === 0) {
@@ -199,15 +225,15 @@ async function showStatus(): Promise<void> {
 
     await ensureMigrationsTable(pool);
 
-    const appliedVersions = await getAppliedVersions(pool);
+    const appliedFilenames = await getAppliedFilenames(pool);
     const migrationFiles = getMigrationFiles();
 
     console.log("Applied Migrations:");
-    if (appliedVersions.size === 0) {
+    if (appliedFilenames.size === 0) {
       console.log("  (none)");
     } else {
       const applied = migrationFiles.filter((m) =>
-        appliedVersions.has(m.version),
+        appliedFilenames.has(m.filename),
       );
       applied.forEach((m) => {
         console.log(`  ✓ ${m.filename}`);
@@ -216,7 +242,7 @@ async function showStatus(): Promise<void> {
 
     console.log("\nPending Migrations:");
     const pending = migrationFiles.filter(
-      (m) => !appliedVersions.has(m.version),
+      (m) => !appliedFilenames.has(m.filename),
     );
     if (pending.length === 0) {
       console.log("  (none)");
@@ -319,7 +345,9 @@ async function markAsApplied(version: number): Promise<void> {
       [version, migration.filename],
     );
 
-    console.log(`✓ Marked ${migration.filename} as applied (without running it)`);
+    console.log(
+      `✓ Marked ${migration.filename} as applied (without running it)`,
+    );
     console.log(
       "  ⚠ Warning: Ensure the database schema actually matches this migration!\n",
     );
@@ -371,7 +399,9 @@ if (command === "status") {
   console.error("  up (default)       Apply pending migrations");
   console.error("  status             Show migration status");
   console.error("  seed               Create default dev admin user");
-  console.error("  mark-applied <ver> Mark migration as applied without running");
+  console.error(
+    "  mark-applied <ver> Mark migration as applied without running",
+  );
   process.exit(1);
 }
 
