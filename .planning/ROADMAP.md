@@ -8,7 +8,8 @@
 - ✅ **v4.0 Personal Season Setup** - Phases 43-46 (shipped 2026-03-15)
 - ✅ **v5.0 Draft Engine Spec Alignment** - Phases 48-64 (shipped 2026-03-23)
 - ✅ **v6.0 In-Season Command Center** - Phases 65-86 (shipped 2026-05-05)
-- 🚧 **v7.0 Architectural Stabilization** - Phases 87-88 (in progress)
+- ✅ **v7.0 Architectural Stabilization** - Phases 87-88 (shipped 2026-05-05)
+- 🚧 **v8.0 Deep Architecture** - Phases 89-93 (in progress)
 
 ## Phases
 
@@ -379,6 +380,84 @@ Plans:
 Plans:
 
 - [x] 86-01-PLAN.md — All A1-A8 architecture and performance fixes
+
+---
+
+## v8.0 Deep Architecture
+
+**Milestone Goal:** Address the five architectural friction points surfaced by the May 2026 codebase architecture review: decompose the fat ESPN adapter, centralize distributed query logic into a SnapshotRepository, extract shared roster simulation out of TradeRecommendationAgent and WaiverRecommendationAgent, consolidate stat component extraction into shared/formulas.ts, and centralize agent construction into an AgentFactory.
+
+### Phase 89: ESPN Adapter Decomposition
+
+**Goal:** Split the 1200-line ESPNAdapter monolith into three focused modules — EspnHttpClient (throttle, cache, retry), EspnDataNormalizer (raw → canonical), and EspnResponseValidator (schema validation) — with a thin ESPNAdapter facade wiring them together for backward compatibility.
+**Depends on:** Phase 88
+**Requirements:** ESPN-SPLIT-01, ESPN-SPLIT-02, ESPN-SPLIT-03
+**Success Criteria** (what must be TRUE):
+
+1. `EspnHttpClient` owns all HTTP, throttle, cache, and retry logic — no normalization or validation code inside it
+2. `EspnDataNormalizer` converts raw ESPN payloads to canonical types without any HTTP or network code
+3. `EspnResponseValidator` validates schema shape without any HTTP, cache, or normalization code
+4. Existing `ESPNAdapter` public interface (fetchLeague, fetchFreeAgents, normalizeLeagueData, etc.) is unchanged — all callers continue to compile without changes
+5. The 7 constant maps (ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP, etc.) are implementation details of EspnDataNormalizer, not exported from the adapter facade
+6. Tests can instantiate EspnDataNormalizer and EspnResponseValidator without mocking HTTP
+**Plans:** 0/0 plans complete
+
+### Phase 90: SnapshotRepository Centralization
+
+**Goal:** Extract a SnapshotRepository module that centralizes the 5+ duplicated Kysely query patterns (getRosterForSnapshot, getLeagueCategoryTotals, getPlayerProjections, getLeagueSettings) so that agents and views call one interface instead of each writing their own SQL.
+**Depends on:** Phase 89
+**Requirements:** REPO-01, REPO-02, REPO-03
+**Success Criteria** (what must be TRUE):
+
+1. `SnapshotRepository` exports at minimum: `getRosterForSnapshot(leagueId, teamId, snapshotDate)`, `getLeagueCategoryTotals(leagueId, snapshotDate)`, `getPlayerProjections(projectionsRunId, playerIds)`, `getLeagueSettings(leagueId)`
+2. StandingsProjectionAgent, WaiverRecommendationAgent, TradeRecommendationAgent, FreeAgentView, and TradeView all call SnapshotRepository methods — no raw Kysely roster queries remain in those files
+3. The `team_roster_snapshot → player` join is written exactly once (in SnapshotRepository)
+4. All existing tests continue to pass
+5. SnapshotRepository is injectable (accepts `db: Kysely<Database>`) and testable without a running PostgreSQL instance via mocking
+**Plans:** 0/0 plans complete
+
+### Phase 91: RosterSimulator Extraction
+
+**Goal:** Extract a RosterSimulator module from the shared simulation logic in TradeRecommendationAgent and WaiverRecommendationAgent — covering roster-change simulation, post-change gap detection, and standing-delta ranking — so both agents call one interface instead of maintaining parallel implementations.
+**Depends on:** Phase 90
+**Requirements:** SIM-01, SIM-02, SIM-03
+**Success Criteria** (what must be TRUE):
+
+1. `RosterSimulator` exports `simulateTrade(roster, tradeProposal, leagueContext): TradeSimulation` and `simulateAddDrop(roster, add, drop, leagueContext): AddDropSimulation`
+2. `TradeRecommendationAgent` and `WaiverRecommendationAgent` both import from RosterSimulator — no duplicate simulation math remains in either agent
+3. Gap detection logic (`detectPostTradeGaps`, `detectPostSwapGaps`) lives in RosterSimulator, not in the agents
+4. Explanation generation (`generateTradeExplanation`, `generateExplanation`) is unified — one function in RosterSimulator used by both agents
+5. TradeRecommendationAgent shrinks from ~1700 lines to ≤900 lines; WaiverRecommendationAgent shrinks from ~800 lines to ≤500 lines
+6. All existing recommendation endpoints return identical outputs to pre-refactor
+**Plans:** 0/0 plans complete
+
+### Phase 92: Stat Component Consolidation
+
+**Goal:** Make shared/formulas.ts the single source of truth for stat component extraction — move extractBatterComponents and extractPitcherComponents from allocator.ts (and any inline agent copies) into shared/formulas.ts alongside the rate-stat formulas they feed.
+**Depends on:** Phase 91
+**Requirements:** FORMULA-01, FORMULA-02
+**Success Criteria** (what must be TRUE):
+
+1. `shared/formulas.ts` exports `extractBatterComponents(rawStats): BatterComponents` and `extractPitcherComponents(rawStats): PitcherComponents`
+2. `allocator.ts` imports component extraction from shared/formulas.ts — no local extractBatterComponents or extractPitcherComponents defined in allocator.ts
+3. No agent file defines its own component extraction logic — all import from shared/formulas.ts
+4. A single change to the component field list in shared/formulas.ts propagates correctly to all callers
+5. All existing projection calculations produce identical numerical outputs to pre-refactor
+**Plans:** 0/0 plans complete
+
+### Phase 93: AgentFactory Centralization
+
+**Goal:** Introduce an AgentFactory module that centralizes construction of all agents and views — so routes and workers call a factory function instead of newing up agents with their full dependency graphs inline.
+**Depends on:** Phase 92
+**Requirements:** FACTORY-01, FACTORY-02, FACTORY-03
+**Success Criteria** (what must be TRUE):
+
+1. `AgentFactory` exports named factory functions: `createSnapshotOrchestrator(db, logger)`, `createWaiverAgent(db, logger)`, `createTradeAgent(db, logger)`, `createStandingsAgent(db, logger)`, `createProjectionsIngestAgent(db, logger)`
+2. All route handlers in `api/` construct agents via factory functions — no `new WaiverRecommendationAgent(...)` calls remain in route files
+3. All worker files construct agents via factory functions — no `new SnapshotOrchestratorAgent(...)` calls remain in worker files
+4. Adding a new dependency to any agent requires editing exactly one file (the factory) — no route or worker file changes needed
+5. Integration tests can swap factories that inject test doubles without modifying route or worker code
+**Plans:** 0/0 plans complete
 
 ---
 

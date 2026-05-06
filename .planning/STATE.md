@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v7.0
-milestone_name: Architectural Stabilization
-status: Complete
-stopped_at: v7.0 complete — Phase 88 shipped
-last_updated: "2026-05-05T00:00:00.000Z"
+milestone: v8.0
+milestone_name: Deep Architecture
+status: In Progress
+stopped_at: v7.0 complete — starting v8.0 Phase 89
+last_updated: "2026-05-06T00:00:00.000Z"
 progress:
   total_phases: 2
   completed_phases: 2

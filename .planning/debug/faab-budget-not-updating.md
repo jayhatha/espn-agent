@@ -42,5 +42,6 @@ next_action: "Confirm by adding faab_spent to the onConflict doUpdateSet in writ
 root_cause: "snapshot-orchestrator team upsert never wrote faab_spent on conflict; migrate.ts markAsApplied called missing getAppliedVersions function"
 fix: "Added faab_spent to doUpdateSet in team upsert (snapshot-orchestrator.ts); added getAppliedVersions function to migrate.ts"
 files_changed:
-  - packages/backend/src/agents/snapshot-orchestrator.ts
-  - packages/backend/src/db/migrate.ts
+
+- packages/backend/src/agents/snapshot-orchestrator.ts
+- packages/backend/src/db/migrate.ts

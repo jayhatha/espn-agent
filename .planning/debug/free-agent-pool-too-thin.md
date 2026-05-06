@@ -51,4 +51,5 @@ next_action: "RESOLVED — fix applied in commit 8d86984"
 root_cause: "SnapshotOrchestratorAgent never wrote to league_free_agent_snapshot. writeFreeAgentPlayers only upserted into the player table. ESPN primary endpoint does not return free agents reliably, so Tier 2 table stayed empty and Tier 3 fallback also yielded nothing — freeAgents=[] and zero waiver recommendations."
 fix: "Added fetchAndStoreFreeAgents() private method that calls espnAdapter.fetchFreeAgents() (separate ESPN /players call with filterStatus=AVAILABLE/WAIVERS, limit 300) and upserts into player and league_free_agent_snapshot with ownership_pct/started_pct. Called non-blocking as step 8 in executeSnapshot; failures are caught/logged without aborting the snapshot."
 files_changed:
-  - packages/backend/src/agents/snapshot-orchestrator.ts
+
+- packages/backend/src/agents/snapshot-orchestrator.ts
