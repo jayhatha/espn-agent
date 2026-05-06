@@ -73,15 +73,24 @@ export interface SnapshotJobOptions {
 }
 
 export class SnapshotOrchestratorAgent {
-  private espnAdapter: ESPNAdapter;
-  private standingsAgent: StandingsProjectionAgent;
+  private readonly espnAdapter: ESPNAdapter;
+  private readonly standingsAgent: StandingsProjectionAgent;
 
+  /**
+   * @param db - Kysely database instance
+   * @param logger - Optional Pino logger
+   * @param espnAdapter - Optional pre-constructed ESPNAdapter (enables injection for testing)
+   * @param standingsAgent - Optional pre-constructed StandingsProjectionAgent (enables injection for testing)
+   */
   constructor(
-    private db: Kysely<Database>,
-    private logger?: BaseLogger,
+    private readonly db: Kysely<Database>,
+    private readonly logger?: BaseLogger,
+    espnAdapter?: ESPNAdapter,
+    standingsAgent?: StandingsProjectionAgent,
   ) {
-    this.espnAdapter = new ESPNAdapter(logger);
-    this.standingsAgent = new StandingsProjectionAgent(db, logger);
+    this.espnAdapter = espnAdapter ?? new ESPNAdapter(logger);
+    this.standingsAgent =
+      standingsAgent ?? new StandingsProjectionAgent(db, logger);
   }
 
   /**
@@ -245,6 +254,7 @@ export class SnapshotOrchestratorAgent {
             league_id: leagueId,
             espn_team_id: team.id,
             name: team.name,
+            faab_spent: team.faabSpent ?? 0,
             created_at: new Date(),
           }));
           const upsertedTeams = await trx
@@ -253,6 +263,7 @@ export class SnapshotOrchestratorAgent {
             .onConflict((oc) =>
               oc.columns(["league_id", "espn_team_id"]).doUpdateSet((eb) => ({
                 name: eb.ref("excluded.name"),
+                faab_spent: eb.ref("excluded.faab_spent"),
               })),
             )
             .returning(["id", "espn_team_id"])
@@ -318,7 +329,23 @@ export class SnapshotOrchestratorAgent {
         );
       }
 
-      // 8. Generate standings change log events (Phase 81)
+      // 8. Fetch and store free agents in league_free_agent_snapshot (non-blocking)
+      try {
+        await this.fetchAndStoreFreeAgents(
+          league.espn_league_id,
+          league.season,
+          espnAuth,
+          leagueId,
+          snapshotDate,
+        );
+      } catch (err) {
+        this.logger?.warn(
+          { err, leagueId, snapshotDate },
+          "Free agent fetch failed — non-fatal",
+        );
+      }
+
+      // 9. Generate standings change log events (Phase 81)
       // Non-blocking: errors here do not fail the snapshot
       try {
         const logger = this.logger ?? pino();
@@ -701,6 +728,69 @@ export class SnapshotOrchestratorAgent {
     this.logger?.info(
       { freeAgentCount: freeAgents.length },
       "Free agent players written",
+    );
+  }
+
+  private async fetchAndStoreFreeAgents(
+    espnLeagueId: number,
+    season: number,
+    auth: ESPNAuthCookies | undefined,
+    leagueId: number,
+    snapshotDate: string,
+  ): Promise<void> {
+    const freeAgents = await this.espnAdapter.fetchFreeAgents({
+      leagueId: espnLeagueId,
+      season,
+      auth,
+      limit: 300,
+    });
+
+    if (freeAgents.length === 0) {
+      this.logger?.info({ leagueId, snapshotDate }, "No free agents returned from ESPN");
+      return;
+    }
+
+    for (const fa of freeAgents) {
+      await this.db
+        .insertInto("player")
+        .values({
+          id: fa.playerId,
+          name: fa.name,
+          mlb_team: fa.mlbTeam,
+          positions: fa.positions,
+          created_at: new Date(),
+        } as any)
+        .onConflict((oc) =>
+          oc.column("id").doUpdateSet({
+            name: fa.name,
+            mlb_team: fa.mlbTeam,
+            positions: fa.positions,
+          }),
+        )
+        .execute();
+
+      await this.db
+        .insertInto("league_free_agent_snapshot")
+        .values({
+          league_id: leagueId,
+          snapshot_date: snapshotDate,
+          player_id: fa.playerId,
+          ownership_pct: fa.pctOwned,
+          started_pct: fa.pctStarted,
+          created_at: new Date(),
+        })
+        .onConflict((oc) =>
+          oc.columns(["league_id", "snapshot_date", "player_id"]).doUpdateSet({
+            ownership_pct: fa.pctOwned,
+            started_pct: fa.pctStarted,
+          }),
+        )
+        .execute();
+    }
+
+    this.logger?.info(
+      { leagueId, snapshotDate, freeAgentCount: freeAgents.length },
+      "Free agents stored in league_free_agent_snapshot",
     );
   }
 
