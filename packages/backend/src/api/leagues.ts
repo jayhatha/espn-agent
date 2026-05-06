@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
-import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
+import { createSnapshotOrchestrator } from "../agents/agent-factory.js";
 import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
@@ -268,7 +268,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         // Trigger initial snapshot for newly connected league
         try {
           request.log.info({ leagueId: league.id }, "Triggering initial snapshot for new league");
-          const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
+          const orchestrator = createSnapshotOrchestrator(db, request.log);
           const today = new Date().toISOString().split("T")[0];
 
           // Run snapshot in background (don't await)
@@ -847,7 +847,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Trigger initial snapshot in background
-        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
+        const orchestrator = createSnapshotOrchestrator(db, request.log);
         const today = new Date().toISOString().split("T")[0];
         orchestrator
           .executeSnapshot({

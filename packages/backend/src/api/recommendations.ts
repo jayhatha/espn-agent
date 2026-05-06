@@ -1,11 +1,10 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
-import { WaiverRecommendationAgent } from "../agents/waiver-recommendation.js";
-import { StandingsProjectionAgent } from "../agents/standings-projection.js";
+import { type ProposedTrade } from "../agents/trade-recommendation.js";
 import {
-  TradeRecommendationAgent,
-  type ProposedTrade,
-} from "../agents/trade-recommendation.js";
+  createWaiverAgent,
+  createTradeAgent,
+} from "../agents/agent-factory.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
 import { AdvancedStatsAdapter } from "../adapters/advanced-stats.js";
@@ -327,13 +326,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       }
 
       try {
-        const standingsAgent = new StandingsProjectionAgent(db, request.log);
-        const waiverAgent = new WaiverRecommendationAgent(
-          db,
-          standingsAgent,
-          espnAdapter,
-          request.log,
-        );
+        const waiverAgent = createWaiverAgent(db, request.log, espnAdapter);
 
         // Get player names
         const [addPlayer, dropPlayer] = await Promise.all([
@@ -469,13 +462,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const standingsAgent = new StandingsProjectionAgent(db, request.log);
-      const waiverAgent = new WaiverRecommendationAgent(
-        db,
-        standingsAgent,
-        espnAdapter,
-        request.log,
-      );
+      const waiverAgent = createWaiverAgent(db, request.log, espnAdapter);
 
       try {
         let freeAgentPlayerIds: number[] | undefined;
@@ -660,7 +647,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = createTradeAgent(db, request.log);
 
       try {
         const analysis = await tradeAgent.analyzeTradeImpact(
@@ -713,7 +700,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = new TradeRecommendationAgent(db, request.log);
+      const tradeAgent = createTradeAgent(db, request.log);
 
       try {
         const candidates = await tradeAgent.generateTradeCandidates(

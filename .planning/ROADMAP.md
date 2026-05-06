@@ -9,7 +9,7 @@
 - ✅ **v5.0 Draft Engine Spec Alignment** - Phases 48-64 (shipped 2026-03-23)
 - ✅ **v6.0 In-Season Command Center** - Phases 65-86 (shipped 2026-05-05)
 - ✅ **v7.0 Architectural Stabilization** - Phases 87-88 (shipped 2026-05-05)
-- 🚧 **v8.0 Deep Architecture** - Phases 89-93 (in progress)
+- ✅ **v8.0 Deep Architecture** - Phases 89-93 (shipped 2026-05-XX)
 
 ## Phases
 
@@ -445,7 +445,7 @@ Plans:
 5. All existing projection calculations produce identical numerical outputs to pre-refactor
    **Plans:** 0/0 plans complete
 
-### Phase 93: AgentFactory Centralization
+### Phase 93: AgentFactory Centralization ✅ COMPLETE
 
 **Goal:** Introduce an AgentFactory module that centralizes construction of all agents and views — so routes and workers call a factory function instead of newing up agents with their full dependency graphs inline.
 **Depends on:** Phase 92

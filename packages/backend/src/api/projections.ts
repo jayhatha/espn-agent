@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
-import { ProjectionsIngestAgent } from "../agents/projections-ingest.js";
+import { createProjectionsIngestAgent, createSnapshotOrchestrator } from "../agents/agent-factory.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
@@ -73,16 +73,11 @@ async function triggerDegradedLeagueResnapshots(
       "Triggering re-snapshots for degraded leagues"
     );
 
-    // Import and trigger snapshots in background
-    const { SnapshotOrchestratorAgent } = await import(
-      "../agents/snapshot-orchestrator.js"
-    );
-
     // Fire and forget - don't wait for snapshots to complete
     Promise.all(
       degradedLeagues.map(async (league: any) => {
         try {
-          const orchestrator = new SnapshotOrchestratorAgent(db, log);
+          const orchestrator = createSnapshotOrchestrator(db, log);
 
           // ESPN auth: env vars first, then encrypted DB fallback
           let auth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
@@ -158,7 +153,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         const buffer = await data.toBuffer();
         const csvContent = buffer.toString("utf-8");
 
-        const agent = new ProjectionsIngestAgent(db, request.log);
+        const agent = createProjectionsIngestAgent(db, request.log);
 
         const today = new Date().toISOString().split("T")[0];
 
@@ -233,7 +228,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
     ) => {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const agent = new ProjectionsIngestAgent(db, request.log);
+        const agent = createProjectionsIngestAgent(db, request.log);
 
         let battersCsv: string | undefined;
         let pitchersCsv: string | undefined;

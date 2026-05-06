@@ -2,7 +2,7 @@ import { Queue, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
-import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
+import { createSnapshotOrchestrator } from "../agents/agent-factory.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 
 // Import backfill worker so it runs in the same process
@@ -56,7 +56,7 @@ const worker = new Worker<SnapshotJobData>(
     );
 
     const db = getDb();
-    const orchestrator = new SnapshotOrchestratorAgent(db, logger);
+    const orchestrator = createSnapshotOrchestrator(db, logger);
 
     try {
       await orchestrator.executeSnapshot({
