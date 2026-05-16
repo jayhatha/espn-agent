@@ -107,4 +107,45 @@ export class SnapshotRepository {
       .orderBy("snapshot_date", "desc")
       .executeTakeFirst();
   }
+
+  /**
+   * Fetch free agent player IDs from league_free_agent_snapshot for a given date.
+   * Returns an empty array when no snapshot exists for that date.
+   */
+  async getFreeAgentsForSnapshot(
+    leagueId: number,
+    snapshotDate: string,
+  ): Promise<number[]> {
+    const rows = await this.db
+      .selectFrom("league_free_agent_snapshot")
+      .select("player_id")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+    return rows.map((r) => r.player_id);
+  }
+
+  /**
+   * Fetch projected overall standings for a league+date.
+   */
+  async getProjectedOverall(leagueId: number, snapshotDate: string) {
+    return this.db
+      .selectFrom("team_daily_projected_overall")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+  }
+
+  /**
+   * Fetch projected per-category standings for a league+date.
+   */
+  async getProjectedCategory(leagueId: number, snapshotDate: string) {
+    return this.db
+      .selectFrom("team_daily_projected_category")
+      .selectAll()
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .execute();
+  }
 }
