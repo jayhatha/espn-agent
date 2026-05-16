@@ -1,19 +1,21 @@
 import type { StatComponents } from "../../../shared/dist/index.js";
 import type { RosteredPlayer, SlotAssignment } from "./types.js";
-import { canFillSlot } from "./slot-eligibility.js";
+import {
+  canFillSlot,
+  SPECIFIC_SLOT_TYPES,
+  FLEX_SLOT_TYPES,
+  OVERFLOW_SLOT_TYPES,
+  BENCH_SLOT_TYPES,
+} from "./slot-eligibility.js";
 
 /**
  * Slot processing tiers: most constrained first.
- *
- * SPECIFIC_SLOTS: Position-specific — only eligible players can fill them
- * FLEX_SLOTS: Accept multiple positions (MI, CI, P, DH)
- * OVERFLOW_SLOTS: Universal (UTIL accepts any hitter/pitcher)
- * BENCH_SLOTS: Non-contributing (BN, BE, IL)
+ * Re-exported from slot-eligibility for reference.
  */
-const SPECIFIC_SLOTS = new Set(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "OF", "SP", "RP"]);
-const FLEX_SLOTS = new Set(["MI", "CI", "P", "DH"]);
-const OVERFLOW_SLOTS = new Set(["UTIL"]);
-const BENCH_SLOTS = new Set(["BN", "BE", "IL"]);
+const SPECIFIC_SLOTS = SPECIFIC_SLOT_TYPES;
+const FLEX_SLOTS = FLEX_SLOT_TYPES;
+const OVERFLOW_SLOTS = OVERFLOW_SLOT_TYPES;
+const BENCH_SLOTS = BENCH_SLOT_TYPES;
 
 /**
  * Score a player for slot assignment priority.
@@ -21,12 +23,22 @@ const BENCH_SLOTS = new Set(["BN", "BE", "IL"]);
  * Hitters: HR + RBI + R + SB
  * Pitchers: K + W*5 + SV*5
  */
-export function scorePlayer(components: StatComponents | null, isPitcher: boolean): number {
+export function scorePlayer(
+  components: StatComponents | null,
+  isPitcher: boolean,
+): number {
   if (!components) return 0;
   if (isPitcher) {
-    return (components.K ?? 0) + (components.W ?? 0) * 5 + (components.SV ?? 0) * 5;
+    return (
+      (components.K ?? 0) + (components.W ?? 0) * 5 + (components.SV ?? 0) * 5
+    );
   }
-  return (components.HR ?? 0) + (components.RBI ?? 0) + (components.R ?? 0) + (components.SB ?? 0);
+  return (
+    (components.HR ?? 0) +
+    (components.RBI ?? 0) +
+    (components.R ?? 0) +
+    (components.SB ?? 0)
+  );
 }
 
 /**
@@ -97,7 +109,11 @@ export function allocateLineup(
   const overflowSlotKeys = slotKeys.filter((s) => OVERFLOW_SLOTS.has(s));
   const benchSlotKeys = slotKeys.filter((s) => BENCH_SLOTS.has(s));
 
-  const orderedStartingSlots = [...specificSlotKeys, ...flexSlotKeys, ...overflowSlotKeys];
+  const orderedStartingSlots = [
+    ...specificSlotKeys,
+    ...flexSlotKeys,
+    ...overflowSlotKeys,
+  ];
 
   // Score active players for sorting
   const playerScores = new Map<number, number>();
@@ -109,7 +125,8 @@ export function allocateLineup(
 
   // Sort players by score descending (higher scored players fill slots first)
   const sortedActivePlayers = [...activePlayers].sort(
-    (a, b) => (playerScores.get(b.playerId) ?? 0) - (playerScores.get(a.playerId) ?? 0),
+    (a, b) =>
+      (playerScores.get(b.playerId) ?? 0) - (playerScores.get(a.playerId) ?? 0),
   );
 
   // Greedy assignment: for each starting slot type, fill N slots
@@ -130,7 +147,10 @@ export function allocateLineup(
         } else {
           // Hitter slots: pitcher-only players should not fill them
           // (Two-way players with both AB and IP can fill hitter slots)
-          if (isPitcherOnly(p.projectedComponents) && p.positions.every((pos) => pos === "SP" || pos === "RP")) {
+          if (
+            isPitcherOnly(p.projectedComponents) &&
+            p.positions.every((pos) => pos === "SP" || pos === "RP")
+          ) {
             return false;
           }
           return canFillSlot(p.positions, slotType);
@@ -153,7 +173,9 @@ export function allocateLineup(
   for (const slotType of benchSlotKeys) {
     const count = rosterSlots[slotType] ?? 0;
     // Fill remaining unassigned active players into bench slots
-    const unassigned = sortedActivePlayers.filter((p) => !assignedPlayerIds.has(p.playerId));
+    const unassigned = sortedActivePlayers.filter(
+      (p) => !assignedPlayerIds.has(p.playerId),
+    );
     const toAssign = unassigned.slice(0, count);
     for (const player of toAssign) {
       assignments.push({

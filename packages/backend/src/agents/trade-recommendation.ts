@@ -7,7 +7,10 @@ import {
   type StatComponents,
 } from "../../../shared/dist/index.js";
 import type { RosteredPlayer, RosterGap } from "../projection/types.js";
-import { canFillSlot } from "../projection/slot-eligibility.js";
+import {
+  canFillSlot,
+  orderSlotsByConstraint,
+} from "../projection/slot-eligibility.js";
 import { RosterSimulator, type TradeSimContext } from "./roster-simulator.js";
 // ASV (Average Season Value) is stored on player.espn_asv, populated by snapshot pipeline
 
@@ -390,20 +393,11 @@ export class TradeRecommendationAgent {
       })),
     ];
 
-    // Run greedy slot assignment
+    // Run greedy slot assignment using canonical slot ordering from slot-eligibility
     const issues: string[] = [];
     const assigned = new Set<number>();
 
-    // Derive slot order dynamically from rosterSlots keys
-    const genericSlots = new Set(["P", "DH", "UTIL", "MI", "CI"]);
-    const overflowSlots = new Set(["BN", "IL"]);
-    const allSlotTypes = Object.keys(rosterSlots);
-    const specificTier = allSlotTypes.filter(
-      (s) => !genericSlots.has(s) && !overflowSlots.has(s),
-    );
-    const genericTier = allSlotTypes.filter((s) => genericSlots.has(s));
-    const overflowTier = allSlotTypes.filter((s) => overflowSlots.has(s));
-    const slotOrder = [...specificTier, ...genericTier, ...overflowTier];
+    const slotOrder = orderSlotsByConstraint(Object.keys(rosterSlots));
 
     for (const slotType of slotOrder) {
       const count = rosterSlots[slotType] || 0;

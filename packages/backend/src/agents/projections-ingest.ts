@@ -80,7 +80,7 @@ export interface ValidationReport {
  * Set high (0.95) because the char-set overlap algorithm is too generous —
  * it matched completely different names (e.g., "Jared Young" → Aaron Judge)
  * at 0.80+. Only accept very close matches (typos, accents, suffixes). */
-const FUZZY_MATCH_CONFIDENCE_THRESHOLD = 0.95;
+// Threshold is defined in PlayerIdentityResolutionAgent.FUZZY_MATCH_CONFIDENCE_THRESHOLD
 
 export class ProjectionsIngestAgent {
   private identityAgent: PlayerIdentityResolutionAgent;
@@ -103,87 +103,20 @@ export class ProjectionsIngestAgent {
   }
 
   /**
-   * Match a FanGraphs player to a database player using identity resolution
-   * Uses cached identity map first, then fuzzy matching with confidence threshold
-   * @returns { playerId, matchType } if matched, null otherwise
+   * Match a FanGraphs player to a database player using identity resolution.
+   * Delegates to PlayerIdentityResolutionAgent.resolve() which handles
+   * cache lookup, fuzzy matching, threshold filtering, and map writes.
    */
   private async matchPlayer(
     playerName: string,
     team?: string,
     positions?: string[],
   ): Promise<{ playerId: number; matchType: "exact" | "fuzzy" } | null> {
-    // Create FanGraphs key from name (normalized)
     const fangraphsKey = playerName
       .toLowerCase()
       .replace(/[^a-z]/g, "")
       .trim();
-
-    // 1. Check existing identity map (cached exact or fuzzy match)
-    const existingMap = await this.db
-      .selectFrom("player_identity_map")
-      .innerJoin("player", "player.id", "player_identity_map.player_id")
-      .select(["player_identity_map.player_id", "player_identity_map.confidence", "player_identity_map.resolution_method"])
-      .where("player_identity_map.fangraphs_key", "=", fangraphsKey)
-      .executeTakeFirst();
-
-    if (existingMap) {
-      const matchType = existingMap.resolution_method === "exact_match" ? "exact" as const : "fuzzy" as const;
-      this.logger?.debug(
-        { playerName, playerId: existingMap.player_id, confidence: existingMap.confidence, matchType },
-        "Using cached identity mapping",
-      );
-      return { playerId: existingMap.player_id, matchType };
-    }
-
-    // 2. Find best match using PlayerIdentityResolutionAgent (fuzzy matching fallback)
-    const match = await this.identityAgent.findBestMatch(
-      fangraphsKey,
-      playerName,
-      team,
-      positions,
-    );
-
-    if (!match) {
-      this.logger?.warn({ playerName, team, positions }, "No match found for player");
-      return null;
-    }
-
-    // 3. Apply confidence threshold for fuzzy matches
-    if (match.confidence < FUZZY_MATCH_CONFIDENCE_THRESHOLD) {
-      this.logger?.warn(
-        { playerName, matchedId: match.playerId, confidence: match.confidence, threshold: FUZZY_MATCH_CONFIDENCE_THRESHOLD },
-        "Fuzzy match below confidence threshold, rejecting",
-      );
-      return null;
-    }
-
-    // 4. Store the mapping for future use
-    await this.db
-      .insertInto("player_identity_map")
-      .values({
-        player_id: match.playerId,
-        fangraphs_key: fangraphsKey,
-        confidence: match.confidence,
-        resolution_method: match.method,
-        updated_at: new Date(),
-      })
-      .onConflict((oc) =>
-        oc.column("player_id").doUpdateSet({
-          fangraphs_key: fangraphsKey,
-          confidence: match.confidence,
-          resolution_method: match.method,
-          updated_at: new Date(),
-        }),
-      )
-      .execute();
-
-    const matchType = match.method === "exact_match" ? "exact" as const : "fuzzy" as const;
-    this.logger?.debug(
-      { playerName, matchedId: match.playerId, confidence: match.confidence, method: match.method },
-      "New player identity mapping created via fuzzy matching",
-    );
-
-    return { playerId: match.playerId, matchType };
+    return this.identityAgent.resolve(fangraphsKey, playerName, team, positions);
   }
 
   /**

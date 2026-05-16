@@ -6,10 +6,7 @@ import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { RosterSimulator, type AddDropSimContext } from "./roster-simulator.js";
 import { ESPNAdapter } from "../adapters/espn.js";
-import type {
-  RosteredPlayer,
-  RosterGap,
-} from "../projection/types.js";
+import type { RosteredPlayer, RosterGap } from "../projection/types.js";
 
 /**
  * Waiver Recommendation Agent
@@ -53,7 +50,11 @@ export class WaiverRecommendationAgent {
   }
 
   /**
-   * Get waiver recommendations for a team
+   * Get waiver recommendations for a team.
+   *
+   * Pass freeAgentPlayerIds to override the pool (e.g. evaluate a specific add).
+   * Otherwise the agent resolves the pool internally via the snapshot repository
+   * with fallback to parsing the latest raw ESPN payload.
    */
   async getRecommendations(
     leagueId: number,
@@ -62,20 +63,9 @@ export class WaiverRecommendationAgent {
     options?: {
       maxRecommendations?: number;
       freeAgentPlayerIds?: number[];
-      fallbackPlayers?: Array<{
-        id: number;
-        name: string;
-        positions: string[];
-      }>;
-      fallbackProjections?: Record<number, StatComponents>;
     },
   ): Promise<WaiverRecommendation[]> {
-    const {
-      maxRecommendations = 10,
-      freeAgentPlayerIds,
-      fallbackPlayers,
-      fallbackProjections,
-    } = options || {};
+    const { maxRecommendations = 10, freeAgentPlayerIds } = options || {};
 
     this.logger?.info(
       { leagueId, teamId, snapshotDate },
@@ -89,24 +79,19 @@ export class WaiverRecommendationAgent {
       teamId,
     );
 
-    // Get free agents using four-tier strategy
+    // Resolve free agent pool — caller may supply override (e.g. for evaluate endpoint)
     let freeAgents: number[];
     if (freeAgentPlayerIds) {
-      // Tier 1: Use provided list
       freeAgents = freeAgentPlayerIds;
     } else {
-      // Tier 2: Query league_free_agent_snapshot table (primary source)
-      const snapshotFreeAgents = await this.db
-        .selectFrom("league_free_agent_snapshot")
-        .select("player_id")
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", snapshotDate)
-        .execute();
+      // Primary: league_free_agent_snapshot table (populated during snapshot)
+      freeAgents = await this.repo.getFreeAgentsForSnapshot(
+        leagueId,
+        snapshotDate,
+      );
 
-      if (snapshotFreeAgents.length > 0) {
-        freeAgents = snapshotFreeAgents.map((fa) => fa.player_id);
-      } else {
-        // Tier 3: Try to parse from latest raw ESPN payload (fallback for old snapshots)
+      if (freeAgents.length === 0) {
+        // Fallback: parse from latest raw ESPN payload (for old snapshots)
         const latestPayload = await this.db
           .selectFrom("league_raw_payload")
           .select("response_json")
@@ -115,28 +100,19 @@ export class WaiverRecommendationAgent {
           .executeTakeFirst();
 
         if (latestPayload) {
-          // Parse free agents from raw payload (ESPN may not include them, so this could still be empty)
           const normalized = this.espnAdapter.normalizeLeagueData(
             latestPayload.response_json as Record<string, unknown>,
           );
-
-          // Map ESPN player IDs to internal player IDs
           const espnPlayerIds =
             normalized.freeAgents?.map((fa) => fa.playerId) || [];
-
           if (espnPlayerIds.length > 0) {
             const freeAgentPlayers = await this.db
               .selectFrom("player")
               .select("id")
               .where("id", "in", espnPlayerIds)
               .execute();
-
             freeAgents = freeAgentPlayers.map((p) => p.id);
-          } else {
-            freeAgents = [];
           }
-        } else {
-          freeAgents = [];
         }
       }
 
@@ -153,29 +129,16 @@ export class WaiverRecommendationAgent {
       "Free agents identified",
     );
 
-    // Get baseline projections
-    const baseline = await this.db
-      .selectFrom("team_daily_projected_overall")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .where("team_id", "=", teamId)
-      .executeTakeFirst();
-
-    if (!baseline) {
-      this.logger?.warn({ teamId }, "No baseline projections found");
-      return [];
-    }
-
-    // Pre-fetch all invariant data for simulation (hoisted from simulateSwap to avoid O(n*m) queries)
-    const snapshot = await this.db
+    // Fetch snapshot + settings via repository
+    const snapshot = await this.repo.getLeagueSettings(leagueId, snapshotDate);
+    const snapshotRow = await this.db
       .selectFrom("league_daily_snapshot")
       .selectAll()
       .where("league_id", "=", leagueId)
       .where("snapshot_date", "=", snapshotDate)
       .executeTakeFirst();
 
-    if (!snapshot || !snapshot.projections_run_id) {
+    if (!snapshotRow || !snapshotRow.projections_run_id) {
       this.logger?.warn(
         { leagueId, snapshotDate },
         "No snapshot or projections run found",
@@ -183,35 +146,22 @@ export class WaiverRecommendationAgent {
       return [];
     }
 
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .selectAll()
-      .where("id", "=", snapshot.settings_version_id)
-      .executeTakeFirst();
-
-    if (!settings) {
+    if (!snapshot) {
       this.logger?.warn({ leagueId }, "No settings version found");
       return [];
     }
 
-    const categories = settings.settings_json.categories as Category[];
+    const categories = snapshot.settings_json.categories as Category[];
 
-    // Pre-fetch current team projections for all categories
-    const currentProjections = await this.db
-      .selectFrom("team_daily_projected_category")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .where("team_id", "=", teamId)
-      .execute();
-
-    // Pre-fetch all teams' projections for re-ranking
-    const allTeamsProjections = await this.db
-      .selectFrom("team_daily_projected_category")
-      .selectAll()
-      .where("league_id", "=", leagueId)
-      .where("snapshot_date", "=", snapshotDate)
-      .execute();
+    // Fetch projected standings via repository
+    const allCategoryProjections = await this.repo.getProjectedCategory(
+      leagueId,
+      snapshotDate,
+    );
+    const currentProjections = allCategoryProjections.filter(
+      (p) => p.team_id === teamId,
+    );
+    const allTeamsProjections = allCategoryProjections;
 
     const numTeams = new Set(allTeamsProjections.map((p) => p.team_id)).size;
 
@@ -231,7 +181,7 @@ export class WaiverRecommendationAgent {
           .where("id", "in", allPlayerIds)
           .execute(),
         this.repo.getPlayerProjections(
-          snapshot.projections_run_id,
+          snapshotRow.projections_run_id,
           allPlayerIds,
         ),
       ]);
@@ -241,24 +191,6 @@ export class WaiverRecommendationAgent {
       }
       for (const proj of projections) {
         projectionMap.set(proj.player_id, proj);
-      }
-
-      for (const fallbackPlayer of fallbackPlayers ?? []) {
-        if (!playerMap.has(fallbackPlayer.id)) {
-          playerMap.set(fallbackPlayer.id, fallbackPlayer);
-        }
-      }
-
-      for (const [playerId, statComponents] of Object.entries(
-        fallbackProjections ?? {},
-      )) {
-        const numericPlayerId = Number(playerId);
-        if (!projectionMap.has(numericPlayerId)) {
-          projectionMap.set(numericPlayerId, {
-            player_id: numericPlayerId,
-            stat_components_json: statComponents,
-          });
-        }
       }
     }
 
@@ -363,13 +295,13 @@ export class WaiverRecommendationAgent {
 
     // Detect roster gaps via allocateProjections for top-N recommendations
     const rosterSlots =
-      ((settings.settings_json as any).roster_slots as Record<
+      ((snapshot.settings_json as any).roster_slots as Record<
         string,
         number
       >) || {};
     const [{ gsUsed, gsCap }, projectionAsOfDate] = await Promise.all([
       this.getGsData(leagueId, teamId),
-      this.getProjectionAsOfDate(snapshot.projections_run_id),
+      this.getProjectionAsOfDate(snapshotRow.projections_run_id),
     ]);
 
     for (const rec of topN) {

@@ -8,7 +8,12 @@ import { computeProrateFactor, prorateComponents } from "./staleness.js";
 import { allocateLineup } from "./hitter-allocation.js";
 import { applyGsCap } from "./pitcher-scaling.js";
 import { computeConfidenceIntervals } from "./variance.js";
-import type { AllocationInput, AllocationResult, RosteredPlayer, RosterGap } from "./types.js";
+import type {
+  AllocationInput,
+  AllocationResult,
+  RosteredPlayer,
+  RosterGap,
+} from "./types.js";
 
 /**
  * Non-contributing slot types (bench/injured list).
@@ -44,7 +49,10 @@ function isPitcherSlot(slotType: string): boolean {
  * Determine if a pitcher in a given slot should be treated as an SP (subject to GS cap).
  * SP slot = always SP. P slot = SP if projected GS > 0. RP slot = never SP.
  */
-function shouldTreatAsSP(slotType: string, components: StatComponents | null): boolean {
+function shouldTreatAsSP(
+  slotType: string,
+  components: StatComponents | null,
+): boolean {
   if (slotType === "SP") return true;
   if (slotType === "RP") return false;
   // "P" slot: classify by projected GS or IP threshold
@@ -93,7 +101,10 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
   // ── 2. Build prorated projection map ────────────────────────────────────────
   const proratedProjections = new Map<number, StatComponents>();
   for (const [playerId, components] of projectionsByPlayerId) {
-    const prorated = prorateComponents(components as Record<string, number | undefined>, prorateFactor);
+    const prorated = prorateComponents(
+      components as Record<string, number | undefined>,
+      prorateFactor,
+    );
     proratedProjections.set(playerId, prorated as StatComponents);
   }
 
@@ -120,7 +131,9 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
   const assignments = allocateLineup(playersWithProjections, rosterSlots);
 
   // ── 5. Split assignments into starters (weight > 0) ─────────────────────────
-  const starterAssignments = assignments.filter((a) => a.contributionWeight > 0);
+  const starterAssignments = assignments.filter(
+    (a) => a.contributionWeight > 0,
+  );
 
   // Build lookup: playerId -> player with prorated projections
   const playerMap = new Map<number, RosteredPlayer>(
@@ -131,7 +144,11 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
   // Pitchers in SP, RP, or P slots are classified:
   //   - SP slot or P-slot with GS > 0 → SP (subject to GS cap)
   //   - RP slot or P-slot with no GS → RP (never scaled)
-  const spProjections: Array<{ playerId: number; components: StatComponents; projectedGS: number | null }> = [];
+  const spProjections: Array<{
+    playerId: number;
+    components: StatComponents;
+    projectedGS: number | null;
+  }> = [];
   const rpStarterIds = new Set<number>();
 
   for (const assignment of starterAssignments) {
@@ -200,7 +217,9 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     const player = playerMap.get(assignment.playerId);
     if (!player || !player.projectedComponents) continue;
 
-    const pitchComponents = extractPitcherComponents(player.projectedComponents);
+    const pitchComponents = extractPitcherComponents(
+      player.projectedComponents,
+    );
     if (Object.keys(pitchComponents).length > 0) {
       pitcherComponents = combineComponents(pitcherComponents, pitchComponents);
       perPlayerPitcherProjections.push(pitchComponents);
@@ -219,20 +238,52 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
       rpStarterIds.has(player.playerId);
 
     if (!isAlreadyCounted) {
-      const pitchComponents = extractPitcherComponents(player.projectedComponents);
+      const pitchComponents = extractPitcherComponents(
+        player.projectedComponents,
+      );
       if (Object.keys(pitchComponents).length > 0) {
-        pitcherComponents = combineComponents(pitcherComponents, pitchComponents);
+        pitcherComponents = combineComponents(
+          pitcherComponents,
+          pitchComponents,
+        );
         perPlayerPitcherProjections.push(pitchComponents);
       }
     }
   }
 
   // ── 9b. Compute confidence intervals from per-player data ─────────────────────
-  const BATTER_COUNTING_KEYS = ["HR", "R", "RBI", "SB", "H", "AB", "BB", "HBP", "SF", "TB"];
-  const PITCHER_COUNTING_KEYS = ["K", "W", "SV", "HLD", "QS", "IP", "ER", "HA", "BBA"];
+  const BATTER_COUNTING_KEYS = [
+    "HR",
+    "R",
+    "RBI",
+    "SB",
+    "H",
+    "AB",
+    "BB",
+    "HBP",
+    "SF",
+    "TB",
+  ];
+  const PITCHER_COUNTING_KEYS = [
+    "K",
+    "W",
+    "SV",
+    "HLD",
+    "QS",
+    "IP",
+    "ER",
+    "HA",
+    "BBA",
+  ];
 
-  const batterConfidence = computeConfidenceIntervals(perPlayerBatterProjections, BATTER_COUNTING_KEYS);
-  const pitcherConfidence = computeConfidenceIntervals(perPlayerPitcherProjections, PITCHER_COUNTING_KEYS);
+  const batterConfidence = computeConfidenceIntervals(
+    perPlayerBatterProjections,
+    BATTER_COUNTING_KEYS,
+  );
+  const pitcherConfidence = computeConfidenceIntervals(
+    perPlayerPitcherProjections,
+    PITCHER_COUNTING_KEYS,
+  );
 
   // ── 10. Detect roster gaps ─────────────────────────────────────────────────────
   const gaps: RosterGap[] = [];
