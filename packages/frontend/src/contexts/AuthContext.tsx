@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 // =============================================================================
 // AUTH BYPASSED: Single-user mode (v4.0)
@@ -25,7 +27,7 @@ interface AuthContextType {
     password: string,
     displayName?: string,
   ) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loginWithGoogle: () => void;
   loginWithGitHub: () => void;
 }
@@ -41,7 +43,17 @@ const MOCK_USER: User = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const noop = async () => {};
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // ignore — backend may not have a session to clear
+    }
+    router.push("/");
+  };
 
   return (
     <AuthContext.Provider
@@ -51,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null,
         login: noop,
         signup: noop,
-        logout: () => {},
+        logout,
         loginWithGoogle: () => {},
         loginWithGitHub: () => {},
       }}

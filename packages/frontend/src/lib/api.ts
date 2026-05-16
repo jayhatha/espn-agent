@@ -10,8 +10,9 @@ function cleanParams(params: Record<string, any>): Record<string, string> {
 }
 
 // =============================================================================
-// AUTH BYPASSED: Single-user mode (v4.0)
+// AUTH MODE: Single-user mode (backend SINGLE_USER_MODE=true)
 // No token refresh, no 401 redirect-to-login. Just fetch and return.
+// When backend SINGLE_USER_MODE is removed, wire 401 → /login redirect here.
 // =============================================================================
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
