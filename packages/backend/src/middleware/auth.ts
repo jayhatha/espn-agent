@@ -12,23 +12,34 @@ declare module "@fastify/jwt" {
 }
 
 // =============================================================================
-// AUTH BYPASSED: Single-user mode (v4.0)
-// All middleware functions are no-ops. Auth code preserved for future multi-user.
+// AUTH MODE
+// Set SINGLE_USER_MODE=true in .env to bypass JWT authentication.
+// When SINGLE_USER_MODE is not set, the real JWT path runs and unauthenticated
+// requests receive 401. This flag makes the bypass explicit and auditable.
 // =============================================================================
 
-// Mock user for single-user mode — routes reference request.user.userId / request.user.role
+// Mock user injected when SINGLE_USER_MODE=true
 const MOCK_USER = {
   userId: 1,
   email: "local@localhost",
   role: "admin" as const,
 };
 
-// Authenticate middleware — no-op in single-user mode (v4.0)
+// Authenticate middleware — injects MOCK_USER when SINGLE_USER_MODE=true,
+// otherwise validates JWT and returns 401 on failure.
 export async function authenticate(
   request: FastifyRequest,
-  _reply: FastifyReply,
+  reply: FastifyReply,
 ) {
-  (request as any).user = MOCK_USER;
+  if (process.env.SINGLE_USER_MODE === "true") {
+    (request as any).user = MOCK_USER;
+    return;
+  }
+  try {
+    await request.jwtVerify();
+  } catch {
+    return reply.code(401).send({ error: "Unauthorized" });
+  }
 }
 
 // Require admin role
@@ -44,18 +55,20 @@ export async function requireAdmin(
   }
 }
 
-// Require league access (bypassed — single-user tool owns all leagues)
+// Require league access — no-op in single-user mode; extend for multi-user.
 export async function requireLeagueAccess(
   _request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // Single-user: user owns all leagues. Extend here if multi-user is added.
+  // SINGLE_USER_MODE: user owns all leagues. Implement ownership check here when
+  // SINGLE_USER_MODE is removed and multi-user mode is enabled.
 }
 
-// Require specific team ownership (bypassed — single-user tool owns all teams)
+// Require specific team ownership — no-op in single-user mode; extend for multi-user.
 export async function requireTeamOwnership(
   _request: FastifyRequest,
   _reply: FastifyReply,
 ) {
-  // Single-user: user owns all teams. Extend here if multi-user is added.
+  // SINGLE_USER_MODE: user owns all teams. Implement ownership check here when
+  // SINGLE_USER_MODE is removed and multi-user mode is enabled.
 }
