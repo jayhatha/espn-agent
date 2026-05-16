@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v8.0
-milestone_name: Deep Architecture
-status: In Progress
-stopped_at: v7.0 complete — starting v8.0 Phase 89
-last_updated: "2026-05-06T00:00:00.000Z"
+milestone: v10.0
+milestone_name: Architecture Improvements
+status: planning
+stopped_at: ""
+last_updated: "2026-05-15T00:00:00.000Z"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-23)
+See: .planning/PROJECT.md (updated 2026-05-15)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v6.0 complete — waiver page advanced stats columns shipped with Statcast enrichment and graceful degradation for unavailable public-source metrics
+**Current focus:** v10.0 Architecture Improvements — container module, worker runtime, snapshot decomposition, player identity consolidation, frontend league workspace hook
 
 ## Current Position
 
-Phase: 85 complete
-Plan: 01 complete — v6.0 milestone finished
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-15 — Milestone v10.0 started
 
 ## Performance Metrics
 

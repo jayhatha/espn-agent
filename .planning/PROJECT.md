@@ -51,21 +51,36 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 - ✓ Dynamic budget allocation with surplus multiplier + endgame flush — v5.0
 - ✓ Grafana dark extension sidebar with signal strip + category heatmap — v5.0
 - ✓ Mobile draft companion with manual bid/nominate controls — v5.0
+- ✓ Linear-style dark command center with on-pace roto tracker — v6.0
+- ✓ Category opportunity map with marginal gap analysis — v6.0
+- ✓ FAAB pacing tracker with ROI and suggested bids — v6.0
+- ✓ GS pacing with SP start planner — v6.0
+- ✓ Roto-point-aware waiver and trade analysis — v6.0
+- ✓ Automatic trade finder with standings delta — v6.0
+- ✓ Hot/cold player trends and lineup efficiency — v6.0
+- ✓ ESPNAdapter decomposed into focused fetch modules — v7.0
+- ✓ SnapshotRepository DB access pattern extracted — v7.0
+- ✓ RosterSimulator extracted as pure computation class — v8.0
+- ✓ Stat component consolidation in shared package — v8.0
+- ✓ Agent factory pattern established — v8.0
+- ✓ Auth mode gating cleaned up — v9.0
+- ✓ NotificationBus naming normalized — v9.0
+- ✓ Frontend query hooks standardized — v9.0
+- ✓ Snapshot pipeline tests added — v9.0
 
 ### Active
 
-#### Current Milestone: v6.0 In-Season Command Center
+#### Current Milestone: v10.0 Architecture Improvements
 
-**Goal:** Transform the in-season dashboard into a Linear-style dark trading terminal for fantasy baseball — on-pace roto tracker, category opportunity map, FAAB pacing, GS pacing with SP start planner, roto-point-aware waiver and trade analysis, and automatic trade finder.
+**Goal:** Eliminate scattered `new Agent()` instantiation, duplicated localStorage patterns, and mixed concerns in snapshot/worker/identity code by extracting five focused modules — container, worker runtime, snapshot pipeline, player identity, and frontend league workspace.
 
-- [ ] On-pace roto tracker with live standings + historical curve fallback
-- [ ] Category opportunity map (marginal gaps, difficulty, priority)
-- [ ] FAAB pacing (budget vs league, bid history, ROI, suggested bids)
-- [ ] GS pacing with SP start planner (weekly + season, optimize pace)
-- [ ] Improved waiver analysis (net roto point delta, category breakdown, marginal gains)
-- [ ] Trade analysis rework (roto-point delta + automatic trade finder)
-- [ ] Full Linear-style dark restyle across all pages
-- [ ] Hot/cold player trends + lineup efficiency tracking
+- [ ] Backend process-scope adapters instantiated once and shared across all routes (container.ts)
+- [ ] Per-request agent construction replaced by factory functions from central container
+- [ ] BullMQ worker bootstrap (Redis, Queue, Worker, SIGTERM) extracted into shared runtime module
+- [ ] `SnapshotOrchestratorAgent.executeSnapshot()` decomposed into independently testable named phases
+- [ ] `PlayerIdentityResolutionAgent` owns all identity resolution logic (threshold, cache, DB write)
+- [ ] `localStorage` team selection encapsulated in `useLeagueTeam(leagueId)` hook across all pages
+- [ ] Page-local TypeScript interfaces consolidated into shared module types
 
 ### Deferred
 
@@ -93,23 +108,24 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Recommendations only, no ESPN write actions | ESPN has no official write API | ✓ Good |
-| Deep links to ESPN.com for user action | Low complexity, reliable | ✓ Good |
-| Component-based rate stat math | Mathematically correct projections | ✓ Good |
-| VBD with population std dev for SGP | Complete player pool, not sample | ✓ Good |
-| Deterministic engine + AI narrator layering | Engine computes, AI interprets — separation of concerns | ✓ Good |
-| Client-side draft engine (not server) | Low latency, works offline, no network dependency during draft | ✓ Good |
-| Greedy roster optimization over ILP | Good enough results within 100ms budget | ✓ Good |
-| Monte Carlo for bid uncertainty | Captures draft outcome variance | ✓ Good |
-| WebSocket hub for mobile companion | Extension → Fastify → phone, works on LAN | ✓ Good |
-| Mastra over raw OpenAI SDK | Typed tools, memory, streaming, model-agnostic | — Pending |
-| Chrome DevTools MCP for selector discovery | Live DOM inspection beats guessing at ESPN selectors | ✓ Good |
-| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline | ✓ Good |
-| Strip auth for v4.0 personal use | No login friction, re-enable later for multi-user | ✓ Good |
-| Hardcode league 112523 settings | Reliable config over error-prone DOM detection | ✓ Good |
-| OPS as custom rate stat | OBP + SLG components, not a simple stat | ✓ Good |
+| Decision                                      | Rationale                                                      | Outcome   |
+| --------------------------------------------- | -------------------------------------------------------------- | --------- |
+| Recommendations only, no ESPN write actions   | ESPN has no official write API                                 | ✓ Good    |
+| Deep links to ESPN.com for user action        | Low complexity, reliable                                       | ✓ Good    |
+| Component-based rate stat math                | Mathematically correct projections                             | ✓ Good    |
+| VBD with population std dev for SGP           | Complete player pool, not sample                               | ✓ Good    |
+| Deterministic engine + AI narrator layering   | Engine computes, AI interprets — separation of concerns        | ✓ Good    |
+| Client-side draft engine (not server)         | Low latency, works offline, no network dependency during draft | ✓ Good    |
+| Greedy roster optimization over ILP           | Good enough results within 100ms budget                        | ✓ Good    |
+| Monte Carlo for bid uncertainty               | Captures draft outcome variance                                | ✓ Good    |
+| WebSocket hub for mobile companion            | Extension → Fastify → phone, works on LAN                      | ✓ Good    |
+| Mastra over raw OpenAI SDK                    | Typed tools, memory, streaming, model-agnostic                 | — Pending |
+| Chrome DevTools MCP for selector discovery    | Live DOM inspection beats guessing at ESPN selectors           | ✓ Good    |
+| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline        | ✓ Good    |
+| Strip auth for v4.0 personal use              | No login friction, re-enable later for multi-user              | ✓ Good    |
+| Hardcode league 112523 settings               | Reliable config over error-prone DOM detection                 | ✓ Good    |
+| OPS as custom rate stat                       | OBP + SLG components, not a simple stat                        | ✓ Good    |
 
 ---
-*Last updated: 2026-03-31 after Phase 80 — Standings Swing Attribution complete (three-bucket attribution engine, API endpoint, "What Changed?" UI panel on Projected Standings tab)*
+
+_Last updated: 2026-05-15 after Phase 97 — Snapshot pipeline tests (v9.0 Architectural Philosophy Remediation complete). Starting v10.0 Architecture Improvements: container module, worker runtime, snapshot decomposition, player identity consolidation, frontend league workspace hook._

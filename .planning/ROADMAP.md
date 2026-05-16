@@ -9,7 +9,9 @@
 - ✅ **v5.0 Draft Engine Spec Alignment** - Phases 48-64 (shipped 2026-03-23)
 - ✅ **v6.0 In-Season Command Center** - Phases 65-86 (shipped 2026-05-05)
 - ✅ **v7.0 Architectural Stabilization** - Phases 87-88 (shipped 2026-05-05)
-- ✅ **v8.0 Deep Architecture** - Phases 89-93 (shipped 2026-05-XX)
+- ✅ **v8.0 Deep Architecture** - Phases 89-93 (shipped 2026-05-06)
+- ✅ **v9.0 Architectural Philosophy Remediation** - Phases 94-97 (shipped 2026-05-06)
+- 🔄 **v10.0 Architecture Improvements** - Phases 98-102 (in progress)
 
 ## Phases
 
@@ -387,7 +389,7 @@ Plans:
 
 **Milestone Goal:** Address the five architectural friction points surfaced by the May 2026 codebase architecture review: decompose the fat ESPN adapter, centralize distributed query logic into a SnapshotRepository, extract shared roster simulation out of TradeRecommendationAgent and WaiverRecommendationAgent, consolidate stat component extraction into shared/formulas.ts, and centralize agent construction into an AgentFactory.
 
-### Phase 89: ESPN Adapter Decomposition
+### Phase 89: ESPN Adapter Decomposition ✅ COMPLETE
 
 **Goal:** Split the 1200-line ESPNAdapter monolith into three focused modules — EspnHttpClient (throttle, cache, retry), EspnDataNormalizer (raw → canonical), and EspnResponseValidator (schema validation) — with a thin ESPNAdapter facade wiring them together for backward compatibility.
 **Depends on:** Phase 88
@@ -400,9 +402,13 @@ Plans:
 4. Existing `ESPNAdapter` public interface (fetchLeague, fetchFreeAgents, normalizeLeagueData, etc.) is unchanged — all callers continue to compile without changes
 5. The 7 constant maps (ESPN_STAT_MAP, ESPN_LINEUP_SLOT_MAP, etc.) are implementation details of EspnDataNormalizer, not exported from the adapter facade
 6. Tests can instantiate EspnDataNormalizer and EspnResponseValidator without mocking HTTP
-   **Plans:** 0/0 plans complete
+   **Plans:** 1/1 plans complete
 
-### Phase 90: SnapshotRepository Centralization
+Plans:
+
+- [x] 89-01-PLAN.md — Split ESPNAdapter into EspnHttpClient, EspnDataNormalizer, EspnResponseValidator sub-modules with backward-compatible facade
+
+### Phase 90: SnapshotRepository Centralization ✅ COMPLETE
 
 **Goal:** Extract a SnapshotRepository module that centralizes the 5+ duplicated Kysely query patterns (getRosterForSnapshot, getLeagueCategoryTotals, getPlayerProjections, getLeagueSettings) so that agents and views call one interface instead of each writing their own SQL.
 **Depends on:** Phase 89
@@ -414,7 +420,11 @@ Plans:
 3. The `team_roster_snapshot → player` join is written exactly once (in SnapshotRepository)
 4. All existing tests continue to pass
 5. SnapshotRepository is injectable (accepts `db: Kysely<Database>`) and testable without a running PostgreSQL instance via mocking
-   **Plans:** 0/0 plans complete
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 90-01-PLAN.md — Create SnapshotRepository class; migrate 5 callers (StandingsProjectionAgent, WaiverRecommendationAgent, TradeRecommendationAgent, FreeAgentView, TradeView)
 
 ### Phase 91: RosterSimulator Extraction ✅ COMPLETE
 
@@ -429,7 +439,11 @@ Plans:
 4. Explanation generation (`generateTradeExplanation`, `generateExplanation`) is unified — one function in RosterSimulator used by both agents
 5. TradeRecommendationAgent shrinks from ~1700 lines to ≤900 lines; WaiverRecommendationAgent shrinks from ~800 lines to ≤500 lines
 6. All existing recommendation endpoints return identical outputs to pre-refactor
-   **Plans:** 0/0 plans complete
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 91-01-PLAN.md — Extract RosterSimulator from TradeRecommendationAgent + WaiverRecommendationAgent; unify simulateTrade, simulateAddDrop, detectGaps, generateExplanation
 
 ### Phase 92: Stat Component Consolidation ✅ COMPLETE
 
@@ -443,7 +457,11 @@ Plans:
 3. No agent file defines its own component extraction logic — all import from shared/formulas.ts
 4. A single change to the component field list in shared/formulas.ts propagates correctly to all callers
 5. All existing projection calculations produce identical numerical outputs to pre-refactor
-   **Plans:** 0/0 plans complete
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 92-01-PLAN.md — Move extractBatterComponents + extractPitcherComponents into shared/formulas.ts; update allocator.ts and all agent callers
 
 ### Phase 93: AgentFactory Centralization ✅ COMPLETE
 
@@ -457,9 +475,167 @@ Plans:
 3. All worker files construct agents via factory functions — no `new SnapshotOrchestratorAgent(...)` calls remain in worker files
 4. Adding a new dependency to any agent requires editing exactly one file (the factory) — no route or worker file changes needed
 5. Integration tests can swap factories that inject test doubles without modifying route or worker code
-   **Plans:** 0/0 plans complete
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 93-01-PLAN.md — Create agent-factory.ts with 5 factory functions; update all route handlers and workers to use factories
 
 ---
+
+## v9.0 Architectural Philosophy Remediation — shipped 2026-05-06
+
+**Milestone Goal:** Address the four highest-impact concerns surfaced by the May 2026 architectural philosophy assessment: make the single-user auth bypass explicit and auditable via SINGLE_USER_MODE flag, rename the misnamed NotificationBus to SlackNotifier to reflect its actual responsibility, create a typed TanStack Query hook layer in the frontend so pages use composable hooks instead of inline useQuery() calls, and add integration tests for the snapshot → standings projection pipeline seam.
+
+### Phase 94: Single-User Mode Explicit Gating
+
+**Goal:** Replace the silent mock-user bypass in `middleware/auth.ts` with an explicit `SINGLE_USER_MODE=true` environment check — making the bypass named, visible, and auditable before multi-user mode ships.
+**Depends on:** Phase 93
+**Requirements:** AUTHMODE-01, AUTHMODE-02, AUTHMODE-03
+**Success Criteria** (what must be TRUE):
+
+1. `middleware/auth.ts` checks `process.env.SINGLE_USER_MODE === 'true'` before injecting the mock user — the bypass is gated, not unconditional
+2. When `SINGLE_USER_MODE` is not set (falsy), `authenticate()` validates a real JWT and returns 401 on failure
+3. `lib/api.ts` and any frontend auth-adjacent code is updated to reflect the single-user mode flag
+4. `SINGLE_USER_MODE=true` is documented in the project and the bypass behavior is traceable to the env flag
+5. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 94-01-PLAN.md — Gate authenticate() behind SINGLE_USER_MODE flag; update .env.example, api.ts comment, CLAUDE.md
+
+### Phase 95: NotificationBus → SlackNotifier Rename
+
+**Goal:** Rename `NotificationBus`, `NoOpNotificationBus`, `SlackWebhookNotificationBus`, and `createNotificationBus` to `SlackNotifier`, `NullSlackNotifier`, `SlackWebhookNotifier`, and `createSlackNotifier` — names that reflect what the abstraction actually does instead of implying a general event bus.
+**Depends on:** Phase 94
+**Requirements:** NOTIF-01, NOTIF-02
+**Success Criteria** (what must be TRUE):
+
+1. `notification-bus.ts` exports `SlackNotifier` interface, `NullSlackNotifier` class, `SlackWebhookNotifier` class, and `createSlackNotifier()` factory
+2. All callers (`live-poll.ts`, `snapshot-orchestrator.ts`, `standings-change-log.ts`) import from the updated names
+3. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 95-01-PLAN.md — Rename all 4 exports in notification-bus.ts; update all 3 callers
+
+### Phase 96: Frontend Query Hook Layer
+
+**Goal:** Create a typed TanStack Query hook layer in `packages/frontend/src/lib/hooks/` so pages call composable, self-caching hooks instead of inlining `useQuery({ queryKey: [...], queryFn: () => api.*() })` directly — centralizing stale-time policy and cache key management.
+**Depends on:** Phase 95
+**Requirements:** HOOKS-01, HOOKS-02, HOOKS-03, HOOKS-04
+**Success Criteria** (what must be TRUE):
+
+1. `lib/hooks/` exports: `useLeagueStatus`, `useProjectedStandings`, `useWaiverRecommendations`, `useTradeRecommendations`, `useFreeAgents`, and `useLeagueTeams`
+2. Each hook uses the centralized `queryKeys` factory from `lib/query-keys.ts` — no hand-written query keys inside hooks
+3. Each hook has an explicit `staleTime` matching the data's update frequency
+4. At least the standings page and waivers page are updated to use the new hooks instead of inline `useQuery()` calls
+5. `npx tsc --noEmit` passes with 0 errors in `packages/frontend`
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 96-01-PLAN.md — Create hooks/ directory with 5 hooks + barrel; update standings + waivers pages
+
+### Phase 97: Snapshot Pipeline Integration Tests
+
+**Goal:** Add integration tests for the `SnapshotOrchestratorAgent → StandingsProjectionAgent` pipeline seam — the highest-risk cross-agent boundary where data completeness assumptions are most likely to produce silent failures.
+**Depends on:** Phase 96
+**Requirements:** TEST-01, TEST-02, TEST-03
+**Success Criteria** (what must be TRUE):
+
+1. `__tests__/snapshot-pipeline.test.ts` tests that `SnapshotOrchestratorAgent` calls `StandingsProjectionAgent` with complete data from a snapshot
+2. A test verifies the `is_degraded=true` + `degraded_reasons` path when projections are missing
+3. A test verifies that the empty-array guard in `getPlayerProjections` is respected (no SQL `WHERE id IN ()` call)
+4. All tests pass with `pnpm test` in `packages/backend`
+   **Plans:** 1/1 plans complete
+
+Plans:
+
+- [x] 97-01-PLAN.md — 8 tests across 2 suites: getPlayerProjections guard + degraded flag logic; all passing
+
+---
+
+## v10.0 Architecture Improvements — in progress (started 2026-05-15)
+
+**Milestone Goal:** Eliminate scattered `new Agent()` instantiation, duplicated localStorage patterns, and mixed concerns in snapshot/worker/identity code by extracting five focused modules: container, worker runtime, snapshot pipeline decomposition, player identity consolidation, and frontend league workspace hook.
+
+### Phase 98: Application Composition Module
+
+**Goal:** Process-scope adapters (`ESPNAdapter`, `PitcherlistAdapter`, `AdvancedStatsAdapter`) are instantiated once at startup in `container.ts` and shared across all routes via Fastify plugin — eliminating per-request re-construction and scattered `new Agent()` calls across 10+ route handlers.
+**Depends on:** Phase 97
+**Requirements:** ARCH-01, ARCH-02, ARCH-03
+**Success Criteria** (what must be TRUE):
+
+1. `packages/backend/src/container.ts` exports a Fastify plugin registered in `index.ts` that decorates `fastify.container` with `adapters` (ESPNAdapter, PitcherlistAdapter, AdvancedStatsAdapter singletons) and `agents` (factory functions)
+2. `new ESPNAdapter(request.log)` no longer appears in route handler bodies in `draft.ts`, `leagues.ts`, or `recommendations.ts`
+3. Per-request `new TradeRecommendationAgent(db, log)`, `new FaabTrackerAgent(db, log)`, `new GsPacingAgent(db, log)`, `new DraftRankingsAgent(db, log)`, `new TransactionImpactAgent(db, log)` are replaced by factory calls from `fastify.container.agents`
+4. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+5. Backend starts cleanly and existing snapshot/waiver/trade routes respond correctly
+
+**Plans:** 0/1 plans complete
+
+### Phase 99: Worker Runtime Module
+
+**Goal:** Shared BullMQ bootstrap code (IORedis connection, Queue creation, Worker construction, SIGTERM/SIGINT handler, retry policy) is extracted into `worker-runtime.ts` — each worker file shrinks to: job data type + handler function + `createRuntime()` call.
+**Depends on:** Phase 98
+**Requirements:** ARCH-04, ARCH-05
+**Success Criteria** (what must be TRUE):
+
+1. `packages/backend/src/workers/worker-runtime.ts` exports `createRedisConnection()`, `createQueue()`, `createWorker()`, and `registerShutdown()`
+2. Each of the 6 worker files (`snapshot-worker.ts`, `backfill-worker.ts`, `live-poll-worker.ts`, `player-pool-worker.ts`, `morning-report-worker.ts`, `slack-approval-worker.ts`) no longer contains inline `new IORedis()` or `process.on("SIGTERM")` — delegates to `worker-runtime.ts`
+3. Worker startup behavior is unchanged — all workers start and process jobs correctly
+4. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+
+**Plans:** 0/1 plans complete
+
+### Phase 100: Snapshot Pipeline Decomposition
+
+**Goal:** `SnapshotOrchestratorAgent.executeSnapshot()` is decomposed into independently testable named private methods (`fetchAndArchive`, `resolveSettingsVersion`, `writeSnapshotRows`, `computeProjections`, `emitChangeLog`) — the orchestrator method becomes ≤ 40 lines of sequencing logic.
+**Depends on:** Phase 99
+**Requirements:** ARCH-06, ARCH-07
+**Success Criteria** (what must be TRUE):
+
+1. `executeSnapshot()` body is ≤ 40 lines — calls private methods in sequence with degraded-state threading
+2. `fetchAndArchive()`, `writeSnapshotRows()`, `computeProjections()`, and `emitChangeLog()` exist as private methods each ≤ 80 lines
+3. `computeDegradedStatus()` remains a pure function with no side effects
+4. Existing `snapshot-pipeline.test.ts` tests pass unchanged
+5. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+
+**Plans:** 0/1 plans complete
+
+### Phase 101: Player Identity Consolidation
+
+**Goal:** `PlayerIdentityResolutionAgent` owns all identity resolution logic — `FUZZY_MATCH_CONFIDENCE_THRESHOLD`, cache lookup, and `player_identity_map` write move out of `projections-ingest.ts` into a single `resolve()` method — eliminating duplicate DB access and threshold definitions.
+**Depends on:** Phase 100
+**Requirements:** ARCH-08, ARCH-09, ARCH-10
+**Success Criteria** (what must be TRUE):
+
+1. `FUZZY_MATCH_CONFIDENCE_THRESHOLD` is defined in `player-identity.ts` and not in `projections-ingest.ts`
+2. `PlayerIdentityResolutionAgent` exposes `resolve(fangraphsKey, playerName, team?, positions?)` that atomically handles cache-check → fuzzy-match → threshold → cache-write
+3. `projections-ingest.ts` no longer contains inline `player_identity_map` SELECT or INSERT queries for identity resolution
+4. `projections-ingest.ts` calls `identityAgent.resolve()` as the single identity resolution call
+5. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+
+**Plans:** 0/1 plans complete
+
+### Phase 102: Frontend League Workspace
+
+**Goal:** `localStorage.getItem(`league_${leagueId}_team`)` duplicated across 7 pages is encapsulated in a `useLeagueTeam(leagueId)` hook, and page-local TypeScript interfaces that duplicate common types are consolidated in `lib/types/league.ts`.
+**Depends on:** Phase 101
+**Requirements:** FE-01, FE-02
+**Success Criteria** (what must be TRUE):
+
+1. `packages/frontend/src/lib/hooks/use-league-team.ts` exports `useLeagueTeam(leagueId): [string | null, (id: string) => void]` with SSR-safe `typeof window` guard
+2. All 7 pages (`waivers`, `moves`, `lineup`, `standings`, `trends`, `changelog`, `trades`) import `useLeagueTeam` instead of accessing `localStorage` directly for team selection
+3. `packages/frontend/src/lib/types/league.ts` exports consolidated shared interfaces used across pages
+4. No inline `localStorage.getItem(`league_${leagueId}_team`)` remains in any page file
+5. `npx tsc --noEmit` passes with 0 errors in `packages/frontend`
+6. Pages render and team selection persists correctly in browser
+
+**Plans:** 0/1 plans complete
 
 ## v7.0 Architectural Stabilization — shipped 2026-05-05
 

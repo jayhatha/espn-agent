@@ -3,21 +3,77 @@
 **Defined:** 2026-03-23
 **Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
 
-## v6.0 Requirements
+## v10.0 Requirements
 
-Requirements for the In-Season Command Center milestone.
+Requirements for the Architecture Improvements milestone.
 
-### Dark Mode & Shell
+### Backend: Application Composition
 
-- [x] **SHELL-01**: Dashboard uses Linear-style dark palette (#0B0D10 background, #111318 panels, #1D2128 borders)
-- [x] **SHELL-02**: Left nav with icon + label navigation (Dashboard, Standings, Categories, Roster, Waivers, FAAB Market, Pitching Usage, Trades, Settings)
-- [x] **SHELL-03**: Top bar shows league name, week, FAAB remaining, GS pace, projected total points
-- [x] **SHELL-04**: Right signals panel with contextual daily action items
-- [x] **SHELL-05**: Typography uses Inter for text, JetBrains Mono for numbers
-- [x] **SHELL-06**: All existing dashboard pages restyled to dark theme (no light mode remnants)
-- [x] **SHELL-07**: 8px base spacing, 16px panel padding, 24px section spacing
+- [ ] **ARCH-01**: Process-scope adapters (`ESPNAdapter`, `PitcherlistAdapter`, `AdvancedStatsAdapter`) are instantiated once at startup in `container.ts` and shared across all route handlers via dependency injection, eliminating per-request re-construction
+- [ ] **ARCH-02**: Per-request agent construction (`new TradeRecommendationAgent(db, log)`, `new FaabTrackerAgent(db, log)`, `new GsPacingAgent(db, log)`, `new DraftRankingsAgent(db, log)`, etc.) is replaced by factory functions exported from `container.ts`
+- [ ] **ARCH-03**: `container.ts` is registered as a Fastify plugin so `db`, `log`, and all adapters/factories are available via `fastify.container` on every route without import chaining
 
-### Roto Tracker
+### Backend: Worker Runtime
+
+- [ ] **ARCH-04**: Shared BullMQ bootstrap (IORedis connection, Queue creation, Worker construction, SIGTERM/SIGINT handler, retry policy config) is extracted into `packages/backend/src/workers/worker-runtime.ts`
+- [ ] **ARCH-05**: Each worker file (`snapshot-worker.ts`, `backfill-worker.ts`, `live-poll-worker.ts`, `player-pool-worker.ts`, `morning-report-worker.ts`, `slack-approval-worker.ts`) exports only: job data type, job handler function, and optional schedule config — startup wiring removed from each file
+
+### Backend: Snapshot Pipeline Decomposition
+
+- [ ] **ARCH-06**: `SnapshotOrchestratorAgent.executeSnapshot()` is decomposed into named private methods: `fetchAndArchive()`, `resolveSettingsVersion()`, `writeSnapshotRows()`, `computeProjections()`, `emitChangeLog()` — each callable and testable independently
+- [ ] **ARCH-07**: Degraded-state detection remains a pure function (`computeDegradedStatus()` already extracted) with no side effects; degraded reasons are passed forward through the pipeline rather than computed inline in multiple places
+
+### Backend: Player Identity Consolidation
+
+- [ ] **ARCH-08**: `FUZZY_MATCH_CONFIDENCE_THRESHOLD` constant moves from `projections-ingest.ts` to `player-identity.ts` as the single source of truth
+- [ ] **ARCH-09**: `player_identity_map` cache lookup and write logic moves out of `projections-ingest.ts` into `PlayerIdentityResolutionAgent`, exposing a single `resolve(fangraphsKey, playerName, team?, positions?)` method that handles cache-check → fuzzy-match → cache-write atomically
+- [ ] **ARCH-10**: `projections-ingest.ts` calls `identityAgent.resolve()` instead of duplicating cache lookup + threshold + DB write inline
+
+### Frontend: League Workspace
+
+- [ ] **FE-01**: `localStorage.getItem/setItem(`league\_${leagueId}\_team`)` pattern duplicated across 7+ pages is encapsulated in a `useLeagueTeam(leagueId)` hook that returns `[teamId, setTeamId]` — pages import the hook rather than accessing localStorage directly
+- [ ] **FE-02**: Page-local TypeScript interfaces that are duplicated across pages (`RosterPlayer`, `Team`, `CategoryImpact`, etc.) are consolidated into a shared `packages/frontend/src/lib/types/league.ts` module and imported where needed
+
+## Traceability
+
+| REQ-ID  | Phase |
+| ------- | ----- |
+| ARCH-01 | 98    |
+| ARCH-02 | 98    |
+| ARCH-03 | 98    |
+| ARCH-04 | 99    |
+| ARCH-05 | 99    |
+| ARCH-06 | 100   |
+| ARCH-07 | 100   |
+| ARCH-08 | 101   |
+| ARCH-09 | 101   |
+| ARCH-10 | 101   |
+| FE-01   | 102   |
+| FE-02   | 102   |
+
+## Out of Scope (v10.0)
+
+- Public API / multi-tenant mode — deferred (no auth rework)
+- Database schema changes — no new tables in this milestone
+- New user-facing features — architectural refactor only, no visible behavior changes
+- Chrome extension refactor — scoped to web app backend/frontend only
+
+## Future Requirements
+
+- Mastra AI agent integration (deferred from v6.0)
+- Snake draft / H2H league support (deferred from v1.0)
+- Trade retrospectives with actual vs projected outcomes
+
+---
+
+## v9.0 Requirements (Archived — Shipped)
+
+### Architectural Philosophy Remediation
+
+- [x] **PHIL-01**: Auth mode gating centralized — v9.0
+- [x] **PHIL-02**: NotificationBus naming normalized across codebase — v9.0
+- [x] **PHIL-03**: Frontend query hooks standardized — v9.0
+- [x] **PHIL-04**: Snapshot pipeline tests added — v9.0
 
 - [ ] **ROTO-01**: Projected standings table shows all 13 teams with current points, projected points, and change
 - [ ] **ROTO-02**: Roto points computed from live standings (rank my projected totals against all teams' projected totals)
@@ -101,6 +157,7 @@ Requirements for the In-Season Command Center milestone.
 ## Future Requirements
 
 ### Advanced Analytics
+
 - **ADV-01**: Injury-adjusted projections (discount players on IL)
 - **ADV-02**: Schedule-strength adjustments per category
 - **ADV-03**: Opponent schedule tracking for streaming pitcher recommendations
@@ -108,85 +165,87 @@ Requirements for the In-Season Command Center milestone.
 
 ## Out of Scope
 
-| Feature | Reason |
-|---------|--------|
-| Points/H2H league support | Different scoring paradigm — roto only |
-| Snake draft features | Season is in auction mode only |
-| Real-time ESPN updates | ESPN API is read-only, batch snapshot model sufficient |
-| Mobile-specific in-season app | Desktop command center first, responsive later |
-| AI agent chat interface | Deferred to future milestone |
+| Feature                       | Reason                                                 |
+| ----------------------------- | ------------------------------------------------------ |
+| Points/H2H league support     | Different scoring paradigm — roto only                 |
+| Snake draft features          | Season is in auction mode only                         |
+| Real-time ESPN updates        | ESPN API is read-only, batch snapshot model sufficient |
+| Mobile-specific in-season app | Desktop command center first, responsive later         |
+| AI agent chat interface       | Deferred to future milestone                           |
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| SHELL-01 | Phase 65 | Complete |
-| SHELL-02 | Phase 65 | Complete |
-| SHELL-03 | Phase 65 | Complete |
-| SHELL-04 | Phase 65 | Complete |
-| SHELL-05 | Phase 65 | Complete |
-| SHELL-06 | Phase 65 | Complete |
-| SHELL-07 | Phase 65 | Complete |
-| ROTO-01 | Phase 66 | Pending |
-| ROTO-02 | Phase 66 | Pending |
-| ROTO-03 | Phase 66 | Pending |
-| ROTO-05 | Phase 66 | Pending |
-| ROTO-07 | Phase 66 | Pending |
-| ROTO-08 | Phase 66 | Pending |
-| ROTO-04 | Phase 67 | Pending |
-| ROTO-06 | Phase 67 | Pending |
-| WAIVER-01 | Phase 67 | Pending |
-| WAIVER-02 | Phase 67 | Pending |
-| WAIVER-03 | Phase 67 | Pending |
-| WAIVER-04 | Phase 67 | Pending |
-| WAIVER-05 | Phase 67 | Pending |
-| FAAB-01 | Phase 68 | Pending |
-| FAAB-02 | Phase 68 | Pending |
-| FAAB-03 | Phase 68 | Pending |
-| FAAB-04 | Phase 68 | Pending |
-| FAAB-05 | Phase 68 | Pending |
-| PITCH-01 | Phase 68 | Pending |
-| PITCH-02 | Phase 68 | Pending |
-| PITCH-03 | Phase 68 | Pending |
-| PITCH-04 | Phase 68 | Pending |
-| PITCH-05 | Phase 68 | Pending |
-| TRADE-01 | Phase 69 | Pending |
-| TRADE-02 | Phase 69 | Pending |
-| TRADE-03 | Phase 69 | Pending |
-| TRADE-04 | Phase 69 | Pending |
-| TRADE-05 | Phase 69 | Pending |
-| TREND-01 | Phase 70 | Pending |
-| TREND-02 | Phase 70 | Pending |
-| TREND-03 | Phase 70 | Pending |
-| TREND-04 | Phase 70 | Pending |
-| TREND-05 | Phase 70 | Pending |
-| CACHE-01 | Phase 74 | Complete |
-| CACHE-02 | Phase 74 | Complete |
-| CACHE-03 | Phase 74 | Complete |
-| CACHE-04 | Phase 74 | Complete |
+| Requirement | Phase    | Status   |
+| ----------- | -------- | -------- |
+| SHELL-01    | Phase 65 | Complete |
+| SHELL-02    | Phase 65 | Complete |
+| SHELL-03    | Phase 65 | Complete |
+| SHELL-04    | Phase 65 | Complete |
+| SHELL-05    | Phase 65 | Complete |
+| SHELL-06    | Phase 65 | Complete |
+| SHELL-07    | Phase 65 | Complete |
+| ROTO-01     | Phase 66 | Pending  |
+| ROTO-02     | Phase 66 | Pending  |
+| ROTO-03     | Phase 66 | Pending  |
+| ROTO-05     | Phase 66 | Pending  |
+| ROTO-07     | Phase 66 | Pending  |
+| ROTO-08     | Phase 66 | Pending  |
+| ROTO-04     | Phase 67 | Pending  |
+| ROTO-06     | Phase 67 | Pending  |
+| WAIVER-01   | Phase 67 | Pending  |
+| WAIVER-02   | Phase 67 | Pending  |
+| WAIVER-03   | Phase 67 | Pending  |
+| WAIVER-04   | Phase 67 | Pending  |
+| WAIVER-05   | Phase 67 | Pending  |
+| FAAB-01     | Phase 68 | Pending  |
+| FAAB-02     | Phase 68 | Pending  |
+| FAAB-03     | Phase 68 | Pending  |
+| FAAB-04     | Phase 68 | Pending  |
+| FAAB-05     | Phase 68 | Pending  |
+| PITCH-01    | Phase 68 | Pending  |
+| PITCH-02    | Phase 68 | Pending  |
+| PITCH-03    | Phase 68 | Pending  |
+| PITCH-04    | Phase 68 | Pending  |
+| PITCH-05    | Phase 68 | Pending  |
+| TRADE-01    | Phase 69 | Pending  |
+| TRADE-02    | Phase 69 | Pending  |
+| TRADE-03    | Phase 69 | Pending  |
+| TRADE-04    | Phase 69 | Pending  |
+| TRADE-05    | Phase 69 | Pending  |
+| TREND-01    | Phase 70 | Pending  |
+| TREND-02    | Phase 70 | Pending  |
+| TREND-03    | Phase 70 | Pending  |
+| TREND-04    | Phase 70 | Pending  |
+| TREND-05    | Phase 70 | Pending  |
+| CACHE-01    | Phase 74 | Complete |
+| CACHE-02    | Phase 74 | Complete |
+| CACHE-03    | Phase 74 | Complete |
+| CACHE-04    | Phase 74 | Complete |
 | SITSTART-01 | Phase 77 | Complete |
 | SITSTART-02 | Phase 77 | Complete |
 | SITSTART-03 | Phase 77 | Complete |
 | SITSTART-04 | Phase 77 | Complete |
 | SITSTART-05 | Phase 77 | Complete |
-| PROJ-01 | Phase 79 | Complete |
-| PROJ-02 | Phase 79 | Complete |
-| PROJ-03 | Phase 79 | Complete |
-| PROJ-04 | Phase 79 | Complete |
-| PROJ-05 | Phase 79 | Complete |
-| PROJ-06 | Phase 79 | Complete |
-| PROJ-07 | Phase 79 | Complete |
-| PROJ-08 | Phase 79 | Complete |
-| PROJ-09 | Phase 79 | Complete |
-| PROJ-10 | Phase 79 | Complete |
-| PROJ-11 | Phase 79 | Complete |
-| PROJ-12 | Phase 79 | Complete |
+| PROJ-01     | Phase 79 | Complete |
+| PROJ-02     | Phase 79 | Complete |
+| PROJ-03     | Phase 79 | Complete |
+| PROJ-04     | Phase 79 | Complete |
+| PROJ-05     | Phase 79 | Complete |
+| PROJ-06     | Phase 79 | Complete |
+| PROJ-07     | Phase 79 | Complete |
+| PROJ-08     | Phase 79 | Complete |
+| PROJ-09     | Phase 79 | Complete |
+| PROJ-10     | Phase 79 | Complete |
+| PROJ-11     | Phase 79 | Complete |
+| PROJ-12     | Phase 79 | Complete |
 
 **Coverage:**
+
 - v6.0 requirements: 56 total
 - Mapped to phases: 56
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-03-23*
-*Last updated: 2026-03-30 — added PROJ-01 through PROJ-12 for Phase 79*
+
+_Requirements defined: 2026-03-23_
+_Last updated: 2026-03-30 — added PROJ-01 through PROJ-12 for Phase 79_
