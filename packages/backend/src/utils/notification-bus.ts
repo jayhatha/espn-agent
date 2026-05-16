@@ -21,17 +21,17 @@ export interface StandingsChangeEventPayload {
   } | null;
 }
 
-export interface NotificationBus {
+export interface SlackNotifier {
   emit(event: StandingsChangeEventPayload): Promise<void>;
 }
 
-export class NoOpNotificationBus implements NotificationBus {
+export class NullSlackNotifier implements SlackNotifier {
   async emit(_event: StandingsChangeEventPayload): Promise<void> {
     // intentionally empty
   }
 }
 
-export class SlackWebhookNotificationBus implements NotificationBus {
+export class SlackWebhookNotifier implements SlackNotifier {
   constructor(
     private readonly webhookUrl: string,
     private readonly logger: BaseLogger,
@@ -73,11 +73,11 @@ export class SlackWebhookNotificationBus implements NotificationBus {
   }
 }
 
-export function createNotificationBus(logger: BaseLogger): NotificationBus {
+export function createSlackNotifier(logger: BaseLogger): SlackNotifier {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (webhookUrl) {
-    logger.info("NotificationBus: Slack webhook adapter active");
-    return new SlackWebhookNotificationBus(webhookUrl, logger);
+    logger.info("SlackNotifier: Slack webhook adapter active");
+    return new SlackWebhookNotifier(webhookUrl, logger);
   }
-  return new NoOpNotificationBus();
+  return new NullSlackNotifier();
 }

@@ -3,7 +3,7 @@ import { sql } from "kysely";
 import type { BaseLogger } from "pino";
 import type { Database } from "../db/schema.js";
 import type {
-  NotificationBus,
+  SlackNotifier,
   StandingsChangeEventPayload,
 } from "../utils/notification-bus.js";
 
@@ -11,7 +11,7 @@ export class StandingsChangeLogAgent {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly logger: BaseLogger,
-    private readonly bus: NotificationBus,
+    private readonly bus: SlackNotifier,
   ) {}
 
   async generateEvents(

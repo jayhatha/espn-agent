@@ -14,7 +14,7 @@ import {
 } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { StandingsChangeLogAgent } from "./standings-change-log.js";
-import { createNotificationBus } from "../utils/notification-bus.js";
+import { createSlackNotifier } from "../utils/notification-bus.js";
 import {
   changeLogEmitter,
   CHANGE_LOG_EVENT,
@@ -22,40 +22,31 @@ import {
 import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
- * ESPN stat ID → component key mapping for player period stats extraction.
- * Only COUNTING stats are stored in components_json — RATE stats are computed
- * from components at read time.
+ * Compute degraded status and reasons for a snapshot.
+ * Pure function — no DB access, fully testable in isolation.
  */
-const ESPN_PERIOD_STAT_MAP: Record<number, string> = {
-  // Batting counting stats
-  0: "AB",
-  1: "H",
-  3: "2B",
-  4: "3B",
-  5: "HR",
-  8: "TB",
-  10: "BB",
-  12: "HBP",
-  13: "SF",
-  20: "R",
-  21: "RBI",
-  23: "SB",
-  24: "CS",
-  27: "SO",
-  // Pitching counting stats (OUTS converted to IP on ingestion)
-  34: "OUTS", // will be converted to IP via / 3
-  37: "HA",
-  39: "BBA",
-  45: "ER",
-  46: "HRA",
-  48: "K",
-  53: "W",
-  54: "L",
-  57: "SV",
-  58: "BLSV",
-  60: "HLD",
-  63: "QS",
-};
+export function computeDegradedStatus(
+  projectionsRun: { as_of_date: unknown; staleness: string } | undefined,
+  snapshotDate: string,
+): { isDegraded: boolean; degradedReasons: string[] } {
+  const normDate = (d: unknown): string => {
+    if (d instanceof Date) return d.toISOString().split("T")[0];
+    return String(d).split("T")[0];
+  };
+
+  if (!projectionsRun) {
+    return { isDegraded: true, degradedReasons: ["projections_missing"] };
+  }
+
+  const projDate = normDate(projectionsRun.as_of_date);
+  const snapDate = normDate(snapshotDate);
+
+  if (projDate !== snapDate || projectionsRun.staleness !== "fresh") {
+    return { isDegraded: true, degradedReasons: ["projections_stale"] };
+  }
+
+  return { isDegraded: false, degradedReasons: [] };
+}
 
 /**
  * Snapshot Orchestrator Agent
@@ -101,7 +92,6 @@ export class SnapshotOrchestratorAgent {
 
     this.logger?.info({ leagueId, snapshotDate }, "Starting snapshot job");
 
-    // Check if snapshot already exists
     if (!forceFresh) {
       const existing = await this.db
         .selectFrom("league_daily_snapshot")
@@ -109,285 +99,193 @@ export class SnapshotOrchestratorAgent {
         .where("league_id", "=", leagueId)
         .where("snapshot_date", "=", snapshotDate)
         .executeTakeFirst();
-
       if (existing) {
-        this.logger?.info(
-          { leagueId, snapshotDate },
-          "Snapshot already exists, skipping",
-        );
+        this.logger?.info({ leagueId, snapshotDate }, "Snapshot already exists, skipping");
         return;
       }
     }
 
     try {
-      // 1. Fetch league info
       const league = await this.db
         .selectFrom("league")
         .selectAll()
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
 
-      // 2. Fetch ESPN data (including kona_player_info for free agents)
-      const espnData = await this.espnAdapter.fetchLeague({
-        leagueId: league.espn_league_id,
-        season: league.season,
-        auth: espnAuth,
-        views: [
-          "mSettings",
-          "mTeam",
-          "mRoster",
-          "mStandings",
-          "kona_player_info",
-        ],
-        xFantasyFilter: {
-          players: {
-            limit: 1500,
-            sortDraftRanks: {
-              sortPriority: 100,
-              sortAsc: true,
-              value: "STANDARD",
-            },
-          },
-        },
-      });
-
-      // Archive raw payload
-      await this.db
-        .insertInto("league_raw_payload")
-        .values({
-          league_id: leagueId,
-          fetched_at: espnData.fetchedAt,
-          endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
-          views: [
-            "mSettings",
-            "mTeam",
-            "mRoster",
-            "mStandings",
-            "kona_player_info",
-          ],
-          scoring_period_id: null,
-          x_fantasy_filter: {
-            players: {
-              limit: 1500,
-              sortDraftRanks: {
-                sortPriority: 100,
-                sortAsc: true,
-                value: "STANDARD",
-              },
-            },
-          },
-          response_json: espnData.data,
-          schema_fingerprint: espnData.schemaFingerprint,
-        })
-        .execute();
-
-      // 3. Normalize data
-      const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
-
-      // 4. Determine settings version
-      const settingsVersionId = await this.getOrCreateSettingsVersion(
-        leagueId,
-        snapshotDate,
-        normalized.settings,
-      );
-
-      // 5. Select projections run
+      const { espnData, normalized } = await this.fetchAndArchive(leagueId, league, espnAuth, snapshotDate);
+      const settingsVersionId = await this.getOrCreateSettingsVersion(leagueId, snapshotDate, normalized.settings);
       const projectionsRun = await this.db
         .selectFrom("projections_run")
         .selectAll()
         .where("as_of_date", "<=", snapshotDate)
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
+      const { isDegraded, degradedReasons } = computeDegradedStatus(projectionsRun, snapshotDate);
 
-      // Normalize dates for comparison (DB may return Date object or ISO string)
-      const normDate = (d: unknown): string => {
-        if (d instanceof Date) return d.toISOString().split("T")[0];
-        return String(d).split("T")[0];
-      };
-      const projDate = projectionsRun
-        ? normDate(projectionsRun.as_of_date)
-        : "";
-      const snapDate = normDate(snapshotDate);
-
-      const isDegraded =
-        !projectionsRun ||
-        projDate !== snapDate ||
-        projectionsRun.staleness !== "fresh";
-      const degradedReasons: string[] = [];
-      if (!projectionsRun) {
-        degradedReasons.push("projections_missing");
-      } else if (projDate !== snapDate) {
-        degradedReasons.push("projections_stale");
-      } else if (projectionsRun.staleness !== "fresh") {
-        degradedReasons.push("projections_stale");
-      }
-
-      // 6. Begin transaction and write snapshot
-      await this.db.transaction().execute(async (trx) => {
-        // Write snapshot
-        await trx
-          .insertInto("league_daily_snapshot")
-          .values({
-            league_id: leagueId,
-            snapshot_date: snapshotDate,
-            created_at: new Date(),
-            settings_version_id: settingsVersionId,
-            projections_run_id: projectionsRun?.id || null,
-            is_degraded: isDegraded,
-            degraded_reasons: degradedReasons,
-          })
-          .onConflict((oc) =>
-            oc.columns(["league_id", "snapshot_date"]).doUpdateSet({
-              created_at: new Date(),
-              settings_version_id: settingsVersionId,
-              projections_run_id: projectionsRun?.id || null,
-              is_degraded: isDegraded,
-              degraded_reasons: degradedReasons,
-            }),
-          )
-          .execute();
-
-        // Write teams in a single batch upsert and collect DB team IDs
-        const espnTeamIdToDbId = new Map<number, number>();
-        if (normalized.teams.length > 0) {
-          const teamRows = normalized.teams.map((team) => ({
-            league_id: leagueId,
-            espn_team_id: team.id,
-            name: team.name,
-            faab_spent: team.faabSpent ?? 0,
-            created_at: new Date(),
-          }));
-          const upsertedTeams = await trx
-            .insertInto("team")
-            .values(teamRows)
-            .onConflict((oc) =>
-              oc.columns(["league_id", "espn_team_id"]).doUpdateSet((eb) => ({
-                name: eb.ref("excluded.name"),
-                faab_spent: eb.ref("excluded.faab_spent"),
-              })),
-            )
-            .returning(["id", "espn_team_id"])
-            .execute();
-          for (const row of upsertedTeams) {
-            espnTeamIdToDbId.set(row.espn_team_id, row.id);
-          }
-        }
-
-        // Write players and roster snapshots
-        await this.writePlayersAndRosters(
-          trx,
-          leagueId,
-          snapshotDate,
-          normalized.teams,
-          espnTeamIdToDbId,
-        );
-
-        // Write free agent players
-        await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
-
-        // Write current category totals, ranks, and overall
-        const categories = normalized.settings.categories;
-        if (categories.length > 0) {
-          await this.writeCurrentStandings(
-            trx,
-            leagueId,
-            snapshotDate,
-            normalized.teams,
-            espnTeamIdToDbId,
-            categories,
-          );
-        }
-
-        // Store per-player period stats for tenure tracking
-        // Extract scoringPeriodId from raw ESPN data
-        const rawData = espnData.data as Record<string, any>;
-        const rawTeams = rawData?.teams;
-        const snapshotScoringPeriodId =
-          rawData?.scoringPeriodId ??
-          rawData?.status?.currentScoringPeriod?.id ??
-          1;
-        if (rawTeams && Array.isArray(rawTeams)) {
-          await this.writePlayerPeriodStats(
-            trx,
-            leagueId,
-            snapshotDate,
-            rawTeams,
-            espnTeamIdToDbId,
-            snapshotScoringPeriodId,
-          );
-        }
-
-        this.logger?.info({ leagueId, snapshotDate }, "Snapshot data written");
-      });
-
-      // 7. Compute projected standings
-      if (projectionsRun) {
-        await this.standingsAgent.computeProjectedStandings(
-          leagueId,
-          snapshotDate,
-          projectionsRun.id,
-        );
-      }
-
-      // 8. Fetch and store free agents in league_free_agent_snapshot (non-blocking)
-      try {
-        await this.fetchAndStoreFreeAgents(
-          league.espn_league_id,
-          league.season,
-          espnAuth,
-          leagueId,
-          snapshotDate,
-        );
-      } catch (err) {
-        this.logger?.warn(
-          { err, leagueId, snapshotDate },
-          "Free agent fetch failed — non-fatal",
-        );
-      }
-
-      // 9. Generate standings change log events (Phase 81)
-      // Non-blocking: errors here do not fail the snapshot
-      try {
-        const logger = this.logger ?? pino();
-        const bus = createNotificationBus(logger);
-        const changeLogAgent = new StandingsChangeLogAgent(
-          this.db,
-          logger,
-          bus,
-        );
-        const eventCount = await changeLogAgent.generateEvents(
-          leagueId,
-          snapshotDate,
-          "snapshot",
-        );
-        if (eventCount > 0) {
-          changeLogEmitter.emit(CHANGE_LOG_EVENT, {
-            leagueId,
-            snapshotDate,
-            eventCount,
-          });
-        }
-        this.logger?.info(
-          { leagueId, snapshotDate, eventCount },
-          "Change log events generated",
-        );
-      } catch (err) {
-        this.logger?.warn(
-          { err, leagueId, snapshotDate },
-          "Change log generation failed — non-fatal",
-        );
-      }
-
-      this.logger?.info(
-        { leagueId, snapshotDate },
-        "Snapshot job completed successfully",
+      await this.db.transaction().execute((trx) =>
+        this.writeSnapshotRows(trx, leagueId, snapshotDate, espnData, normalized, settingsVersionId, projectionsRun, isDegraded, degradedReasons),
       );
+
+      await this.computeProjections(leagueId, snapshotDate, projectionsRun?.id);
+
+      try {
+        await this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate);
+      } catch (err) {
+        this.logger?.warn({ err, leagueId, snapshotDate }, "Free agent fetch failed — non-fatal");
+      }
+
+      await this.emitChangeLog(leagueId, snapshotDate);
+
+      this.logger?.info({ leagueId, snapshotDate }, "Snapshot job completed successfully");
     } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate },
-        "Snapshot job failed",
-      );
+      this.logger?.error({ error, leagueId, snapshotDate }, "Snapshot job failed");
       throw error;
+    }
+  }
+
+  private async fetchAndArchive(
+    leagueId: number,
+    league: { espn_league_id: number; season: number },
+    espnAuth: ESPNAuthCookies | undefined,
+    snapshotDate: string,
+  ): Promise<{
+    espnData: Awaited<ReturnType<ESPNAdapter["fetchLeague"]>>;
+    normalized: ReturnType<ESPNAdapter["normalizeLeagueData"]>;
+  }> {
+    void snapshotDate;
+    const espnData = await this.espnAdapter.fetchLeague({
+      leagueId: league.espn_league_id,
+      season: league.season,
+      auth: espnAuth,
+      views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+      xFantasyFilter: {
+        players: {
+          limit: 1500,
+          sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
+        },
+      },
+    });
+
+    await this.db
+      .insertInto("league_raw_payload")
+      .values({
+        league_id: leagueId,
+        fetched_at: espnData.fetchedAt,
+        endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
+        views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+        scoring_period_id: null,
+        x_fantasy_filter: {
+          players: {
+            limit: 1500,
+            sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
+          },
+        },
+        response_json: espnData.data,
+        schema_fingerprint: espnData.schemaFingerprint,
+      })
+      .execute();
+
+    const normalized = this.espnAdapter.normalizeLeagueData(espnData.data);
+    return { espnData, normalized };
+  }
+
+  private async writeSnapshotRows(
+    trx: Kysely<Database>,
+    leagueId: number,
+    snapshotDate: string,
+    espnData: { data: unknown },
+    normalized: ReturnType<ESPNAdapter["normalizeLeagueData"]>,
+    settingsVersionId: number,
+    projectionsRun: { id: number } | undefined,
+    isDegraded: boolean,
+    degradedReasons: string[],
+  ): Promise<void> {
+    await trx
+      .insertInto("league_daily_snapshot")
+      .values({
+        league_id: leagueId,
+        snapshot_date: snapshotDate,
+        created_at: new Date(),
+        settings_version_id: settingsVersionId,
+        projections_run_id: projectionsRun?.id || null,
+        is_degraded: isDegraded,
+        degraded_reasons: degradedReasons,
+      })
+      .onConflict((oc) =>
+        oc.columns(["league_id", "snapshot_date"]).doUpdateSet({
+          created_at: new Date(),
+          settings_version_id: settingsVersionId,
+          projections_run_id: projectionsRun?.id || null,
+          is_degraded: isDegraded,
+          degraded_reasons: degradedReasons,
+        }),
+      )
+      .execute();
+
+    const espnTeamIdToDbId = new Map<number, number>();
+    if (normalized.teams.length > 0) {
+      const teamRows = normalized.teams.map((team) => ({
+        league_id: leagueId,
+        espn_team_id: team.id,
+        name: team.name,
+        faab_spent: team.faabSpent ?? 0,
+        created_at: new Date(),
+      }));
+      const upsertedTeams = await trx
+        .insertInto("team")
+        .values(teamRows)
+        .onConflict((oc) =>
+          oc.columns(["league_id", "espn_team_id"]).doUpdateSet((eb) => ({
+            name: eb.ref("excluded.name"),
+            faab_spent: eb.ref("excluded.faab_spent"),
+          })),
+        )
+        .returning(["id", "espn_team_id"])
+        .execute();
+      for (const row of upsertedTeams) {
+        espnTeamIdToDbId.set(row.espn_team_id, row.id);
+      }
+    }
+
+    await this.writePlayersAndRosters(trx, leagueId, snapshotDate, normalized.teams, espnTeamIdToDbId);
+    await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
+
+    const categories = normalized.settings.categories;
+    if (categories.length > 0) {
+      await this.writeCurrentStandings(trx, leagueId, snapshotDate, normalized.teams, espnTeamIdToDbId, categories);
+    }
+
+    const rawData = espnData.data as Record<string, any>;
+    const rawTeams = rawData?.teams;
+    const snapshotScoringPeriodId = rawData?.scoringPeriodId ?? rawData?.status?.currentScoringPeriod?.id ?? 1;
+    if (rawTeams && Array.isArray(rawTeams)) {
+      await this.writePlayerPeriodStats(trx, leagueId, snapshotDate, rawTeams, espnTeamIdToDbId, snapshotScoringPeriodId);
+    }
+
+    this.logger?.info({ leagueId, snapshotDate }, "Snapshot data written");
+  }
+
+  private async computeProjections(
+    leagueId: number,
+    snapshotDate: string,
+    projectionsRunId: number | undefined,
+  ): Promise<void> {
+    if (!projectionsRunId) return;
+    await this.standingsAgent.computeProjectedStandings(leagueId, snapshotDate, projectionsRunId);
+  }
+
+  private async emitChangeLog(leagueId: number, snapshotDate: string): Promise<void> {
+    try {
+      const logger = this.logger ?? pino();
+      const bus = createSlackNotifier(logger);
+      const changeLogAgent = new StandingsChangeLogAgent(this.db, logger, bus);
+      const eventCount = await changeLogAgent.generateEvents(leagueId, snapshotDate, "snapshot");
+      if (eventCount > 0) {
+        changeLogEmitter.emit(CHANGE_LOG_EVENT, { leagueId, snapshotDate, eventCount });
+      }
+      this.logger?.info({ leagueId, snapshotDate, eventCount }, "Change log events generated");
+    } catch (err) {
+      this.logger?.warn({ err, leagueId, snapshotDate }, "Change log generation failed — non-fatal");
     }
   }
 
@@ -746,7 +644,10 @@ export class SnapshotOrchestratorAgent {
     });
 
     if (freeAgents.length === 0) {
-      this.logger?.info({ leagueId, snapshotDate }, "No free agents returned from ESPN");
+      this.logger?.info(
+        { leagueId, snapshotDate },
+        "No free agents returned from ESPN",
+      );
       return;
     }
 
@@ -797,14 +698,9 @@ export class SnapshotOrchestratorAgent {
   /**
    * Write per-player period stats from raw ESPN team data.
    *
-   * Queries the player table by id (which IS the ESPN player ID after migration 016),
-   * then upserts into player_period_stats for tenure tracking.
-   *
-   * Only COUNTING stats are stored; rate stats (AVG, ERA, WHIP) are computed
-   * from components at read time.
-   *
+   * Delegates ESPN stat-ID → component-key parsing to EspnDataNormalizer.parsePlayerPeriodComponents.
+   * Only COUNTING stats are stored; rate stats (AVG, ERA, WHIP) are computed at read time.
    * Skips IL (lineupSlotId=17) and NA (lineupSlotId=19) players.
-   * Uses statSplitTypeId=5 for current scoring period stats.
    */
   private async writePlayerPeriodStats(
     trx: Kysely<Database>,
@@ -814,32 +710,22 @@ export class SnapshotOrchestratorAgent {
     espnTeamIdToDbId: Map<number, number>,
     scoringPeriodId: number,
   ): Promise<void> {
-    // Collect all ESPN player IDs from all teams' rosters (excluding IL/NA)
-    const espnPlayerIds: number[] = [];
-    for (const rawTeam of rawTeams) {
-      const entries = rawTeam.roster?.entries || [];
-      for (const entry of entries) {
-        const lineupSlotId = entry.lineupSlotId ?? -1;
-        // Skip IL (17) and NA (19)
-        if (lineupSlotId === 17 || lineupSlotId === 19) continue;
-        const playerId = entry.playerId ?? entry.playerPoolEntry?.player?.id;
-        if (playerId) espnPlayerIds.push(playerId);
-      }
-    }
+    // Parse components via normalizer (ESPN-specific parsing lives there)
+    const componentsByEspnPlayerId =
+      this.espnAdapter.parsePlayerPeriodComponents(rawTeams, scoringPeriodId);
 
-    if (espnPlayerIds.length === 0) return;
+    if (componentsByEspnPlayerId.size === 0) return;
 
-    // Build ESPN player ID -> DB player ID lookup
-    // After migration 016, player.id IS the ESPN player ID (no separate column)
+    const espnPlayerIds = Array.from(componentsByEspnPlayerId.keys());
+
+    // After migration 016, player.id IS the ESPN player ID
     const playerRows = await trx
       .selectFrom("player")
       .select(["id"])
       .where("id", "in", espnPlayerIds)
       .execute();
 
-    const espnPlayerIdToDbId = new Map<number, number>(
-      playerRows.map((row) => [row.id, row.id]),
-    );
+    const knownPlayerIds = new Set(playerRows.map((r) => r.id));
 
     let storedCount = 0;
 
@@ -851,54 +737,22 @@ export class SnapshotOrchestratorAgent {
       const entries = rawTeam.roster?.entries || [];
       for (const entry of entries) {
         const lineupSlotId = entry.lineupSlotId ?? -1;
-        // Skip IL (17) and NA (19)
         if (lineupSlotId === 17 || lineupSlotId === 19) continue;
 
         const espnPlayerId =
           entry.playerId ?? entry.playerPoolEntry?.player?.id;
-        if (!espnPlayerId) continue;
+        if (!espnPlayerId || !knownPlayerIds.has(espnPlayerId)) continue;
 
-        const dbPlayerId = espnPlayerIdToDbId.get(espnPlayerId);
-        if (!dbPlayerId) continue;
+        const components = componentsByEspnPlayerId.get(espnPlayerId);
+        if (!components) continue;
 
-        // Extract player stats for current scoring period (statSplitTypeId=5)
-        const playerStats = entry.playerPoolEntry?.player?.stats || [];
-        const periodStats = playerStats.find(
-          (s: any) =>
-            s.statSplitTypeId === 5 && s.scoringPeriodId === scoringPeriodId,
-        );
-
-        if (!periodStats?.stats) continue;
-
-        // Map ESPN stat IDs to component keys
-        const components: Record<string, number> = {};
-        for (const [statIdStr, value] of Object.entries(
-          periodStats.stats as Record<string, number>,
-        )) {
-          const statId = parseInt(statIdStr, 10);
-          const componentKey = ESPN_PERIOD_STAT_MAP[statId];
-          if (!componentKey || typeof value !== "number" || value === 0)
-            continue;
-
-          if (componentKey === "OUTS") {
-            // Convert outs to innings pitched
-            components["IP"] = (components["IP"] || 0) + value / 3;
-          } else {
-            components[componentKey] = (components[componentKey] || 0) + value;
-          }
-        }
-
-        // Skip if no stats were mapped (avoids storing empty {} rows that pollute tenure aggregation)
-        if (Object.keys(components).length === 0) continue;
-
-        // Upsert into player_period_stats
         await trx
           .insertInto("player_period_stats")
           .values({
             league_id: leagueId,
             snapshot_date: snapshotDate,
             scoring_period: scoringPeriodId,
-            player_id: dbPlayerId,
+            player_id: espnPlayerId,
             team_id: dbTeamId,
             lineup_slot_id: lineupSlotId >= 0 ? lineupSlotId : null,
             components_json: components as StatComponents,
