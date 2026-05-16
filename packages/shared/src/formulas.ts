@@ -144,7 +144,7 @@ export function getRequiredComponents(formulaId: string): string[] {
  */
 export function calculateCategorySGP(
   statValue: number,
-  allPlayerValues: number[]
+  allPlayerValues: number[],
 ): number {
   if (allPlayerValues.length === 0) return 0;
 
@@ -176,7 +176,7 @@ export function calculateTotalSGP(
     type: "COUNTING" | "RATE" | "POINTS";
     direction: "HIGHER_BETTER" | "LOWER_BETTER";
     formula_id?: string;
-  }>
+  }>,
 ): number {
   let totalSGP = 0;
 
@@ -229,7 +229,7 @@ export function calculateTotalSGP(
 export function getReplacementLevel(
   position: string,
   rosterSlots: Record<string, number>,
-  totalTeams: number
+  totalTeams: number,
 ): number {
   // Get slot count for this position
   let slotCount = rosterSlots[position] || 0;
@@ -260,7 +260,7 @@ export function getReplacementLevel(
  */
 export function calculateVBD(
   playerSGP: number,
-  replacementSGP: number
+  replacementSGP: number,
 ): number {
   const vbd = playerSGP - replacementSGP;
   return Math.max(0, vbd);
@@ -274,7 +274,7 @@ export function calculateSpendingPool(
   budget: number,
   totalTeams: number,
   rosterSize: number,
-  minBid: number
+  minBid: number,
 ): number {
   const totalBudget = budget * totalTeams;
   const minSpend = minBid * rosterSize * totalTeams;
@@ -289,7 +289,7 @@ export function calculateAuctionDollarValue(
   vbd: number,
   totalVBD: number,
   spendingPool: number,
-  minBid: number
+  minBid: number,
 ): number {
   if (totalVBD === 0) return minBid;
 
@@ -303,21 +303,48 @@ export function calculateAuctionDollarValue(
  * Stat keys that belong to batting statistics.
  */
 export const BATTER_COMPONENT_KEYS = new Set([
-  "AB", "H", "R", "HR", "RBI", "SB", "BB", "HBP", "SF", "TB",
-  "1B", "2B", "3B", "CS", "PA", "G",
+  "AB",
+  "H",
+  "R",
+  "HR",
+  "RBI",
+  "SB",
+  "BB",
+  "HBP",
+  "SF",
+  "TB",
+  "1B",
+  "2B",
+  "3B",
+  "CS",
+  "PA",
+  "G",
 ]);
 
 /**
  * Stat keys that belong to pitching statistics.
  */
 export const PITCHER_COMPONENT_KEYS = new Set([
-  "IP", "ER", "HA", "BBA", "K", "SO", "W", "SV", "HLD", "QS", "GS", "G",
+  "IP",
+  "ER",
+  "HA",
+  "BBA",
+  "K",
+  "SO",
+  "W",
+  "SV",
+  "HLD",
+  "QS",
+  "GS",
+  "G",
 ]);
 
 /**
  * Extract only batter-relevant components from a stat object.
  */
-export function extractBatterComponents(components: StatComponents): StatComponents {
+export function extractBatterComponents(
+  components: StatComponents,
+): StatComponents {
   const result: StatComponents = {};
   for (const key of BATTER_COMPONENT_KEYS) {
     if (components[key] !== undefined) result[key] = components[key];
@@ -328,7 +355,9 @@ export function extractBatterComponents(components: StatComponents): StatCompone
 /**
  * Extract only pitcher-relevant components from a stat object.
  */
-export function extractPitcherComponents(components: StatComponents): StatComponents {
+export function extractPitcherComponents(
+  components: StatComponents,
+): StatComponents {
   const result: StatComponents = {};
   for (const key of PITCHER_COMPONENT_KEYS) {
     if (components[key] !== undefined) result[key] = components[key];
@@ -377,7 +406,12 @@ export interface AtRiskCategory {
 export function interpolateRotoPoints(
   teamProjections: TeamCategoryProjection[],
   direction: "HIGHER_BETTER" | "LOWER_BETTER",
-): Array<{ teamId: number; teamName: string; rank: number; rotoPoints: number }> {
+): Array<{
+  teamId: number;
+  teamName: string;
+  rank: number;
+  rotoPoints: number;
+}> {
   if (teamProjections.length === 0) return [];
 
   const sorted = [...teamProjections].sort((a, b) =>
@@ -430,7 +464,9 @@ export function computeMarginalGains(
 
     if (myRankIndex > 0) {
       const above = ranked[myRankIndex - 1];
-      const aboveProjection = projections.find((p) => p.teamId === above.teamId);
+      const aboveProjection = projections.find(
+        (p) => p.teamId === above.teamId,
+      );
       if (aboveProjection) {
         teamAbove = {
           teamId: above.teamId,
@@ -456,10 +492,13 @@ export function computeMarginalGains(
   }
 
   // Compute average gap for difficulty assignment (exclude rank 1 teams)
-  const gapsWithTeamAbove = gains.filter((g) => g.teamAbove !== null && g.gap > 0);
+  const gapsWithTeamAbove = gains.filter(
+    (g) => g.teamAbove !== null && g.gap > 0,
+  );
   const avgGap =
     gapsWithTeamAbove.length > 0
-      ? gapsWithTeamAbove.reduce((sum, g) => sum + g.gap, 0) / gapsWithTeamAbove.length
+      ? gapsWithTeamAbove.reduce((sum, g) => sum + g.gap, 0) /
+        gapsWithTeamAbove.length
       : 1;
 
   for (const gain of gains) {
@@ -523,7 +562,9 @@ export function computeAtRiskCategories(
 
     if (myRankIndex < ranked.length - 1) {
       const below = ranked[myRankIndex + 1];
-      const belowProjection = projections.find((p) => p.teamId === below.teamId);
+      const belowProjection = projections.find(
+        (p) => p.teamId === below.teamId,
+      );
       if (belowProjection) {
         teamBelow = {
           teamId: below.teamId,
@@ -548,10 +589,13 @@ export function computeAtRiskCategories(
   }
 
   // Compute average gap for risk assignment (exclude last-place teams)
-  const gapsWithTeamBelow = risks.filter((r) => r.teamBelow !== null && r.gap > 0);
+  const gapsWithTeamBelow = risks.filter(
+    (r) => r.teamBelow !== null && r.gap > 0,
+  );
   const avgGap =
     gapsWithTeamBelow.length > 0
-      ? gapsWithTeamBelow.reduce((sum, r) => sum + r.gap, 0) / gapsWithTeamBelow.length
+      ? gapsWithTeamBelow.reduce((sum, r) => sum + r.gap, 0) /
+        gapsWithTeamBelow.length
       : 1;
 
   for (const risk of risks) {

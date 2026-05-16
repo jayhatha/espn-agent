@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsgo --noEmit",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
