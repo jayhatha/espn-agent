@@ -21,15 +21,21 @@ describe("parseIntParam", () => {
   });
 
   it("throws for non-numeric strings", () => {
-    expect(() => parseIntParam("abc", "id")).toThrowError(/must be a valid integer/);
+    expect(() => parseIntParam("abc", "id")).toThrowError(
+      /must be a valid integer/,
+    );
   });
 
   it("throws for decimal strings (rejects floats explicitly)", () => {
-    expect(() => parseIntParam("3.14", "id")).toThrowError(/must be an integer/);
+    expect(() => parseIntParam("3.14", "id")).toThrowError(
+      /must be an integer/,
+    );
   });
 
   it("throws for empty string", () => {
-    expect(() => parseIntParam("", "id")).toThrowError(/must be a valid integer/);
+    expect(() => parseIntParam("", "id")).toThrowError(
+      /must be a valid integer/,
+    );
   });
 
   it("includes the paramName in the error message", () => {

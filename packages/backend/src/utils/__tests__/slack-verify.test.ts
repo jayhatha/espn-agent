@@ -12,7 +12,10 @@ function buildValidSignature(
   secret: string = SIGNING_SECRET,
 ): string {
   const sigBase = `v0:${timestamp}:${rawBody}`;
-  const hmac = crypto.createHmac("sha256", secret).update(sigBase).digest("hex");
+  const hmac = crypto
+    .createHmac("sha256", secret)
+    .update(sigBase)
+    .digest("hex");
   return `v0=${hmac}`;
 }
 

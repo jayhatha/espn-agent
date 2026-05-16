@@ -201,7 +201,21 @@ describe("calculateFinalRate", () => {
   });
 
   it("dispatches all recognized formulaIds without throwing", () => {
-    const comps = { AB: 500, H: 150, BB: 60, HBP: 5, SF: 3, TB: 240, IP: 150, ER: 50, HA: 130, BBA: 50, K: 175, W: 12, L: 8 };
+    const comps = {
+      AB: 500,
+      H: 150,
+      BB: 60,
+      HBP: 5,
+      SF: 3,
+      TB: 240,
+      IP: 150,
+      ER: 50,
+      HA: 130,
+      BBA: 50,
+      K: 175,
+      W: 12,
+      L: 8,
+    };
     const formulas = ["avg", "obp", "slg", "ops", "era", "whip", "k9", "wpct"];
     for (const f of formulas) {
       expect(() => calculateFinalRate(f, comps, {})).not.toThrow();
@@ -209,7 +223,9 @@ describe("calculateFinalRate", () => {
   });
 
   it("throws on unknown formulaId", () => {
-    expect(() => calculateFinalRate("xfip", {}, {})).toThrowError(/Unknown formula/);
+    expect(() => calculateFinalRate("xfip", {}, {})).toThrowError(
+      /Unknown formula/,
+    );
   });
 });
 
