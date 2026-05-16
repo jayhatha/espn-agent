@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useLeagueTeam } from "@/lib/hooks";
 import {
   LineChart,
   Line,
@@ -157,20 +158,11 @@ export default function MovesPage() {
   const params = useParams();
   const leagueId = parseInt(params.id as string, 10);
 
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useLeagueTeam(leagueId);
   const [activeTab, setActiveTab] = useState<TabView>("league");
   const [moveFilter, setMoveFilter] = useState<MoveFilter>("all");
   const [expandedMoveId, setExpandedMoveId] = useState<number | null>(null);
   const [season, setSeason] = useState<number | null>(null);
-
-  // Load team from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
 
   // Fetch teams
   const { data: teamsData } = useQuery({
@@ -248,7 +240,6 @@ export default function MovesPage() {
 
   const handleTeamChange = (teamId: number) => {
     setSelectedTeamId(teamId);
-    localStorage.setItem(`league_${leagueId}_team`, String(teamId));
   };
 
   const tabClass = (active: boolean) =>

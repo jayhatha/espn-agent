@@ -2,10 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import React, { useState, useEffect, useMemo } from "react";
-import { computeMarginalGains, computeAtRiskCategories } from "@espn-fantasy/shared";
+import React, { useState, useMemo } from "react";
+import {
+  computeMarginalGains,
+  computeAtRiskCategories,
+} from "@espn-fantasy/shared";
 import type { TeamCategoryProjection } from "@espn-fantasy/shared";
+import { useLeagueTeam } from "@/lib/hooks";
 import { api } from "@/lib/api";
+import { useProjectedStandings } from "@/lib/hooks";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Heading } from "@/components/ui/Heading";
@@ -98,7 +103,11 @@ interface SwingAttributionData {
     prevRotoPoints: number;
     currRotoPoints: number;
     rotoDelta: number;
-    bucket: "actual_performance" | "projection_change" | "competitor_movement" | "mixed";
+    bucket:
+      | "actual_performance"
+      | "projection_change"
+      | "competitor_movement"
+      | "mixed";
     topDriverPlayer?: string;
     topCompetitorMoved?: string;
   }>;
@@ -119,26 +128,11 @@ type ViewMode = "current" | "projected";
 export default function StandingsPage() {
   const params = useParams();
   const leagueId = params.id as string;
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("current");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["standings", leagueId],
-    queryFn: async () => {
-      return api.getProjectedStandings(
-        parseInt(leagueId, 10),
-      ) as Promise<StandingsData>;
-    },
-  });
+  const { data, isLoading, error } = useProjectedStandings(leagueId);
 
   // Fetch historical category-rank data as fallback when projected data unavailable
   const { data: categoryRankHistory } = useQuery({
@@ -146,29 +140,34 @@ export default function StandingsPage() {
     queryFn: async () => {
       if (!selectedTeamId || !data?.categories) return null;
       const entries = await Promise.allSettled(
-        data.categories.map((cat) =>
+        data.categories.map((cat: Category) =>
           api.getCategoryRankTimeSeries(
             parseInt(leagueId, 10),
             cat.category_id,
             { teamIds: String(selectedTeamId) },
-          )
+          ),
         ),
       );
       const results: Record<string, Array<{ date: string; rank: number }>> = {};
-      data.categories.forEach((cat, i) => {
+      data.categories.forEach((cat: Category, i: number) => {
         const entry = entries[i];
         if (entry.status === "fulfilled") {
-          results[cat.category_id] = (entry.value as any).series?.map((s: any) => ({
-            date: s.snapshot_date,
-            rank: s.rank,
-          })) ?? [];
+          results[cat.category_id] =
+            (entry.value as any).series?.map((s: any) => ({
+              date: s.snapshot_date,
+              rank: s.rank,
+            })) ?? [];
         } else {
           results[cat.category_id] = [];
         }
       });
       return results;
     },
-    enabled: viewMode === "projected" && !!data && data.overallStandings.length === 0 && !!selectedTeamId,
+    enabled:
+      viewMode === "projected" &&
+      !!data &&
+      data.overallStandings.length === 0 &&
+      !!selectedTeamId,
   });
 
   // Swing attribution — fetches when projected tab is active and a team is selected
@@ -182,16 +181,22 @@ export default function StandingsPage() {
         data?.snapshotDate ? { snapshotDate: data.snapshotDate } : undefined,
       ) as Promise<SwingAttributionData>;
     },
-    enabled: viewMode === "projected" && !!selectedTeamId && !!data?.snapshotDate,
+    enabled:
+      viewMode === "projected" && !!selectedTeamId && !!data?.snapshotDate,
   });
 
   const currentMatrix = useMemo(() => {
     if (!data) return null;
-    const { categories, currentCategoryStandings, currentOverallStandings } = data;
-    if (!currentOverallStandings || currentOverallStandings.length === 0) return null;
+    const { categories, currentCategoryStandings, currentOverallStandings } =
+      data;
+    if (!currentOverallStandings || currentOverallStandings.length === 0)
+      return null;
     if (!currentCategoryStandings) return null;
 
-    const teamCategoryMap = new Map<number, Map<string, CurrentCategoryStanding>>();
+    const teamCategoryMap = new Map<
+      number,
+      Map<string, CurrentCategoryStanding>
+    >();
     for (const cs of currentCategoryStandings) {
       if (!teamCategoryMap.has(cs.team_id)) {
         teamCategoryMap.set(cs.team_id, new Map());
@@ -199,7 +204,11 @@ export default function StandingsPage() {
       teamCategoryMap.get(cs.team_id)!.set(cs.category_id, cs);
     }
 
-    return { categories, overallStandings: currentOverallStandings, teamCategoryMap };
+    return {
+      categories,
+      overallStandings: currentOverallStandings,
+      teamCategoryMap,
+    };
   }, [data]);
 
   const projectedMatrix = useMemo(() => {
@@ -230,7 +239,8 @@ export default function StandingsPage() {
 
   // Build projected category values for gap detail
   const projectedCategoryValues = useMemo(() => {
-    if (!data?.categoryStandings) return new Map<string, TeamCategoryProjection[]>();
+    if (!data?.categoryStandings)
+      return new Map<string, TeamCategoryProjection[]>();
     const map = new Map<string, TeamCategoryProjection[]>();
     for (const cs of data.categoryStandings) {
       if (!map.has(cs.category_id)) map.set(cs.category_id, []);
@@ -245,11 +255,16 @@ export default function StandingsPage() {
 
   // Compute marginal gains for selected team
   const marginalGains = useMemo(() => {
-    if (!selectedTeamId || !data?.categories || projectedCategoryValues.size === 0) return [];
+    if (
+      !selectedTeamId ||
+      !data?.categories ||
+      projectedCategoryValues.size === 0
+    )
+      return [];
     return computeMarginalGains(
       selectedTeamId,
       projectedCategoryValues,
-      data.categories.map((c) => ({
+      data.categories.map((c: Category) => ({
         category_id: c.category_id,
         name: c.name || c.stat_key,
         direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
@@ -259,11 +274,16 @@ export default function StandingsPage() {
 
   // Compute at-risk categories for selected team
   const atRiskCategories = useMemo(() => {
-    if (!selectedTeamId || !data?.categories || projectedCategoryValues.size === 0) return [];
+    if (
+      !selectedTeamId ||
+      !data?.categories ||
+      projectedCategoryValues.size === 0
+    )
+      return [];
     return computeAtRiskCategories(
       selectedTeamId,
       projectedCategoryValues,
-      data.categories.map((c) => ({
+      data.categories.map((c: Category) => ({
         category_id: c.category_id,
         name: c.name || c.stat_key,
         direction: c.direction as "HIGHER_BETTER" | "LOWER_BETTER",
@@ -281,7 +301,9 @@ export default function StandingsPage() {
       label: "Rank",
       align: "left",
       format: (val) => (
-        <span className="font-medium text-content dark:text-shell-text">{val}</span>
+        <span className="font-medium text-content dark:text-shell-text">
+          {val}
+        </span>
       ),
     },
     {
@@ -293,7 +315,9 @@ export default function StandingsPage() {
           {selectedTeamId === row.team_id && (
             <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
           )}
-          <span className="font-medium text-content dark:text-shell-text">{val}</span>
+          <span className="font-medium text-content dark:text-shell-text">
+            {val}
+          </span>
         </div>
       ),
     },
@@ -302,7 +326,9 @@ export default function StandingsPage() {
       label: <Term id="roto-points">Total Roto Points</Term>,
       align: "right",
       format: (val) => (
-        <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
+        <span className="font-semibold text-data text-content dark:text-shell-text">
+          {Number(val)}
+        </span>
       ),
     },
   ];
@@ -314,7 +340,9 @@ export default function StandingsPage() {
       label: "Rank",
       align: "left",
       format: (val) => (
-        <span className="font-medium text-content dark:text-shell-text">{val}</span>
+        <span className="font-medium text-content dark:text-shell-text">
+          {val}
+        </span>
       ),
     },
     {
@@ -326,7 +354,9 @@ export default function StandingsPage() {
           {selectedTeamId === row.team_id && (
             <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2" />
           )}
-          <span className="font-medium text-content dark:text-shell-text">{val}</span>
+          <span className="font-medium text-content dark:text-shell-text">
+            {val}
+          </span>
         </div>
       ),
     },
@@ -338,7 +368,9 @@ export default function StandingsPage() {
         const mc = (row as OverallStanding).confidence;
         return (
           <div className="flex flex-col items-end">
-            <span className="font-semibold text-data text-content dark:text-shell-text">{Number(val)}</span>
+            <span className="font-semibold text-data text-content dark:text-shell-text">
+              {Number(val)}
+            </span>
             {mc && (
               <span className="text-[0.65rem] text-content-tertiary dark:text-shell-muted tabular-nums">
                 {mc.p10}–{mc.p90}
@@ -353,12 +385,29 @@ export default function StandingsPage() {
       label: "Change",
       align: "right",
       format: (val) => {
-        if (val == null) return <span className="text-content-tertiary dark:text-shell-muted">--</span>;
+        if (val == null)
+          return (
+            <span className="text-content-tertiary dark:text-shell-muted">
+              --
+            </span>
+          );
         const num = Number(val);
-        if (num === 0) return <span className="text-content-tertiary dark:text-shell-muted">0</span>;
+        if (num === 0)
+          return (
+            <span className="text-content-tertiary dark:text-shell-muted">
+              0
+            </span>
+          );
         return (
-          <span className={num > 0 ? "text-positive font-medium" : "text-negative font-medium"}>
-            {num > 0 ? "+" : ""}{num}
+          <span
+            className={
+              num > 0
+                ? "text-positive font-medium"
+                : "text-negative font-medium"
+            }
+          >
+            {num > 0 ? "+" : ""}
+            {num}
           </span>
         );
       },
@@ -408,8 +457,10 @@ export default function StandingsPage() {
                       key={cat.category_id}
                       className={cn(
                         "px-3 py-3 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider min-w-[80px]",
-                        showGapDetail && "cursor-pointer hover:text-accent dark:hover:text-shell-accent transition-colors",
-                        expandedCategory === cat.category_id && "text-accent dark:text-shell-accent",
+                        showGapDetail &&
+                          "cursor-pointer hover:text-accent dark:hover:text-shell-accent transition-colors",
+                        expandedCategory === cat.category_id &&
+                          "text-accent dark:text-shell-accent",
                       )}
                       onClick={
                         showGapDetail
@@ -423,9 +474,12 @@ export default function StandingsPage() {
                       }
                     >
                       {cat.name || cat.stat_key}
-                      {showGapDetail && expandedCategory === cat.category_id && (
-                        <span className="ml-1 text-accent dark:text-shell-accent">{"\u25BC"}</span>
-                      )}
+                      {showGapDetail &&
+                        expandedCategory === cat.category_id && (
+                          <span className="ml-1 text-accent dark:text-shell-accent">
+                            {"\u25BC"}
+                          </span>
+                        )}
                     </th>
                   ))}
                   <th className="px-3 py-3 text-center text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider font-bold">
@@ -443,7 +497,9 @@ export default function StandingsPage() {
                       <tr
                         className={cn(
                           "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
-                          isSelected ? "bg-accent-light dark:bg-shell-accent/20" : "",
+                          isSelected
+                            ? "bg-accent-light dark:bg-shell-accent/20"
+                            : "",
                         )}
                       >
                         <td className="px-3 py-3 whitespace-nowrap text-body-sm font-medium text-content dark:text-shell-text sticky left-0 bg-inherit z-10">
@@ -480,22 +536,38 @@ export default function StandingsPage() {
                             >
                               <div className="flex flex-col items-center">
                                 <span className="text-data text-content dark:text-shell-text font-medium">
-                                  {formatStatValue(catData[valueKey], cat.type, cat.stat_key)}
+                                  {formatStatValue(
+                                    catData[valueKey],
+                                    cat.type,
+                                    cat.stat_key,
+                                  )}
                                 </span>
                                 <span
                                   className={`text-data rounded px-1 mt-0.5 ${getRankColor(catData[rankKey], numTeams)}`}
                                 >
-                                  #{catData[rankKey]} ({Number(catData[pointsKey])}
+                                  #{catData[rankKey]} (
+                                  {Number(catData[pointsKey])}
                                   pts)
                                 </span>
                                 {/* Confidence range: show P10–P90 for projected view */}
-                                {showPaceBars && (catData as CategoryStanding).confidence && (
-                                  <span className="text-[0.65rem] text-content-tertiary dark:text-shell-muted mt-0.5 tabular-nums">
-                                    {formatStatValue((catData as CategoryStanding).confidence!.p10, cat.type, cat.stat_key)}
-                                    –
-                                    {formatStatValue((catData as CategoryStanding).confidence!.p90, cat.type, cat.stat_key)}
-                                  </span>
-                                )}
+                                {showPaceBars &&
+                                  (catData as CategoryStanding).confidence && (
+                                    <span className="text-[0.65rem] text-content-tertiary dark:text-shell-muted mt-0.5 tabular-nums">
+                                      {formatStatValue(
+                                        (catData as CategoryStanding)
+                                          .confidence!.p10,
+                                        cat.type,
+                                        cat.stat_key,
+                                      )}
+                                      –
+                                      {formatStatValue(
+                                        (catData as CategoryStanding)
+                                          .confidence!.p90,
+                                        cat.type,
+                                        cat.stat_key,
+                                      )}
+                                    </span>
+                                  )}
                                 {/* Pace bar: show for selected team in projected view */}
                                 {showPaceBars &&
                                   isSelected &&
@@ -526,7 +598,9 @@ export default function StandingsPage() {
                             (c) => c.category_id === expandedCategory,
                           );
                           if (!cat) return null;
-                          const values = projectedCategoryValues.get(cat.category_id);
+                          const values = projectedCategoryValues.get(
+                            cat.category_id,
+                          );
                           if (!values) return null;
                           return (
                             <GapDetailRow
@@ -535,7 +609,11 @@ export default function StandingsPage() {
                               categoryName={cat.name || cat.stat_key}
                               myTeamId={team.team_id}
                               allTeamValues={values}
-                              direction={cat.direction as "HIGHER_BETTER" | "LOWER_BETTER"}
+                              direction={
+                                cat.direction as
+                                  | "HIGHER_BETTER"
+                                  | "LOWER_BETTER"
+                              }
                               numTeams={numTeams}
                               statType={cat.type}
                               statKey={cat.stat_key}
@@ -565,10 +643,20 @@ export default function StandingsPage() {
 
       {data?.snapshotDate && (
         <p className="mt-1 mb-6 text-body-sm text-content-secondary dark:text-shell-muted">
-          As of snapshot: {new Date(data.snapshotDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          As of snapshot:{" "}
+          {new Date(data.snapshotDate).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })}
           {data.previousSnapshotDate && viewMode === "projected" && (
             <span className="text-content-tertiary dark:text-shell-muted ml-2">
-              (change since {new Date(data.previousSnapshotDate!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})
+              (change since{" "}
+              {new Date(data.previousSnapshotDate!).toLocaleDateString(
+                "en-US",
+                { month: "short", day: "numeric", year: "numeric" },
+              )}
+              )
             </span>
           )}
         </p>
@@ -620,11 +708,13 @@ export default function StandingsPage() {
                 <CardContent className="p-0">
                   <StatsTable
                     columns={overallColumns}
-                    data={currentMatrix.overallStandings.map((t) => ({
-                      ...t,
-                      rank: t.overall_rank,
-                      points: t.overall_points,
-                    }))}
+                    data={currentMatrix.overallStandings.map(
+                      (t: CurrentOverallStanding) => ({
+                        ...t,
+                        rank: t.overall_rank,
+                        points: t.overall_points,
+                      }),
+                    )}
                     rowKey="team_id"
                     highlightRow={(row) => selectedTeamId === row.team_id}
                   />
@@ -651,7 +741,10 @@ export default function StandingsPage() {
                 <ErrorAlert
                   variant="info"
                   message="Current standings require a daily snapshot. Trigger a snapshot from the league dashboard to sync your league data from ESPN."
-                  action={{ label: "Go to Dashboard", href: `/leagues/${leagueId}` }}
+                  action={{
+                    label: "Go to Dashboard",
+                    href: `/leagues/${leagueId}`,
+                  }}
                 />
               </CardContent>
             </Card>
@@ -667,12 +760,14 @@ export default function StandingsPage() {
                 <CardContent className="p-0">
                   <StatsTable
                     columns={projectedOverallColumns}
-                    data={projectedMatrix.overallStandings.map((t) => ({
-                      ...t,
-                      rank: t.projected_overall_rank,
-                      points: t.projected_overall_points,
-                      pointsDelta: t.pointsDelta,
-                    }))}
+                    data={projectedMatrix.overallStandings.map(
+                      (t: OverallStanding) => ({
+                        ...t,
+                        rank: t.projected_overall_rank,
+                        points: t.projected_overall_points,
+                        pointsDelta: t.pointsDelta,
+                      }),
+                    )}
                     rowKey="team_id"
                     highlightRow={(row) => selectedTeamId === row.team_id}
                   />
@@ -680,29 +775,34 @@ export default function StandingsPage() {
               </Card>
 
               {/* What Changed? — Swing Attribution Panel */}
-              {selectedTeamId && swingData?.attribution_available && Math.abs(swingData.totalDelta) >= 0.5 && (
-                <Card>
-                  <CardHeader>
-                    <Heading level={3}>What Changed?</Heading>
-                    <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
-                      Why your projected roto points changed since the last snapshot
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <SwingAttributionPanel
-                      data={swingData}
-                      previousSnapshotDate={swingData.previousSnapshotDate}
-                    />
-                  </CardContent>
-                </Card>
-              )}
+              {selectedTeamId &&
+                swingData?.attribution_available &&
+                Math.abs(swingData.totalDelta) >= 0.5 && (
+                  <Card>
+                    <CardHeader>
+                      <Heading level={3}>What Changed?</Heading>
+                      <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                        Why your projected roto points changed since the last
+                        snapshot
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <SwingAttributionPanel
+                        data={swingData}
+                        previousSnapshotDate={swingData.previousSnapshotDate}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Marginal Gains Summary */}
               {selectedTeamId && marginalGains.length > 0 && (
                 <Card>
                   <CardHeader>
                     <Heading level={3}>
-                      <Term id="marginal-gains">Cheapest Path to Next Roto Point</Term>
+                      <Term id="marginal-gains">
+                        Cheapest Path to Next Roto Point
+                      </Term>
                     </Heading>
                     <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
                       Categories sorted by smallest gap to gain 1 roto point
@@ -715,7 +815,7 @@ export default function StandingsPage() {
                         .slice(0, 5)
                         .map((gain) => {
                           const cat = data?.categories?.find(
-                            (c) => c.category_id === gain.categoryId,
+                            (c: Category) => c.category_id === gain.categoryId,
                           );
                           return (
                             <div
@@ -763,10 +863,13 @@ export default function StandingsPage() {
                 <Card>
                   <CardHeader>
                     <Heading level={3}>
-                      <Term id="category-opportunity">Category Opportunity Map</Term>
+                      <Term id="category-opportunity">
+                        Category Opportunity Map
+                      </Term>
                     </Heading>
                     <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
-                      All categories ranked by gap to next roto point with difficulty rating
+                      All categories ranked by gap to next roto point with
+                      difficulty rating
                     </p>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -813,7 +916,10 @@ export default function StandingsPage() {
                   <ErrorAlert
                     variant="info"
                     message="Projected standings require both a daily snapshot and uploaded FanGraphs projections. Upload projections from the league dashboard to see projected final standings."
-                    action={{ label: "Go to Dashboard", href: `/leagues/${leagueId}` }}
+                    action={{
+                      label: "Go to Dashboard",
+                      href: `/leagues/${leagueId}`,
+                    }}
                   />
                 </CardContent>
               </Card>
@@ -822,17 +928,17 @@ export default function StandingsPage() {
               {categoryRankHistory && data?.categories && (
                 <Card className="mt-8">
                   <CardHeader>
-                    <Heading level={3}>
-                      Historical Category Trends
-                    </Heading>
+                    <Heading level={3}>Historical Category Trends</Heading>
                     <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
-                      Projected standings unavailable. Showing historical rank trends.
+                      Projected standings unavailable. Showing historical rank
+                      trends.
                     </p>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data.categories.map((cat) => {
-                        const history = categoryRankHistory[cat.category_id] ?? [];
+                      {data.categories.map((cat: Category) => {
+                        const history =
+                          categoryRankHistory[cat.category_id] ?? [];
                         return (
                           <CategoryMiniChart
                             key={cat.category_id}
@@ -855,7 +961,10 @@ export default function StandingsPage() {
             <ErrorAlert
               variant="info"
               message="Projected standings require both a daily snapshot and uploaded FanGraphs projections. Upload projections from the league dashboard to see projected final standings."
-              action={{ label: "Go to Dashboard", href: `/leagues/${leagueId}` }}
+              action={{
+                label: "Go to Dashboard",
+                href: `/leagues/${leagueId}`,
+              }}
             />
           </CardContent>
         </Card>

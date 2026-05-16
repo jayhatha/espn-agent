@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useLeagueTeam } from "@/lib/hooks";
 import { api } from "@/lib/api";
 import { calculateAVG, calculateOBP, calculateERA, calculateWHIP } from "@espn-fantasy/shared";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -89,16 +90,7 @@ function formatRate(
 export default function LineupOptimizerPage() {
   const params = useParams();
   const leagueId = params.id as string;
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-
-  // Load selected team from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
+  const [selectedTeamId, setSelectedTeamId] = useLeagueTeam(leagueId);
 
   // Fetch teams
   const {

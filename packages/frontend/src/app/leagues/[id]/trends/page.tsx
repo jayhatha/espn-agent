@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -15,6 +15,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { api } from "@/lib/api";
+import { useLeagueTeam } from "@/lib/hooks";
 import { useChartTheme } from "@/lib/useChartTheme";
 import { cn } from "@/lib/cn";
 import { Container } from "@/components/ui/Container";
@@ -155,7 +156,7 @@ export default function TrendsPage() {
   const chartTheme = useChartTheme();
   const params = useParams();
   const leagueId = params.id as string;
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("overall");
   const [selectedCategory, setSelectedCategory] = useState<string>("AVG");
   const [selectedSeason, setSelectedSeason] = useState<string | undefined>(undefined);
@@ -164,15 +165,6 @@ export default function TrendsPage() {
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
   const [toDate, setToDate] = useState<string | undefined>(undefined);
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
-
-  // Load selected team from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
 
   // Fetch teams
   const { data: teamsData } = useQuery({

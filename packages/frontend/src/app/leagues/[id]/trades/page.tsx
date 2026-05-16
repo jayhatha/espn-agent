@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, ArrowRightLeft, ExternalLink, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useLeagueTeam } from "@/lib/hooks";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -98,7 +99,7 @@ interface Team {
 export default function TradesPage() {
   const params = useParams();
   const leagueId = params.id as string;
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId] = useLeagueTeam(leagueId);
   const [showAnalyzer, setShowAnalyzer] = useState(false);
   const [expandedCandidate, setExpandedCandidate] = useState<number | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(
@@ -113,15 +114,6 @@ export default function TradesPage() {
     issues: string[];
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
-
-  // Load selected team from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
 
   // Real-time validation with debounce
   useEffect(() => {

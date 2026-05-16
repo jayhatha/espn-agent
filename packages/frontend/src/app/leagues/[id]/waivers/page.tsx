@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   ArrowRight,
   ExternalLink,
@@ -10,6 +10,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useLeagueTeam } from "@/lib/hooks";
+import { useWaiverRecommendations, useFreeAgents } from "@/lib/hooks";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -106,6 +108,68 @@ interface RosterPlayer {
   tenureStats: {
     [key: string]: number;
   } | null;
+}
+
+interface FARow {
+  id: number;
+  name: string;
+  positions: string;
+  team: string;
+  pctOwned: number;
+  pctStarted: number;
+  HR: number | null;
+  R: number | null;
+  RBI: number | null;
+  SB: number | null;
+  AVG: number | null;
+  W: number | null;
+  SV: number | null;
+  K: number | null;
+  ERA: number | null;
+  WHIP: number | null;
+  BABIP: number | null;
+  xBA: number | null;
+  xSLG: number | null;
+  xwOBA: number | null;
+  ISO: number | null;
+  KBBPct: number | null;
+  K9: number | null;
+  FIP: number | null;
+  xFIP: number | null;
+  xERA: number | null;
+  SIERA: number | null;
+  plRank: number | null;
+  _isPitcher: boolean;
+}
+
+interface RosterRow {
+  id: number;
+  name: string;
+  slot: string | null;
+  positions: string;
+  team: string;
+  HR: number | null;
+  R: number | null;
+  RBI: number | null;
+  SB: number | null;
+  AVG: number | null;
+  W: number | null;
+  SV: number | null;
+  K: number | null;
+  ERA: number | null;
+  WHIP: number | null;
+  BABIP: number | null;
+  xBA: number | null;
+  xSLG: number | null;
+  xwOBA: number | null;
+  ISO: number | null;
+  KBBPct: number | null;
+  K9: number | null;
+  FIP: number | null;
+  xFIP: number | null;
+  xERA: number | null;
+  SIERA: number | null;
+  _isPitcher: boolean;
 }
 
 interface EvaluationResult {
@@ -272,7 +336,7 @@ function toggleSort(
 export default function WaiversPage() {
   const params = useParams();
   const leagueId = params.id as string;
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("ai");
   const [selectedFreeAgentId, setSelectedFreeAgentId] = useState<number | null>(
     null,
@@ -284,23 +348,25 @@ export default function WaiversPage() {
     useState<EvaluationResult | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
-  const [positionFilter, setPositionFilter] = useState<string[]>([]);
   const [expandedRecKey, setExpandedRecKey] = useState<string | null>(null);
 
-  // Sort state for manual eval tables
-  const [faSortKey, setFaSortKey] = useState("pctOwned");
-  const [faSortDir, setFaSortDir] = useState<"asc" | "desc">("desc");
-  const [rosterSortKey, setRosterSortKey] = useState("slot");
-  const [rosterSortDir, setRosterSortDir] = useState<"asc" | "desc">("asc");
-
-  // Load selected team from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setSelectedTeamId(parsed);
-    }
-  }, [leagueId]);
+  // Sort state for manual eval tables (separate hitter/pitcher)
+  const [faHitterSortKey, setFaHitterSortKey] = useState("pctOwned");
+  const [faHitterSortDir, setFaHitterSortDir] = useState<"asc" | "desc">(
+    "desc",
+  );
+  const [faPitcherSortKey, setFaPitcherSortKey] = useState("pctOwned");
+  const [faPitcherSortDir, setFaPitcherSortDir] = useState<"asc" | "desc">(
+    "desc",
+  );
+  const [rosterHitterSortKey, setRosterHitterSortKey] = useState("slot");
+  const [rosterHitterSortDir, setRosterHitterSortDir] = useState<
+    "asc" | "desc"
+  >("asc");
+  const [rosterPitcherSortKey, setRosterPitcherSortKey] = useState("slot");
+  const [rosterPitcherSortDir, setRosterPitcherSortDir] = useState<
+    "asc" | "desc"
+  >("asc");
 
   // Fetch league status for ESPN links
   const { data: leagueStatus } = useQuery({
@@ -315,40 +381,24 @@ export default function WaiversPage() {
     data: aiData,
     isLoading: aiLoading,
     error: aiError,
-  } = useQuery({
-    queryKey: ["waivers", leagueId, selectedTeamId],
-    queryFn: async () => {
-      if (!selectedTeamId) throw new Error("No team selected");
-      return api.getWaiverRecommendations(
-        parseInt(leagueId, 10),
-        selectedTeamId,
-      ) as Promise<{
-        recommendations: WaiverRecommendation[];
-        snapshotDate: string;
-      }>;
-    },
-    enabled: !!selectedTeamId && viewMode === "ai",
-  });
+  } = useWaiverRecommendations(
+    leagueId,
+    viewMode === "ai" ? selectedTeamId : null,
+  );
 
   // Free agents query
-  const { data: freeAgentsData, isLoading: freeAgentsLoading } = useQuery({
-    queryKey: ["free-agents", leagueId, positionFilter.join(",")],
-    queryFn: async () => {
-      return api.getFreeAgents(parseInt(leagueId, 10), {
-        sortBy: "pct_owned",
-        ...(positionFilter.length > 0 && {
-          position: positionFilter.join(","),
-        }),
-      }) as Promise<{
-        freeAgents: FreeAgent[];
-        snapshotDate: string;
-      }>;
-    },
-    enabled: !!selectedTeamId && viewMode === "manual",
-  });
+  const { data: freeAgentsData, isLoading: freeAgentsLoading } = useFreeAgents(
+    leagueId,
+    { sortBy: "pct_owned" },
+    !!selectedTeamId && viewMode === "manual",
+  );
 
   // Roster query
-  const { data: rosterData, isLoading: rosterLoading } = useQuery({
+  const {
+    data: rosterData,
+    isLoading: rosterLoading,
+    isError: rosterError,
+  } = useQuery({
     queryKey: ["roster", leagueId, selectedTeamId],
     queryFn: async () => {
       if (!selectedTeamId) throw new Error("No team selected");
@@ -364,9 +414,9 @@ export default function WaiversPage() {
   });
 
   // Build flat row data for free agents table
-  const faRows = useMemo(() => {
+  const faRows = useMemo((): FARow[] => {
     if (!freeAgentsData?.freeAgents) return [];
-    return freeAgentsData.freeAgents.map((p) => {
+    return freeAgentsData.freeAgents.map((p: FreeAgent) => {
       const pitcher = isPitcherPosition(p.positions);
       const proj = p.projections ?? {};
       const advanced = p.advancedStats ?? null;
@@ -407,7 +457,7 @@ export default function WaiversPage() {
   }, [freeAgentsData]);
 
   // Build flat row data for roster table
-  const rosterRows = useMemo(() => {
+  const rosterRows = useMemo((): RosterRow[] => {
     if (!rosterData?.roster) return [];
     return rosterData.roster.map((p) => {
       const pitcher = isPitcherPosition(p.positions);
@@ -447,11 +497,23 @@ export default function WaiversPage() {
     });
   }, [rosterData]);
 
-  // Determine which stat columns to show based on position filter
-  const showPitcherStats =
-    positionFilter.length > 0 && ["SP", "RP"].includes(positionFilter[0]);
-  const showHitterStats = positionFilter.length > 0 && !showPitcherStats;
-  const showAllStats = positionFilter.length === 0;
+  // Split rows by player type
+  const faHitters = useMemo(
+    () => faRows.filter((r) => !r._isPitcher),
+    [faRows],
+  );
+  const faPitchers = useMemo(
+    () => faRows.filter((r) => r._isPitcher),
+    [faRows],
+  );
+  const rosterHitters = useMemo(
+    () => rosterRows.filter((r) => !r._isPitcher),
+    [rosterRows],
+  );
+  const rosterPitchers = useMemo(
+    () => rosterRows.filter((r) => r._isPitcher),
+    [rosterRows],
+  );
 
   // Evaluate add/drop
   const handleEvaluate = async () => {
@@ -624,351 +686,246 @@ export default function WaiversPage() {
     </div>
   );
 
-  // ── Render stat columns for player tables ──
-  const renderStatHeaders = (
+  // ── Hitter stat columns ──
+  const renderHitterStatHeaders = (
     sortKey: string,
     sortDir: "asc" | "desc",
     onSort: (k: string) => void,
-  ) => {
-    const cols: JSX.Element[] = [];
-    if (showHitterStats || showAllStats) {
-      cols.push(
+  ) => (
+    <>
+      {(["HR", "R", "RBI", "SB"] as const).map((s) => (
         <SortHeader
-          key="HR"
-          label="HR"
-          sortKey="HR"
+          key={s}
+          label={s}
+          sortKey={s}
           currentKey={sortKey}
           currentDir={sortDir}
           onSort={onSort}
           align="right"
-        />,
-        <SortHeader
-          key="R"
-          label="R"
-          sortKey="R"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="RBI"
-          label="RBI"
-          sortKey="RBI"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="SB"
-          label="SB"
-          sortKey="SB"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="AVG"
-          label="AVG"
-          sortKey="AVG"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="BABIP"
-          label="BABIP"
-          sortKey="BABIP"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="xBA"
-          label="xBA"
-          sortKey="xBA"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="xSLG"
-          label="xSLG"
-          sortKey="xSLG"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="xwOBA"
-          label="xwOBA"
-          sortKey="xwOBA"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="ISO"
-          label="ISO"
-          sortKey="ISO"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-      );
-    }
-    if (showPitcherStats || showAllStats) {
-      cols.push(
-        <SortHeader
-          key="W"
-          label="W"
-          sortKey="W"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="SV"
-          label="SV"
-          sortKey="SV"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="K"
-          label="K"
-          sortKey="K"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="ERA"
-          label="ERA"
-          sortKey="ERA"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="WHIP"
-          label="WHIP"
-          sortKey="WHIP"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="KBBPct"
-          label="K-BB%"
-          sortKey="KBBPct"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="K9"
-          label="K/9"
-          sortKey="K9"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="FIP"
-          label="FIP"
-          sortKey="FIP"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="xFIP"
-          label="xFIP"
-          sortKey="xFIP"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="xERA"
-          label="xERA"
-          sortKey="xERA"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-        <SortHeader
-          key="SIERA"
-          label="SIERA"
-          sortKey="SIERA"
-          currentKey={sortKey}
-          currentDir={sortDir}
-          onSort={onSort}
-          align="right"
-        />,
-      );
-    }
-    return cols;
-  };
+        />
+      ))}
+      <SortHeader
+        key="AVG"
+        label="AVG"
+        sortKey="AVG"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="BABIP"
+        label="BABIP"
+        sortKey="BABIP"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="xBA"
+        label="xBA"
+        sortKey="xBA"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="xSLG"
+        label="xSLG"
+        sortKey="xSLG"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="xwOBA"
+        label="xwOBA"
+        sortKey="xwOBA"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="ISO"
+        label="ISO"
+        sortKey="ISO"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+    </>
+  );
 
-  const renderStatCells = (row: Record<string, any>) => {
-    const cells: JSX.Element[] = [];
-    if (showHitterStats || showAllStats) {
-      cells.push(
-        <td
-          key="HR"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.HR)}
-        </td>,
-        <td
-          key="R"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.R)}
-        </td>,
-        <td
-          key="RBI"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.RBI)}
-        </td>,
-        <td
-          key="SB"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.SB)}
-        </td>,
-        <td
-          key="AVG"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.AVG, 3)}
-        </td>,
-        <td
-          key="BABIP"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.BABIP, 3)}
-        </td>,
-        <td
-          key="xBA"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.xBA, 3)}
-        </td>,
-        <td
-          key="xSLG"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.xSLG, 3)}
-        </td>,
-        <td
-          key="xwOBA"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.xwOBA, 3)}
-        </td>,
-        <td
-          key="ISO"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.ISO, 3)}
-        </td>,
-      );
-    }
-    if (showPitcherStats || showAllStats) {
-      cells.push(
-        <td
-          key="W"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.W)}
-        </td>,
-        <td
-          key="SV"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.SV)}
-        </td>,
-        <td
-          key="K"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtInt(row.K)}
-        </td>,
-        <td
-          key="ERA"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.ERA, 2)}
-        </td>,
-        <td
-          key="WHIP"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.WHIP, 2)}
-        </td>,
-        <td
-          key="KBBPct"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtPercent(row.KBBPct)}
-        </td>,
-        <td
-          key="K9"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.K9, 1)}
-        </td>,
-        <td
-          key="FIP"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.FIP, 2)}
-        </td>,
-        <td
-          key="xFIP"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.xFIP, 2)}
-        </td>,
-        <td
-          key="xERA"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.xERA, 2)}
-        </td>,
-        <td
-          key="SIERA"
-          className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text"
-        >
-          {fmtRate(row.SIERA, 2)}
-        </td>,
-      );
-    }
-    return cells;
-  };
+  const renderHitterStatCells = (row: Record<string, any>) => (
+    <>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.HR)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.R)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.RBI)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.SB)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.AVG, 3)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.BABIP, 3)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.xBA, 3)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.xSLG, 3)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.xwOBA, 3)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.ISO, 3)}
+      </td>
+    </>
+  );
+
+  // ── Pitcher stat columns ──
+  const renderPitcherStatHeaders = (
+    sortKey: string,
+    sortDir: "asc" | "desc",
+    onSort: (k: string) => void,
+  ) => (
+    <>
+      {(["W", "SV", "K"] as const).map((s) => (
+        <SortHeader
+          key={s}
+          label={s}
+          sortKey={s}
+          currentKey={sortKey}
+          currentDir={sortDir}
+          onSort={onSort}
+          align="right"
+        />
+      ))}
+      <SortHeader
+        key="ERA"
+        label="ERA"
+        sortKey="ERA"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="WHIP"
+        label="WHIP"
+        sortKey="WHIP"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="KBBPct"
+        label="K-BB%"
+        sortKey="KBBPct"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="K9"
+        label="K/9"
+        sortKey="K9"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="FIP"
+        label="FIP"
+        sortKey="FIP"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="xFIP"
+        label="xFIP"
+        sortKey="xFIP"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="xERA"
+        label="xERA"
+        sortKey="xERA"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+      <SortHeader
+        key="SIERA"
+        label="SIERA"
+        sortKey="SIERA"
+        currentKey={sortKey}
+        currentDir={sortDir}
+        onSort={onSort}
+        align="right"
+      />
+    </>
+  );
+
+  const renderPitcherStatCells = (row: Record<string, any>) => (
+    <>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.W)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.SV)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtInt(row.K)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.ERA, 2)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.WHIP, 2)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtPercent(row.KBBPct)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.K9, 1)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.FIP, 2)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.xFIP, 2)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.xERA, 2)}
+      </td>
+      <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+        {fmtRate(row.SIERA, 2)}
+      </td>
+    </>
+  );
 
   return (
     <Container size="wide" className="py-6 sm:py-8">
@@ -1186,25 +1143,7 @@ export default function WaiversPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <Heading level={3}>Select Add/Drop</Heading>
-                <select
-                  value={positionFilter.length > 0 ? positionFilter[0] : ""}
-                  onChange={(e) =>
-                    setPositionFilter(e.target.value ? [e.target.value] : [])
-                  }
-                  className="text-data border border-neutral-200 dark:border-shell-border rounded px-2 py-1 text-content dark:text-shell-text dark:bg-shell-bg"
-                >
-                  <option value="">All Positions</option>
-                  {["C", "1B", "2B", "3B", "SS", "OF", "DH", "SP", "RP"].map(
-                    (pos) => (
-                      <option key={pos} value={pos}>
-                        {pos}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </div>
+              <Heading level={3}>Select Add/Drop</Heading>
               <p className="mt-2 text-body-sm text-content-secondary dark:text-shell-muted">
                 Advanced columns use current-season Statcast and ESPN component
                 data. xFIP and SIERA show -- when a reliable public source is
@@ -1214,248 +1153,492 @@ export default function WaiversPage() {
             <CardContent>
               {freeAgentsLoading || rosterLoading ? (
                 <LoadingSkeleton lines={2} />
+              ) : rosterError ? (
+                <ErrorAlert
+                  message="Failed to load your roster. Try refreshing the page."
+                  variant="warning"
+                />
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* ── Free Agents Table ── */}
+                <div className="space-y-8">
+                  {/* ── Your Roster ── */}
                   <div>
-                    <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
-                      Add from Waiver Wire
-                    </label>
-                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
-                      <table className="min-w-full">
-                        <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
-                          <tr className="border-b border-neutral-200 dark:border-shell-border">
-                            <SortHeader
-                              label="Name"
-                              sortKey="name"
-                              currentKey={faSortKey}
-                              currentDir={faSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  faSortKey,
-                                  faSortDir,
-                                  setFaSortKey,
-                                  setFaSortDir,
-                                )
-                              }
-                            />
-                            <th className={TH_CLASS}>Pos</th>
-                            <SortHeader
-                              label="% Own"
-                              sortKey="pctOwned"
-                              currentKey={faSortKey}
-                              currentDir={faSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  faSortKey,
-                                  faSortDir,
-                                  setFaSortKey,
-                                  setFaSortDir,
-                                )
-                              }
-                              align="right"
-                            />
-                            <SortHeader
-                              label="% Start"
-                              sortKey="pctStarted"
-                              currentKey={faSortKey}
-                              currentDir={faSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  faSortKey,
-                                  faSortDir,
-                                  setFaSortKey,
-                                  setFaSortDir,
-                                )
-                              }
-                              align="right"
-                            />
-                            <SortHeader
-                              label="PL"
-                              sortKey="plRank"
-                              currentKey={faSortKey}
-                              currentDir={faSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  faSortKey,
-                                  faSortDir,
-                                  setFaSortKey,
-                                  setFaSortDir,
-                                )
-                              }
-                              align="right"
-                            />
-                            {renderStatHeaders(faSortKey, faSortDir, (k) =>
-                              toggleSort(
-                                k,
-                                faSortKey,
-                                faSortDir,
-                                setFaSortKey,
-                                setFaSortDir,
-                              ),
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
-                          {sortRows(faRows, faSortKey, faSortDir).map((row) => (
-                            <tr
-                              key={row.id}
-                              onClick={() => setSelectedFreeAgentId(row.id)}
-                              className={cn(
-                                "cursor-pointer transition-colors",
-                                selectedFreeAgentId === row.id
-                                  ? "bg-positive-light dark:bg-positive-dark-bg/20"
-                                  : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
-                              )}
-                            >
-                              <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
-                                {row.name}
-                              </td>
-                              <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
-                                {row.positions}
-                              </td>
-                              <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
-                                {row.pctOwned.toFixed(1)}%
-                              </td>
-                              <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
-                                {row.pctStarted.toFixed(1)}%
-                              </td>
-                              <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
-                                {row.plRank != null ? (
-                                  <span
-                                    className={cn(
-                                      "inline-flex items-center justify-center min-w-[1.5rem] px-1 py-0.5 rounded text-caption font-medium",
-                                      row.plRank <= 20
-                                        ? "bg-positive-light text-positive dark:bg-positive-dark-bg/30 dark:text-positive"
-                                        : row.plRank <= 50
-                                          ? "bg-info-light text-info dark:bg-info-dark-bg/30 dark:text-info"
-                                          : "text-content-secondary dark:text-shell-muted",
-                                    )}
-                                  >
-                                    {row.plRank}
-                                  </span>
-                                ) : (
-                                  <span className="text-content-tertiary dark:text-shell-muted">
-                                    --
-                                  </span>
+                    <h4 className="text-data font-semibold text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-3">
+                      Your Roster
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Roster Hitters */}
+                      <div>
+                        <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
+                          Hitters
+                        </label>
+                        <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
+                              <tr className="border-b border-neutral-200 dark:border-shell-border">
+                                <SortHeader
+                                  label="Slot"
+                                  sortKey="slot"
+                                  currentKey={rosterHitterSortKey}
+                                  currentDir={rosterHitterSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterHitterSortKey,
+                                      rosterHitterSortDir,
+                                      setRosterHitterSortKey,
+                                      setRosterHitterSortDir,
+                                    )
+                                  }
+                                />
+                                <SortHeader
+                                  label="Name"
+                                  sortKey="name"
+                                  currentKey={rosterHitterSortKey}
+                                  currentDir={rosterHitterSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterHitterSortKey,
+                                      rosterHitterSortDir,
+                                      setRosterHitterSortKey,
+                                      setRosterHitterSortDir,
+                                    )
+                                  }
+                                />
+                                <th className={TH_CLASS}>Pos</th>
+                                {renderHitterStatHeaders(
+                                  rosterHitterSortKey,
+                                  rosterHitterSortDir,
+                                  (k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterHitterSortKey,
+                                      rosterHitterSortDir,
+                                      setRosterHitterSortKey,
+                                      setRosterHitterSortDir,
+                                    ),
                                 )}
-                              </td>
-                              {renderStatCells(row)}
-                            </tr>
-                          ))}
-                          {faRows.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={20}
-                                className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted"
-                              >
-                                No free agents available
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                              {sortRows(
+                                rosterHitters,
+                                rosterHitterSortKey,
+                                rosterHitterSortDir,
+                              ).map((row) => (
+                                <tr
+                                  key={row.id}
+                                  onClick={() =>
+                                    setSelectedRosterPlayerId(row.id)
+                                  }
+                                  className={cn(
+                                    "cursor-pointer transition-colors",
+                                    selectedRosterPlayerId === row.id
+                                      ? "bg-negative-light dark:bg-negative-dark-bg/20"
+                                      : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                                  )}
+                                >
+                                  <td className="px-2 py-2 text-data font-medium text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.slot}
+                                  </td>
+                                  <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
+                                    {row.name}
+                                  </td>
+                                  <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.positions}
+                                  </td>
+                                  {renderHitterStatCells(row)}
+                                </tr>
+                              ))}
+                              {rosterHitters.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={13}
+                                    className="px-4 py-6 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                                  >
+                                    No hitters on roster
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      {/* Roster Pitchers */}
+                      <div>
+                        <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
+                          Pitchers
+                        </label>
+                        <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
+                              <tr className="border-b border-neutral-200 dark:border-shell-border">
+                                <SortHeader
+                                  label="Slot"
+                                  sortKey="slot"
+                                  currentKey={rosterPitcherSortKey}
+                                  currentDir={rosterPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterPitcherSortKey,
+                                      rosterPitcherSortDir,
+                                      setRosterPitcherSortKey,
+                                      setRosterPitcherSortDir,
+                                    )
+                                  }
+                                />
+                                <SortHeader
+                                  label="Name"
+                                  sortKey="name"
+                                  currentKey={rosterPitcherSortKey}
+                                  currentDir={rosterPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterPitcherSortKey,
+                                      rosterPitcherSortDir,
+                                      setRosterPitcherSortKey,
+                                      setRosterPitcherSortDir,
+                                    )
+                                  }
+                                />
+                                <th className={TH_CLASS}>Pos</th>
+                                {renderPitcherStatHeaders(
+                                  rosterPitcherSortKey,
+                                  rosterPitcherSortDir,
+                                  (k) =>
+                                    toggleSort(
+                                      k,
+                                      rosterPitcherSortKey,
+                                      rosterPitcherSortDir,
+                                      setRosterPitcherSortKey,
+                                      setRosterPitcherSortDir,
+                                    ),
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                              {sortRows(
+                                rosterPitchers,
+                                rosterPitcherSortKey,
+                                rosterPitcherSortDir,
+                              ).map((row) => (
+                                <tr
+                                  key={row.id}
+                                  onClick={() =>
+                                    setSelectedRosterPlayerId(row.id)
+                                  }
+                                  className={cn(
+                                    "cursor-pointer transition-colors",
+                                    selectedRosterPlayerId === row.id
+                                      ? "bg-negative-light dark:bg-negative-dark-bg/20"
+                                      : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                                  )}
+                                >
+                                  <td className="px-2 py-2 text-data font-medium text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.slot}
+                                  </td>
+                                  <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
+                                    {row.name}
+                                  </td>
+                                  <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.positions}
+                                  </td>
+                                  {renderPitcherStatCells(row)}
+                                </tr>
+                              ))}
+                              {rosterPitchers.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={14}
+                                    className="px-4 py-6 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                                  >
+                                    No pitchers on roster
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* ── Roster Table ── */}
+                  {/* ── Waiver Wire ── */}
                   <div>
-                    <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
-                      Drop from Your Roster
-                    </label>
-                    <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
-                      <table className="min-w-full">
-                        <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
-                          <tr className="border-b border-neutral-200 dark:border-shell-border">
-                            <SortHeader
-                              label="Slot"
-                              sortKey="slot"
-                              currentKey={rosterSortKey}
-                              currentDir={rosterSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  rosterSortKey,
-                                  rosterSortDir,
-                                  setRosterSortKey,
-                                  setRosterSortDir,
-                                )
-                              }
-                            />
-                            <SortHeader
-                              label="Name"
-                              sortKey="name"
-                              currentKey={rosterSortKey}
-                              currentDir={rosterSortDir}
-                              onSort={(k) =>
-                                toggleSort(
-                                  k,
-                                  rosterSortKey,
-                                  rosterSortDir,
-                                  setRosterSortKey,
-                                  setRosterSortDir,
-                                )
-                              }
-                            />
-                            <th className={TH_CLASS}>Pos</th>
-                            {renderStatHeaders(
-                              rosterSortKey,
-                              rosterSortDir,
-                              (k) =>
-                                toggleSort(
-                                  k,
-                                  rosterSortKey,
-                                  rosterSortDir,
-                                  setRosterSortKey,
-                                  setRosterSortDir,
-                                ),
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
-                          {sortRows(
-                            rosterRows,
-                            rosterSortKey,
-                            rosterSortDir,
-                          ).map((row) => (
-                            <tr
-                              key={row.id}
-                              onClick={() => setSelectedRosterPlayerId(row.id)}
-                              className={cn(
-                                "cursor-pointer transition-colors",
-                                selectedRosterPlayerId === row.id
-                                  ? "bg-negative-light dark:bg-negative-dark-bg/20"
-                                  : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                    <h4 className="text-data font-semibold text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-3">
+                      Waiver Wire
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* FA Hitters */}
+                      <div>
+                        <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
+                          Hitters
+                        </label>
+                        <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
+                              <tr className="border-b border-neutral-200 dark:border-shell-border">
+                                <SortHeader
+                                  label="Name"
+                                  sortKey="name"
+                                  currentKey={faHitterSortKey}
+                                  currentDir={faHitterSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faHitterSortKey,
+                                      faHitterSortDir,
+                                      setFaHitterSortKey,
+                                      setFaHitterSortDir,
+                                    )
+                                  }
+                                />
+                                <th className={TH_CLASS}>Pos</th>
+                                <SortHeader
+                                  label="% Own"
+                                  sortKey="pctOwned"
+                                  currentKey={faHitterSortKey}
+                                  currentDir={faHitterSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faHitterSortKey,
+                                      faHitterSortDir,
+                                      setFaHitterSortKey,
+                                      setFaHitterSortDir,
+                                    )
+                                  }
+                                  align="right"
+                                />
+                                <SortHeader
+                                  label="% Start"
+                                  sortKey="pctStarted"
+                                  currentKey={faHitterSortKey}
+                                  currentDir={faHitterSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faHitterSortKey,
+                                      faHitterSortDir,
+                                      setFaHitterSortKey,
+                                      setFaHitterSortDir,
+                                    )
+                                  }
+                                  align="right"
+                                />
+                                {renderHitterStatHeaders(
+                                  faHitterSortKey,
+                                  faHitterSortDir,
+                                  (k) =>
+                                    toggleSort(
+                                      k,
+                                      faHitterSortKey,
+                                      faHitterSortDir,
+                                      setFaHitterSortKey,
+                                      setFaHitterSortDir,
+                                    ),
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                              {sortRows(
+                                faHitters,
+                                faHitterSortKey,
+                                faHitterSortDir,
+                              ).map((row) => (
+                                <tr
+                                  key={row.id}
+                                  onClick={() => setSelectedFreeAgentId(row.id)}
+                                  className={cn(
+                                    "cursor-pointer transition-colors",
+                                    selectedFreeAgentId === row.id
+                                      ? "bg-positive-light dark:bg-positive-dark-bg/20"
+                                      : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                                  )}
+                                >
+                                  <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
+                                    {row.name}
+                                  </td>
+                                  <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.positions}
+                                  </td>
+                                  <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                    {row.pctOwned.toFixed(1)}%
+                                  </td>
+                                  <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                    {row.pctStarted.toFixed(1)}%
+                                  </td>
+                                  {renderHitterStatCells(row)}
+                                </tr>
+                              ))}
+                              {faHitters.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={14}
+                                    className="px-4 py-6 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                                  >
+                                    No hitters available
+                                  </td>
+                                </tr>
                               )}
-                            >
-                              <td className="px-2 py-2 text-data font-medium text-content-secondary dark:text-shell-muted whitespace-nowrap">
-                                {row.slot}
-                              </td>
-                              <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
-                                {row.name}
-                              </td>
-                              <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
-                                {row.positions}
-                              </td>
-                              {renderStatCells(row)}
-                            </tr>
-                          ))}
-                          {rosterRows.length === 0 && (
-                            <tr>
-                              <td
-                                colSpan={20}
-                                className="px-4 py-8 text-center text-body-sm text-content-secondary dark:text-shell-muted"
-                              >
-                                No roster players available
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      {/* FA Pitchers */}
+                      <div>
+                        <label className="block text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider mb-2">
+                          Pitchers
+                        </label>
+                        <div className="border border-neutral-200 dark:border-shell-border rounded-lg max-h-[28rem] overflow-auto">
+                          <table className="min-w-full">
+                            <thead className="bg-surface-secondary dark:bg-shell-bg sticky top-0 z-10">
+                              <tr className="border-b border-neutral-200 dark:border-shell-border">
+                                <SortHeader
+                                  label="Name"
+                                  sortKey="name"
+                                  currentKey={faPitcherSortKey}
+                                  currentDir={faPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faPitcherSortKey,
+                                      faPitcherSortDir,
+                                      setFaPitcherSortKey,
+                                      setFaPitcherSortDir,
+                                    )
+                                  }
+                                />
+                                <th className={TH_CLASS}>Pos</th>
+                                <SortHeader
+                                  label="% Own"
+                                  sortKey="pctOwned"
+                                  currentKey={faPitcherSortKey}
+                                  currentDir={faPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faPitcherSortKey,
+                                      faPitcherSortDir,
+                                      setFaPitcherSortKey,
+                                      setFaPitcherSortDir,
+                                    )
+                                  }
+                                  align="right"
+                                />
+                                <SortHeader
+                                  label="% Start"
+                                  sortKey="pctStarted"
+                                  currentKey={faPitcherSortKey}
+                                  currentDir={faPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faPitcherSortKey,
+                                      faPitcherSortDir,
+                                      setFaPitcherSortKey,
+                                      setFaPitcherSortDir,
+                                    )
+                                  }
+                                  align="right"
+                                />
+                                <SortHeader
+                                  label="PL"
+                                  sortKey="plRank"
+                                  currentKey={faPitcherSortKey}
+                                  currentDir={faPitcherSortDir}
+                                  onSort={(k) =>
+                                    toggleSort(
+                                      k,
+                                      faPitcherSortKey,
+                                      faPitcherSortDir,
+                                      setFaPitcherSortKey,
+                                      setFaPitcherSortDir,
+                                    )
+                                  }
+                                  align="right"
+                                />
+                                {renderPitcherStatHeaders(
+                                  faPitcherSortKey,
+                                  faPitcherSortDir,
+                                  (k) =>
+                                    toggleSort(
+                                      k,
+                                      faPitcherSortKey,
+                                      faPitcherSortDir,
+                                      setFaPitcherSortKey,
+                                      setFaPitcherSortDir,
+                                    ),
+                                )}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                              {sortRows(
+                                faPitchers,
+                                faPitcherSortKey,
+                                faPitcherSortDir,
+                              ).map((row) => (
+                                <tr
+                                  key={row.id}
+                                  onClick={() => setSelectedFreeAgentId(row.id)}
+                                  className={cn(
+                                    "cursor-pointer transition-colors",
+                                    selectedFreeAgentId === row.id
+                                      ? "bg-positive-light dark:bg-positive-dark-bg/20"
+                                      : "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                                  )}
+                                >
+                                  <td className="px-2 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap sticky left-0 bg-inherit z-[5]">
+                                    {row.name}
+                                  </td>
+                                  <td className="px-2 py-2 text-data text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                    {row.positions}
+                                  </td>
+                                  <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                    {row.pctOwned.toFixed(1)}%
+                                  </td>
+                                  <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                    {row.pctStarted.toFixed(1)}%
+                                  </td>
+                                  <td className="px-2 py-2 text-right font-mono text-data text-content dark:text-shell-text">
+                                    {row.plRank != null ? (
+                                      <span
+                                        className={cn(
+                                          "inline-flex items-center justify-center min-w-[1.5rem] px-1 py-0.5 rounded text-caption font-medium",
+                                          row.plRank <= 20
+                                            ? "bg-positive-light text-positive dark:bg-positive-dark-bg/30 dark:text-positive"
+                                            : row.plRank <= 50
+                                              ? "bg-info-light text-info dark:bg-info-dark-bg/30 dark:text-info"
+                                              : "text-content-secondary dark:text-shell-muted",
+                                        )}
+                                      >
+                                        {row.plRank}
+                                      </span>
+                                    ) : (
+                                      <span className="text-content-tertiary dark:text-shell-muted">
+                                        --
+                                      </span>
+                                    )}
+                                  </td>
+                                  {renderPitcherStatCells(row)}
+                                </tr>
+                              ))}
+                              {faPitchers.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={16}
+                                    className="px-4 py-6 text-center text-body-sm text-content-secondary dark:text-shell-muted"
+                                  >
+                                    No pitchers available
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1477,7 +1660,9 @@ export default function WaiversPage() {
                 {(selectedFreeAgentId || selectedRosterPlayerId) && (
                   <span className="text-data text-content-secondary dark:text-shell-muted">
                     {selectedFreeAgentId
-                      ? faRows.find((r) => r.id === selectedFreeAgentId)?.name
+                      ? faRows.find(
+                          (r: { id: number }) => r.id === selectedFreeAgentId,
+                        )?.name
                       : "..."}{" "}
                     for{" "}
                     {selectedRosterPlayerId

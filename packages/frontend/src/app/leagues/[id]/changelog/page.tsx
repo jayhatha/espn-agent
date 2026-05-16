@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLeagueTeam } from "@/lib/hooks";
 import {
   ScrollText,
   TrendingUp,
@@ -309,7 +310,7 @@ export default function ChangeLogPage() {
   const leagueId = params.id as string;
   const leagueIdNum = parseInt(leagueId, 10);
 
-  const [ourTeamId, setOurTeamId] = useState<number | null>(null);
+  const [ourTeamId] = useLeagueTeam(leagueId);
   const [liveEvents, setLiveEvents] = useState<ChangeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
@@ -317,15 +318,6 @@ export default function ChangeLogPage() {
   // false on server; real value set after mount to avoid SSR/client hydration mismatch
   const [isGameTime, setIsGameTime] = useState(false);
   const seenIds = useRef(new Set<number>());
-
-  // Load our team from localStorage (same pattern as rest of app)
-  useEffect(() => {
-    const stored = localStorage.getItem(`league_${leagueId}_team`);
-    if (stored) {
-      const parsed = parseInt(stored, 10);
-      if (!isNaN(parsed)) setOurTeamId(parsed);
-    }
-  }, [leagueId]);
 
   // Set real game-window value on mount (client only), then update every minute
   useEffect(() => {

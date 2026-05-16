@@ -69,6 +69,31 @@ interface RosterPlayer {
   acquisition_type: string | null;
 }
 
+interface EnrichedRosterPlayer {
+  playerId: number;
+  playerName: string;
+  mlbTeam: string | null;
+  positions: string[];
+  rosterStatus: string;
+  rosterSlot: string | null;
+  projections: Record<string, number> | null;
+  currentStats: Record<string, number> | null;
+  advancedStats: {
+    babip: number | null;
+    xba: number | null;
+    xslg: number | null;
+    xwoba: number | null;
+    iso: number | null;
+    kBbPct: number | null;
+    k9: number | null;
+    fip: number | null;
+    xfip: number | null;
+    xera: number | null;
+    siera: number | null;
+  } | null;
+  tenureStats: Record<string, number> | null;
+}
+
 interface TeamOverviewData {
   snapshotDate: string;
   team: { id: number; name: string };
@@ -180,6 +205,18 @@ function LeagueDetailPageContent() {
     },
     enabled: !!selectedTeamId,
   });
+
+  // Enriched roster with projections and advanced stats
+  const { data: enrichedRosterData, isLoading: enrichedRosterLoading } =
+    useQuery({
+      queryKey: ["roster-enriched", leagueId, selectedTeamId],
+      queryFn: () =>
+        api.getTeamRoster(parseInt(leagueId, 10), selectedTeamId!) as Promise<{
+          roster: EnrichedRosterPlayer[];
+          snapshotDate: string;
+        }>,
+      enabled: !!selectedTeamId,
+    });
 
   // Waiver recommendations for dashboard
   const { data: waiverRecs } = useQuery({
@@ -407,6 +444,8 @@ function LeagueDetailPageContent() {
             <RosterSection
               groupedRoster={groupedRoster}
               hasRosterData={teamOverview.roster.length > 0}
+              enrichedRoster={enrichedRosterData?.roster ?? null}
+              enrichedRosterIsLoading={enrichedRosterLoading}
             />
           </FadeIn>
         </>
