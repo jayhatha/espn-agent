@@ -11,7 +11,8 @@
 - ✅ **v7.0 Architectural Stabilization** - Phases 87-88 (shipped 2026-05-05)
 - ✅ **v8.0 Deep Architecture** - Phases 89-93 (shipped 2026-05-06)
 - ✅ **v9.0 Architectural Philosophy Remediation** - Phases 94-97 (shipped 2026-05-06)
-- 🔄 **v10.0 Architecture Improvements** - Phases 98-102 (in progress)
+- ⏸️ **v10.0 Architecture Improvements** - Phases 98-102 (paused 2026-05-16)
+- 🔄 **v11.0 Projected Season Simulation Engine** - Phases 103-107 (in progress)
 
 ## Phases
 
@@ -558,7 +559,91 @@ Plans:
 
 ---
 
-## v10.0 Architecture Improvements — in progress (started 2026-05-15)
+## v11.0 Projected Season Simulation Engine — in progress (started 2026-05-16)
+
+**Milestone Goal:** Build a backend-first, seeded Monte Carlo engine that turns current standings plus RoS projections into constraint-aware remaining-season outcome distributions for roto leagues.
+
+### Phase 103: Simulation Contract & Baseline State
+
+**Goal:** Establish one canonical backend simulation state and deterministic baseline path on top of the existing projection infrastructure.
+**Depends on:** Nothing beyond the current projection stack (Phases 79-80)
+**Requirements:** SIM-01, SIM-02
+**Success Criteria** (what must be TRUE):
+
+1. A caller can materialize a single simulation input for league + snapshot without route-level joins or ad hoc data assembly
+2. The baseline state includes current standings, team category components, roster constraints, remaining-season horizon, and explicit degraded reasons when inputs are incomplete
+3. With randomness disabled, baseline rollup matches current projected-standings output within an agreed tolerance
+4. Re-running the same snapshot with the same config and seed returns identical dry-run outputs
+5. Changing underlying stat components changes AVG/OPS/ERA/WHIP consistently across deterministic and simulated paths, proving there is no duplicate rate-math branch
+
+**Plans:** 0/1 plans complete
+
+### Phase 104: Opportunity & Variance Model
+
+**Goal:** Convert remaining-season projections into daily or bucketed opportunity streams with tunable uncertainty.
+**Depends on:** Phase 103
+**Requirements:** OPP-01, VAR-01
+**Success Criteria** (what must be TRUE):
+
+1. Remaining-season output is expressed as daily or configured time-bucket opportunity for hitters and pitchers instead of only season-end totals
+2. Changing days remaining, roster status, or role assumptions changes opportunity allocation in a visible and explainable way
+3. Counting-stat uncertainty can be tuned by stat or role and visibly changes generated intervals and distributions
+4. Rate-stat uncertainty is produced by perturbing shared stat components rather than inventing separate ERA/WHIP/OPS noise models
+5. A no-variance mode produces the same totals as the Phase 103 deterministic baseline
+
+**Plans:** 0/1 plans complete
+
+### Phase 105: Constraint-Aware Daily Season Simulator
+
+**Goal:** Simulate team production under real lineup, slot, and GS-cap constraints.
+**Depends on:** Phase 104
+**Requirements:** LINEUP-01, GS-01
+**Success Criteria** (what must be TRUE):
+
+1. Simulated hitter and pitcher totals never exceed eligible active slots for any day or time bucket
+2. Bench and IL players contribute only when activated through lineup logic or explicit replacement flow
+3. SP usage is throttled against the season GS cap based on current pace, not only final-season cap math
+4. RP opportunity remains distinct from SP pacing, so throttling starters does not incorrectly suppress all pitching output
+5. Two-way players and flex slots resolve without double counting production or leaving eligible slots incorrectly empty
+
+**Plans:** 0/1 plans complete
+
+### Phase 106: Replacement & Availability Dynamics
+
+**Goal:** Reflect roster fragility by simulating missed time, bench coverage, and replacement-level churn.
+**Depends on:** Phase 105
+**Requirements:** CHURN-01, CHURN-02
+**Success Criteria** (what must be TRUE):
+
+1. Unfilled starter opportunity can be covered by bench depth or replacement-level production instead of disappearing silently
+2. Teams with thinner depth or higher missed-time exposure show lower medians and wider outcome ranges than equally projected healthier teams
+3. Output makes clear whether category production came from starters, bench coverage, or replacement fill
+4. Availability shocks can remove player opportunity for sampled windows and reallocate leftover volume to remaining roster or replacement paths
+5. Disabling churn and availability layers returns the same totals as the pure Phase 105 simulator
+
+**Plans:** 0/1 plans complete
+
+### Phase 107: Monte Carlo Outcomes & Backend Exposure
+
+**Goal:** Produce downstream-ready league outcome distributions with bounded runtime and calibration evidence.
+**Depends on:** Phase 106
+**Requirements:** MC-01, MC-02, OPS-01, CAL-01
+**Success Criteria** (what must be TRUE):
+
+1. A seeded run returns per-team finish distribution, first-place/top-3/top-6 probabilities, roto-point confidence intervals, and category swing ranges
+2. Probability outputs are internally consistent: each team's finish probabilities sum to approximately 100%, and league-wide rank occupancy is valid
+3. Repeated requests for the same snapshot, config, and seed can reuse a cached or persisted result instead of rerunning the full simulation
+4. Default run count for a standard roto league completes within an agreed backend runtime budget
+5. Results are available through a backend agent plus minimal API or report payload, with no major frontend dependency
+6. Calibration output shows interval coverage and bias on historical snapshots before later trade or waiver scenario tools depend on the distributions
+
+**Plans:** 0/1 plans complete
+
+---
+
+## v10.0 Architecture Improvements — paused 2026-05-16 (started 2026-05-15)
+
+**Status Note:** Paused when season-simulation work took priority. Existing phase folders were moved to `.planning/milestones/v10.0-phases/` so v11.0 can start cleanly.
 
 **Milestone Goal:** Eliminate scattered `new Agent()` instantiation, duplicated localStorage patterns, and mixed concerns in snapshot/worker/identity code by extracting five focused modules: container, worker runtime, snapshot pipeline decomposition, player identity consolidation, and frontend league workspace hook.
 

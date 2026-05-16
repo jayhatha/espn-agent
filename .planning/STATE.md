@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: v10.0
-milestone_name: Architecture Improvements
+milestone: v11.0
+milestone_name: Projected Season Simulation Engine
 status: planning
 stopped_at: ""
-last_updated: "2026-05-15T00:00:00.000Z"
+last_updated: "2026-05-16T00:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -16,17 +16,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-15)
+See: .planning/PROJECT.md (updated 2026-05-16)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v10.0 Architecture Improvements — container module, worker runtime, snapshot decomposition, player identity consolidation, frontend league workspace hook
+**Current focus:** v11.0 Projected Season Simulation Engine — canonical simulation state, opportunity and variance modeling, lineup and GS constraints, churn dynamics, Monte Carlo outputs
 
 ## Current Position
 
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-05-15 — Milestone v10.0 started
+Last activity: 2026-05-16 — Milestone v11.0 started; v10.0 phase folders archived into milestone storage
 
 ## Performance Metrics
 
@@ -76,6 +76,11 @@ _Updated after each plan completion_
 
 ### Decisions
 
+- [v11.0 roadmap]: Simulator composes on top of the existing allocation/projection pipeline instead of replacing `allocateProjections()` or shared rate-stat formulas
+- [v11.0 roadmap]: Milestone stays backend-first — ship reusable agent/module + minimal API/report exposure before any major frontend probability UI
+- [v11.0 roadmap]: Time progression is daily or configurable bucketed simulation from snapshot date to season end, not direct season-end sampling only
+- [v11.0 roadmap]: Replacement-level and availability modeling are heuristic, tunable, and traceable in outputs rather than hidden adjustments
+- [v11.0 roadmap]: Seeded reproducibility, runtime budget, and calibration/backtesting are milestone requirements, not post-launch polish
 - [v6.0 roadmap]: Phase 65 (shell) is pure frontend — build first, all other phases populate into it
 - [v6.0 roadmap]: Phase 66 (roto math) uses interpolateRotoPoints() in shared/formulas.ts — pure function, no DB writes
 - [v6.0 roadmap]: Phase 67 depends on Phase 66: marginal gain engine must exist before category opportunity map
@@ -147,6 +152,11 @@ _Updated after each plan completion_
 
 ### Roadmap Evolution
 
+- Phase 103 added: Simulation Contract & Baseline State — canonical input assembly + deterministic parity path
+- Phase 104 added: Opportunity & Variance Model — daily/bucketed usage streams + component-based uncertainty
+- Phase 105 added: Constraint-Aware Daily Season Simulator — lineup, slot, two-way, and GS pacing rules
+- Phase 106 added: Replacement & Availability Dynamics — bench coverage, replacement fill, and missed-time shocks
+- Phase 107 added: Monte Carlo Outcomes & Backend Exposure — finish distributions, caching, minimal API/reporting, calibration
 - Phase 71 added: Moves page data population — transaction ingestion, FAAB bid history, move impact computation
 - Phase 73 added: Show current and projected stats for each player on waivers and roster pages
 - Phase 74 added: Cache and materialize derived data from previous seasons to avoid recalculating immutable historical stats
@@ -160,6 +170,9 @@ _Updated after each plan completion_
 
 ### Blockers/Concerns
 
+- [v11.0 — runtime]: Default run count and caching strategy need measurement against backend worker/API budgets before results are exposed broadly
+- [v11.0 — calibration]: Historical snapshots and realized outcomes may be incomplete for interval-coverage validation, so calibration scope may need a first-pass heuristic harness
+- [v11.0 — churn]: Replacement-level fill must stay traceable and league-valid; no hidden projection-only transactions or fabricated exact future moves
 - [Phase 68 — FAAB]: ESPN mRoster view field name for FAAB remaining (acquisitionBudgetRemaining) is MEDIUM confidence — verify against live ESPN API before writing storage logic
 - [Phase 68 — GS]: GS cap field in league_settings_version JSONB needs verification from ESPN API before GS pacing is built
 - [Phase 67 — Category Map]: Free agent pool is never fetched from ESPN (CLAUDE.md Known Issue #1) — must fix or gracefully degrade before category opportunity map ships
@@ -199,7 +212,7 @@ None yet.
 | 260329-k0x | Add league GS + K/GS overview table to GS Pacing tab                                   | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
 | 260401-f32 | Fix waiver page position filter + % Owned + add % Started column                       | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
 | 260401-uyx | Add PitcherList SP ranking (PL) column to waivers free agents table                    | 2026-04-02 | fc382ee | [260401-uyx-add-pitcherlist-sp-ranking-column-to-wai](./quick/260401-uyx-add-pitcherlist-sp-ranking-column-to-wai/) |
-| 260515-rms | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/) |
+| 260515-rms | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/)                               |
 
 ## Session Continuity
 

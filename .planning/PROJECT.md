@@ -70,17 +70,17 @@ Give fantasy baseball managers an information edge that saves time and leads to 
 
 ### Active
 
-#### Current Milestone: v10.0 Architecture Improvements
+#### Current Milestone: v11.0 Projected Season Simulation Engine
 
-**Goal:** Eliminate scattered `new Agent()` instantiation, duplicated localStorage patterns, and mixed concerns in snapshot/worker/identity code by extracting five focused modules — container, worker runtime, snapshot pipeline, player identity, and frontend league workspace.
+**Goal:** Build a backend-first, seeded Monte Carlo engine that turns current standings plus RoS projections into constraint-aware remaining-season outcome distributions for roto leagues.
 
-- [ ] Backend process-scope adapters instantiated once and shared across all routes (container.ts)
-- [ ] Per-request agent construction replaced by factory functions from central container
-- [ ] BullMQ worker bootstrap (Redis, Queue, Worker, SIGTERM) extracted into shared runtime module
-- [ ] `SnapshotOrchestratorAgent.executeSnapshot()` decomposed into independently testable named phases
-- [ ] `PlayerIdentityResolutionAgent` owns all identity resolution logic (threshold, cache, DB write)
-- [ ] `localStorage` team selection encapsulated in `useLeagueTeam(leagueId)` hook across all pages
-- [ ] Page-local TypeScript interfaces consolidated into shared module types
+- [ ] Canonical simulation input assembled from latest snapshot, settings, rosters, current components, and allocated RoS projections
+- [ ] Deterministic baseline mode reproduces current projected standings when stochastic layers are disabled
+- [ ] Remaining season modeled as daily or bucketed opportunity streams with tunable variance by stat and role
+- [ ] Constraint-aware simulator honors lineup slots, two-way players, RP/SP separation, and GS cap pacing
+- [ ] Replacement-level fill and availability shocks widen outcomes without hiding where production came from
+- [ ] Monte Carlo runs return finish distributions, place probabilities, roto-point intervals, and category swing ranges
+- [ ] Seeded reproducibility, snapshot-bound caching, and calibration/backtesting exist before downstream scenario tools depend on outputs
 
 ### Deferred
 
@@ -105,6 +105,7 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 - **Projections**: FanGraphs CSV upload (manual) — ToS prevents automated fetching
 - **Rate stats**: Must use component math from `packages/shared/src/formulas.ts` — never average rates
 - **Roto only**: Category-based roto leagues — points/H2H are different paradigms
+- **Simulation runtime**: Seeded Monte Carlo runs must be cacheable by snapshot/config and fit a practical backend runtime budget
 
 ## Key Decisions
 
@@ -125,7 +126,10 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 | Strip auth for v4.0 personal use              | No login friction, re-enable later for multi-user              | ✓ Good    |
 | Hardcode league 112523 settings               | Reliable config over error-prone DOM detection                 | ✓ Good    |
 | OPS as custom rate stat                       | OBP + SLG components, not a simple stat                        | ✓ Good    |
+| Compose season simulation on existing projection pipeline | Reuse allocation, roster, and stat-component math instead of forking formulas | — Pending |
+| Backend-first simulation exposure             | Ship reusable engine + minimal API/report payload before UI work | — Pending |
+| Seeded Monte Carlo with calibration           | Reproducible distributions must be trustworthy before downstream scenario tools depend on them | — Pending |
 
 ---
 
-_Last updated: 2026-05-15 after Phase 97 — Snapshot pipeline tests (v9.0 Architectural Philosophy Remediation complete). Starting v10.0 Architecture Improvements: container module, worker runtime, snapshot decomposition, player identity consolidation, frontend league workspace hook._
+_Last updated: 2026-05-16 after starting v11.0 Projected Season Simulation Engine. v10.0 Architecture Improvements paused and phase folders archived under .planning/milestones/v10.0-phases/._

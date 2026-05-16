@@ -3,7 +3,76 @@
 **Defined:** 2026-03-23
 **Core Value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions
 
-## v10.0 Requirements
+## v11.0 Requirements
+
+Requirements for the Projected Season Simulation Engine milestone.
+
+### Backend: Simulation Contract & Baseline
+
+- [ ] **SIM-01**: A canonical simulation state combines latest snapshot data, league settings, rosters, current standings components, and allocated RoS projections without duplicating rate-stat math outside the shared formulas/allocation path
+- [ ] **SIM-02**: A deterministic seeded dry-run mode reproduces current point-estimate projected standings when stochastic layers are disabled, so simulation builds on a verifiable baseline instead of a second projection branch
+
+### Backend: Opportunity & Variance Modeling
+
+- [ ] **OPP-01**: Remaining season output is modeled as daily or configurable time-bucket opportunity and usage streams per player role and roster slot, not only naive season-end totals
+- [ ] **VAR-01**: Uncertainty is tunable by stat and role, with counting stats sampled directly and rate stats derived from perturbed shared stat components rather than independent ERA/WHIP/OPS noise
+
+### Backend: Lineup & Usage Constraints
+
+- [ ] **LINEUP-01**: Simulated production honors roster-slot eligibility, active lineup limits, flex handling, and two-way player handling for every day or time bucket
+- [ ] **GS-01**: Pitching usage paces SP volume against the league GS cap while keeping SP and RP opportunity distinct across the remaining season
+
+### Backend: Replacement & Availability Dynamics
+
+- [ ] **CHURN-01**: Missed lineup opportunity is covered by traceable bench or replacement-level production instead of silently disappearing from team totals
+- [ ] **CHURN-02**: Availability shocks and roster churn heuristics widen outcomes without pretending to predict exact future transactions or injuries
+
+### Backend: Outcome Surface
+
+- [ ] **MC-01**: Monte Carlo runs return per-team finish distributions, place probabilities, roto-point intervals, and category swing ranges for a full league snapshot
+- [ ] **MC-02**: Simulation outputs are consumable by backend APIs now and reusable later by add/drop and trade scenario evaluators without route-specific recomputation logic
+
+### Backend: Execution Quality
+
+- [ ] **OPS-01**: Simulation supports configurable run counts, deterministic seeds, and snapshot-bound caching while staying within a practical backend runtime budget
+- [ ] **CAL-01**: Calibration and backtest tooling measures interval coverage and systematic bias against historical snapshots or realized outcomes before downstream features rely on the distributions
+
+## Traceability
+
+| REQ-ID    | Phase |
+| --------- | ----- |
+| SIM-01    | 103   |
+| SIM-02    | 103   |
+| OPP-01    | 104   |
+| VAR-01    | 104   |
+| LINEUP-01 | 105   |
+| GS-01     | 105   |
+| CHURN-01  | 106   |
+| CHURN-02  | 106   |
+| MC-01     | 107   |
+| MC-02     | 107   |
+| OPS-01    | 107   |
+| CAL-01    | 107   |
+
+## Out of Scope (v11.0)
+
+- Major frontend dashboards or new visualization-heavy UI beyond minimal API/report exposure
+- Points leagues or H2H scoring formats
+- Exact future transaction prediction, FAAB strategy automation, or opponent-behavior modeling
+- Full injury/news ingestion with player-specific medical forecasts
+- Draft-engine unification work across backend and extension beyond reusing pure Monte Carlo patterns
+- Trade and add/drop scenario products themselves — v11.0 ships reusable simulation core only
+
+## Future Requirements
+
+- Scenario evaluators that consume season-simulation distributions for trade, waiver, and lineup decisions
+- Lightweight frontend surfaces for place probabilities, category swing bands, and confidence intervals
+- Schedule-strength and opponent-context adjustments layered on top of the simulation core
+- Mastra AI agent integration (deferred from v6.0)
+- Snake draft / H2H league support (deferred from v1.0)
+- Trade retrospectives with actual vs projected outcomes
+
+## v10.0 Requirements (Paused — retained context)
 
 Requirements for the Architecture Improvements milestone.
 
@@ -34,7 +103,7 @@ Requirements for the Architecture Improvements milestone.
 - [ ] **FE-01**: `localStorage.getItem/setItem(`league\_${leagueId}\_team`)` pattern duplicated across 7+ pages is encapsulated in a `useLeagueTeam(leagueId)` hook that returns `[teamId, setTeamId]` — pages import the hook rather than accessing localStorage directly
 - [ ] **FE-02**: Page-local TypeScript interfaces that are duplicated across pages (`RosterPlayer`, `Team`, `CategoryImpact`, etc.) are consolidated into a shared `packages/frontend/src/lib/types/league.ts` module and imported where needed
 
-## Traceability
+### Traceability (v10.0)
 
 | REQ-ID  | Phase |
 | ------- | ----- |
@@ -51,18 +120,12 @@ Requirements for the Architecture Improvements milestone.
 | FE-01   | 102   |
 | FE-02   | 102   |
 
-## Out of Scope (v10.0)
+### Out of Scope (v10.0)
 
 - Public API / multi-tenant mode — deferred (no auth rework)
 - Database schema changes — no new tables in this milestone
 - New user-facing features — architectural refactor only, no visible behavior changes
 - Chrome extension refactor — scoped to web app backend/frontend only
-
-## Future Requirements
-
-- Mastra AI agent integration (deferred from v6.0)
-- Snake draft / H2H league support (deferred from v1.0)
-- Trade retrospectives with actual vs projected outcomes
 
 ---
 
@@ -248,4 +311,4 @@ Requirements for the Architecture Improvements milestone.
 ---
 
 _Requirements defined: 2026-03-23_
-_Last updated: 2026-03-30 — added PROJ-01 through PROJ-12 for Phase 79_
+_Last updated: 2026-05-16 — added v11.0 Projected Season Simulation Engine requirements; retained v10.0 below as paused context_
