@@ -623,7 +623,7 @@ Plans:
 
 ### Phase 102: Frontend League Workspace
 
-**Goal:** `localStorage.getItem(`league_${leagueId}_team`)` duplicated across 7 pages is encapsulated in a `useLeagueTeam(leagueId)` hook, and page-local TypeScript interfaces that duplicate common types are consolidated in `lib/types/league.ts`.
+**Goal:** `localStorage.getItem(`league\_${leagueId}\_team`)` duplicated across 7 pages is encapsulated in a `useLeagueTeam(leagueId)` hook, and page-local TypeScript interfaces that duplicate common types are consolidated in `lib/types/league.ts`.
 **Depends on:** Phase 101
 **Requirements:** FE-01, FE-02
 **Success Criteria** (what must be TRUE):
@@ -631,7 +631,7 @@ Plans:
 1. `packages/frontend/src/lib/hooks/use-league-team.ts` exports `useLeagueTeam(leagueId): [string | null, (id: string) => void]` with SSR-safe `typeof window` guard
 2. All 7 pages (`waivers`, `moves`, `lineup`, `standings`, `trends`, `changelog`, `trades`) import `useLeagueTeam` instead of accessing `localStorage` directly for team selection
 3. `packages/frontend/src/lib/types/league.ts` exports consolidated shared interfaces used across pages
-4. No inline `localStorage.getItem(`league_${leagueId}_team`)` remains in any page file
+4. No inline `localStorage.getItem(`league\_${leagueId}\_team`)` remains in any page file
 5. `npx tsc --noEmit` passes with 0 errors in `packages/frontend`
 6. Pages render and team selection persists correctly in browser
 

@@ -98,7 +98,7 @@ Each agent is an isolated class in `packages/backend/src/agents/`. Agents should
 
 ### Unimplemented Agents
 
-*(All core agents implemented — see Chrome extension package for draft assistance functionality)*
+_(All core agents implemented — see Chrome extension package for draft assistance functionality)_
 
 ## API Endpoints
 
@@ -166,3 +166,7 @@ Projected values combine current-to-date components + remaining-season projected
 4. WaiverRecommendationAgent delta simulation returns hardcoded 0.5 (real delta calc not implemented)
 5. SnapshotOrchestratorAgent does not ingest transaction events (league_transaction_event table stays empty)
 6. Manual snapshot endpoint now returns 202 (async) — frontend should poll `GET /snapshot/status/:jobId` for completion rather than blocking
+
+## Auth Mode
+
+The backend uses `SINGLE_USER_MODE=true` (set in `.env`) to bypass JWT authentication for local development. When `SINGLE_USER_MODE` is not set, the real JWT path runs and unauthenticated requests receive 401. See `packages/backend/src/middleware/auth.ts` for the gate. To enable multi-user mode: remove `SINGLE_USER_MODE` from `.env` and implement ownership checks in `requireLeagueAccess` and `requireTeamOwnership`.
