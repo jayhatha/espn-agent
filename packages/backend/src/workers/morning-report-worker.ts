@@ -1,22 +1,17 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { MorningReportAgent } from "../agents/morning-report.js";
 import { SlackGateway } from "../utils/slack-gateway.js";
 import { isSlackEnabled } from "../utils/feature-flags.js";
 import type { MorningReportData } from "../agents/morning-report.js";
+import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  { maxRetriesPerRequest: null },
-);
+const connection = createRedisConnection();
 
-export const morningReportQueue = new Queue("morning-reports", {
-  connection: connection as any,
-});
+export const morningReportQueue = createQueue("morning-reports", connection);
 
 // Check if Slack is enabled before starting worker
 if (!isSlackEnabled()) {
@@ -35,7 +30,7 @@ interface MorningReportJobData {
 }
 
 function startWorker() {
-  const worker = new Worker<MorningReportJobData>(
+  const worker = createWorker<MorningReportJobData>(
     "morning-reports",
     async (job: Job<MorningReportJobData>) => {
       const { slackUserLinkId, leagueId, reportDate } = job.data;
@@ -147,8 +142,8 @@ function startWorker() {
         throw error;
       }
     },
+    connection,
     {
-      connection: connection as any,
       concurrency: 5, // Process up to 5 reports concurrently
     },
   );
@@ -163,12 +158,7 @@ function startWorker() {
   });
 
   // Graceful shutdown
-  process.on("SIGTERM", async () => {
-    logger.info("SIGTERM received, closing morning report worker...");
-    await worker.close();
-    await connection.quit();
-    process.exit(0);
-  });
+  registerShutdown([worker], [connection], logger);
 
   logger.info("Morning report worker started");
 }

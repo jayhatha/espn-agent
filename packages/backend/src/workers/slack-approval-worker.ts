@@ -1,19 +1,16 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { fileURLToPath } from "url";
 import { getDb } from "../db/connection.js";
 import { isSlackEnabled } from "../utils/feature-flags.js";
 import axios from "axios";
+import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  { maxRetriesPerRequest: null },
-);
+const connection = createRedisConnection();
 
-export const slackApprovalQueue = new Queue("slack-approvals", { connection: connection as any });
+export const slackApprovalQueue = createQueue("slack-approvals", connection);
 
 interface SlackApprovalJobData {
   actionId: string;
@@ -39,7 +36,7 @@ export function startWorker(): void {
     process.exit(0);
   }
 
-const worker = new Worker<SlackApprovalJobData>(
+const worker = createWorker<SlackApprovalJobData>(
   "slack-approvals",
   async (job: Job<SlackApprovalJobData>) => {
     const {
@@ -188,8 +185,8 @@ const worker = new Worker<SlackApprovalJobData>(
       throw error;
     }
   },
+  connection,
   {
-    connection: connection as any,
     concurrency: 10, // Process approvals quickly
   },
 );
@@ -268,12 +265,7 @@ worker.on("failed", (job, err) => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, closing approval worker...");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
-});
+registerShutdown([worker], [connection], logger);
 
 logger.info("Slack approval worker started");
 }

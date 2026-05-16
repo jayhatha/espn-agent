@@ -1,9 +1,9 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { PlayerPoolSyncAgent } from "../agents/player-pool-sync.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -16,17 +16,10 @@ function getCurrentSeason(): number {
   return now.getFullYear();
 }
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  {
-    maxRetriesPerRequest: null,
-  },
-);
+const connection = createRedisConnection();
 
 // Create queue for player pool sync jobs
-export const playerPoolQueue = new Queue("player-pool-sync", {
-  connection: connection as any,
-});
+export const playerPoolQueue = createQueue("player-pool-sync", connection);
 
 // Schedule daily job at 4:00 AM ET
 playerPoolQueue
@@ -54,7 +47,7 @@ interface PlayerPoolJobData {
 }
 
 // Worker to process sync jobs
-const worker = new Worker<PlayerPoolJobData>(
+const worker = createWorker<PlayerPoolJobData>(
   "player-pool-sync",
   async (job: Job<PlayerPoolJobData>) => {
     const { season } = job.data;
@@ -98,9 +91,7 @@ const worker = new Worker<PlayerPoolJobData>(
       throw error;
     }
   },
-  {
-    connection: connection as any,
-  },
+  connection,
 );
 
 // Event listeners
@@ -113,11 +104,7 @@ worker.on("failed", (job, err) => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, shutting down player pool worker");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
+registerShutdown([worker], [connection], logger);
 });
 
 process.on("SIGINT", async () => {

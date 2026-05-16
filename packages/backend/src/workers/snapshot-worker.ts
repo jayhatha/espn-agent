@@ -1,9 +1,9 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
-import { createSnapshotOrchestrator } from "../agents/agent-factory.js";
+import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
 
 // Import backfill worker so it runs in the same process
 import "./backfill-worker.js";
@@ -20,20 +20,11 @@ const logger = pino({
   level: process.env.LOG_LEVEL || "info",
 });
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  {
-    maxRetriesPerRequest: null,
-  },
-);
+const connection = createRedisConnection();
 
 // Create queue and DLQ
-export const snapshotQueue = new Queue("snapshots", {
-  connection: connection as any,
-});
-export const snapshotDLQ = new Queue("snapshots-dlq", {
-  connection: connection as any,
-});
+export const snapshotQueue = createQueue("snapshots", connection);
+export const snapshotDLQ = createQueue("snapshots-dlq", connection);
 
 interface SnapshotJobData {
   leagueId: number;
@@ -45,7 +36,7 @@ interface SnapshotJobData {
 }
 
 // Worker
-const worker = new Worker<SnapshotJobData>(
+const worker = createWorker<SnapshotJobData>(
   "snapshots",
   async (job: Job<SnapshotJobData>) => {
     const { leagueId, snapshotDate, auth } = job.data;
@@ -56,7 +47,7 @@ const worker = new Worker<SnapshotJobData>(
     );
 
     const db = getDb();
-    const orchestrator = createSnapshotOrchestrator(db, logger);
+    const orchestrator = new SnapshotOrchestratorAgent(db, logger);
 
     try {
       await orchestrator.executeSnapshot({
@@ -72,7 +63,7 @@ const worker = new Worker<SnapshotJobData>(
       throw error;
     }
   },
-  { connection: connection as any, concurrency: 3 },
+  { concurrency: 3 },
 );
 
 worker.on("completed", (job) => {
@@ -168,12 +159,7 @@ export async function inspectDLQ(limit = 10) {
 }
 
 // Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, closing worker...");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
-});
+registerShutdown([worker], [connection], logger);
 
 logger.info("Worker started");
 

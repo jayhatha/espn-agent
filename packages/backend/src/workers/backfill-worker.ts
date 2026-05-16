@@ -1,9 +1,9 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { HistoricalBackfillAgent, type BackfillProgress } from "../agents/historical-backfill.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
+import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
 
 /**
  * Background worker for historical backfill jobs
@@ -14,15 +14,10 @@ const logger = pino({
   level: process.env.LOG_LEVEL || "info",
 });
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  {
-    maxRetriesPerRequest: null,
-  },
-);
+const connection = createRedisConnection();
 
 // Create queue for backfills (separate from snapshot queue)
-export const backfillQueue = new Queue("backfills", { connection } as any);
+export const backfillQueue = createQueue("backfills", connection);
 
 export interface BackfillJobData {
   leagueId: number;
@@ -36,7 +31,7 @@ export interface BackfillJobData {
 }
 
 // Worker - processes backfill jobs
-const worker = new Worker<BackfillJobData>(
+const worker = createWorker<BackfillJobData>(
   "backfills",
   async (job: Job<BackfillJobData>) => {
     const { leagueId, season, startWeek, endWeek, espnAuth } = job.data;
@@ -80,10 +75,8 @@ const worker = new Worker<BackfillJobData>(
       throw error;
     }
   },
-  {
-    connection: connection as any,
-    concurrency: 1, // One backfill at a time to respect rate limits
-  },
+  connection,
+  { concurrency: 1 },
 );
 
 worker.on("completed", (job) => {
@@ -95,11 +88,6 @@ worker.on("failed", (job, err) => {
 });
 
 // Graceful shutdown
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, closing backfill worker...");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
-});
+registerShutdown([worker], [connection], logger);
 
 logger.info("Backfill worker started");

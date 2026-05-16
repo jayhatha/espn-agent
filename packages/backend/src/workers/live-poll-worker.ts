@@ -1,8 +1,8 @@
-import { Queue, Worker, type Job } from "bullmq";
-import IORedis from "ioredis";
+import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { LivePollAgent } from "../agents/live-poll.js";
+import { createRedisConnection, createQueue, createWorker } from "./worker-runtime.js";
 
 /**
  * Live Poll Worker
@@ -15,20 +15,15 @@ import { LivePollAgent } from "../agents/live-poll.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 
-const connection = new IORedis(
-  process.env.REDIS_URL || "redis://localhost:6379",
-  { maxRetriesPerRequest: null },
-);
+const connection = createRedisConnection();
 
-export const livePollQueue = new Queue("live-polls", {
-  connection: connection as any,
-});
+export const livePollQueue = createQueue("live-polls", connection);
 
 interface LivePollJobData {
   leagueId: number;
 }
 
-const worker = new Worker<LivePollJobData>(
+const worker = createWorker<LivePollJobData>(
   "live-polls",
   async (job: Job<LivePollJobData>) => {
     if (process.env.LIVE_POLL_ENABLED !== "true") {
@@ -51,7 +46,8 @@ const worker = new Worker<LivePollJobData>(
     const eventCount = await agent.refresh(leagueId, today);
     return { leagueId, today, eventCount };
   },
-  { connection: connection as any, concurrency: 2 },
+  connection,
+  { concurrency: 2 },
 );
 
 worker.on("failed", (job, err) => {
