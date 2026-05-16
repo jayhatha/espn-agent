@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ArrowRightLeft, ExternalLink, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  ExternalLink,
+  CheckCircle,
+  AlertTriangle,
+  Loader2,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { useLeagueTeam } from "@/lib/hooks";
 import { Container } from "@/components/ui/Container";
@@ -101,7 +108,9 @@ export default function TradesPage() {
   const leagueId = params.id as string;
   const [selectedTeamId] = useLeagueTeam(leagueId);
   const [showAnalyzer, setShowAnalyzer] = useState(false);
-  const [expandedCandidate, setExpandedCandidate] = useState<number | null>(null);
+  const [expandedCandidate, setExpandedCandidate] = useState<number | null>(
+    null,
+  );
   const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(
     null,
   );
@@ -145,7 +154,7 @@ export default function TradesPage() {
 
   // Fetch league status for ESPN links
   const { data: leagueStatus } = useQuery({
-    queryKey: ['league', leagueId],
+    queryKey: ["league", leagueId],
     queryFn: () => api.getLeagueStatus(parseInt(leagueId, 10)),
   });
   const espnLeagueId = leagueStatus?.league?.espn_league_id;
@@ -200,10 +209,7 @@ export default function TradesPage() {
       return api.analyzeTradeImpact(
         parseInt(leagueId, 10),
         selectedTeamId!,
-        {
-          givePlayers: trade.givePlayers.map((p) => p.playerId),
-          receivePlayers: trade.receivePlayers.map((p) => p.playerId),
-        },
+        trade,
       ) as Promise<{ analysis: TradeImpactAnalysis }>;
     },
     onSuccess: (data) => {
@@ -221,9 +227,7 @@ export default function TradesPage() {
     }
 
     const givePlayers = givePlayerIds.map((id) => {
-      const player = rostersData.userTeam.roster.find(
-        (p) => p.playerId === id,
-      );
+      const player = rostersData.userTeam.roster.find((p) => p.playerId === id);
       return {
         playerId: id,
         playerName: player?.playerName || `Player ${id}`,
@@ -284,30 +288,42 @@ export default function TradesPage() {
       {/* Compact header with inline mode toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-h3 font-semibold text-content dark:text-shell-text">Trades</h1>
+          <h1 className="text-h3 font-semibold text-content dark:text-shell-text">
+            Trades
+          </h1>
           <p className="text-body-sm text-content-secondary dark:text-shell-muted">
-            {showAnalyzer ? "Build and analyze custom trades" : "Auto-discovered roto-point-positive swaps"}
+            {showAnalyzer
+              ? "Build and analyze custom trades"
+              : "Auto-discovered roto-point-positive swaps"}
           </p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { setShowAnalyzer(false); setExpandedCandidate(null); }}
+            onClick={() => {
+              setShowAnalyzer(false);
+              setExpandedCandidate(null);
+            }}
             className={cn(
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
               !showAnalyzer
                 ? "bg-accent text-white"
-                : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+                : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text",
             )}
           >
             Auto Finder
           </button>
           <button
-            onClick={() => { setShowAnalyzer(true); setTradeAnalysis(null); setGivePlayerIds([]); setReceivePlayerIds([]); }}
+            onClick={() => {
+              setShowAnalyzer(true);
+              setTradeAnalysis(null);
+              setGivePlayerIds([]);
+              setReceivePlayerIds([]);
+            }}
             className={cn(
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
               showAnalyzer
                 ? "bg-accent text-white"
-                : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text"
+                : "bg-transparent border border-shell-border text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text",
             )}
           >
             <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -362,7 +378,8 @@ export default function TradesPage() {
                     {/* Your Team */}
                     <div>
                       <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
-                        You Give ({givePlayerIds.length}/3 selected) - {rostersData.userTeam.name}
+                        You Give ({givePlayerIds.length}/3 selected) -{" "}
+                        {rostersData.userTeam.name}
                       </label>
                       <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
                         {rostersData.userTeam.roster.map((player) => (
@@ -373,8 +390,13 @@ export default function TradesPage() {
                             <div className="pl-3">
                               <input
                                 type="checkbox"
-                                checked={givePlayerIds.includes(player.playerId)}
-                                disabled={givePlayerIds.length >= 3 && !givePlayerIds.includes(player.playerId)}
+                                checked={givePlayerIds.includes(
+                                  player.playerId,
+                                )}
+                                disabled={
+                                  givePlayerIds.length >= 3 &&
+                                  !givePlayerIds.includes(player.playerId)
+                                }
                                 onChange={(e) => {
                                   if (e.target.checked) {
                                     setGivePlayerIds([
@@ -420,7 +442,8 @@ export default function TradesPage() {
                     {/* Partner Team */}
                     <div>
                       <label className="block text-body-sm font-medium text-content dark:text-shell-text mb-3">
-                        You Receive ({receivePlayerIds.length}/3 selected) - {rostersData.partnerTeam.name}
+                        You Receive ({receivePlayerIds.length}/3 selected) -{" "}
+                        {rostersData.partnerTeam.name}
                       </label>
                       <div className="space-y-2 max-h-96 overflow-y-auto border border-neutral-200 dark:border-shell-border rounded-lg p-3">
                         {rostersData.partnerTeam.roster.map((player) => (
@@ -434,7 +457,10 @@ export default function TradesPage() {
                                 checked={receivePlayerIds.includes(
                                   player.playerId,
                                 )}
-                                disabled={receivePlayerIds.length >= 3 && !receivePlayerIds.includes(player.playerId)}
+                                disabled={
+                                  receivePlayerIds.length >= 3 &&
+                                  !receivePlayerIds.includes(player.playerId)
+                                }
                                 onChange={(e) => {
                                   if (e.target.checked) {
                                     setReceivePlayerIds([
@@ -518,7 +544,8 @@ export default function TradesPage() {
                       analyzeTradeM.isPending ||
                       givePlayerIds.length === 0 ||
                       receivePlayerIds.length === 0 ||
-                      (validationResult !== null && !validationResult.isLegal) ||
+                      (validationResult !== null &&
+                        !validationResult.isLegal) ||
                       isValidating
                     }
                   >
@@ -532,9 +559,11 @@ export default function TradesPage() {
                         <Loader2 className="animate-spin h-4 w-4 mr-2" />
                         Validating...
                       </>
-                    ) : validationResult && !validationResult.isLegal
-                      ? "Fix Roster Issues First"
-                      : `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`}
+                    ) : validationResult && !validationResult.isLegal ? (
+                      "Fix Roster Issues First"
+                    ) : (
+                      `Analyze ${givePlayerIds.length}-for-${receivePlayerIds.length} Trade`
+                    )}
                   </Button>
                 </div>
 
@@ -548,8 +577,8 @@ export default function TradesPage() {
                     ) && (
                       <div className="mt-3">
                         <p className="text-body-sm text-negative mb-3">
-                          Trade analysis requires projections. Please contact your
-                          administrator to upload projections.
+                          Trade analysis requires projections. Please contact
+                          your administrator to upload projections.
                         </p>
                         <Link
                           href={`/leagues/${leagueId}`}
@@ -580,7 +609,10 @@ export default function TradesPage() {
                         Net Roto Point Impact
                       </div>
                       <div
-                        className={cn("text-h2 font-bold font-mono", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}
+                        className={cn(
+                          "text-h2 font-bold font-mono",
+                          renderDeltaColor(tradeAnalysis.deltaOverallPoints),
+                        )}
                       >
                         {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
                         {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto pts
@@ -592,7 +624,9 @@ export default function TradesPage() {
                     </div>
 
                     <Badge
-                      variant={getRecommendationVariant(tradeAnalysis.recommendation)}
+                      variant={getRecommendationVariant(
+                        tradeAnalysis.recommendation,
+                      )}
                       className="uppercase text-sm px-4 py-2 rounded-lg"
                     >
                       {tradeAnalysis.recommendation}
@@ -631,7 +665,10 @@ export default function TradesPage() {
 
                 {/* Category Breakdown */}
                 <div>
-                  <Heading level={4} className="uppercase tracking-wider mb-3 text-body-sm text-content-secondary dark:text-shell-muted font-semibold">
+                  <Heading
+                    level={4}
+                    className="uppercase tracking-wider mb-3 text-body-sm text-content-secondary dark:text-shell-muted font-semibold"
+                  >
                     Category Impact
                   </Heading>
                   <div className="overflow-x-auto">
@@ -651,42 +688,66 @@ export default function TradesPage() {
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                         {[...tradeAnalysis.categoryImpacts]
-                          .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
+                          .sort(
+                            (a, b) =>
+                              Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints),
+                          )
                           .map((cat) => (
-                          <tr key={cat.categoryName} className={cn(
-                            "hover:bg-surface-secondary dark:hover:bg-shell-bg",
-                            cat.deltaPoints > 0 && "bg-positive-light/30 dark:bg-positive-dark-bg/15",
-                            cat.deltaPoints < 0 && "bg-negative-light/30 dark:bg-negative-dark-bg/15",
-                          )}>
-                            <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
-                              {cat.categoryName}
-                            </td>
-                            <td className="px-4 py-3 text-body-sm text-center">
-                              <span
-                                className={cn("font-semibold text-data", renderDeltaColor(cat.deltaRank * -1))}
-                              >
-                                {cat.currentRank} &rarr; {cat.projectedRank}
-                                {cat.deltaRank !== 0 &&
-                                  ` (${cat.deltaRank > 0 ? "+" : ""}${cat.deltaRank})`}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-body-sm text-right">
-                              <span
-                                className={cn("font-semibold text-data", renderDeltaColor(cat.deltaPoints))}
-                              >
-                                {cat.deltaPoints > 0 ? "+" : ""}
-                                {cat.deltaPoints.toFixed(1)} roto pts
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                            <tr
+                              key={cat.categoryName}
+                              className={cn(
+                                "hover:bg-surface-secondary dark:hover:bg-shell-bg",
+                                cat.deltaPoints > 0 &&
+                                  "bg-positive-light/30 dark:bg-positive-dark-bg/15",
+                                cat.deltaPoints < 0 &&
+                                  "bg-negative-light/30 dark:bg-negative-dark-bg/15",
+                              )}
+                            >
+                              <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
+                                {cat.categoryName}
+                              </td>
+                              <td className="px-4 py-3 text-body-sm text-center">
+                                <span
+                                  className={cn(
+                                    "font-semibold text-data",
+                                    renderDeltaColor(cat.deltaRank * -1),
+                                  )}
+                                >
+                                  {cat.currentRank} &rarr; {cat.projectedRank}
+                                  {cat.deltaRank !== 0 &&
+                                    ` (${cat.deltaRank > 0 ? "+" : ""}${cat.deltaRank})`}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-body-sm text-right">
+                                <span
+                                  className={cn(
+                                    "font-semibold text-data",
+                                    renderDeltaColor(cat.deltaPoints),
+                                  )}
+                                >
+                                  {cat.deltaPoints > 0 ? "+" : ""}
+                                  {cat.deltaPoints.toFixed(1)} roto pts
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
                         <tr className="bg-surface-secondary dark:bg-shell-bg font-semibold">
-                          <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">Total</td>
+                          <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">
+                            Total
+                          </td>
                           <td className="px-4 py-3" />
                           <td className="px-4 py-3 text-body-sm text-right">
-                            <span className={cn("text-data", renderDeltaColor(tradeAnalysis.deltaOverallPoints))}>
+                            <span
+                              className={cn(
+                                "text-data",
+                                renderDeltaColor(
+                                  tradeAnalysis.deltaOverallPoints,
+                                ),
+                              )}
+                            >
                               {tradeAnalysis.deltaOverallPoints > 0 ? "+" : ""}
-                              {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto pts
+                              {tradeAnalysis.deltaOverallPoints.toFixed(1)} roto
+                              pts
                             </span>
                           </td>
                         </tr>
@@ -703,233 +764,272 @@ export default function TradesPage() {
       {/* Auto Trade Finder */}
       {!showAnalyzer && (
         <div>
-            {candidatesData &&
-              candidatesData.candidates.length > 0 &&
-              candidatesData.candidates[0]?.positionalContext?.needPositions &&
-              candidatesData.candidates[0].positionalContext.needPositions.length >
-                0 && (
-                <div className="mb-4 px-4 py-2.5 bg-shell-panel dark:bg-shell-panel border border-shell-border rounded-lg flex items-center gap-3">
-                  <span
-                    className="text-body-sm text-content-secondary dark:text-shell-muted cursor-help border-b border-dotted border-content-secondary/40"
-                    title="Positions where adding a player would give you the biggest projected standings improvement"
-                  >
-                    Positions of need:
-                  </span>
-                  <div className="flex gap-1.5">
-                    {candidatesData.candidates[0].positionalContext.needPositions.map((pos) => (
-                      <span key={pos} className="px-2 py-0.5 bg-info/10 text-info text-xs font-medium rounded">
+          {candidatesData &&
+            candidatesData.candidates.length > 0 &&
+            candidatesData.candidates[0]?.positionalContext?.needPositions &&
+            candidatesData.candidates[0].positionalContext.needPositions
+              .length > 0 && (
+              <div className="mb-4 px-4 py-2.5 bg-shell-panel dark:bg-shell-panel border border-shell-border rounded-lg flex items-center gap-3">
+                <span
+                  className="text-body-sm text-content-secondary dark:text-shell-muted cursor-help border-b border-dotted border-content-secondary/40"
+                  title="Positions where adding a player would give you the biggest projected standings improvement"
+                >
+                  Positions of need:
+                </span>
+                <div className="flex gap-1.5">
+                  {candidatesData.candidates[0].positionalContext.needPositions.map(
+                    (pos) => (
+                      <span
+                        key={pos}
+                        className="px-2 py-0.5 bg-info/10 text-info text-xs font-medium rounded"
+                      >
                         {pos}
                       </span>
-                    ))}
-                  </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            )}
+
+          {candidatesLoading ? (
+            <LoadingSkeleton lines={3} />
+          ) : candidatesError ? (
+            <div>
+              <ErrorAlert message={(candidatesError as Error).message} />
+              {(candidatesError as Error).message.includes(
+                "projected standings",
+              ) && (
+                <div className="mt-4">
+                  <p className="text-body-sm text-negative mb-3">
+                    Trade suggestions require projections. Please contact your
+                    administrator to upload projections.
+                  </p>
+                  <Link
+                    href={`/leagues/${leagueId}`}
+                    className="inline-flex items-center px-4 py-2 bg-negative text-white text-body-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Go to League Page
+                  </Link>
                 </div>
               )}
-
-            {candidatesLoading ? (
-              <LoadingSkeleton lines={3} />
-            ) : candidatesError ? (
-              <div>
-                <ErrorAlert message={(candidatesError as Error).message} />
-                {(candidatesError as Error).message.includes(
-                  "projected standings",
-                ) && (
-                  <div className="mt-4">
-                    <p className="text-body-sm text-negative mb-3">
-                      Trade suggestions require projections. Please contact your
-                      administrator to upload projections.
-                    </p>
-                    <Link
-                      href={`/leagues/${leagueId}`}
-                      className="inline-flex items-center px-4 py-2 bg-negative text-white text-body-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Go to League Page
-                    </Link>
-                  </div>
-                )}
-              </div>
-            ) : candidatesData && candidatesData.candidates.length > 0 ? (
-              <div className="space-y-4">
-                {candidatesData.candidates.map((candidate, idx) => (
-                  <div
-                    key={idx}
-                    className="border border-shell-border rounded-lg p-4 sm:p-5 bg-shell-panel dark:bg-shell-panel hover:border-accent/40 transition-colors cursor-pointer"
-                    onClick={() => setExpandedCandidate(expandedCandidate === idx ? null : idx)}
-                  >
-                    {/* Header row: delta | team | likelihood */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="px-2.5 py-1 rounded-md font-bold text-base font-mono bg-positive/10 text-positive">
-                        +{candidate.deltaOverallPoints.toFixed(1)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-semibold text-content dark:text-shell-text truncate block">
-                          {candidate.partnerTeamName}
-                        </span>
-                      </div>
-                      <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full",
-                        candidate.likelihood === "high" ? "bg-positive/10 text-positive" :
-                        candidate.likelihood === "medium" ? "bg-warning/10 text-warning" :
-                        "bg-negative/10 text-negative"
-                      )}>
-                        {candidate.likelihood}
+            </div>
+          ) : candidatesData && candidatesData.candidates.length > 0 ? (
+            <div className="space-y-4">
+              {candidatesData.candidates.map((candidate, idx) => (
+                <div
+                  key={idx}
+                  className="border border-shell-border rounded-lg p-4 sm:p-5 bg-shell-panel dark:bg-shell-panel hover:border-accent/40 transition-colors cursor-pointer"
+                  onClick={() =>
+                    setExpandedCandidate(expandedCandidate === idx ? null : idx)
+                  }
+                >
+                  {/* Header row: delta | team | likelihood */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="px-2.5 py-1 rounded-md font-bold text-base font-mono bg-positive/10 text-positive">
+                      +{candidate.deltaOverallPoints.toFixed(1)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-semibold text-content dark:text-shell-text truncate block">
+                        {candidate.partnerTeamName}
                       </span>
                     </div>
+                    <span
+                      className={cn(
+                        "text-xs font-medium px-2 py-0.5 rounded-full",
+                        candidate.likelihood === "high"
+                          ? "bg-positive/10 text-positive"
+                          : candidate.likelihood === "medium"
+                            ? "bg-warning/10 text-warning"
+                            : "bg-negative/10 text-negative",
+                      )}
+                    >
+                      {candidate.likelihood}
+                    </span>
+                  </div>
 
-                    {/* Trade Details */}
-                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
-                      <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-                        <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">
-                          You Give
+                  {/* Trade Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 mb-4">
+                    <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
+                      <div className="text-caption font-semibold text-negative uppercase tracking-wider mb-1.5">
+                        You Give
+                      </div>
+                      {candidate.trade.givePlayers.map((p, i) => (
+                        <div
+                          key={i}
+                          className="text-sm font-medium text-content dark:text-shell-text truncate"
+                        >
+                          {p.playerName}
                         </div>
-                        {candidate.trade.givePlayers.map((p, i) => (
-                          <div
-                            key={i}
-                            className="text-sm font-medium text-content dark:text-shell-text truncate"
-                          >
-                            {p.playerName}
-                          </div>
-                        ))}
-                        {candidate.givePlayerAsv != null && (
-                          <div className="mt-2 pt-2 border-t border-shell-border font-mono text-xs text-content-secondary dark:text-shell-muted">
-                            ASV <span className="font-semibold text-content dark:text-shell-text">${Math.round(candidate.givePlayerAsv)}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-center">
-                        <ArrowRight className="w-5 h-5 text-shell-muted rotate-90 sm:rotate-0" />
-                      </div>
-
-                      <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
-                        <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">
-                          You Get
+                      ))}
+                      {candidate.givePlayerAsv != null && (
+                        <div className="mt-2 pt-2 border-t border-shell-border font-mono text-xs text-content-secondary dark:text-shell-muted">
+                          ASV{" "}
+                          <span className="font-semibold text-content dark:text-shell-text">
+                            ${Math.round(candidate.givePlayerAsv)}
+                          </span>
                         </div>
-                        {candidate.trade.receivePlayers.map((p, i) => (
-                          <div
-                            key={i}
-                            className="text-sm font-medium text-content dark:text-shell-text truncate"
-                          >
-                            {p.playerName}
-                          </div>
-                        ))}
-                        {candidate.receivePlayerAsv != null && (
-                          <div className="mt-2 pt-2 border-t border-shell-border font-mono text-xs text-content-secondary dark:text-shell-muted">
-                            ASV <span className="font-semibold text-content dark:text-shell-text">${Math.round(candidate.receivePlayerAsv)}</span>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
 
-                    {/* Positional Context Badges */}
-                    {candidate.positionalContext?.fillsNeed && (
-                      <div className="mb-3 flex flex-wrap gap-2">
-                        <Badge variant="info">
-                          Fills need:{" "}
-                          {candidate.positionalContext.needPositions
-                            .filter((pos) =>
-                              candidate.positionalContext!.positionGained.includes(
-                                pos,
-                              ),
-                            )
-                            .join(", ")}
-                        </Badge>
-                        {candidate.positionalContext.positionalBonus >= 1.0 && (
-                          <Badge variant="default">
-                            High positional value
-                          </Badge>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center justify-center">
+                      <ArrowRight className="w-5 h-5 text-shell-muted rotate-90 sm:rotate-0" />
+                    </div>
 
-                    <p className="text-body-sm text-content-secondary dark:text-shell-muted leading-relaxed line-clamp-2 max-w-prose">
-                      {candidate.explanation}
-                    </p>
-                    {expandedCandidate !== idx && (
-                      <div className="mt-2 text-xs text-accent dark:text-shell-accent font-medium">
-                        Click to see category breakdown
+                    <div className="bg-shell-bg dark:bg-shell-bg border border-shell-border rounded-lg p-3">
+                      <div className="text-caption font-semibold text-positive uppercase tracking-wider mb-1.5">
+                        You Get
                       </div>
-                    )}
-
-                    {/* Expandable Category Breakdown */}
-                    {expandedCandidate === idx && (
-                      <div className="mt-3 border-t border-shell-border pt-3">
-                        <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-2 uppercase tracking-wider">
-                          Category Impact
+                      {candidate.trade.receivePlayers.map((p, i) => (
+                        <div
+                          key={i}
+                          className="text-sm font-medium text-content dark:text-shell-text truncate"
+                        >
+                          {p.playerName}
                         </div>
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
-                            <thead className="bg-surface-secondary dark:bg-shell-bg">
-                              <tr>
-                                <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted">
-                                  Category
-                                </th>
-                                <th className="px-3 py-2 text-center text-data font-medium text-content-secondary dark:text-shell-muted">
-                                  Rank
-                                </th>
-                                <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted">
-                                  Points
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
-                              {candidate.categoryImpacts
-                                .filter((cat) => cat.deltaPoints !== 0)
-                                .sort((a, b) => Math.abs(b.deltaPoints) - Math.abs(a.deltaPoints))
-                                .map((cat) => (
-                                  <tr key={cat.categoryName} className={cn(
-                                    cat.deltaPoints > 0 && "bg-positive-light/30",
-                                    cat.deltaPoints < 0 && "bg-negative-light/30",
-                                  )}>
-                                    <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text">
-                                      {cat.categoryName}
-                                    </td>
-                                    <td className="px-3 py-2 text-body-sm text-center">
-                                      <span className={cn("font-mono text-data", renderDeltaColor(cat.deltaRank * -1))}>
-                                        {cat.currentRank} &rarr; {cat.projectedRank}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2 text-body-sm text-right">
-                                      <span className={cn("font-semibold font-mono text-data", renderDeltaColor(cat.deltaPoints))}>
-                                        {cat.deltaPoints > 0 ? "+" : ""}{cat.deltaPoints.toFixed(1)}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))}
-                            </tbody>
-                          </table>
+                      ))}
+                      {candidate.receivePlayerAsv != null && (
+                        <div className="mt-2 pt-2 border-t border-shell-border font-mono text-xs text-content-secondary dark:text-shell-muted">
+                          ASV{" "}
+                          <span className="font-semibold text-content dark:text-shell-text">
+                            ${Math.round(candidate.receivePlayerAsv)}
+                          </span>
                         </div>
-
-                        {/* ESPN Link */}
-                        {espnLeagueId && season && (
-                          <div className="mt-3">
-                            <a
-                              href={getESPNTradeUrl(espnLeagueId, season)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Propose on ESPN
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Expand hint */}
-                    <div className="mt-2 text-data text-content-tertiary dark:text-shell-muted text-center">
-                      {expandedCandidate === idx ? "Click to collapse" : "Click to see category breakdown"}
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <ErrorAlert
-                variant="info"
-                message="No trade recommendations available. Upload projections data to analyze potential trades."
-                action={{ label: "Upload Projections", href: "/admin" }}
-              />
-            )}
+
+                  {/* Positional Context Badges */}
+                  {candidate.positionalContext?.fillsNeed && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <Badge variant="info">
+                        Fills need:{" "}
+                        {candidate.positionalContext.needPositions
+                          .filter((pos) =>
+                            candidate.positionalContext!.positionGained.includes(
+                              pos,
+                            ),
+                          )
+                          .join(", ")}
+                      </Badge>
+                      {candidate.positionalContext.positionalBonus >= 1.0 && (
+                        <Badge variant="default">High positional value</Badge>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-body-sm text-content-secondary dark:text-shell-muted leading-relaxed line-clamp-2 max-w-prose">
+                    {candidate.explanation}
+                  </p>
+                  {expandedCandidate !== idx && (
+                    <div className="mt-2 text-xs text-accent dark:text-shell-accent font-medium">
+                      Click to see category breakdown
+                    </div>
+                  )}
+
+                  {/* Expandable Category Breakdown */}
+                  {expandedCandidate === idx && (
+                    <div className="mt-3 border-t border-shell-border pt-3">
+                      <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-2 uppercase tracking-wider">
+                        Category Impact
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                          <thead className="bg-surface-secondary dark:bg-shell-bg">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted">
+                                Category
+                              </th>
+                              <th className="px-3 py-2 text-center text-data font-medium text-content-secondary dark:text-shell-muted">
+                                Rank
+                              </th>
+                              <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted">
+                                Points
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
+                            {candidate.categoryImpacts
+                              .filter((cat) => cat.deltaPoints !== 0)
+                              .sort(
+                                (a, b) =>
+                                  Math.abs(b.deltaPoints) -
+                                  Math.abs(a.deltaPoints),
+                              )
+                              .map((cat) => (
+                                <tr
+                                  key={cat.categoryName}
+                                  className={cn(
+                                    cat.deltaPoints > 0 &&
+                                      "bg-positive-light/30",
+                                    cat.deltaPoints < 0 &&
+                                      "bg-negative-light/30",
+                                  )}
+                                >
+                                  <td className="px-3 py-2 text-body-sm font-medium text-content dark:text-shell-text">
+                                    {cat.categoryName}
+                                  </td>
+                                  <td className="px-3 py-2 text-body-sm text-center">
+                                    <span
+                                      className={cn(
+                                        "font-mono text-data",
+                                        renderDeltaColor(cat.deltaRank * -1),
+                                      )}
+                                    >
+                                      {cat.currentRank} &rarr;{" "}
+                                      {cat.projectedRank}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-body-sm text-right">
+                                    <span
+                                      className={cn(
+                                        "font-semibold font-mono text-data",
+                                        renderDeltaColor(cat.deltaPoints),
+                                      )}
+                                    >
+                                      {cat.deltaPoints > 0 ? "+" : ""}
+                                      {cat.deltaPoints.toFixed(1)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* ESPN Link */}
+                      {espnLeagueId && season && (
+                        <div className="mt-3">
+                          <a
+                            href={getESPNTradeUrl(espnLeagueId, season)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 bg-accent text-content-inverse rounded-lg hover:bg-accent-hover font-medium text-body-sm gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Propose on ESPN
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Expand hint */}
+                  <div className="mt-2 text-data text-content-tertiary dark:text-shell-muted text-center">
+                    {expandedCandidate === idx
+                      ? "Click to collapse"
+                      : "Click to see category breakdown"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ErrorAlert
+              variant="info"
+              message="No trade recommendations available. Upload projections data to analyze potential trades."
+              action={{ label: "Upload Projections", href: "/admin" }}
+            />
+          )}
         </div>
       )}
     </Container>

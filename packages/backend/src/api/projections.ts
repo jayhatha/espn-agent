@@ -31,7 +31,10 @@ async function triggerDegradedLeagueResnapshots(
   let degradedLeagues: any[];
 
   if (projectionsNowFresh) {
-    // Re-snapshot all leagues that have any snapshot for today
+    // Re-snapshot all leagues that have any snapshot (not just today's).
+    // Projections uploaded after the last snapshot must be applied regardless
+    // of when that snapshot was taken — otherwise trade analysis stays broken
+    // for leagues whose last snapshot predates the projection upload.
     degradedLeagues = await db
       .selectFrom("league")
       .innerJoin(
@@ -44,7 +47,6 @@ async function triggerDegradedLeagueResnapshots(
         "league.espn_swid_encrypted",
         "league.espn_s2_encrypted",
       ])
-      .where("league_daily_snapshot.snapshot_date", "=", today)
       .groupBy([
         "league.id",
         "league.espn_swid_encrypted",

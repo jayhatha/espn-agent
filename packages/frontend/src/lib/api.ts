@@ -251,11 +251,14 @@ export const api = {
   async analyzeTradeImpact(
     leagueId: number,
     teamId: number,
-    data: { givePlayers: number[]; receivePlayers: number[] },
+    data: {
+      givePlayers: { playerId: number; playerName: string }[];
+      receivePlayers: { playerId: number; playerName: string }[];
+    },
   ) {
     return fetchAPI(`/api/leagues/${leagueId}/teams/${teamId}/trades/impact`, {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ trade: data }),
     });
   },
 
