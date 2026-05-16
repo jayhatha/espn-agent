@@ -199,6 +199,7 @@ None yet.
 | 260329-k0x | Add league GS + K/GS overview table to GS Pacing tab                                   | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
 | 260401-f32 | Fix waiver page position filter + % Owned + add % Started column                       | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
 | 260401-uyx | Add PitcherList SP ranking (PL) column to waivers free agents table                    | 2026-04-02 | fc382ee | [260401-uyx-add-pitcherlist-sp-ranking-column-to-wai](./quick/260401-uyx-add-pitcherlist-sp-ranking-column-to-wai/) |
+| 260515-rms | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/) |
 
 ## Session Continuity
 
