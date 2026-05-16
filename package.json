@@ -2,6 +2,7 @@
   "name": "espn-fantasy-assistant",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.1.2",
   "workspaces": [
     "packages/*"
   ],
@@ -10,9 +11,11 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@typescript/native-preview": "latest",
     "tsx": "^4.7.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.3"

@@ -55,6 +55,7 @@ services:
       SCRAPER_URL: http://scraper:3002
       INTERNAL_JOB_TOKEN: ${INTERNAL_JOB_TOKEN:?INTERNAL_JOB_TOKEN is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SINGLE_USER_MODE: ${SINGLE_USER_MODE:-false}
     ports:
       - "3001:3001"
     depends_on:

@@ -1,5 +1,5 @@
 # Frontend Dockerfile
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 
 # Install pnpm
 RUN npm install -g pnpm@10
@@ -33,7 +33,7 @@ WORKDIR /app/packages/frontend
 RUN pnpm build
 
 # Production stage
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
