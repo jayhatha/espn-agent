@@ -14,7 +14,6 @@ import {
 } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { StandingsChangeLogAgent } from "./standings-change-log.js";
-import { createSlackNotifier } from "../utils/notification-bus.js";
 import {
   changeLogEmitter,
   CHANGE_LOG_EVENT,
@@ -100,7 +99,10 @@ export class SnapshotOrchestratorAgent {
         .where("snapshot_date", "=", snapshotDate)
         .executeTakeFirst();
       if (existing) {
-        this.logger?.info({ leagueId, snapshotDate }, "Snapshot already exists, skipping");
+        this.logger?.info(
+          { leagueId, snapshotDate },
+          "Snapshot already exists, skipping",
+        );
         return;
       }
     }
@@ -112,33 +114,72 @@ export class SnapshotOrchestratorAgent {
         .where("id", "=", leagueId)
         .executeTakeFirstOrThrow();
 
-      const { espnData, normalized } = await this.fetchAndArchive(leagueId, league, espnAuth, snapshotDate);
-      const settingsVersionId = await this.getOrCreateSettingsVersion(leagueId, snapshotDate, normalized.settings);
+      const { espnData, normalized } = await this.fetchAndArchive(
+        leagueId,
+        league,
+        espnAuth,
+        snapshotDate,
+      );
+      const settingsVersionId = await this.getOrCreateSettingsVersion(
+        leagueId,
+        snapshotDate,
+        normalized.settings,
+      );
       const projectionsRun = await this.db
         .selectFrom("projections_run")
         .selectAll()
         .where("as_of_date", "<=", snapshotDate)
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
-      const { isDegraded, degradedReasons } = computeDegradedStatus(projectionsRun, snapshotDate);
-
-      await this.db.transaction().execute((trx) =>
-        this.writeSnapshotRows(trx, leagueId, snapshotDate, espnData, normalized, settingsVersionId, projectionsRun, isDegraded, degradedReasons),
+      const { isDegraded, degradedReasons } = computeDegradedStatus(
+        projectionsRun,
+        snapshotDate,
       );
+
+      await this.db
+        .transaction()
+        .execute((trx) =>
+          this.writeSnapshotRows(
+            trx,
+            leagueId,
+            snapshotDate,
+            espnData,
+            normalized,
+            settingsVersionId,
+            projectionsRun,
+            isDegraded,
+            degradedReasons,
+          ),
+        );
 
       await this.computeProjections(leagueId, snapshotDate, projectionsRun?.id);
 
       try {
-        await this.fetchAndStoreFreeAgents(league.espn_league_id, league.season, espnAuth, leagueId, snapshotDate);
+        await this.fetchAndStoreFreeAgents(
+          league.espn_league_id,
+          league.season,
+          espnAuth,
+          leagueId,
+          snapshotDate,
+        );
       } catch (err) {
-        this.logger?.warn({ err, leagueId, snapshotDate }, "Free agent fetch failed — non-fatal");
+        this.logger?.warn(
+          { err, leagueId, snapshotDate },
+          "Free agent fetch failed — non-fatal",
+        );
       }
 
       await this.emitChangeLog(leagueId, snapshotDate);
 
-      this.logger?.info({ leagueId, snapshotDate }, "Snapshot job completed successfully");
+      this.logger?.info(
+        { leagueId, snapshotDate },
+        "Snapshot job completed successfully",
+      );
     } catch (error) {
-      this.logger?.error({ error, leagueId, snapshotDate }, "Snapshot job failed");
+      this.logger?.error(
+        { error, leagueId, snapshotDate },
+        "Snapshot job failed",
+      );
       throw error;
     }
   }
@@ -157,11 +198,21 @@ export class SnapshotOrchestratorAgent {
       leagueId: league.espn_league_id,
       season: league.season,
       auth: espnAuth,
-      views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+      views: [
+        "mSettings",
+        "mTeam",
+        "mRoster",
+        "mStandings",
+        "kona_player_info",
+      ],
       xFantasyFilter: {
         players: {
           limit: 1500,
-          sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
+          sortDraftRanks: {
+            sortPriority: 100,
+            sortAsc: true,
+            value: "STANDARD",
+          },
         },
       },
     });
@@ -172,12 +223,22 @@ export class SnapshotOrchestratorAgent {
         league_id: leagueId,
         fetched_at: espnData.fetchedAt,
         endpoint: `/seasons/${league.season}/segments/0/leagues/${league.espn_league_id}`,
-        views: ["mSettings", "mTeam", "mRoster", "mStandings", "kona_player_info"],
+        views: [
+          "mSettings",
+          "mTeam",
+          "mRoster",
+          "mStandings",
+          "kona_player_info",
+        ],
         scoring_period_id: null,
         x_fantasy_filter: {
           players: {
             limit: 1500,
-            sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
+            sortDraftRanks: {
+              sortPriority: 100,
+              sortAsc: true,
+              value: "STANDARD",
+            },
           },
         },
         response_json: espnData.data,
@@ -247,19 +308,42 @@ export class SnapshotOrchestratorAgent {
       }
     }
 
-    await this.writePlayersAndRosters(trx, leagueId, snapshotDate, normalized.teams, espnTeamIdToDbId);
+    await this.writePlayersAndRosters(
+      trx,
+      leagueId,
+      snapshotDate,
+      normalized.teams,
+      espnTeamIdToDbId,
+    );
     await this.writeFreeAgentPlayers(trx, normalized.freeAgents || []);
 
     const categories = normalized.settings.categories;
     if (categories.length > 0) {
-      await this.writeCurrentStandings(trx, leagueId, snapshotDate, normalized.teams, espnTeamIdToDbId, categories);
+      await this.writeCurrentStandings(
+        trx,
+        leagueId,
+        snapshotDate,
+        normalized.teams,
+        espnTeamIdToDbId,
+        categories,
+      );
     }
 
     const rawData = espnData.data as Record<string, any>;
     const rawTeams = rawData?.teams;
-    const snapshotScoringPeriodId = rawData?.scoringPeriodId ?? rawData?.status?.currentScoringPeriod?.id ?? 1;
+    const snapshotScoringPeriodId =
+      rawData?.scoringPeriodId ??
+      rawData?.status?.currentScoringPeriod?.id ??
+      1;
     if (rawTeams && Array.isArray(rawTeams)) {
-      await this.writePlayerPeriodStats(trx, leagueId, snapshotDate, rawTeams, espnTeamIdToDbId, snapshotScoringPeriodId);
+      await this.writePlayerPeriodStats(
+        trx,
+        leagueId,
+        snapshotDate,
+        rawTeams,
+        espnTeamIdToDbId,
+        snapshotScoringPeriodId,
+      );
     }
 
     this.logger?.info({ leagueId, snapshotDate }, "Snapshot data written");
@@ -271,21 +355,41 @@ export class SnapshotOrchestratorAgent {
     projectionsRunId: number | undefined,
   ): Promise<void> {
     if (!projectionsRunId) return;
-    await this.standingsAgent.computeProjectedStandings(leagueId, snapshotDate, projectionsRunId);
+    await this.standingsAgent.computeProjectedStandings(
+      leagueId,
+      snapshotDate,
+      projectionsRunId,
+    );
   }
 
-  private async emitChangeLog(leagueId: number, snapshotDate: string): Promise<void> {
+  private async emitChangeLog(
+    leagueId: number,
+    snapshotDate: string,
+  ): Promise<void> {
     try {
       const logger = this.logger ?? pino();
-      const bus = createSlackNotifier(logger);
-      const changeLogAgent = new StandingsChangeLogAgent(this.db, logger, bus);
-      const eventCount = await changeLogAgent.generateEvents(leagueId, snapshotDate, "snapshot");
+      const changeLogAgent = new StandingsChangeLogAgent(this.db, logger);
+      const eventCount = await changeLogAgent.generateEvents(
+        leagueId,
+        snapshotDate,
+        "snapshot",
+      );
       if (eventCount > 0) {
-        changeLogEmitter.emit(CHANGE_LOG_EVENT, { leagueId, snapshotDate, eventCount });
+        changeLogEmitter.emit(CHANGE_LOG_EVENT, {
+          leagueId,
+          snapshotDate,
+          eventCount,
+        });
       }
-      this.logger?.info({ leagueId, snapshotDate, eventCount }, "Change log events generated");
+      this.logger?.info(
+        { leagueId, snapshotDate, eventCount },
+        "Change log events generated",
+      );
     } catch (err) {
-      this.logger?.warn({ err, leagueId, snapshotDate }, "Change log generation failed — non-fatal");
+      this.logger?.warn(
+        { err, leagueId, snapshotDate },
+        "Change log generation failed — non-fatal",
+      );
     }
   }
 

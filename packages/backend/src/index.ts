@@ -14,7 +14,6 @@ import { timeSeriesRoutes } from "./api/timeseries.js";
 import { recommendationsRoutes } from "./api/recommendations.js";
 import { draftRoutes } from "./api/draft.js";
 import { draftLiveRoutes } from "./api/draft-live.js";
-import { slackRoutes } from "./api/slack.js";
 import { internalRoutes } from "./api/internal.js";
 import { authRoutes } from "./api/auth.js";
 import { setupOAuth } from "./api/auth-oauth.js";
@@ -26,7 +25,6 @@ import { trendsRoutes } from "./api/trends.js";
 import { faabRoutes } from "./api/faab.js";
 import { pitchingUsageRoutes } from "./api/pitching-usage.js";
 import { authenticate, requireAdmin } from "./middleware/auth.js";
-import { getFeatureFlags } from "./utils/feature-flags.js";
 import type { FastifyInstance } from "fastify";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -102,9 +100,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   // Register cookie plugin (must be before JWT)
   const cookieSecret =
-    process.env.COOKIE_SECRET ??
-    process.env.JWT_SECRET ??
-    "development-secret";
+    process.env.COOKIE_SECRET ?? process.env.JWT_SECRET ?? "development-secret";
   await server.register(cookie, { secret: cookieSecret });
 
   // Register JWT plugin for authentication (reads from accessToken cookie or Authorization header)
@@ -155,23 +151,6 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Register WebSocket plugin (must be before any route that uses { websocket: true })
   await server.register(fastifyWebsocket);
 
-  // Add raw body parser for Slack signature verification
-  // Slack sends form-encoded payloads that need raw body for HMAC
-  server.addContentTypeParser(
-    "application/x-www-form-urlencoded",
-    { parseAs: "string" },
-    (req, body: string, done) => {
-      (req as any).rawBody = body;
-      // Parse form data
-      const parsed: any = {};
-      body.split("&").forEach((pair) => {
-        const [key, value] = pair.split("=");
-        parsed[decodeURIComponent(key)] = decodeURIComponent(value || "");
-      });
-      done(null, parsed);
-    },
-  );
-
   // Health check
   server.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
@@ -182,7 +161,6 @@ export async function buildServer(): Promise<FastifyInstance> {
     return {
       name: "ESPN Fantasy Baseball Assistant API",
       version: "0.1.0",
-      features: getFeatureFlags(),
     };
   });
 
@@ -210,17 +188,6 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(trendsRoutes);
   await server.register(faabRoutes);
   await server.register(pitchingUsageRoutes);
-
-  // Feature-flagged routes
-  const flags = getFeatureFlags();
-  if (flags.slackEnabled) {
-    server.log.info("Slack integration enabled - registering Slack routes");
-    await server.register(slackRoutes);
-  } else {
-    server.log.info(
-      "Slack integration disabled - set FEATURE_SLACK_ENABLED=true to enable",
-    );
-  }
 
   await server.register(internalRoutes);
 

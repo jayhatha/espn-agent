@@ -5,7 +5,6 @@ import type { Database } from "../db/schema.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { StandingsChangeLogAgent } from "./standings-change-log.js";
-import { createSlackNotifier } from "../utils/notification-bus.js";
 import {
   changeLogEmitter,
   CHANGE_LOG_EVENT,
@@ -371,8 +370,7 @@ export class LivePollAgent {
     // 8. Generate and persist change events (non-fatal)
     let eventCount = 0;
     try {
-      const bus = createSlackNotifier(log);
-      const changeLogAgent = new StandingsChangeLogAgent(this.db, log, bus);
+      const changeLogAgent = new StandingsChangeLogAgent(this.db, log);
       eventCount = await changeLogAgent.generateEvents(leagueId, today, "live");
     } catch (err) {
       log.warn(

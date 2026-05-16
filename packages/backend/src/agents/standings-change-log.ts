@@ -2,16 +2,32 @@ import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import type { BaseLogger } from "pino";
 import type { Database } from "../db/schema.js";
-import type {
-  SlackNotifier,
-  StandingsChangeEventPayload,
-} from "../utils/notification-bus.js";
+
+export interface StandingsChangeEventPayload {
+  league_id: number;
+  team_id: number;
+  snapshot_date: string;
+  category_id: string;
+  category_name: string;
+  prev_roto_pts: number;
+  curr_roto_pts: number;
+  roto_delta: number;
+  passed_team_id: number | null;
+  passed_team_name: string | null;
+  direction: "gained" | "lost";
+  event_source: string;
+  proximate_cause: {
+    playerName: string;
+    stat: string;
+    value: number;
+    description: string;
+  } | null;
+}
 
 export class StandingsChangeLogAgent {
   constructor(
     private readonly db: Kysely<Database>,
     private readonly logger: BaseLogger,
-    private readonly bus: SlackNotifier,
   ) {}
 
   async generateEvents(
@@ -292,7 +308,6 @@ export class StandingsChangeLogAgent {
           totalInserted++;
           // Update the local map so subsequent categories in this same call don't re-emit
           existingDeltaMap.set(eventKey, rotoDelta);
-          await this.bus.emit(payload);
         }
       }
     }
