@@ -5,7 +5,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { backfillQueue } from "../workers/backfill-worker.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
-import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
+import { type ESPNAuthCookies } from "../adapters/espn.js";
 import {
   ESPN_STAT_MAP,
   ESPN_LINEUP_SLOT_MAP,
@@ -901,7 +901,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
       try {
         // Create ESPNAdapter instance with request logger
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
 
         // Fetch historical week data
         const espnData = await espnAdapter.fetchHistoricalWeek({

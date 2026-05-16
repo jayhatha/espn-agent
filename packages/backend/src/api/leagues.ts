@@ -1,13 +1,20 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { ESPNAdapter, type ESPNAuthCookies } from "../adapters/espn.js";
-import { createSnapshotOrchestrator } from "../agents/agent-factory.js";
-import { encryptToken, decryptToken, hasEncryptionKey } from "../utils/encryption.js";
+import { type ESPNAuthCookies } from "../adapters/espn.js";
+import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
+import {
+  encryptToken,
+  decryptToken,
+  hasEncryptionKey,
+} from "../utils/encryption.js";
 import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
 import { ConnectLeagueSchema } from "../utils/validation.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
-import { DEFAULT_ESPN_LEAGUE_ID, DEFAULT_TEAM_ID } from "../../../shared/dist/index.js";
+import {
+  DEFAULT_ESPN_LEAGUE_ID,
+  DEFAULT_TEAM_ID,
+} from "../../../shared/dist/index.js";
 import { snapshotQueue } from "../workers/snapshot-worker.js";
 
 /**
@@ -15,7 +22,10 @@ import { snapshotQueue } from "../workers/snapshot-worker.js";
  */
 let gamesPlayedCache: { value: number | null; date: string } | null = null;
 
-async function getCachedGamesPlayed(season: number, logger?: any): Promise<number | null> {
+async function getCachedGamesPlayed(
+  season: number,
+  logger?: any,
+): Promise<number | null> {
   const today = new Date().toISOString().split("T")[0];
   if (gamesPlayedCache && gamesPlayedCache.date === today) {
     return gamesPlayedCache.value;
@@ -60,10 +70,11 @@ export async function leaguesRoutes(app: FastifyInstance) {
       if (!validation.success) {
         return reply.code(400).send({
           error: "Validation failed",
-          details: validation.error.errors
+          details: validation.error.errors,
         });
       }
-      const { espnLeagueId, season, auth, name, timezone, teamEspnId } = validation.data;
+      const { espnLeagueId, season, auth, name, timezone, teamEspnId } =
+        validation.data;
 
       try {
         // Check if league already exists
@@ -80,7 +91,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Fetch league data to validate and find user's team
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
         const espnData = await espnAdapter.fetchLeague({
           leagueId: espnLeagueId,
           season,
@@ -94,20 +105,21 @@ export async function leaguesRoutes(app: FastifyInstance) {
         let userTeamEspnId: number | null = teamEspnId || null;
         if (!userTeamEspnId && auth?.SWID) {
           const swid = auth.SWID; // Type narrowing helper
-          const userTeam = normalized.teams.find((team) =>
-            team.primaryOwner === swid ||
-            (team.owners && team.owners.includes(swid))
+          const userTeam = normalized.teams.find(
+            (team) =>
+              team.primaryOwner === swid ||
+              (team.owners && team.owners.includes(swid)),
           );
           if (userTeam) {
             userTeamEspnId = userTeam.id;
             request.log.info(
               { espnTeamId: userTeamEspnId, teamName: userTeam.name },
-              "Auto-detected user's team"
+              "Auto-detected user's team",
             );
           } else {
             request.log.warn(
               { swid: auth.SWID },
-              "Could not auto-detect user's team from SWID"
+              "Could not auto-detect user's team from SWID",
             );
           }
         }
@@ -128,7 +140,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
               .onConflict((oc) =>
                 oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
                   name: teamData.name,
-                })
+                }),
               )
               .returningAll()
               .executeTakeFirstOrThrow();
@@ -144,7 +156,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
               league,
               isNew: false,
               userTeamDetected: false,
-              teams: normalized.teams.map((t) => ({ espnTeamId: t.id, name: t.name })),
+              teams: normalized.teams.map((t) => ({
+                espnTeamId: t.id,
+                name: t.name,
+              })),
             };
           }
 
@@ -176,9 +191,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         if (auth?.SWID || auth?.espn_s2) {
           if (!hasEncryptionKey()) {
-            return reply
-              .code(500)
-              .send({ error: "ENCRYPTION_KEY required for ESPN credential storage" });
+            return reply.code(500).send({
+              error: "ENCRYPTION_KEY required for ESPN credential storage",
+            });
           }
           try {
             if (auth?.SWID) {
@@ -225,7 +240,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
             .onConflict((oc) =>
               oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
                 name: teamData.name,
-              })
+              }),
             )
             .returningAll()
             .executeTakeFirstOrThrow();
@@ -241,7 +256,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
             league,
             isNew: true,
             userTeamDetected: false,
-            teams: normalized.teams.map((t) => ({ espnTeamId: t.id, name: t.name })),
+            teams: normalized.teams.map((t) => ({
+              espnTeamId: t.id,
+              name: t.name,
+            })),
           };
         }
 
@@ -267,8 +285,11 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         // Trigger initial snapshot for newly connected league
         try {
-          request.log.info({ leagueId: league.id }, "Triggering initial snapshot for new league");
-          const orchestrator = createSnapshotOrchestrator(db, request.log);
+          request.log.info(
+            { leagueId: league.id },
+            "Triggering initial snapshot for new league",
+          );
+          const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
           const today = new Date().toISOString().split("T")[0];
 
           // Run snapshot in background (don't await)
@@ -279,24 +300,36 @@ export async function leaguesRoutes(app: FastifyInstance) {
               espnAuth: auth,
             })
             .then(() => {
-              request.log.info({ leagueId: league.id }, "Initial snapshot completed");
+              request.log.info(
+                { leagueId: league.id },
+                "Initial snapshot completed",
+              );
             })
             .catch((err) => {
-              request.log.error({ error: err, leagueId: league.id }, "Initial snapshot failed");
+              request.log.error(
+                { error: err, leagueId: league.id },
+                "Initial snapshot failed",
+              );
             });
         } catch (error) {
           // Log but don't fail the connection if snapshot fails
-          request.log.error({ error, leagueId: league.id }, "Failed to trigger initial snapshot");
+          request.log.error(
+            { error, leagueId: league.id },
+            "Failed to trigger initial snapshot",
+          );
         }
 
         return { league, isNew: true, userTeamDetected: userTeamDbId !== null };
       } catch (error) {
         request.log.error({ error }, "Failed to connect league");
         const errorMessage =
-          error instanceof Error ? error.message : "Failed to connect to league";
-        return reply
-          .code(500)
-          .send({ error: "Failed to connect to league", details: errorMessage });
+          error instanceof Error
+            ? error.message
+            : "Failed to connect to league";
+        return reply.code(500).send({
+          error: "Failed to connect to league",
+          details: errorMessage,
+        });
       }
     },
   );
@@ -343,7 +376,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .executeTakeFirst();
 
       // Get season games played from MLB standings (cached per-day)
-      const gamesPlayed = await getCachedGamesPlayed(league.season, request.log);
+      const gamesPlayed = await getCachedGamesPlayed(
+        league.season,
+        request.log,
+      );
 
       return {
         league,
@@ -453,9 +489,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         if (SWID || espn_s2) {
           if (!hasEncryptionKey()) {
-            return reply
-              .code(500)
-              .send({ error: "ENCRYPTION_KEY required for ESPN credential storage" });
+            return reply.code(500).send({
+              error: "ENCRYPTION_KEY required for ESPN credential storage",
+            });
           }
           try {
             if (SWID) {
@@ -526,9 +562,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
       if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
-          return reply
-            .code(500)
-            .send({ error: "ENCRYPTION_KEY not configured - cannot decrypt credentials" });
+          return reply.code(500).send({
+            error: "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+          });
         }
         try {
           auth = {
@@ -562,10 +598,15 @@ export async function leaguesRoutes(app: FastifyInstance) {
       );
 
       if (!job) {
-        return reply.code(202).send({ queued: false, reason: "duplicate", jobId });
+        return reply
+          .code(202)
+          .send({ queued: false, reason: "duplicate", jobId });
       }
 
-      request.log.info({ leagueId, jobId }, "Manual snapshot queued via BullMQ");
+      request.log.info(
+        { leagueId, jobId },
+        "Manual snapshot queued via BullMQ",
+      );
       return reply.code(202).send({ queued: true, jobId });
     },
   );
@@ -630,9 +671,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .executeTakeFirst();
 
       if (!team) {
-        return reply
-          .code(404)
-          .send({ error: "Team not found in this league" });
+        return reply.code(404).send({ error: "Team not found in this league" });
       }
 
       // Run parallel queries
@@ -777,19 +816,24 @@ export async function leaguesRoutes(app: FastifyInstance) {
           .executeTakeFirst();
 
         if (existing) {
-          return { league: existing, isNew: false, message: "League already exists" };
+          return {
+            league: existing,
+            isNew: false,
+            message: "League already exists",
+          };
         }
 
         // Require ESPN credentials
         const auth = getEspnAuthFromEnv();
         if (!auth) {
           return reply.code(400).send({
-            error: "ESPN_SWID and ESPN_S2 environment variables required for bootstrap",
+            error:
+              "ESPN_SWID and ESPN_S2 environment variables required for bootstrap",
           });
         }
 
         // Fetch league data from ESPN to get name + teams
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
         const espnData = await espnAdapter.fetchLeague({
           leagueId: DEFAULT_ESPN_LEAGUE_ID,
           season,
@@ -806,7 +850,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
             provider: "espn",
             espn_league_id: DEFAULT_ESPN_LEAGUE_ID,
             season,
-            name: normalized.settings.name || `ESPN League ${DEFAULT_ESPN_LEAGUE_ID}`,
+            name:
+              normalized.settings.name ||
+              `ESPN League ${DEFAULT_ESPN_LEAGUE_ID}`,
             timezone: "America/New_York",
             created_at: new Date(),
           })
@@ -827,7 +873,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
             .onConflict((oc) =>
               oc.columns(["league_id", "espn_team_id"]).doUpdateSet({
                 name: teamData.name,
-              })
+              }),
             )
             .returningAll()
             .executeTakeFirstOrThrow();
@@ -847,7 +893,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         }
 
         // Trigger initial snapshot in background
-        const orchestrator = createSnapshotOrchestrator(db, request.log);
+        const orchestrator = new SnapshotOrchestratorAgent(db, request.log);
         const today = new Date().toISOString().split("T")[0];
         orchestrator
           .executeSnapshot({
@@ -856,10 +902,16 @@ export async function leaguesRoutes(app: FastifyInstance) {
             espnAuth: auth,
           })
           .then(() => {
-            request.log.info({ leagueId: league.id }, "Bootstrap snapshot completed");
+            request.log.info(
+              { leagueId: league.id },
+              "Bootstrap snapshot completed",
+            );
           })
           .catch((err) => {
-            request.log.error({ error: err, leagueId: league.id }, "Bootstrap snapshot failed");
+            request.log.error(
+              { error: err, leagueId: league.id },
+              "Bootstrap snapshot failed",
+            );
           });
 
         const updatedLeague = await db
@@ -912,16 +964,10 @@ export async function leaguesRoutes(app: FastifyInstance) {
       }
 
       try {
-        const escaped = name.trim().replace(/[%_\\]/g, '\\$&');
+        const escaped = name.trim().replace(/[%_\\]/g, "\\$&");
         let query = db
           .selectFrom("league")
-          .select([
-            "id",
-            "espn_league_id",
-            "name",
-            "season",
-            "created_at",
-          ])
+          .select(["id", "espn_league_id", "name", "season", "created_at"])
           .where("name", "ilike", `%${escaped}%`)
           .orderBy("created_at", "desc")
           .limit(Math.min(maxResults, 50));
@@ -957,5 +1003,4 @@ export async function leaguesRoutes(app: FastifyInstance) {
       }
     },
   );
-
 }

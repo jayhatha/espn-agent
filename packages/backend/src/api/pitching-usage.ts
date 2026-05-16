@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { GsPacingAgent } from "../agents/gs-pacing.js";
 import { SitStartAdvisor } from "../agents/sit-start-advisor.js";
 import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
 
@@ -27,7 +26,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new GsPacingAgent(db, request.log);
+        const agent = app.container.agents.gsPacing(db, request.log);
         const summary = await agent.getSeasonSummary(leagueId, teamId);
         return summary;
       } catch (error) {
@@ -53,7 +52,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const weekStart = request.query.weekStart;
 
       try {
-        const agent = new GsPacingAgent(db, request.log);
+        const agent = app.container.agents.gsPacing(db, request.log);
         const weekly = await agent.getWeeklySummary(leagueId, teamId, weekStart);
         return weekly;
       } catch (error) {
@@ -77,7 +76,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const teamId = parseInt(request.params.teamId, 10);
 
       try {
-        const agent = new GsPacingAgent(db, request.log);
+        const agent = app.container.agents.gsPacing(db, request.log);
         const plan = await agent.getStartPlan(leagueId, teamId);
         return plan;
       } catch (error) {
@@ -100,7 +99,7 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
       const leagueId = parseInt(request.params.leagueId, 10);
 
       try {
-        const agent = new GsPacingAgent(db, request.log);
+        const agent = app.container.agents.gsPacing(db, request.log);
         return await agent.getLeagueGsOverview(leagueId);
       } catch (error) {
         request.log.error({ error, leagueId }, "Failed to get league GS overview");

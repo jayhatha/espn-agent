@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { DraftRankingsAgent } from "../agents/draft-rankings.js";
 import { AuctionValuationAgent } from "../agents/auction-valuation.js";
 import { DraftNarratorAgent } from "../agents/draft-narrator.js";
 import type { NarratorPayload } from "../agents/draft-narrator.js";
@@ -125,7 +124,7 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Instantiate agent
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
 
         // Get rankings
         const rankings = await draftAgent.getRankings(leagueId, {
@@ -220,7 +219,7 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Instantiate agents
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
@@ -294,7 +293,7 @@ export async function draftRoutes(app: FastifyInstance) {
       const maxPlayers = limit ? parseInt(limit, 10) : 300;
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
 
         const rankings = await draftAgent.getRankingsWithConfig(config, {
           projectionsRunId: projectionsRunId
@@ -374,7 +373,7 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
@@ -483,8 +482,7 @@ export async function draftRoutes(app: FastifyInstance) {
         const budget = (acquisitionRules as Record<string, unknown>).auction_budget as number || 260; // Default ESPN auction budget
 
         // Fetch ESPN's global draft data (auction values + ADP)
-        const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
         const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: league.season,
         });
@@ -499,7 +497,7 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Fetch our VBD auction values
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
@@ -741,8 +739,7 @@ export async function draftRoutes(app: FastifyInstance) {
 
       try {
         // Fetch ESPN's global draft data (auction values + ADP)
-        const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
 
         const espnDraftData = await espnAdapter.fetchGlobalDraftData({
           season: espnSeasonNum,
@@ -758,7 +755,7 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         // Fetch our VBD auction values using generic config
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
         const auctionAgent = new AuctionValuationAgent(
           db,
           draftAgent,
@@ -1000,7 +997,7 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       try {
-        const draftAgent = new DraftRankingsAgent(db, request.log);
+        const draftAgent = app.container.agents.draftRankings(db, request.log);
 
         const result = await draftAgent.calculateProjectedStandings(
           config,
@@ -1091,8 +1088,7 @@ export async function draftRoutes(app: FastifyInstance) {
         : 500;
 
       try {
-        const { ESPNAdapter } = await import("../adapters/espn.js");
-        const espnAdapter = new ESPNAdapter(request.log);
+        const espnAdapter = app.container.adapters.espn;
 
         const draftData = await espnAdapter.fetchGlobalDraftData({
           season,

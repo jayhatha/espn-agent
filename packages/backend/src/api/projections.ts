@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { sql } from "kysely";
 import { getDb } from "../db/connection.js";
-import { createProjectionsIngestAgent, createSnapshotOrchestrator } from "../agents/agent-factory.js";
+import { ProjectionsIngestAgent } from "../agents/projections-ingest.js";
+import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
@@ -33,7 +34,11 @@ async function triggerDegradedLeagueResnapshots(
     // Re-snapshot all leagues that have any snapshot for today
     degradedLeagues = await db
       .selectFrom("league")
-      .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
+      .innerJoin(
+        "league_daily_snapshot",
+        "league.id",
+        "league_daily_snapshot.league_id",
+      )
       .select([
         "league.id",
         "league.espn_swid_encrypted",
@@ -49,7 +54,11 @@ async function triggerDegradedLeagueResnapshots(
   } else {
     degradedLeagues = await db
       .selectFrom("league")
-      .innerJoin("league_daily_snapshot", "league.id", "league_daily_snapshot.league_id")
+      .innerJoin(
+        "league_daily_snapshot",
+        "league.id",
+        "league_daily_snapshot.league_id",
+      )
       .select([
         "league.id",
         "league.espn_swid_encrypted",
@@ -57,7 +66,7 @@ async function triggerDegradedLeagueResnapshots(
       ])
       .where("league_daily_snapshot.is_degraded", "=", true)
       .where(
-        sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any
+        sql`(league_daily_snapshot.degraded_reasons @> ARRAY['projections_missing']::text[] OR league_daily_snapshot.degraded_reasons @> ARRAY['projections_stale']::text[])` as any,
       )
       .groupBy([
         "league.id",
@@ -70,20 +79,24 @@ async function triggerDegradedLeagueResnapshots(
   if (degradedLeagues.length > 0) {
     log.info(
       { leagueCount: degradedLeagues.length },
-      "Triggering re-snapshots for degraded leagues"
+      "Triggering re-snapshots for degraded leagues",
     );
 
     // Fire and forget - don't wait for snapshots to complete
     Promise.all(
       degradedLeagues.map(async (league: any) => {
         try {
-          const orchestrator = createSnapshotOrchestrator(db, log);
+          const orchestrator = new SnapshotOrchestratorAgent(db, log);
 
           // ESPN auth: env vars first, then encrypted DB fallback
-          let auth: { SWID: string; espn_s2: string } | undefined = getEspnAuthFromEnv();
+          let auth: { SWID: string; espn_s2: string } | undefined =
+            getEspnAuthFromEnv();
           if (!auth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
             if (!hasEncryptionKey()) {
-              log.error({ leagueId: league.id }, "ENCRYPTION_KEY not configured - cannot decrypt credentials");
+              log.error(
+                { leagueId: league.id },
+                "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+              );
               return;
             }
             try {
@@ -92,7 +105,10 @@ async function triggerDegradedLeagueResnapshots(
                 espn_s2: decryptToken(league.espn_s2_encrypted),
               };
             } catch (error) {
-              log.error({ error, leagueId: league.id }, "Failed to decrypt ESPN cookies");
+              log.error(
+                { error, leagueId: league.id },
+                "Failed to decrypt ESPN cookies",
+              );
               return;
             }
           }
@@ -104,9 +120,12 @@ async function triggerDegradedLeagueResnapshots(
             forceFresh: true,
           });
         } catch (error) {
-          log.error({ error, leagueId: league.id }, "Failed to re-snapshot league");
+          log.error(
+            { error, leagueId: league.id },
+            "Failed to re-snapshot league",
+          );
         }
-      })
+      }),
     ).catch((error) => {
       log.error({ error }, "Error during re-snapshots");
     });
@@ -132,16 +151,14 @@ export async function projectionsRoutes(app: FastifyInstance) {
           if (request.user.role !== "admin") {
             return reply.code(403).send({
               error: "Forbidden",
-              message: "Only administrators can upload projections. Projections are shared across all leagues.",
+              message:
+                "Only administrators can upload projections. Projections are shared across all leagues.",
             });
           }
         },
       ],
     },
-    async (
-      request: FastifyRequest,
-      reply: FastifyReply,
-    ) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Get file from multipart form data
         const data = await request.file();
@@ -153,16 +170,20 @@ export async function projectionsRoutes(app: FastifyInstance) {
         const buffer = await data.toBuffer();
         const csvContent = buffer.toString("utf-8");
 
-        const agent = createProjectionsIngestAgent(db, request.log);
+        const agent = new ProjectionsIngestAgent(db, request.log);
 
         const today = new Date().toISOString().split("T")[0];
 
         // Auto-detect batters vs pitchers by checking column headers
         // Detect pitchers first: IP/ERA/ER are uniquely pitching columns.
         // HR/H/BB appear in both batter and pitcher CSVs (HR allowed, hits allowed, etc.)
-        const firstLine = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
+        const firstLine =
+          csvContent.replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
         const headers = firstLine.split(",").map((h) => h.trim());
-        const isPitchers = headers.includes("IP") || headers.includes("ERA") || headers.includes("ER");
+        const isPitchers =
+          headers.includes("IP") ||
+          headers.includes("ERA") ||
+          headers.includes("ER");
         const isBatters = !isPitchers;
 
         const result = await agent.ingest({
@@ -182,7 +203,12 @@ export async function projectionsRoutes(app: FastifyInstance) {
         // Re-snapshot leagues: if projections are now fully fresh, re-snapshot all leagues
         // that have a snapshot today (not just degraded ones), to recompute projected standings
         // with complete projections data. If still partial, only re-snapshot degraded leagues.
-        await triggerDegradedLeagueResnapshots(db, request.log, today, projectionsNowFresh);
+        await triggerDegradedLeagueResnapshots(
+          db,
+          request.log,
+          today,
+          projectionsNowFresh,
+        );
 
         return {
           projectionsRunId: result.projectionsRunId,
@@ -216,19 +242,17 @@ export async function projectionsRoutes(app: FastifyInstance) {
           if (request.user.role !== "admin") {
             return reply.code(403).send({
               error: "Forbidden",
-              message: "Only administrators can upload projections. Projections are shared across all leagues.",
+              message:
+                "Only administrators can upload projections. Projections are shared across all leagues.",
             });
           }
         },
       ],
     },
-    async (
-      request: any,
-      reply: any,
-    ) => {
+    async (request: any, reply: any) => {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const agent = createProjectionsIngestAgent(db, request.log);
+        const agent = new ProjectionsIngestAgent(db, request.log);
 
         let battersCsv: string | undefined;
         let pitchersCsv: string | undefined;
@@ -248,13 +272,20 @@ export async function projectionsRoutes(app: FastifyInstance) {
 
           if (file.fieldname === "pitcher" || file.fieldname === "pitchers") {
             isPitchers = true;
-          } else if (file.fieldname === "batter" || file.fieldname === "batters") {
+          } else if (
+            file.fieldname === "batter" ||
+            file.fieldname === "batters"
+          ) {
             isBatters = true;
           } else {
             // Auto-detect from headers
-            const firstLine = csvContent.replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
+            const firstLine =
+              csvContent.replace(/^\uFEFF/, "").split(/\r?\n/)[0] || "";
             const headers = firstLine.split(",").map((h: string) => h.trim());
-            isPitchers = headers.includes("IP") || headers.includes("ERA") || headers.includes("ER");
+            isPitchers =
+              headers.includes("IP") ||
+              headers.includes("ERA") ||
+              headers.includes("ER");
             isBatters = !isPitchers;
           }
 
@@ -287,7 +318,12 @@ export async function projectionsRoutes(app: FastifyInstance) {
         // Re-snapshot leagues: if projections are now fully fresh, re-snapshot all leagues
         // that have a snapshot today (not just degraded ones), to recompute projected standings
         // with complete projections data. If still partial, only re-snapshot degraded leagues.
-        await triggerDegradedLeagueResnapshots(db, request.log, today, batchProjectionsNowFresh);
+        await triggerDegradedLeagueResnapshots(
+          db,
+          request.log,
+          today,
+          batchProjectionsNowFresh,
+        );
 
         return {
           projectionsRunId: result.projectionsRunId,
@@ -297,10 +333,13 @@ export async function projectionsRoutes(app: FastifyInstance) {
       } catch (error) {
         request.log.error({ error }, "Batch projections upload failed");
         const errorMessage =
-          error instanceof Error ? error.message : "Batch projections upload failed";
-        return reply
-          .code(500)
-          .send({ error: "Batch projections upload failed", details: errorMessage });
+          error instanceof Error
+            ? error.message
+            : "Batch projections upload failed";
+        return reply.code(500).send({
+          error: "Batch projections upload failed",
+          details: errorMessage,
+        });
       }
     },
   );
@@ -317,10 +356,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: any,
-      reply: any,
-    ) => {
+    async (request: any, reply: any) => {
       const runId = parseInt(request.params.runId, 10);
 
       const run = await db
@@ -349,9 +385,7 @@ export async function projectionsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (
-      request: any,
-    ) => {
+    async (request: any) => {
       const limit = parseInt(request.query.limit || "20", 10);
 
       const runs = await db

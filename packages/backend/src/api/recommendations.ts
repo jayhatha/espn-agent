@@ -1,13 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
 import { type ProposedTrade } from "../agents/trade-recommendation.js";
-import {
-  createWaiverAgent,
-  createTradeAgent,
-} from "../agents/agent-factory.js";
-import { ESPNAdapter } from "../adapters/espn.js";
-import { PitcherlistAdapter } from "../adapters/pitcherlist.js";
-import { AdvancedStatsAdapter } from "../adapters/advanced-stats.js";
+import { createWaiverAgent } from "../agents/agent-factory.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
 import type { StatComponents } from "../../../shared/dist/index.js";
@@ -24,11 +18,10 @@ import { TradeView } from "./views/trade-view.js";
 export async function recommendationsRoutes(app: FastifyInstance) {
   const db = getDb();
 
-  // Singleton adapters — created once per server startup so their LRU caches
-  // survive across requests instead of being discarded after every response.
-  const espnAdapter = new ESPNAdapter(app.log);
-  const pitcherlistAdapter = new PitcherlistAdapter(app.log);
-  const advancedStatsAdapter = new AdvancedStatsAdapter(app.log);
+  // Adapters from container — process-scope singletons, LRU caches persist across requests
+  const espnAdapter = app.container.adapters.espn;
+  const pitcherlistAdapter = app.container.adapters.pitcherlist;
+  const advancedStatsAdapter = app.container.adapters.advancedStats;
 
   // Domain views — own query orchestration, adapters remain singleton
   const freeAgentView = new FreeAgentView(
@@ -148,19 +141,33 @@ export async function recommendationsRoutes(app: FastifyInstance) {
       // Get latest snapshot date if not provided
       let date = snapshotDate;
       if (!date) {
-        const latest = await db
-          .selectFrom("league_daily_snapshot")
+        // Use the most recent date where this team actually has roster data,
+        // falling back to league_daily_snapshot if team_roster_snapshot is empty.
+        const latestTeamRoster = await db
+          .selectFrom("team_roster_snapshot")
           .select("snapshot_date")
           .where("league_id", "=", leagueId)
+          .where("team_id", "=", teamId)
           .orderBy("snapshot_date", "desc")
           .executeTakeFirst();
 
-        if (!latest) {
-          return reply
-            .code(404)
-            .send({ error: "No snapshots found for league" });
+        if (latestTeamRoster) {
+          date = latestTeamRoster.snapshot_date;
+        } else {
+          const latest = await db
+            .selectFrom("league_daily_snapshot")
+            .select("snapshot_date")
+            .where("league_id", "=", leagueId)
+            .orderBy("snapshot_date", "desc")
+            .executeTakeFirst();
+
+          if (!latest) {
+            return reply
+              .code(404)
+              .send({ error: "No snapshots found for league" });
+          }
+          date = latest.snapshot_date;
         }
-        date = latest.snapshot_date;
       }
 
       try {
@@ -466,10 +473,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
 
       try {
         let freeAgentPlayerIds: number[] | undefined;
-        const fallbackFreeAgentPlayers = new Map<
-          number,
-          { id: number; name: string; positions: string[] }
-        >();
         const fallbackFreeAgentProjections = new Map<number, StatComponents>();
 
         const snapshot = await db
@@ -510,11 +513,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
               continue;
             }
 
-            fallbackFreeAgentPlayers.set(player.playerId, {
-              id: player.playerId,
-              name: player.playerName,
-              positions: player.positions,
-            });
             fallbackFreeAgentProjections.set(
               player.playerId,
               player.espnProjectedStats as StatComponents,
@@ -533,12 +531,23 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             });
             if (liveFreeAgents.length > 0) {
               const liveIds = liveFreeAgents.map((player) => player.playerId);
-              const projectedLiveIds = await filterToProjectedFreeAgents(liveIds);
+              const projectedLiveIds =
+                await filterToProjectedFreeAgents(liveIds);
               await addEspnFallbackProjections(liveIds);
               freeAgentPlayerIds =
                 projectedLiveIds.length > 0
-                  ? [...new Set([...projectedLiveIds, ...fallbackFreeAgentProjections.keys()])]
-                  : [...new Set([...liveIds, ...fallbackFreeAgentProjections.keys()])];
+                  ? [
+                      ...new Set([
+                        ...projectedLiveIds,
+                        ...fallbackFreeAgentProjections.keys(),
+                      ]),
+                    ]
+                  : [
+                      ...new Set([
+                        ...liveIds,
+                        ...fallbackFreeAgentProjections.keys(),
+                      ]),
+                    ];
             }
           } catch (error) {
             request.log.warn(
@@ -557,10 +566,11 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .execute();
 
           if (snapshotFreeAgents.length > 0) {
-            const snapshotIds = snapshotFreeAgents.map((player) => player.player_id);
-            const projectedSnapshotIds = await filterToProjectedFreeAgents(
-              snapshotIds,
+            const snapshotIds = snapshotFreeAgents.map(
+              (player) => player.player_id,
             );
+            const projectedSnapshotIds =
+              await filterToProjectedFreeAgents(snapshotIds);
             await addEspnFallbackProjections(snapshotIds);
             freeAgentPlayerIds =
               projectedSnapshotIds.length > 0
@@ -588,10 +598,6 @@ export async function recommendationsRoutes(app: FastifyInstance) {
               ? parseInt(maxRecommendations, 10)
               : 10,
             freeAgentPlayerIds,
-            fallbackPlayers: [...fallbackFreeAgentPlayers.values()],
-            fallbackProjections: Object.fromEntries(
-              fallbackFreeAgentProjections.entries(),
-            ),
           },
         );
         return { recommendations, snapshotDate: date };
@@ -647,7 +653,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = createTradeAgent(db, request.log);
+      const tradeAgent = app.container.agents.tradeRecommendation(
+        db,
+        request.log,
+      );
 
       try {
         const analysis = await tradeAgent.analyzeTradeImpact(
@@ -700,7 +709,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      const tradeAgent = createTradeAgent(db, request.log);
+      const tradeAgent = app.container.agents.tradeRecommendation(
+        db,
+        request.log,
+      );
 
       try {
         const candidates = await tradeAgent.generateTradeCandidates(
