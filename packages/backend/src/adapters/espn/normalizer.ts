@@ -4,6 +4,7 @@ import {
   ESPN_LINEUP_SLOT_MAP,
   ESPN_PRO_TEAM_MAP,
   ESPN_POSITION_MAP,
+  ESPN_PERIOD_STAT_MAP,
 } from "./constants.js";
 import type {
   ESPNLeagueData,
@@ -76,7 +77,11 @@ export class EspnDataNormalizer {
           let rosterStatus: ESPNRosterEntry["rosterStatus"] = "unknown";
           if (lineupSlotId === 16) rosterStatus = "bench";
           else if (lineupSlotId === 17) rosterStatus = "il";
-          else if (lineupSlotId >= 0 && lineupSlotId <= 15)
+          // Slot 19 = IF utility — treated as active roster slot
+          else if (
+            (lineupSlotId >= 0 && lineupSlotId <= 15) ||
+            lineupSlotId === 19
+          )
             rosterStatus = "active";
 
           const injuryStatus = player.injuryStatus || null;
@@ -171,6 +176,63 @@ export class EspnDataNormalizer {
       }
     }
     return mapped;
+  }
+
+  /**
+   * Parse per-player period stats from raw ESPN team data.
+   *
+   * Returns a map of ESPN player ID → component key → value.
+   * Handles OUTS → IP conversion (divide by 3).
+   * Skips IL (lineupSlotId=17) and NA (lineupSlotId=19) players.
+   * Uses statSplitTypeId=5 for current scoring period stats.
+   */
+  parsePlayerPeriodComponents(
+    rawTeams: any[],
+    scoringPeriodId: number,
+  ): Map<number, Record<string, number>> {
+    const result = new Map<number, Record<string, number>>();
+
+    for (const rawTeam of rawTeams) {
+      const entries = rawTeam.roster?.entries || [];
+      for (const entry of entries) {
+        const lineupSlotId = entry.lineupSlotId ?? -1;
+        // Skip IL (17) and NA (19)
+        if (lineupSlotId === 17 || lineupSlotId === 19) continue;
+
+        const espnPlayerId =
+          entry.playerId ?? entry.playerPoolEntry?.player?.id;
+        if (!espnPlayerId) continue;
+
+        const playerStats = entry.playerPoolEntry?.player?.stats || [];
+        const periodStats = playerStats.find(
+          (s: any) =>
+            s.statSplitTypeId === 5 && s.scoringPeriodId === scoringPeriodId,
+        );
+        if (!periodStats?.stats) continue;
+
+        const components: Record<string, number> = {};
+        for (const [statIdStr, value] of Object.entries(
+          periodStats.stats as Record<string, number>,
+        )) {
+          const statId = parseInt(statIdStr, 10);
+          const componentKey = ESPN_PERIOD_STAT_MAP[statId];
+          if (!componentKey || typeof value !== "number" || value === 0)
+            continue;
+
+          if (componentKey === "OUTS") {
+            components["IP"] = (components["IP"] || 0) + value / 3;
+          } else {
+            components[componentKey] = (components[componentKey] || 0) + value;
+          }
+        }
+
+        if (Object.keys(components).length > 0) {
+          result.set(espnPlayerId, components);
+        }
+      }
+    }
+
+    return result;
   }
 
   /**

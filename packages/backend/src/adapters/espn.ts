@@ -83,6 +83,21 @@ export class ESPNAdapter {
   }
 
   /**
+   * Parse per-player period stats from raw ESPN team roster data.
+   * Returns ESPN player ID → component key → value.
+   * OUTS are converted to IP (divide by 3).
+   */
+  parsePlayerPeriodComponents(
+    rawTeams: any[],
+    scoringPeriodId: number,
+  ): Map<number, Record<string, number>> {
+    return this.normalizer.parsePlayerPeriodComponents(
+      rawTeams,
+      scoringPeriodId,
+    );
+  }
+
+  /**
    * Parse rosterForCurrentScoringPeriod from a response fetched with rosterForTeamId.
    * Returns ESPN stat ID → summed value for active lineup players only.
    */

@@ -201,6 +201,42 @@ export const ESPN_POSITION_TO_SLOT: Record<string, number> = {
   P: 13,
 };
 
+/**
+ * ESPN stat ID → component key mapping for player period stats extraction.
+ * Only COUNTING stats — RATE stats are computed from components at read time.
+ * Stat ID 34 (OUTS) must be converted to IP via / 3 by the caller.
+ */
+export const ESPN_PERIOD_STAT_MAP: Record<number, string> = {
+  // Batting counting stats
+  0: "AB",
+  1: "H",
+  3: "2B",
+  4: "3B",
+  5: "HR",
+  8: "TB",
+  10: "BB",
+  12: "HBP",
+  13: "SF",
+  20: "R",
+  21: "RBI",
+  23: "SB",
+  24: "CS",
+  27: "SO",
+  // Pitching counting stats (OUTS converted to IP on ingestion)
+  34: "OUTS", // convert via / 3
+  37: "HA",
+  39: "BBA",
+  45: "ER",
+  46: "HRA",
+  48: "K",
+  53: "W",
+  54: "L",
+  57: "SV",
+  58: "BLSV",
+  60: "HLD",
+  63: "QS",
+};
+
 /** All position slot IDs for unfiltered free agent queries */
 export const ALL_POSITION_SLOT_IDS = [
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 24,
