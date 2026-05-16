@@ -7,6 +7,7 @@ import multipart from "@fastify/multipart";
 import fastifyJwt from "@fastify/jwt";
 import fastifyWebsocket from "@fastify/websocket";
 import { getDb } from "./db/connection.js";
+import { setupContainer } from "./container.js";
 import { leaguesRoutes } from "./api/leagues.js";
 import { projectionsRoutes } from "./api/projections.js";
 import { timeSeriesRoutes } from "./api/timeseries.js";
@@ -123,6 +124,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   // Decorate fastify instance with auth methods
   server.decorate("authenticate", authenticate);
   server.decorate("requireAdmin", requireAdmin);
+
+  // Set up process-scope adapter singletons and agent factories
+  setupContainer(server);
 
   await server.register(multipart, {
     limits: {
