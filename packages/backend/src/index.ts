@@ -24,6 +24,7 @@ import { transactionImpactRoutes } from "./api/transaction-impact.js";
 import { trendsRoutes } from "./api/trends.js";
 import { faabRoutes } from "./api/faab.js";
 import { pitchingUsageRoutes } from "./api/pitching-usage.js";
+import { simulationRoutes } from "./api/simulation.js";
 import { authenticate, requireAdmin } from "./middleware/auth.js";
 import type { FastifyInstance } from "fastify";
 
@@ -188,6 +189,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await server.register(trendsRoutes);
   await server.register(faabRoutes);
   await server.register(pitchingUsageRoutes);
+  await server.register(simulationRoutes);
 
   await server.register(internalRoutes);
 
