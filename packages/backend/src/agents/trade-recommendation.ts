@@ -685,6 +685,23 @@ export class TradeRecommendationAgent {
       );
     }
 
+    // Fail fast with a clear error if projected standings haven't been computed yet.
+    // Without them every analyzeTradeImpact call throws and candidates are silently skipped,
+    // leaving the user with an unexplained blank list.
+    const projectedStandingsExist = await this.db
+      .selectFrom("team_daily_projected_overall")
+      .select("team_id")
+      .where("league_id", "=", leagueId)
+      .where("snapshot_date", "=", snapshotDate)
+      .executeTakeFirst();
+
+    if (!projectedStandingsExist) {
+      throw new Error(
+        `No projected standings found for league ${leagueId} on ${snapshotDate}. ` +
+          `Please ensure projections have been uploaded and a snapshot has been run.`,
+      );
+    }
+
     const allTeams = await this.db
       .selectFrom("team")
       .selectAll()
@@ -824,7 +841,7 @@ export class TradeRecommendationAgent {
           });
 
           if (
-            equivalentValue.ratio == null ||
+            equivalentValue.ratio != null &&
             equivalentValue.ratio < MIN_EQUIVALENT_VALUE_RATIO
           ) {
             continue;

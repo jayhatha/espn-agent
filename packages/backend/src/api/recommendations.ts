@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
-import { type ProposedTrade } from "../agents/trade-recommendation.js";
+import {
+  TradeRecommendationAgent,
+  type ProposedTrade,
+} from "../agents/trade-recommendation.js";
 import { createWaiverAgent } from "../agents/agent-factory.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
@@ -599,6 +602,82 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           error: "Failed to compute waiver recommendations",
           details: error instanceof Error ? error.message : String(error),
         });
+      }
+    },
+  );
+
+  // Trade roster-slot validation (real-time, non-blocking)
+  app.post(
+    "/api/leagues/:leagueId/teams/:teamId/trades/validate",
+    async (
+      request: FastifyRequest<{
+        Params: { leagueId: string; teamId: string };
+        Body: unknown;
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+      const teamId = parseInt(request.params.teamId, 10);
+
+      const body = request.body as
+        | { givePlayers?: unknown; receivePlayers?: unknown }
+        | null
+        | undefined;
+
+      if (
+        !Array.isArray(body?.givePlayers) ||
+        !Array.isArray(body?.receivePlayers)
+      ) {
+        return reply.code(400).send({
+          error: "givePlayers and receivePlayers arrays required",
+        });
+      }
+
+      const trade: ProposedTrade = {
+        givePlayers: (body.givePlayers as number[]).map((id) => ({
+          playerId: id,
+          playerName: "",
+        })),
+        receivePlayers: (body.receivePlayers as number[]).map((id) => ({
+          playerId: id,
+          playerName: "",
+        })),
+      };
+
+      const sizeCheck = TradeRecommendationAgent.validateTradeSize(trade);
+      if (!sizeCheck.valid) {
+        return { isLegal: false, issues: [sizeCheck.error!] };
+      }
+
+      const latest = await db
+        .selectFrom("league_daily_snapshot")
+        .select("snapshot_date")
+        .where("league_id", "=", leagueId)
+        .orderBy("snapshot_date", "desc")
+        .executeTakeFirst();
+
+      if (!latest) {
+        return reply
+          .code(404)
+          .send({ error: "No snapshots found for league" });
+      }
+
+      const tradeAgent = app.container.agents.tradeRecommendation(
+        db,
+        request.log,
+      );
+
+      try {
+        const result = await tradeAgent.validateRosterSlots(
+          leagueId,
+          teamId,
+          latest.snapshot_date,
+          trade,
+        );
+        return result;
+      } catch (error) {
+        request.log.error({ error }, "Trade slot validation failed");
+        return reply.code(500).send({ error: "Failed to validate trade" });
       }
     },
   );
