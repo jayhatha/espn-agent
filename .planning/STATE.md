@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v11.0
-milestone_name: Projected Season Simulation Engine
-status: complete
-stopped_at: ""
+milestone: v12.0
+milestone_name: Scenario Recommendation Integrity
+status: planning
+stopped_at: "Ready for execute-phase handoff"
 last_updated: "2026-05-17T00:00:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 5
-  completed_plans: 5
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 0
 ---
 
 # Project State
@@ -19,14 +19,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-16)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v11.0 Projected Season Simulation Engine — canonical simulation state, opportunity and variance modeling, lineup and GS constraints, churn dynamics, Monte Carlo outputs
+**Current focus:** v12.0 Scenario Recommendation Integrity — shared scenario evaluator, snapshot-bound reproducibility fixes, trade/waiver integration, deterministic-first screening, bounded Monte Carlo rerank
 
 ## Current Position
 
-Phase: COMPLETE — all 5 phases shipped (103–107)
-Plan: Phase 107 (Monte Carlo Outcomes & Backend Exposure)
-Status: v11.0 milestone complete
-Last activity: 2026-05-17 — All phases committed in 1c9851d
+Phase: 108 — Scenario-Driven Trade & Waiver Evaluation
+Plan: COMPLETE — 108-01 + 108-02 executed
+Status: all 346 tests pass; tsc clean
+Last activity: 2026-05-18 — both plans executed; 3c812b8 + 8c96258
 
 ## Performance Metrics
 
@@ -77,6 +77,12 @@ _Updated after each plan completion_
 
 ### Decisions
 
+- [Phase 108]: Add `ScenarioEvaluationAgent` as shared backend scenario entry point on top of v11 simulation helpers; keep `SeasonSimulationAgent` focused on whole-snapshot orchestration
+- [Phase 108]: Deterministic scenario scoring owns legality and broad candidate screening; seeded Monte Carlo reranks only a bounded top legal subset
+- [Phase 108]: Snapshot-bound reproducibility is a prerequisite — `daysRemaining` derives from `snapshotDate`, and snapshot-scoped data stays authoritative over latest raw payload fallbacks
+- [Phase 108]: `RosterSimulator` remains a response-helper module for explanations and depth labels only; scenario scoring ownership moves out
+- [Phase 108]: Waiver legality must come from allocator or gap detection output; `canReplacePosition()` is removed from recommendation gating
+- [Phase 108]: Trade fairness or likelihood must be bilateral first and market-value-aware second
 - [v11.0 roadmap]: Simulator composes on top of the existing allocation/projection pipeline instead of replacing `allocateProjections()` or shared rate-stat formulas
 - [v11.0 roadmap]: Milestone stays backend-first — ship reusable agent/module + minimal API/report exposure before any major frontend probability UI
 - [v11.0 roadmap]: Time progression is daily or configurable bucketed simulation from snapshot date to season end, not direct season-end sampling only
@@ -153,6 +159,7 @@ _Updated after each plan completion_
 
 ### Roadmap Evolution
 
+- Phase 108 added: Scenario-Driven Trade & Waiver Evaluation — shared scenario evaluator, snapshot-bound reproducibility, trade/waiver integration, deterministic-first screening, bounded Monte Carlo rerank
 - Phase 103 added: Simulation Contract & Baseline State — canonical input assembly + deterministic parity path
 - Phase 104 added: Opportunity & Variance Model — daily/bucketed usage streams + component-based uncertainty
 - Phase 105 added: Constraint-Aware Daily Season Simulator — lineup, slot, two-way, and GS pacing rules
@@ -171,6 +178,9 @@ _Updated after each plan completion_
 
 ### Blockers/Concerns
 
+- [Phase 108 — snapshot fidelity]: Historical raw-payload and GS-used lookups may be incomplete for some snapshots, so degraded fallback behavior must stay explicit rather than silently substituting latest data
+- [Phase 108 — runtime]: Top-K and run-count defaults for Monte Carlo rerank need measurement during execution to stay inside backend request budgets
+- [Phase 108 — legacy assumptions]: Older Phase 67 and 69 verification artifacts overstate current recommendation correctness and should not be treated as execution truth
 - [v11.0 — runtime]: Default run count and caching strategy need measurement against backend worker/API budgets before results are exposed broadly
 - [v11.0 — calibration]: Historical snapshots and realized outcomes may be incomplete for interval-coverage validation, so calibration scope may need a first-pass heuristic harness
 - [v11.0 — churn]: Replacement-level fill must stay traceable and league-valid; no hidden projection-only transactions or fabricated exact future moves
@@ -181,7 +191,9 @@ _Updated after each plan completion_
 
 ### Pending Todos
 
-None yet.
+- ✅ Execute 108-01 — Scenario evaluator foundation, snapshot-bound reproducibility fixes, wave-0 tests (commit 941f31c)
+- ✅ Execute 108-02 — Trade/waiver integration, route normalization, bounded Monte Carlo rerank, focused regression tests (commits 3c812b8, 8c96258)
+- Phase 109 — TBD (next phase)
 
 ### Quick Tasks Completed
 
