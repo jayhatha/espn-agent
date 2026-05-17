@@ -120,3 +120,57 @@ export interface MonteCarloResult {
     deterministicRotoPoints: Record<number, number>;
   };
 }
+
+// ─── Phase 108: Scenario Evaluation ──────────────────────────────────────────
+
+import type { RosterGap } from "../projection/types.js";
+
+/**
+ * Waiver add/drop mutation applied against canonical SimulationState.
+ * addPlayerProjection must be supplied for free agents not yet in state.
+ */
+export interface WaiverMutation {
+  type: "waiver";
+  teamId: number;
+  addPlayerId: number;
+  dropPlayerId: number;
+  addPlayerPositions: string[];
+  addPlayerProjection?: StatComponents;
+}
+
+/**
+ * Bilateral trade mutation applied against canonical SimulationState.
+ * Both teams' players must already exist in state.teams.
+ */
+export interface TradeMutation {
+  type: "trade";
+  userTeamId: number;
+  partnerTeamId: number;
+  givePlayerIds: number[];
+  receivePlayerIds: number[];
+}
+
+export type ScenarioMutation = WaiverMutation | TradeMutation;
+
+/** Per-category roto delta (categoryId → delta points). */
+export type CategoryDeltaMap = Record<string, number>;
+
+/** Result returned by evaluateDeterministicScenario. */
+export interface ScenarioEvaluationResult {
+  /** Whether the post-mutation roster can fill all required starting slots. */
+  isLegal: boolean;
+  /** Human-readable blocking issues (e.g. unfillable slot descriptions). */
+  blockingIssues: string[];
+  /** Roster gaps detected by the allocator on the mutated team. */
+  gaps: RosterGap[];
+  /** Delta roto points for the requesting team (positive = better). */
+  deltaOverallPoints: number;
+  /** Per-category delta roto points for the requesting team. */
+  categoryDeltas: CategoryDeltaMap;
+  /** Delta roto points for the trade partner team (trade mutations only). */
+  partnerDeltaOverallPoints?: number;
+  /** Per-category delta roto points for the trade partner team. */
+  partnerCategoryDeltas?: CategoryDeltaMap;
+  /** Degradation notes accumulated during evaluation. */
+  degradedReasons: string[];
+}

@@ -9,11 +9,19 @@ import { DEFAULT_SEASON_END } from "./types.js";
 
 const DEFAULT_GS_CAP = 200;
 
-function daysUntil(dateStr: string): number {
-  const end = new Date(dateStr);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.round((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+/**
+ * Compute days between snapshotDate and the season end date.
+ * Reproducible: uses snapshotDate, never wall-clock time.
+ */
+function daysFromSnapshotDate(snapshotDate: string, endDate: string): number {
+  const start = new Date(snapshotDate);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  return Math.max(
+    0,
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+  );
 }
 
 /**
@@ -55,9 +63,8 @@ export async function buildSimulationState(
     : undefined;
 
   const categories = (settings?.settings_json?.categories ?? []) as Category[];
-  const rosterSlots = (
-    (settings?.settings_json as any)?.roster_slots ?? {}
-  ) as Record<string, number>;
+  const rosterSlots = ((settings?.settings_json as any)?.roster_slots ??
+    {}) as Record<string, number>;
 
   if (categories.length === 0) degradedReasons.push("settings_missing");
 
@@ -79,7 +86,7 @@ export async function buildSimulationState(
 
   if (!projectionsRun) degradedReasons.push("projections_missing");
 
-  const daysRemaining = daysUntil(DEFAULT_SEASON_END);
+  const daysRemaining = daysFromSnapshotDate(snapshotDate, DEFAULT_SEASON_END);
 
   // ── Teams ─────────────────────────────────────────────────────────────────
   const teams = await db
@@ -104,12 +111,7 @@ export async function buildSimulationState(
       .select(["id", "espn_team_id"])
       .where("league_id", "=", leagueId)
       .execute(),
-    db
-      .selectFrom("league_raw_payload")
-      .select(["response_json"])
-      .where("league_id", "=", leagueId)
-      .orderBy("fetched_at", "desc")
-      .executeTakeFirst(),
+    repo.getHistoricalRawPayload(leagueId, snapshotDate),
   ]);
 
   if (allRosterEntries.length === 0) degradedReasons.push("rosters_missing");
@@ -175,8 +177,7 @@ export async function buildSimulationState(
     const rosterPlayers: RosteredPlayer[] = roster.map((r) => ({
       playerId: r.player_id,
       positions: (r.positions as string[]) || [],
-      rosterStatus:
-        (r.roster_status as "active" | "bench" | "il") || "active",
+      rosterStatus: (r.roster_status as "active" | "bench" | "il") || "active",
       rosterSlot: r.roster_slot || null,
       projectedComponents: null,
     }));

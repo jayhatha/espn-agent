@@ -148,4 +148,30 @@ export class SnapshotRepository {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
   }
+
+  /**
+   * Fetch the most recent raw ESPN payload at or before snapshotDate.
+   *
+   * Snapshot-bound: prefers historical payloads captured on or before the
+   * requested snapshot date so that simulation state is reproducible.
+   * Falls back to null if no qualifying payload exists.
+   */
+  async getHistoricalRawPayload(
+    leagueId: number,
+    snapshotDate: string,
+  ): Promise<{ response_json: unknown } | null> {
+    // Use the day after snapshotDate as the exclusive upper bound so that
+    // a payload fetched on snapshotDate itself (any time that day) is included.
+    const dayAfter = new Date(snapshotDate);
+    dayAfter.setDate(dayAfter.getDate() + 1);
+    dayAfter.setHours(0, 0, 0, 0);
+
+    return this.db
+      .selectFrom("league_raw_payload")
+      .select(["response_json"])
+      .where("league_id", "=", leagueId)
+      .where("fetched_at", "<", dayAfter)
+      .orderBy("fetched_at", "desc")
+      .executeTakeFirst() as Promise<{ response_json: unknown } | null>;
+  }
 }
