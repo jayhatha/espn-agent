@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import React, { useState, useMemo } from "react";
 import {
@@ -123,7 +123,32 @@ interface StandingsData {
   currentOverallStandings: CurrentOverallStanding[];
 }
 
-type ViewMode = "current" | "projected";
+interface TeamFinishDistribution {
+  teamId: number;
+  teamName: string;
+  projectedRotoPoints: number;
+  rotoPointsP10: number;
+  rotoPointsP50: number;
+  rotoPointsP90: number;
+  finishProbabilities: number[];
+  p1: number;
+  pTop3: number;
+  pTopHalf: number;
+  categoryP50: Record<string, number>;
+  categorySwing: Record<string, number>;
+}
+
+interface SimulationResult {
+  leagueId: number;
+  snapshotDate: string;
+  runs: number;
+  seed: number;
+  computedAt: string;
+  teams: TeamFinishDistribution[];
+  calibration: { deterministicRotoPoints: Record<number, number> };
+}
+
+type ViewMode = "current" | "projected" | "simulation";
 
 export default function StandingsPage() {
   const params = useParams();
@@ -131,6 +156,7 @@ export default function StandingsPage() {
   const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("current");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useProjectedStandings(leagueId);
 
@@ -168,6 +194,20 @@ export default function StandingsPage() {
       !!data &&
       data.overallStandings.length === 0 &&
       !!selectedTeamId,
+  });
+
+  // Monte Carlo simulation — runs when Season Outlook tab is active
+  const {
+    data: simulationResult,
+    isLoading: simLoading,
+    error: simError,
+  } = useQuery({
+    queryKey: ["simulation", leagueId],
+    queryFn: () =>
+      api.runSimulation(parseInt(leagueId, 10)) as Promise<SimulationResult>,
+    enabled: viewMode === "simulation",
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   // Swing attribution — fetches when projected tab is active and a team is selected
@@ -694,6 +734,17 @@ export default function StandingsPage() {
                 >
                   Projected Standings
                 </button>
+                <button
+                  onClick={() => setViewMode("simulation")}
+                  className={cn(
+                    "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
+                    viewMode === "simulation"
+                      ? "border-accent dark:border-shell-accent text-content dark:text-shell-text"
+                      : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300",
+                  )}
+                >
+                  Season Outlook
+                </button>
               </nav>
             </div>
           </div>
@@ -954,6 +1005,227 @@ export default function StandingsPage() {
               )}
             </>
           ) : null}
+
+          {viewMode === "simulation" && (
+            <div className="space-y-6">
+              {simLoading ? (
+                <LoadingSpinner quips />
+              ) : simError ? (
+                <Card>
+                  <CardContent className="py-4">
+                    <ErrorAlert
+                      message={(simError as Error).message}
+                      action={{
+                        label: "Retry",
+                        onClick: () =>
+                          queryClient.invalidateQueries({
+                            queryKey: ["simulation", leagueId],
+                          }),
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              ) : simulationResult ? (
+                <>
+                  {/* Header row: metadata + re-run */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-body-sm text-content-secondary dark:text-shell-muted">
+                      {simulationResult.runs.toLocaleString()} runs &middot;
+                      seed {simulationResult.seed} &middot; computed{" "}
+                      {new Date(simulationResult.computedAt).toLocaleTimeString(
+                        "en-US",
+                        { hour: "numeric", minute: "2-digit" },
+                      )}
+                    </p>
+                    <button
+                      onClick={() =>
+                        queryClient.invalidateQueries({
+                          queryKey: ["simulation", leagueId],
+                        })
+                      }
+                      className="text-body-sm text-accent dark:text-shell-accent hover:underline"
+                    >
+                      Re-run
+                    </button>
+                  </div>
+
+                  {/* Finish probability table */}
+                  <Card>
+                    <CardHeader>
+                      <Heading level={3}>Season Finish Probabilities</Heading>
+                      <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                        Sorted by median projected roto points (P50)
+                      </p>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
+                          <thead className="bg-surface-secondary dark:bg-shell-bg">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider w-12">
+                                #
+                              </th>
+                              <th className="px-4 py-3 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                Team
+                              </th>
+                              <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                Win %
+                              </th>
+                              <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                Top 3
+                              </th>
+                              <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                Top Half
+                              </th>
+                              <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                P50 Pts
+                              </th>
+                              <th className="px-4 py-3 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider">
+                                P10–P90 Range
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
+                            {simulationResult.teams
+                              .slice()
+                              .sort(
+                                (a, b) => b.rotoPointsP50 - a.rotoPointsP50,
+                              )
+                              .map((team, i) => {
+                                const isSelected =
+                                  selectedTeamId === team.teamId;
+                                return (
+                                  <tr
+                                    key={team.teamId}
+                                    className={cn(
+                                      "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                                      isSelected
+                                        ? "bg-accent-light dark:bg-shell-accent/20"
+                                        : "",
+                                    )}
+                                  >
+                                    <td className="px-4 py-3 text-data text-content-secondary dark:text-shell-muted">
+                                      {i + 1}
+                                    </td>
+                                    <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
+                                      <div className="flex items-center">
+                                        {isSelected && (
+                                          <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
+                                        )}
+                                        {team.teamName}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-data tabular-nums">
+                                      <span
+                                        className={cn(
+                                          "font-medium",
+                                          team.p1 >= 0.2
+                                            ? "text-positive"
+                                            : team.p1 >= 0.08
+                                              ? "text-content dark:text-shell-text"
+                                              : "text-content-tertiary dark:text-shell-muted",
+                                        )}
+                                      >
+                                        {(team.p1 * 100).toFixed(1)}%
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-data tabular-nums text-content dark:text-shell-text">
+                                      {(team.pTop3 * 100).toFixed(1)}%
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-data tabular-nums text-content-secondary dark:text-shell-muted">
+                                      {(team.pTopHalf * 100).toFixed(1)}%
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-data font-semibold tabular-nums text-content dark:text-shell-text">
+                                      {team.rotoPointsP50.toFixed(1)}
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-data tabular-nums text-content-tertiary dark:text-shell-muted">
+                                      {team.rotoPointsP10.toFixed(1)}–
+                                      {team.rotoPointsP90.toFixed(1)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Category volatility for selected team */}
+                  {selectedTeamId &&
+                    data?.categories &&
+                    (() => {
+                      const myTeam = simulationResult.teams.find(
+                        (t) => t.teamId === selectedTeamId,
+                      );
+                      if (!myTeam) return null;
+                      const catsWithSwing: Array<{
+                        cat: Category;
+                        swing: number;
+                      }> = data.categories
+                        .map((cat: Category) => ({
+                          cat,
+                          swing: myTeam.categorySwing[cat.category_id] ?? 0,
+                        }))
+                        .sort(
+                          (
+                            a: { cat: Category; swing: number },
+                            b: { cat: Category; swing: number },
+                          ) => b.swing - a.swing,
+                        );
+                      return (
+                        <Card>
+                          <CardHeader>
+                            <Heading level={3}>
+                              Category Volatility — {myTeam.teamName}
+                            </Heading>
+                            <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                              P90–P10 spread per category across all simulation
+                              runs. Higher = more uncertain.
+                            </p>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {catsWithSwing.map(({ cat, swing }) => {
+                                const maxSwing = catsWithSwing[0]?.swing ?? 1;
+                                const pct =
+                                  maxSwing > 0
+                                    ? Math.round((swing / maxSwing) * 100)
+                                    : 0;
+                                return (
+                                  <div
+                                    key={cat.category_id}
+                                    className="flex items-center gap-3"
+                                  >
+                                    <span className="w-14 text-right text-data font-medium text-content-secondary dark:text-shell-muted shrink-0">
+                                      {cat.name || cat.stat_key}
+                                    </span>
+                                    <div className="flex-1 bg-neutral-100 dark:bg-shell-bg rounded-full h-2 overflow-hidden">
+                                      <div
+                                        className="h-2 rounded-full bg-accent dark:bg-shell-accent transition-all"
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                    <span className="w-20 text-right text-data tabular-nums text-content dark:text-shell-text shrink-0">
+                                      ±
+                                      {formatStatValue(
+                                        swing / 2,
+                                        cat.type,
+                                        cat.stat_key,
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+                </>
+              ) : null}
+            </div>
+          )}
         </>
       ) : (
         <Card>

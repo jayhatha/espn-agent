@@ -663,4 +663,15 @@ export const api = {
       `/api/leagues/${leagueId}/teams/${teamId}/standings/neighborhood`,
     );
   },
+
+  // Monte Carlo Season Simulation
+  async runSimulation(
+    leagueId: number,
+    config?: { runs?: number; seed?: number; enableChurn?: boolean },
+  ) {
+    return fetchAPI(`/api/leagues/${leagueId}/simulation/run`, {
+      method: "POST",
+      body: JSON.stringify(config ?? {}),
+    });
+  },
 };
