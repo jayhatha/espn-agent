@@ -363,12 +363,56 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           dropPlayerId,
         });
 
+        // Look up player info for the response shape the frontend expects
+        const [addPlayerRow, dropPlayerRow] = await Promise.all([
+          db
+            .selectFrom("player")
+            .select(["id", "name", "positions"])
+            .where("id", "=", addPlayerId)
+            .executeTakeFirst(),
+          db
+            .selectFrom("player")
+            .select(["id", "name", "positions"])
+            .where("id", "=", dropPlayerId)
+            .executeTakeFirst(),
+        ]);
+
+        // Fetch category names so we can build the categoryImpacts array
+        const categoryImpacts = Object.entries(result.categoryDeltas).map(
+          ([categoryId, deltaPoints]) => ({
+            categoryId,
+            categoryName: categoryId,
+            deltaRank: 0,
+            deltaPoints,
+          }),
+        );
+
+        const sign = result.deltaOverallPoints >= 0 ? "+" : "";
+        const explanation =
+          result.blockingIssues.length > 0
+            ? `This move is not legal: ${result.blockingIssues.join("; ")}.`
+            : `This add/drop projects a ${sign}${result.deltaOverallPoints.toFixed(1)} point change in overall standings.`;
+
         return {
+          addPlayer: addPlayerRow
+            ? {
+                id: addPlayerRow.id,
+                name: addPlayerRow.name,
+                positions: addPlayerRow.positions,
+              }
+            : { id: addPlayerId, name: "Unknown", positions: [] },
+          dropPlayer: dropPlayerRow
+            ? {
+                id: dropPlayerRow.id,
+                name: dropPlayerRow.name,
+                positions: dropPlayerRow.positions,
+              }
+            : { id: dropPlayerId, name: "Unknown", positions: [] },
           isLegal: result.isLegal,
-          blockingIssues: result.blockingIssues,
-          gaps: result.gaps,
+          legalityIssues: result.blockingIssues,
           deltaOverallPoints: result.deltaOverallPoints,
-          categoryDeltas: result.categoryDeltas,
+          categoryImpacts,
+          explanation,
           degradedReasons: result.degradedReasons,
           snapshotDate: date,
         };
