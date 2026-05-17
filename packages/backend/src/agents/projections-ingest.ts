@@ -12,6 +12,21 @@ import { PlayerIdentityResolutionAgent } from "./player-identity.js";
  * Ingest FanGraphs Depth Charts RoS projections via CSV uploads
  */
 
+/**
+ * FanGraphs team abbreviation → ESPN/DB team abbreviation mapping.
+ * FanGraphs uses longer codes (KCR, TBR, WSN, SDP, SFG, ATH) while
+ * ESPN_PRO_TEAM_MAP stores shorter codes (KC, TB, WSH, SD, SF, OAK).
+ * Any FanGraphs abbreviation not listed here is passed through unchanged.
+ */
+const FANGRAPHS_TO_ESPN_TEAM_MAP: Record<string, string> = {
+  KCR: "KC",
+  TBR: "TB",
+  WSN: "WSH",
+  SDP: "SD",
+  SFG: "SF",
+  ATH: "OAK", // Las Vegas/Oakland Athletics
+};
+
 interface ProjectionRow {
   projections_run_id: number;
   player_id: number;
@@ -36,7 +51,10 @@ function deduplicateProjectionRows(rows: ProjectionRow[]): ProjectionRow[] {
   for (const row of rows) {
     const existing = map.get(row.player_id);
     if (existing) {
-      existing.stat_components_json = { ...existing.stat_components_json, ...row.stat_components_json };
+      existing.stat_components_json = {
+        ...existing.stat_components_json,
+        ...row.stat_components_json,
+      };
     } else {
       map.set(row.player_id, { ...row });
     }
@@ -103,6 +121,16 @@ export class ProjectionsIngestAgent {
   }
 
   /**
+   * Normalize a FanGraphs team abbreviation to the ESPN/DB abbreviation.
+   * FanGraphs uses longer codes (KCR, TBR, WSN, SDP, SFG, ATH) that differ
+   * from what ESPN stores in player.mlb_team (KC, TB, WSH, SD, SF, OAK).
+   */
+  private normalizeTeam(team: string | undefined): string | undefined {
+    if (!team) return undefined;
+    return FANGRAPHS_TO_ESPN_TEAM_MAP[team] ?? team;
+  }
+
+  /**
    * Match a FanGraphs player to a database player using identity resolution.
    * Delegates to PlayerIdentityResolutionAgent.resolve() which handles
    * cache lookup, fuzzy matching, threshold filtering, and map writes.
@@ -116,7 +144,12 @@ export class ProjectionsIngestAgent {
       .toLowerCase()
       .replace(/[^a-z]/g, "")
       .trim();
-    return this.identityAgent.resolve(fangraphsKey, playerName, team, positions);
+    return this.identityAgent.resolve(
+      fangraphsKey,
+      playerName,
+      team,
+      positions,
+    );
   }
 
   /**
@@ -180,18 +213,27 @@ export class ProjectionsIngestAgent {
 
     // Aggregate match statistics across batters and pitchers
     const allUnmatched: string[] = [];
-    const aggregateStats: MatchStatistics = { exactMatches: 0, fuzzyMatches: 0, unmatched: 0, total: 0 };
+    const aggregateStats: MatchStatistics = {
+      exactMatches: 0,
+      fuzzyMatches: 0,
+      unmatched: 0,
+      total: 0,
+    };
 
     if (reports.battersReport) {
-      aggregateStats.exactMatches += reports.battersReport.matchStats.exactMatches;
-      aggregateStats.fuzzyMatches += reports.battersReport.matchStats.fuzzyMatches;
+      aggregateStats.exactMatches +=
+        reports.battersReport.matchStats.exactMatches;
+      aggregateStats.fuzzyMatches +=
+        reports.battersReport.matchStats.fuzzyMatches;
       aggregateStats.unmatched += reports.battersReport.matchStats.unmatched;
       aggregateStats.total += reports.battersReport.matchStats.total;
       allUnmatched.push(...reports.battersReport.unmatchedPlayers);
     }
     if (reports.pitchersReport) {
-      aggregateStats.exactMatches += reports.pitchersReport.matchStats.exactMatches;
-      aggregateStats.fuzzyMatches += reports.pitchersReport.matchStats.fuzzyMatches;
+      aggregateStats.exactMatches +=
+        reports.pitchersReport.matchStats.exactMatches;
+      aggregateStats.fuzzyMatches +=
+        reports.pitchersReport.matchStats.fuzzyMatches;
       aggregateStats.unmatched += reports.pitchersReport.matchStats.unmatched;
       aggregateStats.total += reports.pitchersReport.matchStats.total;
       allUnmatched.push(...reports.pitchersReport.unmatchedPlayers);
@@ -202,7 +244,12 @@ export class ProjectionsIngestAgent {
       {
         projectionsRunId: projectionsRun.id,
         ...aggregateStats,
-        unmatchedPlayerNames: allUnmatched.length <= 20 ? allUnmatched : allUnmatched.slice(0, 20).concat([`...and ${allUnmatched.length - 20} more`]),
+        unmatchedPlayerNames:
+          allUnmatched.length <= 20
+            ? allUnmatched
+            : allUnmatched
+                .slice(0, 20)
+                .concat([`...and ${allUnmatched.length - 20} more`]),
       },
       "Projections ingest match summary",
     );
@@ -257,7 +304,10 @@ export class ProjectionsIngestAgent {
       .execute();
 
     if (staleness === "fresh") {
-      this.logger?.info({ projectionsRunId: projectionsRun.id }, "Projections run marked as fresh (both batters and pitchers present)");
+      this.logger?.info(
+        { projectionsRunId: projectionsRun.id },
+        "Projections run marked as fresh (both batters and pitchers present)",
+      );
     }
 
     return {
@@ -279,20 +329,12 @@ export class ProjectionsIngestAgent {
 
     // Required columns for hitters (per DESIGN_DOC.md §5.2)
     // H and TB can be derived from 1B/2B/3B/HR, so they're not strictly required
-    const required = [
-      "AB",
-      "R",
-      "HR",
-      "RBI",
-      "SB",
-      "BB",
-      "HBP",
-      "SF",
-    ];
+    const required = ["AB", "R", "HR", "RBI", "SB", "BB", "HBP", "SF"];
     const missing = required.filter((col) => !(col in rows[0]));
     // Need either H directly or components to derive it
     const hasH = "H" in rows[0];
-    const hasHitComponents = "1B" in rows[0] && "2B" in rows[0] && "3B" in rows[0];
+    const hasHitComponents =
+      "1B" in rows[0] && "2B" in rows[0] && "3B" in rows[0];
     if (!hasH && !hasHitComponents) {
       missing.push("H (or 1B+2B+3B)");
     }
@@ -317,14 +359,15 @@ export class ProjectionsIngestAgent {
       if (!playerName) continue;
 
       totalProcessed++;
-      const team = (row.Team as string) || undefined;
+      const team = this.normalizeTeam((row.Team as string) || undefined);
 
       // Extract positions from CSV (e.g., "SS, 2B" or "SS/2B")
-      const positionsStr = (row.Pos as string) || (row.Position as string) || "";
+      const positionsStr =
+        (row.Pos as string) || (row.Position as string) || "";
       const positions = positionsStr
         .split(/[,/]/)
-        .map(p => p.trim())
-        .filter(p => p.length > 0 && p !== "IL" && p !== "NA" && p !== "BE"); // Filter out roster slots, not positions
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0 && p !== "IL" && p !== "NA" && p !== "BE"); // Filter out roster slots, not positions
 
       const singles = parseFloat(row["1B"] as string) || 0;
       const doubles = parseFloat(row["2B"] as string) || 0;
@@ -332,9 +375,12 @@ export class ProjectionsIngestAgent {
       const homeRuns = parseFloat(row.HR as string) || 0;
 
       // Derive H from components if not in CSV (H = 1B + 2B + 3B + HR)
-      const hits = parseFloat(row.H as string) || (singles + doubles + triples + homeRuns);
+      const hits =
+        parseFloat(row.H as string) || singles + doubles + triples + homeRuns;
       // Derive TB from components — FanGraphs exports don't include TB
-      const totalBases = parseFloat(row.TB as string) || (singles + 2 * doubles + 3 * triples + 4 * homeRuns);
+      const totalBases =
+        parseFloat(row.TB as string) ||
+        singles + 2 * doubles + 3 * triples + 4 * homeRuns;
 
       const components: StatComponents = {
         AB: parseFloat(row.AB as string) || 0,
@@ -357,7 +403,11 @@ export class ProjectionsIngestAgent {
       };
 
       // Match player using identity resolution with fuzzy matching (includes position boosting)
-      const matchResult = await this.matchPlayer(playerName, team, positions.length > 0 ? positions : undefined);
+      const matchResult = await this.matchPlayer(
+        playerName,
+        team,
+        positions.length > 0 ? positions : undefined,
+      );
 
       if (!matchResult) {
         unmatchedPlayers.push(playerName);
@@ -467,14 +517,15 @@ export class ProjectionsIngestAgent {
       if (!playerName) continue;
 
       totalProcessed++;
-      const team = (row.Team as string) || undefined;
+      const team = this.normalizeTeam((row.Team as string) || undefined);
 
       // Extract positions from CSV (e.g., "SP", "RP", "SP/RP")
-      const positionsStr = (row.Pos as string) || (row.Position as string) || "";
+      const positionsStr =
+        (row.Pos as string) || (row.Position as string) || "";
       const positions = positionsStr
         .split(/[,/]/)
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
 
       const strikeouts = hasK
         ? parseFloat(row.K as string) || 0
@@ -483,7 +534,7 @@ export class ProjectionsIngestAgent {
       const components: StatComponents = {
         IP: parseFloat(row.IP as string) || 0,
         ER: parseFloat(row.ER as string) || 0,
-        HA: parseFloat(row.H as string) || 0,  // Hits allowed — use HA to avoid collision with batter H
+        HA: parseFloat(row.H as string) || 0, // Hits allowed — use HA to avoid collision with batter H
         BBA: parseFloat(row.BB as string) || 0, // Walks allowed — use BBA to avoid collision with batter BB
         K: strikeouts,
         SO: strikeouts, // ESPN stat 60 uses "SO" as stat_key
@@ -497,7 +548,11 @@ export class ProjectionsIngestAgent {
       };
 
       // Match player using identity resolution with fuzzy matching (includes position boosting)
-      const matchResult = await this.matchPlayer(playerName, team, positions.length > 0 ? positions : undefined);
+      const matchResult = await this.matchPlayer(
+        playerName,
+        team,
+        positions.length > 0 ? positions : undefined,
+      );
 
       if (!matchResult) {
         unmatchedPlayers.push(playerName);
