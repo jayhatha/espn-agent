@@ -259,6 +259,10 @@ export interface TradeImpactAnalysis {
   recommendation: "accept" | "decline" | "consider";
   explanation: string;
   rosterGaps?: RosterGap[]; // Gaps detected in post-trade roster via allocateProjections
+  /** Delta roto points for the trade partner (Phase 108 — bilateral delta). */
+  partnerDeltaOverallPoints?: number;
+  /** Per-category roto delta for the trade partner (Phase 108). */
+  partnerCategoryImpacts?: CategoryImpact[];
 }
 
 export interface PositionalContext {
@@ -284,6 +288,8 @@ export interface TradeCandidate {
   givePlayerDraftCost?: number | null;
   receivePlayerDraftCost?: number | null;
   equivalentValueRatio?: number | null;
+  /** Delta roto points for the trade partner (Phase 108 — bilateral delta). */
+  partnerDeltaOverallPoints?: number;
 }
 
 export class TradeRecommendationAgent {

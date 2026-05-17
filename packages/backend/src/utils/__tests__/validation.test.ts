@@ -7,6 +7,7 @@ import {
   UpdateAuthSchema,
   ProposedTradeSchema,
   WaiverEvaluationSchema,
+  normalizeTradePayload,
 } from "../../utils/validation.js";
 
 // ─── parseIntParam ─────────────────────────────────────────────────────────
@@ -186,42 +187,42 @@ describe("UpdateAuthSchema", () => {
 // ─── ProposedTradeSchema ───────────────────────────────────────────────────
 
 describe("ProposedTradeSchema", () => {
-  it("accepts a valid 1-for-1 trade", () => {
+  it("accepts a valid 1-for-1 trade using canonical field names", () => {
     const result = ProposedTradeSchema.safeParse({
-      playersGiven: [101],
-      playersReceived: [202],
+      givePlayers: [101],
+      receivePlayers: [202],
     });
     expect(result.success).toBe(true);
   });
 
-  it("accepts a 3-for-3 trade", () => {
+  it("accepts a 3-for-3 trade using canonical field names", () => {
     const result = ProposedTradeSchema.safeParse({
-      playersGiven: [1, 2, 3],
-      playersReceived: [4, 5, 6],
+      givePlayers: [1, 2, 3],
+      receivePlayers: [4, 5, 6],
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects empty playersGiven array", () => {
+  it("rejects empty givePlayers array", () => {
     const result = ProposedTradeSchema.safeParse({
-      playersGiven: [],
-      playersReceived: [202],
+      givePlayers: [],
+      receivePlayers: [202],
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects more than 3 players on either side", () => {
     const result = ProposedTradeSchema.safeParse({
-      playersGiven: [1, 2, 3, 4],
-      playersReceived: [5],
+      givePlayers: [1, 2, 3, 4],
+      receivePlayers: [5],
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects non-positive player IDs", () => {
     const result = ProposedTradeSchema.safeParse({
-      playersGiven: [0],
-      playersReceived: [202],
+      givePlayers: [0],
+      receivePlayers: [202],
     });
     expect(result.success).toBe(false);
   });
@@ -253,5 +254,87 @@ describe("WaiverEvaluationSchema", () => {
       dropPlayerId: 222,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+// ─── Phase 108: canonical trade schema + normalization ─────────────────────
+// These tests fail against the current schema which uses playersGiven/playersReceived.
+
+describe("ProposedTradeSchema — canonical givePlayers/receivePlayers shape", () => {
+  it("accepts canonical { givePlayers, receivePlayers } shape", () => {
+    // FAILING before fix: schema currently uses playersGiven/playersReceived
+    const result = ProposedTradeSchema.safeParse({
+      givePlayers: [101],
+      receivePlayers: [202],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.givePlayers).toEqual([101]);
+      expect(result.data.receivePlayers).toEqual([202]);
+    }
+  });
+
+  it("rejects legacy { playersGiven, playersReceived } directly (normalized before schema)", () => {
+    // After normalization, the schema only accepts givePlayers/receivePlayers.
+    // The legacy shape is invalid without going through normalizeTradePayload first.
+    const result = ProposedTradeSchema.safeParse({
+      playersGiven: [101],
+      playersReceived: [202],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts 3-for-3 canonical trade", () => {
+    const result = ProposedTradeSchema.safeParse({
+      givePlayers: [1, 2, 3],
+      receivePlayers: [4, 5, 6],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects more than 3 players per side in canonical shape", () => {
+    const result = ProposedTradeSchema.safeParse({
+      givePlayers: [1, 2, 3, 4],
+      receivePlayers: [5],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("normalizeTradePayload", () => {
+  it("passes through canonical { givePlayers, receivePlayers } unchanged", () => {
+    // FAILING before fix: normalizeTradePayload doesn't exist yet
+    const result = normalizeTradePayload({
+      givePlayers: [101],
+      receivePlayers: [202],
+    });
+    expect(result).toEqual({ givePlayers: [101], receivePlayers: [202] });
+  });
+
+  it("normalizes legacy { playersGiven, playersReceived } to canonical shape", () => {
+    const result = normalizeTradePayload({
+      playersGiven: [101],
+      playersReceived: [202],
+    });
+    expect(result).toEqual({ givePlayers: [101], receivePlayers: [202] });
+  });
+
+  it("normalizes nested trade envelope { trade: { givePlayers, receivePlayers } }", () => {
+    const result = normalizeTradePayload({
+      trade: { givePlayers: [101], receivePlayers: [202] },
+    });
+    expect(result).toEqual({ givePlayers: [101], receivePlayers: [202] });
+  });
+
+  it("normalizes nested trade envelope with legacy aliases", () => {
+    const result = normalizeTradePayload({
+      trade: { playersGiven: [101], playersReceived: [202] },
+    });
+    expect(result).toEqual({ givePlayers: [101], receivePlayers: [202] });
+  });
+
+  it("returns null for completely invalid payload", () => {
+    const result = normalizeTradePayload({ something: "else" });
+    expect(result).toBeNull();
   });
 });

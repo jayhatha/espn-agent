@@ -296,7 +296,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     },
   );
 
-  // Evaluate add/drop impact
+  // Evaluate add/drop impact — Phase 108: delegates to ScenarioEvaluationAgent
   app.post(
     "/api/leagues/:leagueId/teams/:teamId/waivers/evaluate",
     async (
@@ -306,15 +306,17 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           addPlayerId: number;
           dropPlayerId: number;
           snapshotDate?: string;
+          projectionsRunId?: number;
         };
       }>,
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const { addPlayerId, dropPlayerId, snapshotDate } = request.body;
+      const { addPlayerId, dropPlayerId, snapshotDate, projectionsRunId } =
+        request.body;
 
-      // Get latest snapshot date if not provided
+      // Resolve snapshot date
       let date = snapshotDate;
       if (!date) {
         const latest = await db
@@ -332,101 +334,44 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         date = latest.snapshot_date;
       }
 
-      try {
-        const waiverAgent = createWaiverAgent(db, request.log, espnAdapter);
-
-        // Get player names
-        const [addPlayer, dropPlayer] = await Promise.all([
-          db
-            .selectFrom("player")
-            .select(["id", "name", "positions"])
-            .where("id", "=", addPlayerId)
-            .executeTakeFirst(),
-          db
-            .selectFrom("player")
-            .select(["id", "name", "positions"])
-            .where("id", "=", dropPlayerId)
-            .executeTakeFirst(),
-        ]);
-
-        if (!addPlayer || !dropPlayer) {
-          return reply.code(404).send({ error: "Player not found" });
-        }
-
-        // Get baseline projections
-        const baseline = await db
-          .selectFrom("team_daily_projected_overall")
-          .select("projected_overall_points")
-          .where("league_id", "=", leagueId)
-          .where("snapshot_date", "=", date)
-          .where("team_id", "=", teamId)
+      // Resolve projections run
+      let runId = projectionsRunId;
+      if (!runId) {
+        const latestRun = await db
+          .selectFrom("projections_run")
+          .select("id")
+          .where("staleness", "=", "fresh")
+          .orderBy("ingested_at", "desc")
           .executeTakeFirst();
 
-        if (!baseline) {
-          return reply.code(404).send({
-            error:
-              "No projected standings found. Please upload projections and run a snapshot first.",
-          });
+        if (!latestRun) {
+          return reply
+            .code(404)
+            .send({ error: "No fresh projections run found" });
         }
+        runId = latestRun.id;
+      }
 
-        // Simulate the swap - using private method through reflection is tricky,
-        // so we'll just call getRecommendations with specific players
-        const recommendations = await waiverAgent.getRecommendations(
+      try {
+        const waiverAgent = createWaiverAgent(db, request.log, espnAdapter);
+        const result = await waiverAgent.evaluateAddDropImpact({
           leagueId,
           teamId,
-          date,
-          {
-            maxRecommendations: 100,
-            freeAgentPlayerIds: [addPlayerId],
-          },
-        );
+          snapshotDate: date,
+          projectionsRunId: runId,
+          addPlayerId,
+          dropPlayerId,
+        });
 
-        // Find the specific recommendation for this swap
-        const recommendation = recommendations.find(
-          (r) =>
-            r.addPlayerId === addPlayerId && r.dropPlayerId === dropPlayerId,
-        );
-
-        if (recommendation) {
-          return {
-            addPlayer: {
-              id: addPlayerId,
-              name: addPlayer.name,
-              positions: addPlayer.positions,
-            },
-            dropPlayer: {
-              id: dropPlayerId,
-              name: dropPlayer.name,
-              positions: dropPlayer.positions,
-            },
-            deltaOverallPoints: recommendation.deltaOverallPoints,
-            categoryImpacts: recommendation.categoryImpacts,
-            explanation: recommendation.explanation,
-            isLegal: recommendation.isLegal,
-            legalityIssues: recommendation.legalityIssues,
-            snapshotDate: date,
-          };
-        } else {
-          // No impact or negative impact
-          return {
-            addPlayer: {
-              id: addPlayerId,
-              name: addPlayer.name,
-              positions: addPlayer.positions,
-            },
-            dropPlayer: {
-              id: dropPlayerId,
-              name: dropPlayer.name,
-              positions: dropPlayer.positions,
-            },
-            deltaOverallPoints: 0,
-            categoryImpacts: [],
-            explanation:
-              "This swap would not improve your projected standings.",
-            isLegal: true,
-            snapshotDate: date,
-          };
-        }
+        return {
+          isLegal: result.isLegal,
+          blockingIssues: result.blockingIssues,
+          gaps: result.gaps,
+          deltaOverallPoints: result.deltaOverallPoints,
+          categoryDeltas: result.categoryDeltas,
+          degradedReasons: result.degradedReasons,
+          snapshotDate: date,
+        };
       } catch (error) {
         request.log.error({ error }, "Failed to evaluate add/drop");
         return reply.code(500).send({
@@ -620,22 +565,46 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     async (
       request: FastifyRequest<{
         Params: { leagueId: string; teamId: string };
-        Body: { trade: ProposedTrade; snapshotDate?: string };
+        Body: unknown;
       }>,
       reply: FastifyReply,
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const { trade, snapshotDate } = request.body;
 
-      if (!trade || !trade.givePlayers || !trade.receivePlayers) {
+      // Normalize incoming payload — accept canonical givePlayers/receivePlayers
+      // or legacy playersGiven/playersReceived, with or without { trade: ... } envelope.
+      const body = request.body as Record<string, unknown> | null | undefined;
+      const src =
+        (body?.trade &&
+        typeof body.trade === "object" &&
+        !Array.isArray(body.trade)
+          ? (body.trade as Record<string, unknown>)
+          : body) ?? {};
+      const give = src.givePlayers ?? src.playersGiven;
+      const receive = src.receivePlayers ?? src.playersReceived;
+
+      if (
+        !Array.isArray(give) ||
+        !Array.isArray(receive) ||
+        give.length === 0 ||
+        receive.length === 0
+      ) {
         return reply.code(400).send({
           error:
             "Invalid trade format. Must include givePlayers and receivePlayers.",
         });
       }
 
-      // Get latest snapshot date if not provided
+      const trade: ProposedTrade = {
+        givePlayers:
+          give as import("../agents/trade-recommendation.js").TradePlayer[],
+        receivePlayers:
+          receive as import("../agents/trade-recommendation.js").TradePlayer[],
+      };
+
+      // Resolve snapshotDate
+      const snapshotDate = body?.snapshotDate as string | undefined;
       let date = snapshotDate;
       if (!date) {
         const latest = await db

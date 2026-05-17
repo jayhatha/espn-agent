@@ -7,6 +7,7 @@ import { StandingsProjectionAgent } from "./standings-projection.js";
 import { RosterSimulator, type AddDropSimContext } from "./roster-simulator.js";
 import { ESPNAdapter } from "../adapters/espn.js";
 import type { RosteredPlayer, RosterGap } from "../projection/types.js";
+import type { ScenarioEvaluationAgent } from "./scenario-evaluation.js";
 
 /**
  * Waiver Recommendation Agent
@@ -31,7 +32,28 @@ export interface WaiverRecommendation {
   topCategoryLabel?: string;
   isLegal: boolean;
   legalityIssues?: string[];
+  blockingIssues?: string[];
   rosterGaps?: RosterGap[]; // Roster gaps detected in post-add roster via allocateProjections
+}
+
+/** Input to the dedicated exact add/drop evaluation path (Phase 108). */
+export interface WaiverEvaluationInput {
+  leagueId: number;
+  teamId: number;
+  snapshotDate: string;
+  projectionsRunId: number;
+  addPlayerId: number;
+  dropPlayerId: number;
+}
+
+/** Result from the dedicated exact add/drop evaluation path (Phase 108). */
+export interface WaiverEvaluationResult {
+  isLegal: boolean;
+  blockingIssues: string[];
+  gaps: RosterGap[];
+  deltaOverallPoints: number;
+  categoryDeltas: Record<string, number>;
+  degradedReasons: string[];
 }
 
 export class WaiverRecommendationAgent {
@@ -44,9 +66,52 @@ export class WaiverRecommendationAgent {
     private standingsAgent: StandingsProjectionAgent,
     private espnAdapter: ESPNAdapter,
     private logger?: BaseLogger,
+    private scenarioEvaluationAgent?: ScenarioEvaluationAgent,
   ) {
     this.repo = new SnapshotRepository(db);
     this.simulator = new RosterSimulator();
+  }
+
+  /**
+   * Dedicated exact add/drop evaluation path (Phase 108).
+   *
+   * Uses ScenarioEvaluationAgent for legality and scoring rather than the
+   * heuristic canReplacePosition() gate. Falls back to resolving
+   * projectionsRunId from the snapshot row if not provided directly.
+   */
+  async evaluateAddDropImpact(
+    input: WaiverEvaluationInput,
+  ): Promise<WaiverEvaluationResult> {
+    const evaluator = this.scenarioEvaluationAgent;
+    if (!evaluator) {
+      // Degrade gracefully if the evaluator is not wired
+      return {
+        isLegal: false,
+        blockingIssues: ["ScenarioEvaluationAgent not configured"],
+        gaps: [],
+        deltaOverallPoints: 0,
+        categoryDeltas: {},
+        degradedReasons: ["evaluator_not_configured"],
+      };
+    }
+
+    const result = await evaluator.evaluateWaiver({
+      leagueId: input.leagueId,
+      teamId: input.teamId,
+      snapshotDate: input.snapshotDate,
+      projectionsRunId: input.projectionsRunId,
+      addPlayerId: input.addPlayerId,
+      dropPlayerId: input.dropPlayerId,
+    });
+
+    return {
+      isLegal: result.isLegal,
+      blockingIssues: result.blockingIssues,
+      gaps: result.gaps,
+      deltaOverallPoints: result.deltaOverallPoints,
+      categoryDeltas: result.categoryDeltas,
+      degradedReasons: result.degradedReasons,
+    };
   }
 
   /**
