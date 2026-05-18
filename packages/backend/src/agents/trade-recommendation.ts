@@ -1210,7 +1210,7 @@ export class TradeRecommendationAgent {
     receiveDraftCost: number | null;
     giveCompositeValue: number | null;
     receiveCompositeValue: number | null;
-    equivalentValueRatio: number;
+    equivalentValueRatio: number | null;
     usesDraftCost: boolean;
   }): string {
     if (
@@ -1224,7 +1224,7 @@ export class TradeRecommendationAgent {
       ? "80/20 ESPN ASV + league draft cost"
       : "ESPN ASV";
     let note =
-      ` Equivalent value match ${(options.equivalentValueRatio * 100).toFixed(0)}% using ${signalLabel}` +
+      ` Equivalent value match ${((options.equivalentValueRatio ?? 0) * 100).toFixed(0)}% using ${signalLabel}` +
       ` (${options.giveCompositeValue.toFixed(1)} vs ${options.receiveCompositeValue.toFixed(1)}).`;
 
     if (options.usesDraftCost) {
