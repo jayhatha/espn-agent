@@ -807,7 +807,7 @@ export class TradeRecommendationAgent {
         valueDelta: number;
         positionalBonus: number;
         positionalContext: PositionalContext;
-        equivalentValueRatio: number;
+        equivalentValueRatio: number | null;
         giveCompositeValue: number | null;
         receiveCompositeValue: number | null;
         giveDraftCost: number | null;
@@ -873,7 +873,7 @@ export class TradeRecommendationAgent {
 
       tradePairs.sort(
         (a, b) =>
-          b.equivalentValueRatio - a.equivalentValueRatio ||
+          (b.equivalentValueRatio ?? 0) - (a.equivalentValueRatio ?? 0) ||
           b.valueDelta + b.positionalBonus - (a.valueDelta + a.positionalBonus),
       );
       const topPairsForTeam = tradePairs.slice(0, 20);
