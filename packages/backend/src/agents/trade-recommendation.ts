@@ -644,6 +644,56 @@ export class TradeRecommendationAgent {
       projectedStandings.categoryImpacts,
     );
 
+    // Bilateral partner analysis — find which team holds the received players and
+    // run the inverse simulation so we can surface partner delta and inform likelihood.
+    let partnerDeltaOverallPoints: number | undefined;
+    let partnerCategoryImpacts: CategoryImpact[] | undefined;
+
+    const receiveIds = trade.receivePlayers.map((p) => p.playerId);
+    if (receiveIds.length > 0) {
+      const partnerRosterRow = await this.db
+        .selectFrom("team_roster_snapshot")
+        .select("team_id")
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", snapshotDate)
+        .where("player_id", "in", receiveIds)
+        .executeTakeFirst();
+
+      if (partnerRosterRow && partnerRosterRow.team_id !== teamId) {
+        try {
+          const partnerCurrentStandings = await this.getCurrentStandings(
+            leagueId,
+            partnerRosterRow.team_id,
+            snapshotDate,
+          );
+          const invertedTrade: ProposedTrade = {
+            givePlayers: trade.receivePlayers,
+            receivePlayers: trade.givePlayers,
+          };
+          const partnerCtx: TradeSimContext = {
+            categories,
+            teamCategoryMap,
+            teamId: partnerRosterRow.team_id,
+            currentCategoryImpacts: partnerCurrentStandings.categoryImpacts,
+          };
+          const partnerProjected = this.simulator.simulateTrade(
+            partnerCtx,
+            invertedTrade,
+            projections,
+          );
+          partnerDeltaOverallPoints =
+            partnerProjected.overallPoints -
+            partnerCurrentStandings.overallPoints;
+          partnerCategoryImpacts = partnerProjected.categoryImpacts;
+        } catch (error) {
+          this.logger?.warn(
+            { error },
+            "Failed to compute partner trade impact — skipping bilateral delta",
+          );
+        }
+      }
+    }
+
     return {
       trade,
       currentOverallPoints: currentStandings.overallPoints,
@@ -654,6 +704,8 @@ export class TradeRecommendationAgent {
       recommendation,
       explanation,
       rosterGaps,
+      partnerDeltaOverallPoints,
+      partnerCategoryImpacts,
     };
   }
 
@@ -947,8 +999,9 @@ export class TradeRecommendationAgent {
               deltaOverallPoints: impact.deltaOverallPoints,
               categoryImpacts: impact.categoryImpacts,
               fairnessScore: impact.fairnessScore,
-              likelihood: this.simulator.assessTradeLikelihood(
-                impact.fairnessScore,
+              partnerDeltaOverallPoints: impact.partnerDeltaOverallPoints,
+              likelihood: this._assessBilateralLikelihood(
+                impact.partnerDeltaOverallPoints,
                 giveCompositeValue ?? undefined,
                 receiveCompositeValue ?? undefined,
               ),
@@ -1175,6 +1228,36 @@ export class TradeRecommendationAgent {
     // Normalize to -1 to 1 range
     // A gain of 5+ points is considered a 1.0 fairness score
     return Math.max(-1, Math.min(1, delta / 5));
+  }
+
+  /**
+   * Bilateral likelihood assessment: uses the partner's roto delta as the primary
+   * signal for whether they would accept the trade. Falls back to market-value
+   * comparison when partner delta is unavailable.
+   *
+   * - partnerDelta >= 0.5  → "high"  (partner also gains — both sides win)
+   * - partnerDelta >= -1   → "medium" (partner loses minimally — negotiable)
+   * - partnerDelta < -1    → "low"   (partner loses significantly — unlikely to accept)
+   * - no partnerDelta, user overpays → "high" (partner benefits from market premium)
+   * - no partnerDelta, balanced      → "medium"
+   */
+  private _assessBilateralLikelihood(
+    partnerDelta: number | undefined,
+    giveMarketValue?: number,
+    receiveMarketValue?: number,
+  ): "high" | "medium" | "low" {
+    if (partnerDelta != null) {
+      if (partnerDelta >= 0.5) return "high";
+      if (partnerDelta >= -1) return "medium";
+      return "low";
+    }
+
+    // Fallback: if user is paying a market premium the partner is getting a good deal
+    const userOverpays =
+      giveMarketValue != null &&
+      receiveMarketValue != null &&
+      giveMarketValue > receiveMarketValue;
+    return userOverpays ? "high" : "medium";
   }
 
   private async getLatestLeagueDraftCosts(
