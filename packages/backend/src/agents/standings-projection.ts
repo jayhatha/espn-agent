@@ -13,6 +13,7 @@ import { allocateProjections } from "../projection/allocator.js";
 import { computeRateConfidence } from "../projection/variance.js";
 import type {
   AllocationInput,
+  AllocationResult,
   RosteredPlayer,
   ConfidenceInterval,
 } from "../projection/types.js";
@@ -39,6 +40,129 @@ interface TeamProjection {
 }
 
 const DEFAULT_GS_CAP = 200;
+
+/**
+ * Compute category projections from a completed allocation result.
+ * Pure function — no DB access, no side effects. Safe to test in isolation.
+ *
+ * @param allocResult - Output from allocateProjections()
+ * @param currentTotals - Season-to-date category rows for this team
+ * @param categories - League category definitions
+ * @param logger - Optional pino logger (only used on rate-stat exceptions)
+ */
+export function computeCategoryProjections(
+  allocResult: AllocationResult,
+  currentTotals: Array<{
+    category_id: string;
+    value: unknown;
+    components_json: unknown;
+  }>,
+  categories: Category[],
+  logger?: BaseLogger,
+): Map<
+  string,
+  {
+    value: number;
+    components: StatComponents;
+    isDegraded: boolean;
+    confidence?: ConfidenceInterval;
+  }
+> {
+  const categoryProjections = new Map<
+    string,
+    {
+      value: number;
+      components: StatComponents;
+      isDegraded: boolean;
+      confidence?: ConfidenceInterval;
+    }
+  >();
+
+  for (const category of categories) {
+    const currentTotal = currentTotals.find(
+      (t) => t.category_id === category.category_id,
+    );
+
+    const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
+    const projectedComponents = isPitchingCat
+      ? allocResult.pitcherComponents
+      : allocResult.batterComponents;
+
+    const confidenceMap = isPitchingCat
+      ? allocResult.pitcherConfidence
+      : allocResult.batterConfidence;
+
+    if (category.type === "COUNTING") {
+      const projectedSum = projectedComponents[category.stat_key] || 0;
+      const currentValue = Number(currentTotal?.value || 0);
+      const finalValue = currentValue + projectedSum;
+
+      const ci = confidenceMap[category.stat_key];
+      const confidence: ConfidenceInterval | undefined = ci
+        ? { p10: currentValue + ci.p10, p50: finalValue, p90: currentValue + ci.p90 }
+        : undefined;
+
+      categoryProjections.set(category.category_id, {
+        value: finalValue,
+        components: {},
+        isDegraded: false,
+        confidence,
+      });
+    } else if (category.type === "RATE") {
+      const currentComponents = (currentTotal?.components_json || {}) as StatComponents;
+      const denominatorKey = isPitchingCat ? "IP" : "AB";
+      const projectedDenominator = (projectedComponents[denominatorKey] as number) ?? 0;
+
+      if (projectedDenominator <= 0) {
+        categoryProjections.set(category.category_id, {
+          value: Number(currentTotal?.value ?? 0),
+          components: currentComponents,
+          isDegraded: true,
+        });
+      } else {
+        try {
+          const finalValue = calculateFinalRate(
+            category.formula_id || category.stat_key.toLowerCase(),
+            currentComponents,
+            projectedComponents,
+          );
+
+          const combinedComponents = combineComponents(currentComponents, projectedComponents);
+
+          const formulaId = category.formula_id || category.stat_key.toLowerCase();
+          const rateFn = (c: StatComponents) => {
+            try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
+          };
+          const componentKeys = Object.keys(projectedComponents).filter(
+            (k) =>
+              typeof projectedComponents[k] === "number" &&
+              (projectedComponents[k] as number) > 0,
+          );
+          const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
+
+          categoryProjections.set(category.category_id, {
+            value: finalValue,
+            components: combinedComponents,
+            isDegraded: false,
+            confidence: rateCI,
+          });
+        } catch (error) {
+          logger?.warn(
+            { category: category.category_id, error },
+            "Failed to calculate rate stat, marking degraded",
+          );
+          categoryProjections.set(category.category_id, {
+            value: Number(currentTotal?.value || 0),
+            components: currentComponents,
+            isDegraded: true,
+          });
+        }
+      }
+    }
+  }
+
+  return categoryProjections;
+}
 
 export class StandingsProjectionAgent {
   private readonly repo: SnapshotRepository;
@@ -267,128 +391,12 @@ export class StandingsProjectionAgent {
       "Allocation result for team",
     );
 
-    const categoryProjections = new Map<
-      string,
-      {
-        value: number;
-        components: StatComponents;
-        isDegraded: boolean;
-        confidence?: ConfidenceInterval;
-      }
-    >();
-
-    for (const category of categories) {
-      const currentTotal = currentTotals.find(
-        (t) => t.category_id === category.category_id,
-      );
-
-      // Use the allocated components (pitcher vs batter split done by allocator)
-      const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-      const projectedComponents = isPitchingCat
-        ? allocResult.pitcherComponents
-        : allocResult.batterComponents;
-
-      // Get confidence interval for this stat from allocator
-      const confidenceMap = isPitchingCat
-        ? allocResult.pitcherConfidence
-        : allocResult.batterConfidence;
-
-      if (category.type === "COUNTING") {
-        // Current totals + allocated projected counting stats
-        const projectedSum = projectedComponents[category.stat_key] || 0;
-        const currentValue = Number(currentTotal?.value || 0);
-        const finalValue = currentValue + projectedSum;
-
-        // Build confidence interval: current (fixed) + projected range
-        const ci = confidenceMap[category.stat_key];
-        const confidence: ConfidenceInterval | undefined = ci
-          ? {
-              p10: currentValue + ci.p10,
-              p50: finalValue,
-              p90: currentValue + ci.p90,
-            }
-          : undefined;
-
-        categoryProjections.set(category.category_id, {
-          value: finalValue,
-          components: {},
-          isDegraded: false,
-          confidence,
-        });
-      } else if (category.type === "RATE") {
-        // Component-based rate: combine current actuals + allocated projected components
-        const currentComponents = (currentTotal?.components_json ||
-          {}) as StatComponents;
-
-        // If no projected denominator data exists, fall back to current ESPN rate value.
-        // Batting rates need AB > 0; pitching rates need IP > 0.
-        // Without a denominator, the formula returns 0 which is misleading.
-        const denominatorKey = isPitchingCat ? "IP" : "AB";
-        const projectedDenominator =
-          (projectedComponents[denominatorKey] as number) ?? 0;
-
-        if (projectedDenominator <= 0) {
-          // No projected components available — use current ESPN rate to avoid showing 0
-          categoryProjections.set(category.category_id, {
-            value: Number(currentTotal?.value ?? 0),
-            components: currentComponents,
-            isDegraded: true,
-          });
-        } else {
-          try {
-            const finalValue = calculateFinalRate(
-              category.formula_id || category.stat_key.toLowerCase(),
-              currentComponents,
-              projectedComponents,
-            );
-
-            const combinedComponents = combineComponents(
-              currentComponents,
-              projectedComponents,
-            );
-
-            // Compute rate stat confidence by varying components
-            const formulaId =
-              category.formula_id || category.stat_key.toLowerCase();
-            const rateFn = (c: StatComponents) => {
-              try {
-                return calculateFinalRate(formulaId, {}, c);
-              } catch {
-                return 0;
-              }
-            };
-            const componentKeys = Object.keys(projectedComponents).filter(
-              (k) =>
-                typeof projectedComponents[k] === "number" &&
-                (projectedComponents[k] as number) > 0,
-            );
-            const rateCI = computeRateConfidence(
-              combinedComponents,
-              rateFn,
-              componentKeys,
-            );
-
-            categoryProjections.set(category.category_id, {
-              value: finalValue,
-              components: combinedComponents,
-              isDegraded: false,
-              confidence: rateCI,
-            });
-          } catch (error) {
-            this.logger?.warn(
-              { category: category.category_id, error },
-              "Failed to calculate rate stat, marking degraded",
-            );
-
-            categoryProjections.set(category.category_id, {
-              value: Number(currentTotal?.value || 0),
-              components: currentComponents,
-              isDegraded: true,
-            });
-          }
-        }
-      }
-    }
+    const categoryProjections = computeCategoryProjections(
+      allocResult,
+      currentTotals,
+      categories,
+      this.logger,
+    );
 
     return {
       teamId,
