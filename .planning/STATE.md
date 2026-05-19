@@ -1,32 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v12.0
-milestone_name: Scenario Recommendation Integrity
-status: planning
-stopped_at: "Ready for execute-phase handoff"
-last_updated: "2026-05-17T00:00:00.000Z"
+milestone: v13.0
+milestone_name: Architecture Deepening
+status: complete
+stopped_at: "All 5 phases shipped"
+last_updated: "2026-05-19T00:00:00.000Z"
 progress:
-  total_phases: 1
-  completed_phases: 0
-  total_plans: 2
-  completed_plans: 0
+  total_phases: 5
+  completed_phases: 5
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-16)
+See: .planning/PROJECT.md (updated 2026-05-19)
 
 **Core value:** Give fantasy baseball managers an information edge that saves time and leads to better decisions — see things other managers don't, act faster, finish higher.
-**Current focus:** v12.0 Scenario Recommendation Integrity — shared scenario evaluator, snapshot-bound reproducibility fixes, trade/waiver integration, deterministic-first screening, bounded Monte Carlo rerank
+**Current focus:** v13.0 Architecture Deepening — COMPLETE
 
-## Current Position
+## Shipped
 
-Phase: 108 — Scenario-Driven Trade & Waiver Evaluation
-Plan: COMPLETE — 108-01 + 108-02 executed
-Status: all 346 tests pass; tsc clean
-Last activity: 2026-05-18 — both plans executed; 3c812b8 + 8c96258
+- Phase 109: `resolveStatComponents` exported from `adapters/espn/stat-component-translator.ts`; `buildCurrentComponents` deleted from orchestrator (e2e585d)
+- Phase 110: `resolveSnapshotContext()` extracted; `executeSnapshot()` now ≤40 lines (d6c11f1)
+- Phase 111: Player identity `resolve()` seam verified already connected in projections-ingest.ts (no code change)
+- Phase 112: `computeCategoryProjections` exported pure function + 5 unit tests (c13b795)
+- Phase 113: `getProjectionsByDate()` on SnapshotRepository; recommendations.ts inline player_projection queries replaced (bfc2245)
 
 ## Performance Metrics
 
@@ -197,36 +198,36 @@ _Updated after each plan completion_
 
 ### Quick Tasks Completed
 
-| #          | Description                                                                            | Date       | Commit  | Directory                                                                                                           |
-| ---------- | -------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| 91         | Fix nominated player detection after reload                                            | 2026-03-16 | 6052020 | [91-fix-nominated-player-detection-after-rel](./quick/91-fix-nominated-player-detection-after-rel/)                 |
-| 92         | Detect myTeamId from ESPN draft DOM                                                    | 2026-03-16 | ab29825 | [92-detect-myteamid-from-espn-draft-dom-inst](./quick/92-detect-myteamid-from-espn-draft-dom-inst/)                 |
-| 93         | Fix ideal roster optimizer for value drafting                                          | 2026-03-16 | 1768f8a | [93-fix-ideal-roster-optimizer-for-value-dra](./quick/93-fix-ideal-roster-optimizer-for-value-dra/)                 |
-| 94         | Simplify nomination — overpriced-first                                                 | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/)                 |
-| 95         | Wire shouldBid from Monte Carlo into auto-bid                                          | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/)                 |
-| 96         | Fix auto-nominate bug — add delay after search                                         | 2026-03-22 | b3b5787 | [96-fix-auto-nominate-bug-add-delay-after-se](./quick/96-fix-auto-nominate-bug-add-delay-after-se/)                 |
-| 97         | Filter trade recommendations by ESPN ASV similarity                                    | 2026-03-23 | 1047cd9 | [97-trade-recommendations-should-be-based-on](./quick/97-trade-recommendations-should-be-based-on/)                 |
-| 98         | Dashboard UX overhaul — hero card, status bar, tiered actions                          | 2026-03-23 | 5ac9ae2 | [98-dashboard-ux-overhaul-hero-card-status-b](./quick/98-dashboard-ux-overhaul-hero-card-status-b/)                 |
-| 99         | Fix trade ASV filter — load ASV from static JSON                                       | 2026-03-23 | 1dd596d | [99-fix-trade-asv-filter-load-asv-from-tools](./quick/99-fix-trade-asv-filter-load-asv-from-tools/)                 |
-| 100        | UI audit — Inter/JetBrains Mono consistency + dark mode contrast                       | 2026-03-23 | 756c5cd | [100-ui-audit-inter-jetbrains-mono-consistenc](./quick/100-ui-audit-inter-jetbrains-mono-consistenc/)               |
-| 101        | Fix waiver rank color inversion and trade roster slot validation                       | 2026-03-24 | fde4071 | [101-fix-waiver-rank-color-inversion-and-trad](./quick/101-fix-waiver-rank-color-inversion-and-trad/)               |
-| 102        | Fix GS tracker counting roster slots and FAAB budget default                           | 2026-03-24 | 0f19c72 | [102-fix-gs-tracker-counting-roster-slots-not](./quick/102-fix-gs-tracker-counting-roster-slots-not/)               |
-| 103        | Fix standings page readability — remove DM Serif, dark mode contrast                   | 2026-03-24 | 762a42f | [103-fix-standings-page-readability-redesign-](./quick/103-fix-standings-page-readability-redesign-/)               |
-| 104        | Fix snapshot freshness — clear ESPN cache on forceFresh, add scoringPeriodId           | 2026-03-24 | 139f644 | [104-fix-snapshot-freshness-clear-espn-cache-](./quick/104-fix-snapshot-freshness-clear-espn-cache-/)               |
-| 105        | Fix FAAB — extract remaining budget from ESPN team data                                | 2026-03-24 | e7a5ec9 | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/)               |
-| 106        | Fix ASV filter — default missing players to $1 instead of skipping                     | 2026-03-24 | 6192346 | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/)                 |
-| 260327-h2i | Include scheduled start date in Sit/Start tab (gameDate + opponent from MLB Stats API) | 2026-03-27 | d2244e9 | [260327-h2i-include-the-date-of-the-scheduled-start-](./quick/260327-h2i-include-the-date-of-the-scheduled-start-/) |
-| 260327-hr3 | Fix snapshot refresh not updating projected standings (invalidate all queries)         | 2026-03-27 | a9488b1 | [260327-hr3-if-i-refresh-snapshot-it-should-replace-](./quick/260327-hr3-if-i-refresh-snapshot-it-should-replace-/) |
-| 260327-orm | Replace Week label with today's date + season game progress (MLB GP/162)               | 2026-03-28 | 3e61847 | [260327-orm-change-current-week-from-the-season-to-c](./quick/260327-orm-change-current-week-from-the-season-to-c/) |
-| 107        | Fix tie handling in current standings — use assignRanksWithTies                        | 2026-03-28 | 48f489f | --                                                                                                                  |
-| 260401-f32 | Fix waiver page position filter, %owned from ESPN, add %started column                 | 2026-04-01 | 2a2c667 | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
-| 108        | Fix pctOwned null crash on waivers page                                                | 2026-03-29 | 1962890 | --                                                                                                                  |
-| 109        | Fix tenure/season stats showing previous year (add season filter)                      | 2026-03-29 | 51b05de | --                                                                                                                  |
-| 260329-k0x | Add league GS + K/GS overview table to GS Pacing tab                                   | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
-| 260401-f32 | Fix waiver page position filter + % Owned + add % Started column                       | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
-| 260401-uyx | Add PitcherList SP ranking (PL) column to waivers free agents table                    | 2026-04-02 | fc382ee | [260401-uyx-add-pitcherlist-sp-ranking-column-to-wai](./quick/260401-uyx-add-pitcherlist-sp-ranking-column-to-wai/) |
-| 260515-rms | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/)                               |
-| 20260519-player-wpa-drilldown | Add WPA column to Season Outlook player drilldown                 | 2026-05-19 | a851e06 | [20260519-player-wpa-drilldown](./quick/20260519-player-wpa-drilldown/)                                             |
+| #                             | Description                                                                            | Date       | Commit  | Directory                                                                                                           |
+| ----------------------------- | -------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 91                            | Fix nominated player detection after reload                                            | 2026-03-16 | 6052020 | [91-fix-nominated-player-detection-after-rel](./quick/91-fix-nominated-player-detection-after-rel/)                 |
+| 92                            | Detect myTeamId from ESPN draft DOM                                                    | 2026-03-16 | ab29825 | [92-detect-myteamid-from-espn-draft-dom-inst](./quick/92-detect-myteamid-from-espn-draft-dom-inst/)                 |
+| 93                            | Fix ideal roster optimizer for value drafting                                          | 2026-03-16 | 1768f8a | [93-fix-ideal-roster-optimizer-for-value-dra](./quick/93-fix-ideal-roster-optimizer-for-value-dra/)                 |
+| 94                            | Simplify nomination — overpriced-first                                                 | 2026-03-16 | 0caeedd | [94-simplify-nomination-overpriced-first-on-](./quick/94-simplify-nomination-overpriced-first-on-/)                 |
+| 95                            | Wire shouldBid from Monte Carlo into auto-bid                                          | 2026-03-18 | b22abaa | [95-wire-shouldbid-from-monte-carlo-into-aut](./quick/95-wire-shouldbid-from-monte-carlo-into-aut/)                 |
+| 96                            | Fix auto-nominate bug — add delay after search                                         | 2026-03-22 | b3b5787 | [96-fix-auto-nominate-bug-add-delay-after-se](./quick/96-fix-auto-nominate-bug-add-delay-after-se/)                 |
+| 97                            | Filter trade recommendations by ESPN ASV similarity                                    | 2026-03-23 | 1047cd9 | [97-trade-recommendations-should-be-based-on](./quick/97-trade-recommendations-should-be-based-on/)                 |
+| 98                            | Dashboard UX overhaul — hero card, status bar, tiered actions                          | 2026-03-23 | 5ac9ae2 | [98-dashboard-ux-overhaul-hero-card-status-b](./quick/98-dashboard-ux-overhaul-hero-card-status-b/)                 |
+| 99                            | Fix trade ASV filter — load ASV from static JSON                                       | 2026-03-23 | 1dd596d | [99-fix-trade-asv-filter-load-asv-from-tools](./quick/99-fix-trade-asv-filter-load-asv-from-tools/)                 |
+| 100                           | UI audit — Inter/JetBrains Mono consistency + dark mode contrast                       | 2026-03-23 | 756c5cd | [100-ui-audit-inter-jetbrains-mono-consistenc](./quick/100-ui-audit-inter-jetbrains-mono-consistenc/)               |
+| 101                           | Fix waiver rank color inversion and trade roster slot validation                       | 2026-03-24 | fde4071 | [101-fix-waiver-rank-color-inversion-and-trad](./quick/101-fix-waiver-rank-color-inversion-and-trad/)               |
+| 102                           | Fix GS tracker counting roster slots and FAAB budget default                           | 2026-03-24 | 0f19c72 | [102-fix-gs-tracker-counting-roster-slots-not](./quick/102-fix-gs-tracker-counting-roster-slots-not/)               |
+| 103                           | Fix standings page readability — remove DM Serif, dark mode contrast                   | 2026-03-24 | 762a42f | [103-fix-standings-page-readability-redesign-](./quick/103-fix-standings-page-readability-redesign-/)               |
+| 104                           | Fix snapshot freshness — clear ESPN cache on forceFresh, add scoringPeriodId           | 2026-03-24 | 139f644 | [104-fix-snapshot-freshness-clear-espn-cache-](./quick/104-fix-snapshot-freshness-clear-espn-cache-/)               |
+| 105                           | Fix FAAB — extract remaining budget from ESPN team data                                | 2026-03-24 | e7a5ec9 | [105-fix-faab-extract-remaining-budget-from-e](./quick/105-fix-faab-extract-remaining-budget-from-e/)               |
+| 106                           | Fix ASV filter — default missing players to $1 instead of skipping                     | 2026-03-24 | 6192346 | [106-fix-asv-filter-default-missing-players-](./quick/106-fix-asv-filter-default-missing-players-/)                 |
+| 260327-h2i                    | Include scheduled start date in Sit/Start tab (gameDate + opponent from MLB Stats API) | 2026-03-27 | d2244e9 | [260327-h2i-include-the-date-of-the-scheduled-start-](./quick/260327-h2i-include-the-date-of-the-scheduled-start-/) |
+| 260327-hr3                    | Fix snapshot refresh not updating projected standings (invalidate all queries)         | 2026-03-27 | a9488b1 | [260327-hr3-if-i-refresh-snapshot-it-should-replace-](./quick/260327-hr3-if-i-refresh-snapshot-it-should-replace-/) |
+| 260327-orm                    | Replace Week label with today's date + season game progress (MLB GP/162)               | 2026-03-28 | 3e61847 | [260327-orm-change-current-week-from-the-season-to-c](./quick/260327-orm-change-current-week-from-the-season-to-c/) |
+| 107                           | Fix tie handling in current standings — use assignRanksWithTies                        | 2026-03-28 | 48f489f | --                                                                                                                  |
+| 260401-f32                    | Fix waiver page position filter, %owned from ESPN, add %started column                 | 2026-04-01 | 2a2c667 | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
+| 108                           | Fix pctOwned null crash on waivers page                                                | 2026-03-29 | 1962890 | --                                                                                                                  |
+| 109                           | Fix tenure/season stats showing previous year (add season filter)                      | 2026-03-29 | 51b05de | --                                                                                                                  |
+| 260329-k0x                    | Add league GS + K/GS overview table to GS Pacing tab                                   | 2026-03-29 | 65ec52b | [260329-k0x-add-a-league-section-tracking-gs-and-k-g](./quick/260329-k0x-add-a-league-section-tracking-gs-and-k-g/) |
+| 260401-f32                    | Fix waiver page position filter + % Owned + add % Started column                       | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
+| 260401-uyx                    | Add PitcherList SP ranking (PL) column to waivers free agents table                    | 2026-04-02 | fc382ee | [260401-uyx-add-pitcherlist-sp-ranking-column-to-wai](./quick/260401-uyx-add-pitcherlist-sp-ranking-column-to-wai/) |
+| 260515-rms                    | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/)                               |
+| 20260519-player-wpa-drilldown | Add WPA column to Season Outlook player drilldown                                      | 2026-05-19 | a851e06 | [20260519-player-wpa-drilldown](./quick/20260519-player-wpa-drilldown/)                                             |
 
 ## Session Continuity
 
