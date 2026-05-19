@@ -25,6 +25,7 @@ const FANGRAPHS_TO_ESPN_TEAM_MAP: Record<string, string> = {
   SDP: "SD",
   SFG: "SF",
   ATH: "OAK", // Las Vegas/Oakland Athletics
+  CHW: "CWS", // Chicago White Sox
 };
 
 interface ProjectionRow {
