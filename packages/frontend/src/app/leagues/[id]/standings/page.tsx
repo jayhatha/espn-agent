@@ -6,6 +6,11 @@ import React, { useState, useMemo } from "react";
 import {
   computeMarginalGains,
   computeAtRiskCategories,
+  calculateAVG,
+  calculateOBP,
+  calculateOPS,
+  calculateERA,
+  calculateWHIP,
 } from "@espn-fantasy/shared";
 import type { TeamCategoryProjection } from "@espn-fantasy/shared";
 import { useLeagueTeam } from "@/lib/hooks";
@@ -156,6 +161,7 @@ export default function StandingsPage() {
   const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("current");
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [drilldownTeamId, setDrilldownTeamId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useProjectedStandings(leagueId);
@@ -194,6 +200,26 @@ export default function StandingsPage() {
       !!data &&
       data.overallStandings.length === 0 &&
       !!selectedTeamId,
+  });
+
+  // Roster drilldown for Season Outlook
+  const { data: drilldownRosterData, isLoading: drilldownLoading } = useQuery({
+    queryKey: ["team-roster-drilldown", leagueId, drilldownTeamId],
+    queryFn: () =>
+      api.getTeamRoster(parseInt(leagueId, 10), drilldownTeamId!) as Promise<{
+        roster: Array<{
+          playerId: number;
+          playerName: string;
+          mlbTeam: string | null;
+          positions: string[];
+          rosterStatus: string;
+          projections: Record<string, number> | null;
+          blendedProjections: Record<string, number> | null;
+        }>;
+        snapshotDate: string;
+      }>,
+    enabled: !!drilldownTeamId,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Monte Carlo simulation — runs when Season Outlook tab is active
@@ -330,6 +356,31 @@ export default function StandingsPage() {
       })),
     );
   }, [selectedTeamId, data?.categories, projectedCategoryValues]);
+
+  const getPlayerStatForCategory = (
+    projections: Record<string, number> | null,
+    category: Category,
+  ): number | null => {
+    if (!projections) return null;
+    if (category.type === "COUNTING") {
+      return projections[category.stat_key] ?? null;
+    }
+    const fid = category.stat_key.toLowerCase();
+    switch (fid) {
+      case "avg":
+        return calculateAVG(projections);
+      case "obp":
+        return calculateOBP(projections);
+      case "ops":
+        return calculateOPS(projections);
+      case "era":
+        return calculateERA(projections);
+      case "whip":
+        return calculateWHIP(projections);
+      default:
+        return null;
+    }
+  };
 
   const hasCurrentData = currentMatrix !== null;
   const hasProjectedData = projectedMatrix !== null;
@@ -1088,19 +1139,27 @@ export default function StandingsPage() {
                           <tbody className="bg-white dark:bg-shell-panel divide-y divide-neutral-100 dark:divide-shell-border">
                             {simulationResult.teams
                               .slice()
-                              .sort(
-                                (a, b) => b.rotoPointsP50 - a.rotoPointsP50,
-                              )
+                              .sort((a, b) => b.rotoPointsP50 - a.rotoPointsP50)
                               .map((team, i) => {
                                 const isSelected =
                                   selectedTeamId === team.teamId;
+                                const isDrilldown =
+                                  drilldownTeamId === team.teamId;
                                 return (
                                   <tr
                                     key={team.teamId}
+                                    onClick={() =>
+                                      setDrilldownTeamId(
+                                        isDrilldown ? null : team.teamId,
+                                      )
+                                    }
                                     className={cn(
-                                      "hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
+                                      "cursor-pointer hover:bg-surface-secondary dark:hover:bg-shell-bg transition-colors",
                                       isSelected
                                         ? "bg-accent-light dark:bg-shell-accent/20"
+                                        : "",
+                                      isDrilldown
+                                        ? "bg-surface-secondary dark:bg-shell-bg"
                                         : "",
                                     )}
                                   >
@@ -1108,11 +1167,19 @@ export default function StandingsPage() {
                                       {i + 1}
                                     </td>
                                     <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
-                                      <div className="flex items-center">
+                                      <div className="flex items-center gap-2">
                                         {isSelected && (
-                                          <span className="inline-block w-2 h-2 rounded-full bg-accent mr-2 flex-shrink-0" />
+                                          <span className="inline-block w-2 h-2 rounded-full bg-accent flex-shrink-0" />
                                         )}
                                         {team.teamName}
+                                        <span
+                                          className={cn(
+                                            "ml-auto text-content-tertiary dark:text-shell-muted text-caption transition-transform",
+                                            isDrilldown ? "rotate-90" : "",
+                                          )}
+                                        >
+                                          ›
+                                        </span>
                                       </div>
                                     </td>
                                     <td className="px-4 py-3 text-right text-data tabular-nums">
@@ -1150,6 +1217,210 @@ export default function StandingsPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Team player drilldown */}
+                  {drilldownTeamId &&
+                    data?.categories &&
+                    (() => {
+                      const team = simulationResult.teams.find(
+                        (t) => t.teamId === drilldownTeamId,
+                      );
+                      if (!team) return null;
+                      const cats = data.categories as Category[];
+                      const countingCats = cats.filter(
+                        (c: Category) => c.type === "COUNTING",
+                      );
+
+                      // Compute team totals for counting cats (for % share)
+                      const teamTotals: Record<string, number> = {};
+                      if (drilldownRosterData?.roster) {
+                        for (const cat of countingCats) {
+                          teamTotals[cat.category_id] =
+                            drilldownRosterData.roster.reduce(
+                              (sum, p) =>
+                                sum +
+                                ((p.blendedProjections ?? p.projections)?.[cat.stat_key] ?? 0),
+                              0,
+                            );
+                        }
+                      }
+
+                      return (
+                        <Card>
+                          <CardHeader>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <Heading level={3}>
+                                  Player Breakdown — {team.teamName}
+                                </Heading>
+                                <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                                  Full-season projected contributions (current + RoS)
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => setDrilldownTeamId(null)}
+                                className="text-content-tertiary dark:text-shell-muted hover:text-content dark:hover:text-shell-text text-xl leading-none"
+                                aria-label="Close drilldown"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                            {drilldownLoading ? (
+                              <div className="px-6 py-4">
+                                <LoadingSpinner />
+                              </div>
+                            ) : drilldownRosterData?.roster &&
+                              drilldownRosterData.roster.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border text-data">
+                                  <thead className="bg-surface-secondary dark:bg-shell-bg">
+                                    <tr>
+                                      <th className="px-4 py-2 text-left font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider w-40">
+                                        Player
+                                      </th>
+                                      <th className="px-2 py-2 text-left font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider w-20">
+                                        Pos
+                                      </th>
+                                      {cats.map((cat: Category) => (
+                                        <th
+                                          key={cat.category_id}
+                                          className="px-3 py-2 text-right font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wider min-w-[60px]"
+                                        >
+                                          {cat.name || cat.stat_key}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-neutral-100 dark:divide-shell-border bg-white dark:bg-shell-panel">
+                                    {drilldownRosterData.roster
+                                      .slice()
+                                      .sort((a, b) => {
+                                        // Sort by primary counting cat desc, then name
+                                        const primaryCat = countingCats[0];
+                                        if (!primaryCat) return 0;
+                                        const aVal =
+                                          (a.blendedProjections ?? a.projections)?.[
+                                            primaryCat.stat_key
+                                          ] ?? -1;
+                                        const bVal =
+                                          (b.blendedProjections ?? b.projections)?.[
+                                            primaryCat.stat_key
+                                          ] ?? -1;
+                                        return bVal - aVal;
+                                      })
+                                      .map((player) => (
+                                        <tr
+                                          key={player.playerId}
+                                          className="hover:bg-surface-secondary dark:hover:bg-shell-bg"
+                                        >
+                                          <td className="px-4 py-2 text-body-sm font-medium text-content dark:text-shell-text whitespace-nowrap">
+                                            <div>{player.playerName}</div>
+                                            {player.mlbTeam && (
+                                              <div className="text-caption text-content-tertiary dark:text-shell-muted">
+                                                {player.mlbTeam}
+                                              </div>
+                                            )}
+                                          </td>
+                                          <td className="px-2 py-2 text-caption text-content-secondary dark:text-shell-muted whitespace-nowrap">
+                                            {(player.positions ?? []).join(
+                                              ", ",
+                                            )}
+                                          </td>
+                                          {cats.map((cat: Category) => {
+                                            const val =
+                                              getPlayerStatForCategory(
+                                                player.blendedProjections ?? player.projections,
+                                                cat,
+                                              );
+                                            const teamTotal =
+                                              teamTotals[cat.category_id] ?? 0;
+                                            const pct =
+                                              cat.type === "COUNTING" &&
+                                              teamTotal > 0 &&
+                                              val !== null
+                                                ? Math.round(
+                                                    (val / teamTotal) * 100,
+                                                  )
+                                                : null;
+                                            return (
+                                              <td
+                                                key={cat.category_id}
+                                                className="px-3 py-2 text-right tabular-nums whitespace-nowrap"
+                                              >
+                                                {val === null ? (
+                                                  <span className="text-content-tertiary dark:text-shell-muted">
+                                                    —
+                                                  </span>
+                                                ) : (
+                                                  <div className="flex flex-col items-end">
+                                                    <span className="text-content dark:text-shell-text">
+                                                      {formatStatValue(
+                                                        val,
+                                                        cat.type,
+                                                        cat.stat_key,
+                                                      )}
+                                                    </span>
+                                                    {pct !== null &&
+                                                      pct > 0 && (
+                                                        <span className="text-caption text-content-tertiary dark:text-shell-muted">
+                                                          {pct}%
+                                                        </span>
+                                                      )}
+                                                  </div>
+                                                )}
+                                              </td>
+                                            );
+                                          })}
+                                        </tr>
+                                      ))}
+                                    {/* Team total row */}
+                                    <tr className="bg-surface-secondary dark:bg-shell-bg font-semibold">
+                                      <td
+                                        colSpan={2}
+                                        className="px-4 py-2 text-body-sm text-content dark:text-shell-text"
+                                      >
+                                        Team Total
+                                      </td>
+                                      {cats.map((cat: Category) => {
+                                        const val =
+                                          cat.type === "COUNTING"
+                                            ? teamTotals[cat.category_id]
+                                            : null;
+                                        return (
+                                          <td
+                                            key={cat.category_id}
+                                            className="px-3 py-2 text-right tabular-nums text-content dark:text-shell-text"
+                                          >
+                                            {val !== undefined &&
+                                            val !== null ? (
+                                              formatStatValue(
+                                                val,
+                                                cat.type,
+                                                cat.stat_key,
+                                              )
+                                            ) : (
+                                              <span className="text-content-tertiary dark:text-shell-muted">
+                                                —
+                                              </span>
+                                            )}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="px-6 py-4 text-body-sm text-content-secondary dark:text-shell-muted">
+                                No roster data available for this team.
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
 
                   {/* Category volatility for selected team */}
                   {selectedTeamId &&
