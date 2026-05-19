@@ -226,6 +226,7 @@ _Updated after each plan completion_
 | 260401-f32 | Fix waiver page position filter + % Owned + add % Started column                       | 2026-04-01 | 34a30bb | [260401-f32-fix-waiver-page-position-filter-owned-fr](./quick/260401-f32-fix-waiver-page-position-filter-owned-fr/) |
 | 260401-uyx | Add PitcherList SP ranking (PL) column to waivers free agents table                    | 2026-04-02 | fc382ee | [260401-uyx-add-pitcherlist-sp-ranking-column-to-wai](./quick/260401-uyx-add-pitcherlist-sp-ranking-column-to-wai/) |
 | 260515-rms | Remove Slack integration and Morning Report from codebase                              | 2026-05-15 | da87da7 | [20260515-remove-slack-morning-report](./quick/20260515-remove-slack-morning-report/)                               |
+| 20260519-player-wpa-drilldown | Add WPA column to Season Outlook player drilldown                 | 2026-05-19 | a851e06 | [20260519-player-wpa-drilldown](./quick/20260519-player-wpa-drilldown/)                                             |
 
 ## Session Continuity
 
