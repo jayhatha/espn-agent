@@ -174,4 +174,30 @@ export class SnapshotRepository {
       .orderBy("fetched_at", "desc")
       .executeTakeFirst() as Promise<{ response_json: unknown } | null>;
   }
+
+  /**
+   * Resolve the best projections run at or before `snapshotDate` and return
+   * all player projections for that run.
+   *
+   * Returns `{ runId: null, projections: [] }` when no qualifying run exists.
+   * Callers should check `runId` to determine if projections are available.
+   */
+  async getProjectionsByDate(snapshotDate: string): Promise<{
+    runId: number | null;
+    projections: Awaited<ReturnType<SnapshotRepository["getPlayerProjections"]>>;
+  }> {
+    const run = await this.db
+      .selectFrom("projections_run")
+      .select(["id"])
+      .where("as_of_date", "<=", snapshotDate)
+      .orderBy("as_of_date", "desc")
+      .executeTakeFirst();
+
+    if (!run) {
+      return { runId: null, projections: [] };
+    }
+
+    const projections = await this.getPlayerProjections(run.id);
+    return { runId: run.id, projections };
+  }
 }

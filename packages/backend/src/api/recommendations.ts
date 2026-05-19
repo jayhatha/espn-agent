@@ -13,6 +13,7 @@ import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
 import { FreeAgentView } from "./views/free-agent-view.js";
 import { TradeView } from "./views/trade-view.js";
+import { SnapshotRepository } from "../db/snapshot-repository.js";
 
 /**
  * Recommendations API Routes
@@ -21,6 +22,7 @@ import { TradeView } from "./views/trade-view.js";
 
 export async function recommendationsRoutes(app: FastifyInstance) {
   const db = getDb();
+  const repo = new SnapshotRepository(db);
 
   // Adapters from container — process-scope singletons, LRU caches persist across requests
   const espnAdapter = app.container.adapters.espn;
@@ -198,25 +200,9 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         // Get projections for all players
         const playerIds = roster.map((p) => p.player_id);
 
-        const projections =
-          playerIds.length > 0
-            ? await db
-                .selectFrom("player_projection as proj")
-                .innerJoin(
-                  "projections_run as run",
-                  "proj.projections_run_id",
-                  "run.id",
-                )
-                .select([
-                  "proj.player_id",
-                  "proj.stat_components_json",
-                  "run.as_of_date",
-                ])
-                .where("run.as_of_date", "<=", date)
-                .where("proj.player_id", "in", playerIds)
-                .orderBy("run.as_of_date", "desc")
-                .execute()
-            : [];
+        const { projections: allProjections } = await repo.getProjectionsByDate(date);
+        const playerIdSet = new Set(playerIds);
+        const projections = allProjections.filter((p) => playerIdSet.has(p.player_id));
 
         // Create projection map (most recent per player)
         const projectionMap = new Map();
@@ -517,12 +503,10 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             return playerIds;
           }
 
-          const projectedFreeAgents = await db
-            .selectFrom("player_projection")
-            .select("player_id")
-            .where("projections_run_id", "=", snapshot.projections_run_id)
-            .where("player_id", "in", playerIds)
-            .execute();
+          const projectedFreeAgents = await repo.getPlayerProjections(
+            snapshot.projections_run_id,
+            playerIds,
+          );
 
           return projectedFreeAgents.map((player) => player.player_id);
         };
@@ -695,9 +679,7 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         .executeTakeFirst();
 
       if (!latest) {
-        return reply
-          .code(404)
-          .send({ error: "No snapshots found for league" });
+        return reply.code(404).send({ error: "No snapshots found for league" });
       }
 
       const tradeAgent = app.container.agents.tradeRecommendation(
