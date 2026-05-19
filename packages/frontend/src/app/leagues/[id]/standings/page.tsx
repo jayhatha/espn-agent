@@ -1239,11 +1239,38 @@ export default function StandingsPage() {
                             drilldownRosterData.roster.reduce(
                               (sum, p) =>
                                 sum +
-                                ((p.blendedProjections ?? p.projections)?.[cat.stat_key] ?? 0),
+                                ((p.blendedProjections ?? p.projections)?.[
+                                  cat.stat_key
+                                ] ?? 0),
                               0,
                             );
                         }
                       }
+
+                      // Compute WPA per player: share of projected counting-cat roto points
+                      // WPA_p = Σ_k [(player_stat_k / team_total_k) × categoryP50_k]
+                      const playerWPAMap = new Map<number, number>();
+                      if (drilldownRosterData?.roster) {
+                        for (const player of drilldownRosterData.roster) {
+                          let wpa = 0;
+                          for (const cat of countingCats) {
+                            const teamTotal = teamTotals[cat.category_id] ?? 0;
+                            if (teamTotal <= 0) continue;
+                            const playerStat =
+                              (player.blendedProjections ??
+                                player.projections)?.[cat.stat_key] ?? 0;
+                            const catRoto =
+                              team.categoryP50[cat.category_id] ?? 0;
+                            wpa += (playerStat / teamTotal) * catRoto;
+                          }
+                          playerWPAMap.set(player.playerId, wpa);
+                        }
+                      }
+                      const teamWPA = countingCats.reduce(
+                        (sum, cat) =>
+                          sum + (team.categoryP50[cat.category_id] ?? 0),
+                        0,
+                      );
 
                       return (
                         <Card>
@@ -1254,7 +1281,8 @@ export default function StandingsPage() {
                                   Player Breakdown — {team.teamName}
                                 </Heading>
                                 <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
-                                  Full-season projected contributions (current + RoS)
+                                  Full-season projected contributions (current +
+                                  RoS)
                                 </p>
                               </div>
                               <button
@@ -1291,24 +1319,23 @@ export default function StandingsPage() {
                                           {cat.name || cat.stat_key}
                                         </th>
                                       ))}
+                                      <th
+                                        className="px-3 py-2 text-right font-medium text-accent dark:text-shell-accent uppercase tracking-wider min-w-[56px]"
+                                        title="Win Points Added: share of projected counting-category roto points"
+                                      >
+                                        WPA
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-neutral-100 dark:divide-shell-border bg-white dark:bg-shell-panel">
                                     {drilldownRosterData.roster
                                       .slice()
                                       .sort((a, b) => {
-                                        // Sort by primary counting cat desc, then name
-                                        const primaryCat = countingCats[0];
-                                        if (!primaryCat) return 0;
-                                        const aVal =
-                                          (a.blendedProjections ?? a.projections)?.[
-                                            primaryCat.stat_key
-                                          ] ?? -1;
-                                        const bVal =
-                                          (b.blendedProjections ?? b.projections)?.[
-                                            primaryCat.stat_key
-                                          ] ?? -1;
-                                        return bVal - aVal;
+                                        const aWPA =
+                                          playerWPAMap.get(a.playerId) ?? 0;
+                                        const bWPA =
+                                          playerWPAMap.get(b.playerId) ?? 0;
+                                        return bWPA - aWPA;
                                       })
                                       .map((player) => (
                                         <tr
@@ -1331,7 +1358,8 @@ export default function StandingsPage() {
                                           {cats.map((cat: Category) => {
                                             const val =
                                               getPlayerStatForCategory(
-                                                player.blendedProjections ?? player.projections,
+                                                player.blendedProjections ??
+                                                  player.projections,
                                                 cat,
                                               );
                                             const teamTotal =
@@ -1373,6 +1401,28 @@ export default function StandingsPage() {
                                               </td>
                                             );
                                           })}
+                                          <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                                            {(() => {
+                                              const wpa =
+                                                playerWPAMap.get(
+                                                  player.playerId,
+                                                ) ?? 0;
+                                              return (
+                                                <span
+                                                  className={cn(
+                                                    "font-medium",
+                                                    wpa >= 2
+                                                      ? "text-positive"
+                                                      : wpa >= 0.5
+                                                        ? "text-content dark:text-shell-text"
+                                                        : "text-content-tertiary dark:text-shell-muted",
+                                                  )}
+                                                >
+                                                  {wpa.toFixed(1)}
+                                                </span>
+                                              );
+                                            })()}
+                                          </td>
                                         </tr>
                                       ))}
                                     {/* Team total row */}
@@ -1408,6 +1458,9 @@ export default function StandingsPage() {
                                           </td>
                                         );
                                       })}
+                                      <td className="px-3 py-2 text-right tabular-nums text-accent dark:text-shell-accent">
+                                        {teamWPA.toFixed(1)}
+                                      </td>
                                     </tr>
                                   </tbody>
                                 </table>
