@@ -8,6 +8,7 @@ import { createWaiverAgent } from "../agents/agent-factory.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
 import type { ESPNAuthCookies } from "../adapters/espn.js";
 import type { StatComponents } from "../../../shared/dist/index.js";
+import { combineComponents } from "../../../shared/dist/index.js";
 import { decryptToken, hasEncryptionKey } from "../utils/encryption.js";
 import { authenticate } from "../middleware/auth.js";
 import { FreeAgentView } from "./views/free-agent-view.js";
@@ -254,6 +255,32 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           tenureMap.set(row.player_id, existing);
         }
 
+        // Full-season stats across all teams for blending with RoS projections
+        const seasonRows =
+          playerIds.length > 0
+            ? await db
+                .selectFrom("player_period_stats")
+                .select(["player_id", "components_json"])
+                .where("league_id", "=", leagueId)
+                .where("player_id", "in", playerIds)
+                .where("snapshot_date", ">=", seasonStart)
+                .execute()
+            : [];
+
+        const seasonStatsMap = new Map<number, StatComponents>();
+        for (const row of seasonRows) {
+          const existing =
+            seasonStatsMap.get(row.player_id) ?? ({} as StatComponents);
+          const components = row.components_json as StatComponents;
+          for (const [key, value] of Object.entries(components)) {
+            if (typeof value === "number") {
+              (existing as Record<string, number>)[key] =
+                ((existing as Record<string, number>)[key] ?? 0) + value;
+            }
+          }
+          seasonStatsMap.set(row.player_id, existing);
+        }
+
         const advancedStatsMap =
           await advancedStatsAdapter.getAdvancedStatsForPlayers(
             new Date(date).getFullYear(),
@@ -285,6 +312,17 @@ export async function recommendationsRoutes(app: FastifyInstance) {
           tenureStats: (() => {
             const agg = tenureMap.get(player.player_id);
             return agg && Object.keys(agg).length > 0 ? agg : null;
+          })(),
+          blendedProjections: (() => {
+            const ros = projectionMap.get(player.player_id) as
+              | StatComponents
+              | undefined;
+            const current = seasonStatsMap.get(player.player_id);
+            if (!ros && !current) return null;
+            return combineComponents(
+              current ?? ({} as StatComponents),
+              ros ?? ({} as StatComponents),
+            );
           })(),
         }));
 

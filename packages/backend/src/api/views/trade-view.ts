@@ -1,6 +1,8 @@
 import type { Kysely } from "kysely";
 import type { Database } from "../../db/schema.js";
 import { SnapshotRepository } from "../../db/snapshot-repository.js";
+import type { StatComponents } from "../../../../shared/dist/index.js";
+import { combineComponents } from "../../../../shared/dist/index.js";
 
 export interface EnrichedRosterEntry {
   playerId: number;
@@ -11,6 +13,7 @@ export interface EnrichedRosterEntry {
   rosterStatus: string;
   rosterSlot: string | null;
   projections: unknown | null;
+  blendedProjections: StatComponents | null;
 }
 
 export interface RosterPairResult {
@@ -117,6 +120,33 @@ export class TradeView {
       }
     }
 
+    // Full-season stats across all teams for blending with RoS projections
+    const seasonStart = `${new Date().getFullYear()}-01-01`;
+    const periodStatsRows =
+      allPlayerIds.length > 0
+        ? await this.db
+            .selectFrom("player_period_stats")
+            .select(["player_id", "components_json"])
+            .where("league_id", "=", leagueId)
+            .where("player_id", "in", allPlayerIds)
+            .where("snapshot_date", ">=", seasonStart)
+            .execute()
+        : [];
+
+    const seasonStatsMap = new Map<number, StatComponents>();
+    for (const row of periodStatsRows) {
+      const existing =
+        seasonStatsMap.get(row.player_id) ?? ({} as StatComponents);
+      const components = row.components_json as StatComponents;
+      for (const [key, value] of Object.entries(components)) {
+        if (typeof value === "number") {
+          (existing as Record<string, number>)[key] =
+            ((existing as Record<string, number>)[key] ?? 0) + value;
+        }
+      }
+      seasonStatsMap.set(row.player_id, existing);
+    }
+
     const enrich = (roster: typeof userRoster): EnrichedRosterEntry[] =>
       roster.map((player) => ({
         playerId: player.player_id,
@@ -127,6 +157,17 @@ export class TradeView {
         rosterStatus: player.roster_status,
         rosterSlot: player.roster_slot,
         projections: projectionMap.get(player.player_id) ?? null,
+        blendedProjections: (() => {
+          const ros = projectionMap.get(player.player_id) as
+            | StatComponents
+            | undefined;
+          const current = seasonStatsMap.get(player.player_id);
+          if (!ros && !current) return null;
+          return combineComponents(
+            current ?? ({} as StatComponents),
+            ros ?? ({} as StatComponents),
+          );
+        })(),
       }));
 
     return {

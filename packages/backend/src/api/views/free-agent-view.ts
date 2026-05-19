@@ -5,6 +5,8 @@ import type { ESPNAdapter, ESPNAuthCookies } from "../../adapters/espn.js";
 import type { PitcherlistAdapter } from "../../adapters/pitcherlist.js";
 import { normalizePitcherName } from "../../adapters/pitcherlist.js";
 import type { AdvancedStatsAdapter } from "../../adapters/advanced-stats.js";
+import type { StatComponents } from "../../../../shared/dist/index.js";
+import { combineComponents } from "../../../../shared/dist/index.js";
 
 export interface EnrichedFreeAgent {
   playerId: number;
@@ -18,6 +20,7 @@ export interface EnrichedFreeAgent {
   currentStats: Record<string, number> | null;
   advancedStats: unknown | null;
   pitcherlistRank: number | null;
+  blendedProjections: StatComponents | null;
 }
 
 export interface FreeAgentViewResult {
@@ -118,6 +121,33 @@ export class FreeAgentView {
       );
     }
 
+    // Full-season stats for blending with RoS projections
+    const seasonStart = `${new Date().getFullYear()}-01-01`;
+    const periodStatsRows =
+      espnPlayerIds.length > 0
+        ? await this.db
+            .selectFrom("player_period_stats")
+            .select(["player_id", "components_json"])
+            .where("league_id", "=", leagueId)
+            .where("player_id", "in", espnPlayerIds)
+            .where("snapshot_date", ">=", seasonStart)
+            .execute()
+        : [];
+
+    const seasonStatsMap = new Map<number, StatComponents>();
+    for (const row of periodStatsRows) {
+      const existing =
+        seasonStatsMap.get(row.player_id) ?? ({} as StatComponents);
+      const components = row.components_json as StatComponents;
+      for (const [key, value] of Object.entries(components)) {
+        if (typeof value === "number") {
+          (existing as Record<string, number>)[key] =
+            ((existing as Record<string, number>)[key] ?? 0) + value;
+        }
+      }
+      seasonStatsMap.set(row.player_id, existing);
+    }
+
     // Fetch PitcherList Top 100 SP rankings (graceful degradation)
     const top100 = await this.pitcherlistAdapter
       .getTop100Rankings()
@@ -153,6 +183,15 @@ export class FreeAgentView {
       currentStats: currentStatsMap.get(fa.playerId) ?? null,
       advancedStats: advancedStatsMap.get(fa.playerId) ?? null,
       pitcherlistRank: plRankMap.get(normalizePitcherName(fa.name)) ?? null,
+      blendedProjections: (() => {
+        const ros = projMap.get(fa.playerId) as StatComponents | undefined;
+        const current = seasonStatsMap.get(fa.playerId);
+        if (!ros && !current) return null;
+        return combineComponents(
+          current ?? ({} as StatComponents),
+          ros ?? ({} as StatComponents),
+        );
+      })(),
     }));
 
     return { freeAgents, snapshotDate: snapshotDate ?? null };
