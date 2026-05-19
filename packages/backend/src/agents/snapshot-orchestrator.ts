@@ -62,6 +62,49 @@ export interface SnapshotJobOptions {
   forceFresh?: boolean;
 }
 
+/**
+ * Build stat components from raw ESPN `valuesByStat` for a RATE category.
+ * Returns null for unknown formulaIds (component math not applicable).
+ * IP is derived from OUTS (ESPN stat 34) divided by 3.
+ */
+function buildCurrentComponents(
+  formulaId: string,
+  statValues: Record<number, number>,
+): StatComponents | null {
+  const ip = (statValues[34] ?? 0) / 3;
+  switch (formulaId) {
+    case "avg":
+      return { H: statValues[1] ?? 0, AB: statValues[0] ?? 0 };
+    case "obp":
+      return {
+        H: statValues[1] ?? 0,
+        BB: statValues[10] ?? 0,
+        HBP: statValues[12] ?? 0,
+        AB: statValues[0] ?? 0,
+        SF: statValues[13] ?? 0,
+      };
+    case "slg":
+      return { TB: statValues[8] ?? 0, AB: statValues[0] ?? 0 };
+    case "ops":
+      return {
+        H: statValues[1] ?? 0,
+        BB: statValues[10] ?? 0,
+        HBP: statValues[12] ?? 0,
+        AB: statValues[0] ?? 0,
+        SF: statValues[13] ?? 0,
+        TB: statValues[8] ?? 0,
+      };
+    case "era":
+      return { ER: statValues[45] ?? 0, IP: ip };
+    case "whip":
+      return { HA: statValues[37] ?? 0, BBA: statValues[39] ?? 0, IP: ip };
+    case "k9":
+      return { K: statValues[48] ?? 0, IP: ip };
+    default:
+      return null;
+  }
+}
+
 export class SnapshotOrchestratorAgent {
   private readonly espnAdapter: ESPNAdapter;
   private readonly standingsAgent: StandingsProjectionAgent;
@@ -515,7 +558,7 @@ export class SnapshotOrchestratorAgent {
       team_id: number;
       category_id: string;
       value: number;
-      components_json: null;
+      components_json: StatComponents | null;
     }> = [];
 
     for (const team of teams) {
@@ -529,7 +572,9 @@ export class SnapshotOrchestratorAgent {
           team_id: dbTeamId,
           category_id: cat.statKey,
           value: team.statValues[cat.espnStatId] ?? 0,
-          components_json: null,
+          components_json: cat.formulaId
+            ? buildCurrentComponents(cat.formulaId, team.statValues)
+            : null,
         });
       }
     }
