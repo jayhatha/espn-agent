@@ -51,6 +51,10 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/status`);
   },
 
+  async getLeagueSettings(leagueId: number) {
+    return fetchAPI(`/api/leagues/${leagueId}/settings`);
+  },
+
   async connectLeague(data: {
     espnLeagueId: number;
     season: number;

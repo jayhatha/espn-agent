@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { type ESPNAuthCookies } from "../adapters/espn.js";
+import { type ESPNAuthCookies, type ESPNScoringCategory } from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import {
   encryptToken,
@@ -34,6 +34,67 @@ async function getCachedGamesPlayed(
   const gp = await mlbAdapter.getSeasonGamesPlayed(season);
   gamesPlayedCache = { value: gp, date: today };
   return gp;
+}
+
+/**
+ * Convert normalized ESPN settings to LeagueSettings JSON and upsert into
+ * league_settings_version. Called at connect time so categories are available
+ * before the first snapshot completes.
+ */
+async function upsertLeagueSettingsVersion(
+  db: ReturnType<typeof getDb>,
+  leagueId: number,
+  effectiveDate: string,
+  settings: {
+    scoringFormat: string;
+    categories: ESPNScoringCategory[];
+    rosterSlots: Record<string, number>;
+    acquisitionRules: unknown;
+  },
+): Promise<void> {
+  const categories = settings.categories.map((cat) => ({
+    category_id: cat.statKey,
+    name: cat.name,
+    stat_key: cat.statKey,
+    type: cat.type,
+    direction: cat.direction,
+    formula_id: cat.formulaId,
+    required_components: cat.requiredComponents,
+  }));
+
+  const settingsJson = {
+    scoring_format: settings.scoringFormat || "unknown",
+    categories,
+    roster_slots: settings.rosterSlots || {},
+    acquisition_rules: settings.acquisitionRules || {},
+  };
+
+  const existing = await db
+    .selectFrom("league_settings_version")
+    .select(["id", "settings_json"])
+    .where("league_id", "=", leagueId)
+    .where("effective_date", "=", effectiveDate)
+    .executeTakeFirst();
+
+  if (existing) {
+    if (JSON.stringify(existing.settings_json) !== JSON.stringify(settingsJson)) {
+      await db
+        .updateTable("league_settings_version")
+        .set({ settings_json: settingsJson as any })
+        .where("id", "=", existing.id)
+        .execute();
+    }
+  } else {
+    await db
+      .insertInto("league_settings_version")
+      .values({
+        league_id: leagueId,
+        effective_date: effectiveDate,
+        settings_json: settingsJson as any,
+        created_at: new Date(),
+      })
+      .execute();
+  }
 }
 
 /**
@@ -100,6 +161,7 @@ export async function leaguesRoutes(app: FastifyInstance) {
         });
 
         const normalized = espnAdapter.normalizeLeagueData(espnData.data);
+        const today = new Date().toISOString().split("T")[0];
 
         // Find user's team by matching SWID or explicit teamEspnId
         let userTeamEspnId: number | null = teamEspnId || null;
@@ -126,6 +188,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
 
         // If league already exists, update it with team detection
         if (league) {
+          // Store settings immediately so categories are available before snapshot
+          await upsertLeagueSettingsVersion(db, league.id, today, normalized.settings);
+
           // Update teams first
           let userTeamDbId: number | null = null;
           for (const teamData of normalized.teams) {
@@ -225,6 +290,9 @@ export async function leaguesRoutes(app: FastifyInstance) {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
+
+        // Store settings immediately so categories are available before snapshot
+        await upsertLeagueSettingsVersion(db, league.id, today, normalized.settings);
 
         // Create/update teams and find user's team DB ID
         let userTeamDbId: number | null = null;
@@ -449,6 +517,45 @@ export async function leaguesRoutes(app: FastifyInstance) {
         .execute();
 
       return { teams };
+    },
+  );
+
+  // Get league scoring categories and settings
+  app.get<{ Params: { leagueId: string } }>(
+    "/api/leagues/:leagueId/settings",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+      config: {
+        rateLimit: {
+          max: 100,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const leagueId = parseInt(request.params.leagueId, 10);
+
+      const settingsVersion = await db
+        .selectFrom("league_settings_version")
+        .selectAll()
+        .where("league_id", "=", leagueId)
+        .orderBy("effective_date", "desc")
+        .executeTakeFirst();
+
+      if (!settingsVersion) {
+        return reply
+          .code(404)
+          .send({ error: "League settings not found. Run a snapshot first." });
+      }
+
+      return {
+        effectiveDate: settingsVersion.effective_date,
+        scoringFormat: settingsVersion.settings_json.scoring_format,
+        categories: settingsVersion.settings_json.categories,
+        rosterSlots: settingsVersion.settings_json.roster_slots,
+        acquisitionRules: settingsVersion.settings_json.acquisition_rules,
+      };
     },
   );
 
