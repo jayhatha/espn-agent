@@ -109,32 +109,10 @@ export class SnapshotOrchestratorAgent {
     }
 
     try {
-      const league = await this.db
-        .selectFrom("league")
-        .selectAll()
-        .where("id", "=", leagueId)
-        .executeTakeFirstOrThrow();
-
-      const { espnData, normalized } = await this.fetchAndArchive(
+      const ctx = await this.resolveSnapshotContext(
         leagueId,
-        league,
+        snapshotDate,
         espnAuth,
-        snapshotDate,
-      );
-      const settingsVersionId = await this.getOrCreateSettingsVersion(
-        leagueId,
-        snapshotDate,
-        normalized.settings,
-      );
-      const projectionsRun = await this.db
-        .selectFrom("projections_run")
-        .selectAll()
-        .where("as_of_date", "<=", snapshotDate)
-        .orderBy("as_of_date", "desc")
-        .executeTakeFirst();
-      const { isDegraded, degradedReasons } = computeDegradedStatus(
-        projectionsRun,
-        snapshotDate,
       );
 
       await this.db
@@ -144,21 +122,21 @@ export class SnapshotOrchestratorAgent {
             trx,
             leagueId,
             snapshotDate,
-            espnData,
-            normalized,
-            settingsVersionId,
-            projectionsRun,
-            isDegraded,
-            degradedReasons,
+            ctx.espnData,
+            ctx.normalized,
+            ctx.settingsVersionId,
+            ctx.projectionsRun,
+            ctx.isDegraded,
+            ctx.degradedReasons,
           ),
         );
 
-      await this.computeProjections(leagueId, snapshotDate, projectionsRun?.id);
+      await this.computeProjections(leagueId, snapshotDate, ctx.projectionsRun?.id);
 
       try {
         await this.fetchAndStoreFreeAgents(
-          league.espn_league_id,
-          league.season,
+          ctx.league.espn_league_id,
+          ctx.league.season,
           espnAuth,
           leagueId,
           snapshotDate,
@@ -171,18 +149,50 @@ export class SnapshotOrchestratorAgent {
       }
 
       await this.emitChangeLog(leagueId, snapshotDate);
-
-      this.logger?.info(
-        { leagueId, snapshotDate },
-        "Snapshot job completed successfully",
-      );
+      this.logger?.info({ leagueId, snapshotDate }, "Snapshot job completed successfully");
     } catch (error) {
-      this.logger?.error(
-        { error, leagueId, snapshotDate },
-        "Snapshot job failed",
-      );
+      this.logger?.error({ error, leagueId, snapshotDate }, "Snapshot job failed");
       throw error;
     }
+  }
+
+  private async resolveSnapshotContext(
+    leagueId: number,
+    snapshotDate: string,
+    espnAuth: ESPNAuthCookies | undefined,
+  ) {
+    const league = await this.db
+      .selectFrom("league")
+      .selectAll()
+      .where("id", "=", leagueId)
+      .executeTakeFirstOrThrow();
+
+    const { espnData, normalized } = await this.fetchAndArchive(
+      leagueId,
+      league,
+      espnAuth,
+      snapshotDate,
+    );
+
+    const settingsVersionId = await this.getOrCreateSettingsVersion(
+      leagueId,
+      snapshotDate,
+      normalized.settings,
+    );
+
+    const projectionsRun = await this.db
+      .selectFrom("projections_run")
+      .selectAll()
+      .where("as_of_date", "<=", snapshotDate)
+      .orderBy("as_of_date", "desc")
+      .executeTakeFirst();
+
+    const { isDegraded, degradedReasons } = computeDegradedStatus(
+      projectionsRun,
+      snapshotDate,
+    );
+
+    return { league, espnData, normalized, settingsVersionId, projectionsRun, isDegraded, degradedReasons };
   }
 
   private async fetchAndArchive(
