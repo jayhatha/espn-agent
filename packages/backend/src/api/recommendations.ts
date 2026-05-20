@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { z } from "zod";
 import { getDb } from "../db/connection.js";
 import {
   TradeRecommendationAgent,
@@ -14,6 +15,13 @@ import { authenticate } from "../middleware/auth.js";
 import { FreeAgentView } from "./views/free-agent-view.js";
 import { TradeView } from "./views/trade-view.js";
 import { SnapshotRepository } from "../db/snapshot-repository.js";
+
+const waiverEvaluateBodySchema = z.object({
+  addPlayerId: z.number().int().positive(),
+  dropPlayerId: z.number().int().positive().optional(),
+  snapshotDate: z.string().optional(),
+  projectionsRunId: z.number().int().positive().optional(),
+});
 
 /**
  * Recommendations API Routes
@@ -200,9 +208,12 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         // Get projections for all players
         const playerIds = roster.map((p) => p.player_id);
 
-        const { projections: allProjections } = await repo.getProjectionsByDate(date);
+        const { projections: allProjections } =
+          await repo.getProjectionsByDate(date);
         const playerIdSet = new Set(playerIds);
-        const projections = allProjections.filter((p) => playerIdSet.has(p.player_id));
+        const projections = allProjections.filter((p) =>
+          playerIdSet.has(p.player_id),
+        );
 
         // Create projection map (most recent per player)
         const projectionMap = new Map();
@@ -340,8 +351,16 @@ export async function recommendationsRoutes(app: FastifyInstance) {
     ) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
+
+      const parseResult = waiverEvaluateBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.code(400).send({
+          error: "Invalid request body",
+          details: parseResult.error.flatten().fieldErrors,
+        });
+      }
       const { addPlayerId, dropPlayerId, snapshotDate, projectionsRunId } =
-        request.body;
+        parseResult.data;
 
       // Resolve snapshot date
       let date = snapshotDate;
@@ -397,11 +416,13 @@ export async function recommendationsRoutes(app: FastifyInstance) {
             .select(["id", "name", "positions"])
             .where("id", "=", addPlayerId)
             .executeTakeFirst(),
-          db
-            .selectFrom("player")
-            .select(["id", "name", "positions"])
-            .where("id", "=", dropPlayerId)
-            .executeTakeFirst(),
+          dropPlayerId != null
+            ? db
+                .selectFrom("player")
+                .select(["id", "name", "positions"])
+                .where("id", "=", dropPlayerId)
+                .executeTakeFirst()
+            : Promise.resolve(undefined),
         ]);
 
         // Fetch category names so we can build the categoryImpacts array

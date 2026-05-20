@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getDb } from "../db/connection.js";
 
@@ -11,10 +12,7 @@ import { getDb } from "../db/connection.js";
  * Outside development, INTERNAL_JOB_TOKEN is required — startup fails if absent.
  * In development, the token is optional; when set it is still enforced.
  */
-if (
-  process.env.NODE_ENV !== "development" &&
-  !process.env.INTERNAL_JOB_TOKEN
-) {
+if (process.env.NODE_ENV !== "development" && !process.env.INTERNAL_JOB_TOKEN) {
   throw new Error(
     "INTERNAL_JOB_TOKEN environment variable is required outside development mode",
   );
@@ -35,11 +33,18 @@ async function verifyInternalToken(
   }
 
   const authHeader = request.headers.authorization;
-  if (!authHeader || authHeader !== `Bearer ${INTERNAL_JOB_TOKEN}`) {
-    request.log.warn(
-      { hasAuth: !!authHeader },
-      "Unauthorized internal API request",
-    );
+  if (!authHeader) {
+    request.log.warn({ hasAuth: false }, "Unauthorized internal API request");
+    return reply.code(401).send({ error: "Unauthorized" });
+  }
+  const expected = `Bearer ${INTERNAL_JOB_TOKEN}`;
+  const providedBuf = Buffer.from(authHeader);
+  const expectedBuf = Buffer.from(expected);
+  const valid =
+    providedBuf.length === expectedBuf.length &&
+    timingSafeEqual(providedBuf, expectedBuf);
+  if (!valid) {
+    request.log.warn({ hasAuth: true }, "Unauthorized internal API request");
     return reply.code(401).send({ error: "Unauthorized" });
   }
 }

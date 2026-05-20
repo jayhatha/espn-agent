@@ -328,6 +328,10 @@ export class ProjectionsIngestAgent {
       skip_empty_lines: true,
     }) as ProjectionCSVRow[];
 
+    if (rows.length === 0) {
+      throw new Error("Batters CSV is empty — no rows to ingest");
+    }
+
     // Required columns for hitters (per DESIGN_DOC.md §5.2)
     // H and TB can be derived from 1B/2B/3B/HR, so they're not strictly required
     const required = ["AB", "R", "HR", "RBI", "SB", "BB", "HBP", "SF"];
@@ -491,6 +495,10 @@ export class ProjectionsIngestAgent {
       columns: true,
       skip_empty_lines: true,
     }) as ProjectionCSVRow[];
+
+    if (rows.length === 0) {
+      throw new Error("Pitchers CSV is empty — no rows to ingest");
+    }
 
     // Required columns for pitchers
     // FanGraphs uses "SO" for strikeouts; we accept both "K" and "SO"
