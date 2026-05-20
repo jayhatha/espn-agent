@@ -37,6 +37,19 @@ Requirements for the Projected Season Simulation Engine milestone.
 - [ ] **OPS-01**: Simulation supports configurable run counts, deterministic seeds, and snapshot-bound caching while staying within a practical backend runtime budget
 - [ ] **CAL-01**: Calibration and backtest tooling measures interval coverage and systematic bias against historical snapshots or realized outcomes before downstream features rely on the distributions
 
+## v12.0 Requirements
+
+Requirements for the Scenario Recommendation Integrity milestone.
+
+### Backend: Scenario Evaluation
+
+- [ ] **SCEN-01**: Trade and waiver scenario scoring mutates canonical simulation state for the affected rosters instead of applying ad hoc raw projection deltas in route-specific logic
+- [ ] **SCEN-02**: Trade evaluation simulates both teams in the same league snapshot and returns user delta plus partner delta so fairness is grounded in both sides of the move
+- [ ] **SCEN-03**: Waiver and trade legality are derived from allocator or gap-detection results rather than position-overlap heuristics, and blocking issues are surfaced in the response
+- [ ] **SCEN-04**: Candidate generation uses deterministic scenario scoring for broad screening and can apply bounded Monte Carlo reranking or probability deltas to the top scenarios without recomputing unrelated state
+- [ ] **SCEN-05**: Scenario evaluation is snapshot-bound and reproducible: time horizon derives from snapshot date, and snapshot-scoped data is preferred over latest raw payload fallbacks whenever available
+- [ ] **SCEN-06**: Focused automated tests cover lineup congestion, GS-cap effects, partner-relative trade impact, waiver legality, and historical snapshot reproducibility
+
 ## Traceability
 
 | REQ-ID    | Phase |
@@ -53,6 +66,12 @@ Requirements for the Projected Season Simulation Engine milestone.
 | MC-02     | 107   |
 | OPS-01    | 107   |
 | CAL-01    | 107   |
+| SCEN-01   | 108   |
+| SCEN-02   | 108   |
+| SCEN-03   | 108   |
+| SCEN-04   | 108   |
+| SCEN-05   | 108   |
+| SCEN-06   | 108   |
 
 ## Out of Scope (v11.0)
 
@@ -65,7 +84,6 @@ Requirements for the Projected Season Simulation Engine milestone.
 
 ## Future Requirements
 
-- Scenario evaluators that consume season-simulation distributions for trade, waiver, and lineup decisions
 - Lightweight frontend surfaces for place probabilities, category swing bands, and confidence intervals
 - Schedule-strength and opponent-context adjustments layered on top of the simulation core
 - Mastra AI agent integration (deferred from v6.0)

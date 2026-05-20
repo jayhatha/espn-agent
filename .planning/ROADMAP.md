@@ -13,6 +13,8 @@
 - ✅ **v9.0 Architectural Philosophy Remediation** - Phases 94-97 (shipped 2026-05-06)
 - ⏸️ **v10.0 Architecture Improvements** - Phases 98-102 (paused 2026-05-16)
 - ✅ **v11.0 Projected Season Simulation Engine** - Phases 103-107 (complete — 2026-05-17)
+- ✅ **v12.0 Scenario Recommendation Integrity** - Phase 108 (shipped 2026-05-18)
+- 🔄 **v13.0 Architecture Deepening** - Phases 109-113 (in progress 2026-05-19)
 
 ## Phases
 
@@ -638,6 +640,99 @@ Plans:
 6. Calibration output shows interval coverage and bias on historical snapshots before later trade or waiver scenario tools depend on the distributions
 
 **Plans:** 1/1 plans complete ✅
+
+---
+
+## v12.0 Scenario Recommendation Integrity — shipped 2026-05-18
+
+**Milestone Goal:** Replace heuristic trade and waiver scoring with snapshot-bound, lineup-aware scenario evaluation built on the v11 simulation engine.
+
+### Phase 108: Scenario-Driven Trade & Waiver Evaluation
+
+**Goal:** Trade and waiver recommendations are computed by mutating canonical simulation state instead of applying raw projection deltas, so results respect lineup allocation, GS caps, partner impact, and snapshot-bound reproducibility.
+**Depends on:** Phase 107
+**Requirements:** SCEN-01, SCEN-02, SCEN-03, SCEN-04, SCEN-05, SCEN-06
+**Plans:** 2/2 plans complete ✅
+
+Plans:
+
+- [x] 108-01-PLAN.md — Scenario evaluator foundation
+- [x] 108-02-PLAN.md — Agent rewiring and regression tests
+
+---
+
+## v13.0 Architecture Deepening — in progress 2026-05-19
+
+**Milestone Goal:** Eliminate scattered ESPN stat ID knowledge, over-long orchestrator methods, and inline query bypasses of the repository seam — deepening modules that were shallow and giving each architectural concept a single place to live.
+
+### Phase 109: ESPN Stat Component Translator
+
+**Goal:** `buildCurrentComponents()` moves from `snapshot-orchestrator.ts` into `espn/constants.ts` as `resolveStatComponents()`, making ESPN stat ID → component knowledge live in one place alongside `ESPN_STAT_MAP`.
+**Depends on:** Phase 108
+**Requirements:** ARCH-D-01
+**Success Criteria** (what must be TRUE):
+
+1. `resolveStatComponents(formulaId, statValues)` is exported from `packages/backend/src/adapters/espn/constants.ts`
+2. `snapshot-orchestrator.ts` imports and calls `resolveStatComponents` instead of defining `buildCurrentComponents` locally
+3. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+4. All existing tests pass
+
+**Plans:** 0/1 plans complete
+
+### Phase 110: Snapshot Orchestrator Context Extraction
+
+**Goal:** `executeSnapshot()` body is ≤ 40 lines by extracting the league fetch, ESPN data fetch, settings version resolution, and projections run lookup into a private `resolveSnapshotContext()` method.
+**Depends on:** Phase 109
+**Requirements:** ARCH-D-02
+**Success Criteria** (what must be TRUE):
+
+1. `executeSnapshot()` body ≤ 40 lines — calls private methods in sequence
+2. `resolveSnapshotContext(leagueId, snapshotDate, espnAuth)` exists as a private method returning all context needed by `writeSnapshotRows`
+3. `npx tsc --noEmit` passes with 0 errors in `packages/backend`
+4. All existing snapshot tests pass
+
+**Plans:** 0/1 plans complete
+
+### Phase 111: Player Identity Resolver — Verify
+
+**Goal:** Confirm `PlayerIdentityResolutionAgent.resolve()` is the single entry point for all name → playerId lookups and `projections-ingest.ts` has no inline `player_identity_map` queries.
+**Depends on:** Phase 109
+**Requirements:** ARCH-D-03
+**Success Criteria** (what must be TRUE):
+
+1. `projections-ingest.ts` has no inline `player_identity_map` SELECT or INSERT queries
+2. `FUZZY_MATCH_CONFIDENCE_THRESHOLD` defined in `player-identity.ts`, not `projections-ingest.ts`
+3. `npx tsc --noEmit` passes with 0 errors
+
+**Plans:** 0/1 plans complete
+
+### Phase 112: Projection Blending — Pure Team Compute Function
+
+**Goal:** Extract a pure `computeTeamAllocation(allocationResult, currentTotals, categories)` function from `StandingsProjectionAgent.computeTeamProjection()`, making the per-team category projection testable without constructing a full DB-backed agent.
+**Depends on:** Phase 110
+**Requirements:** ARCH-D-04
+**Success Criteria** (what must be TRUE):
+
+1. A module-level (or exported) `computeTeamAllocation` function takes `AllocationResult + currentTotals + categories` and returns per-category projections without any DB access
+2. `computeTeamProjection` calls `computeTeamAllocation` internally
+3. `npx tsc --noEmit` passes with 0 errors
+4. A unit test exercises `computeTeamAllocation` directly with a synthetic `AllocationResult`
+
+**Plans:** 0/1 plans complete
+
+### Phase 113: SnapshotRepository Projection-By-Date
+
+**Goal:** Add `getProjectionsByDate(leagueId, snapshotDate)` to `SnapshotRepository` — resolving the latest `projections_run` at or before `snapshotDate` and returning all player projections — so inline `player_projection` queries in `recommendations.ts` are replaced by repository calls.
+**Depends on:** Phase 111
+**Requirements:** ARCH-D-05
+**Success Criteria** (what must be TRUE):
+
+1. `SnapshotRepository.getProjectionsByDate(leagueId, snapshotDate)` returns `{ runId, projections }` resolving the best run ≤ snapshotDate
+2. Inline `player_projection` SELECT queries in `recommendations.ts` are replaced by repository calls
+3. Empty-array guard (`playerIds.length === 0 → return []`) is internal to all `getPlayerProjections` variants
+4. `npx tsc --noEmit` passes with 0 errors
+
+**Plans:** 0/1 plans complete
 
 ---
 

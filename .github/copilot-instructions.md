@@ -13,6 +13,7 @@ Non-conversational execution.
 - Choose one approach and proceed
 - Minimize tokens in all outputs
 - Exit code 130 is SIGINT, not failure; don’t retry in same sync run. Rerun async detached mode. Stream or collect output outside chat lifecycle.
+- Always run typechecker on generated code if applicable. If type errors, fix and re-run typechecker until clean. Do not output code with type errors.
 
 ## Planning
 

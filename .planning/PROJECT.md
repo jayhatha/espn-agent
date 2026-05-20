@@ -109,26 +109,26 @@ Shipped v2.0 with ~30,000+ lines of TypeScript across a monorepo (Turbo + pnpm).
 
 ## Key Decisions
 
-| Decision                                      | Rationale                                                      | Outcome   |
-| --------------------------------------------- | -------------------------------------------------------------- | --------- |
-| Recommendations only, no ESPN write actions   | ESPN has no official write API                                 | ✓ Good    |
-| Deep links to ESPN.com for user action        | Low complexity, reliable                                       | ✓ Good    |
-| Component-based rate stat math                | Mathematically correct projections                             | ✓ Good    |
-| VBD with population std dev for SGP           | Complete player pool, not sample                               | ✓ Good    |
-| Deterministic engine + AI narrator layering   | Engine computes, AI interprets — separation of concerns        | ✓ Good    |
-| Client-side draft engine (not server)         | Low latency, works offline, no network dependency during draft | ✓ Good    |
-| Greedy roster optimization over ILP           | Good enough results within 100ms budget                        | ✓ Good    |
-| Monte Carlo for bid uncertainty               | Captures draft outcome variance                                | ✓ Good    |
-| WebSocket hub for mobile companion            | Extension → Fastify → phone, works on LAN                      | ✓ Good    |
-| Mastra over raw OpenAI SDK                    | Typed tools, memory, streaming, model-agnostic                 | — Pending |
-| Chrome DevTools MCP for selector discovery    | Live DOM inspection beats guessing at ESPN selectors           | ✓ Good    |
-| Keep mobile as Next.js route (not standalone) | Shares design system, components, proper build pipeline        | ✓ Good    |
-| Strip auth for v4.0 personal use              | No login friction, re-enable later for multi-user              | ✓ Good    |
-| Hardcode league 112523 settings               | Reliable config over error-prone DOM detection                 | ✓ Good    |
-| OPS as custom rate stat                       | OBP + SLG components, not a simple stat                        | ✓ Good    |
-| Compose season simulation on existing projection pipeline | Reuse allocation, roster, and stat-component math instead of forking formulas | — Pending |
-| Backend-first simulation exposure             | Ship reusable engine + minimal API/report payload before UI work | — Pending |
-| Seeded Monte Carlo with calibration           | Reproducible distributions must be trustworthy before downstream scenario tools depend on them | — Pending |
+| Decision                                                  | Rationale                                                                                      | Outcome   |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------- |
+| Recommendations only, no ESPN write actions               | ESPN has no official write API                                                                 | ✓ Good    |
+| Deep links to ESPN.com for user action                    | Low complexity, reliable                                                                       | ✓ Good    |
+| Component-based rate stat math                            | Mathematically correct projections                                                             | ✓ Good    |
+| VBD with population std dev for SGP                       | Complete player pool, not sample                                                               | ✓ Good    |
+| Deterministic engine + AI narrator layering               | Engine computes, AI interprets — separation of concerns                                        | ✓ Good    |
+| Client-side draft engine (not server)                     | Low latency, works offline, no network dependency during draft                                 | ✓ Good    |
+| Greedy roster optimization over ILP                       | Good enough results within 100ms budget                                                        | ✓ Good    |
+| Monte Carlo for bid uncertainty                           | Captures draft outcome variance                                                                | ✓ Good    |
+| WebSocket hub for mobile companion                        | Extension → Fastify → phone, works on LAN                                                      | ✓ Good    |
+| Mastra over raw OpenAI SDK                                | Typed tools, memory, streaming, model-agnostic                                                 | — Pending |
+| Chrome DevTools MCP for selector discovery                | Live DOM inspection beats guessing at ESPN selectors                                           | ✓ Good    |
+| Keep mobile as Next.js route (not standalone)             | Shares design system, components, proper build pipeline                                        | ✓ Good    |
+| Strip auth for v4.0 personal use                          | No login friction, re-enable later for multi-user                                              | ✓ Good    |
+| Hardcode league 112523 settings                           | Reliable config over error-prone DOM detection                                                 | ✓ Good    |
+| OPS as custom rate stat                                   | OBP + SLG components, not a simple stat                                                        | ✓ Good    |
+| Compose season simulation on existing projection pipeline | Reuse allocation, roster, and stat-component math instead of forking formulas                  | — Pending |
+| Backend-first simulation exposure                         | Ship reusable engine + minimal API/report payload before UI work                               | — Pending |
+| Seeded Monte Carlo with calibration                       | Reproducible distributions must be trustworthy before downstream scenario tools depend on them | — Pending |
 
 ---
 

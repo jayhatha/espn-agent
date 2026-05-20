@@ -16,6 +16,7 @@ Attribute an overall value (Win Points Added) to each player in the Season Outlo
 WPA_p = Σ_k [ (player_stat_p_k / team_total_k) × categoryP50_k ]
 
 Where:
+
 - k = each counting category
 - player_stat_p_k = player.blendedProjections?.[cat.stat_key] (falls back to projections)
 - team_total_k = existing teamTotals[cat.category_id]
@@ -26,6 +27,7 @@ All inputs already in scope — no backend changes, no API changes.
 ## Tasks
 
 ### Task 1: Add WPA to standings drilldown
+
 - **file**: `packages/frontend/src/app/leagues/[id]/standings/page.tsx`
 - **changes**:
   1. Compute `playerWPAMap` (Map<playerId, WPA>) and `teamWPA` after `teamTotals`
