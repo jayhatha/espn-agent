@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   LineChart,
   Line,
@@ -23,7 +23,10 @@ import { Heading } from "@/components/ui/Heading";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { TransactionMarker } from "@/components/league/TransactionMarker";
-import { InflectionPointMarker, type InflectionPoint } from "@/components/league/InflectionPointMarker";
+import {
+  InflectionPointMarker,
+  type InflectionPoint,
+} from "@/components/league/InflectionPointMarker";
 import { DateRangeFilter } from "@/components/league/DateRangeFilter";
 
 interface OverallDataPoint {
@@ -84,9 +87,31 @@ interface HotColdPlayer {
   playerType: "hitter" | "pitcher";
   trend: "hot" | "cold" | "neutral" | "insufficient";
   drivingStat: string | null;
-  sevenDay: { ops?: number; era?: number; whip?: number; kRate?: number; hr?: number; sb?: number; ab?: number; ip?: number };
-  season: { ops?: number; era?: number; whip?: number; kRate?: number; hr?: number; sb?: number; ab?: number; ip?: number };
-  ratios: { opsRatio?: number | null; eraRatio?: number | null; kRateRatio?: number | null };
+  sevenDay: {
+    ops?: number;
+    era?: number;
+    whip?: number;
+    kRate?: number;
+    hr?: number;
+    sb?: number;
+    ab?: number;
+    ip?: number;
+  };
+  season: {
+    ops?: number;
+    era?: number;
+    whip?: number;
+    kRate?: number;
+    hr?: number;
+    sb?: number;
+    ab?: number;
+    ip?: number;
+  };
+  ratios: {
+    opsRatio?: number | null;
+    eraRatio?: number | null;
+    kRateRatio?: number | null;
+  };
 }
 
 interface EfficiencyDay {
@@ -109,14 +134,28 @@ interface EfficiencyDay {
   }>;
 }
 
-type ViewMode = "overall" | "category" | "projected" | "values" | "hotcold" | "efficiency";
+type ViewMode =
+  | "overall"
+  | "category"
+  | "projected"
+  | "values"
+  | "hotcold"
+  | "efficiency";
 
-function TrendBadge({ trend, drivingStat }: { trend: string; drivingStat: string | null }) {
+function TrendBadge({
+  trend,
+  drivingStat,
+}: {
+  trend: string;
+  drivingStat: string | null;
+}) {
   if (trend === "hot") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive border border-positive/20">
         <span className="text-positive">&#9650;</span> HOT
-        {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
+        {drivingStat && (
+          <span className="ml-1 opacity-75">({drivingStat})</span>
+        )}
       </span>
     );
   }
@@ -124,7 +163,9 @@ function TrendBadge({ trend, drivingStat }: { trend: string; drivingStat: string
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-negative/10 text-negative border border-negative/20">
         <span className="text-negative">&#9660;</span> COLD
-        {drivingStat && <span className="ml-1 opacity-75">({drivingStat})</span>}
+        {drivingStat && (
+          <span className="ml-1 opacity-75">({drivingStat})</span>
+        )}
       </span>
     );
   }
@@ -159,7 +200,9 @@ export default function TrendsPage() {
   const [selectedTeamId] = useLeagueTeam(leagueId);
   const [viewMode, setViewMode] = useState<ViewMode>("overall");
   const [selectedCategory, setSelectedCategory] = useState<string>("AVG");
-  const [selectedSeason, setSelectedSeason] = useState<string | undefined>(undefined);
+  const [selectedSeason, setSelectedSeason] = useState<string | undefined>(
+    undefined,
+  );
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [showInflectionPoints, setShowInflectionPoints] = useState(true);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
@@ -194,7 +237,13 @@ export default function TrendsPage() {
 
   // Fetch overall standings time series
   const { data: overallData, isLoading: overallLoading } = useQuery({
-    queryKey: ["timeseries-overall", leagueId, selectedSeason, fromDate, toDate],
+    queryKey: [
+      "timeseries-overall",
+      leagueId,
+      selectedSeason,
+      fromDate,
+      toDate,
+    ],
     queryFn: async () => {
       return api.getOverallTimeSeries(parseInt(leagueId, 10), {
         season: selectedSeason,
@@ -209,7 +258,14 @@ export default function TrendsPage() {
 
   // Fetch category rank time series
   const { data: categoryData, isLoading: categoryLoading } = useQuery({
-    queryKey: ["timeseries-category", leagueId, selectedCategory, selectedSeason, fromDate, toDate],
+    queryKey: [
+      "timeseries-category",
+      leagueId,
+      selectedCategory,
+      selectedSeason,
+      fromDate,
+      toDate,
+    ],
     queryFn: async () => {
       return api.getCategoryRankTimeSeries(
         parseInt(leagueId, 10),
@@ -226,40 +282,59 @@ export default function TrendsPage() {
 
   // Fetch projected overall time series
   const { data: projectedData, isLoading: projectedLoading } = useQuery({
-    queryKey: ["timeseries-projected", leagueId, selectedSeason, fromDate, toDate],
+    queryKey: [
+      "timeseries-projected",
+      leagueId,
+      selectedSeason,
+      fromDate,
+      toDate,
+    ],
     queryFn: async () => {
-      return api.getProjectedOverallTimeSeries(
-        parseInt(leagueId, 10),
-        {
-          season: selectedSeason,
-          from: fromDate,
-          to: toDate,
-        },
-      ) as Promise<{ series: ProjectedOverallDataPoint[] }>;
+      return api.getProjectedOverallTimeSeries(parseInt(leagueId, 10), {
+        season: selectedSeason,
+        from: fromDate,
+        to: toDate,
+      }) as Promise<{ series: ProjectedOverallDataPoint[] }>;
     },
     enabled: !!leagueId && viewMode === "projected",
   });
 
   // Fetch category total (values) time series
-  const { data: categoryTotalData, isLoading: categoryTotalLoading } = useQuery({
-    queryKey: ["timeseries-category-total", leagueId, selectedCategory, selectedSeason, fromDate, toDate],
-    queryFn: async () => {
-      return api.getCategoryTotalTimeSeries(
-        parseInt(leagueId, 10),
+  const { data: categoryTotalData, isLoading: categoryTotalLoading } = useQuery(
+    {
+      queryKey: [
+        "timeseries-category-total",
+        leagueId,
         selectedCategory,
-        {
-          season: selectedSeason,
-          from: fromDate,
-          to: toDate,
-        },
-      ) as Promise<{ series: CategoryTotalDataPoint[] }>;
+        selectedSeason,
+        fromDate,
+        toDate,
+      ],
+      queryFn: async () => {
+        return api.getCategoryTotalTimeSeries(
+          parseInt(leagueId, 10),
+          selectedCategory,
+          {
+            season: selectedSeason,
+            from: fromDate,
+            to: toDate,
+          },
+        ) as Promise<{ series: CategoryTotalDataPoint[] }>;
+      },
+      enabled: !!leagueId && viewMode === "values",
     },
-    enabled: !!leagueId && viewMode === "values",
-  });
+  );
 
   // Fetch transaction annotations
   const { data: annotationsData } = useQuery({
-    queryKey: ["annotations", leagueId, selectedTeamId, fromDate, toDate, selectedSeason],
+    queryKey: [
+      "annotations",
+      leagueId,
+      selectedTeamId,
+      fromDate,
+      toDate,
+      selectedSeason,
+    ],
     queryFn: async () => {
       return api.getAnnotations(parseInt(leagueId, 10), {
         teamIds: selectedTeamId ? String(selectedTeamId) : undefined,
@@ -274,35 +349,57 @@ export default function TrendsPage() {
   });
 
   // Fetch inflection points (category-specific when viewing category rank chart)
-  const inflectionCategory = viewMode === "category" ? selectedCategory : undefined;
+  const inflectionCategory =
+    viewMode === "category" ? selectedCategory : undefined;
   const { data: inflectionData } = useQuery({
-    queryKey: ["inflection-points", leagueId, selectedTeamId, selectedSeason, fromDate, toDate, inflectionCategory],
-    queryFn: () => api.getInflectionPoints(parseInt(leagueId, 10), selectedTeamId!, {
-      season: selectedSeason,
-      from: fromDate,
-      to: toDate,
-      limit: 5,
-      categoryId: inflectionCategory,
-    }),
-    enabled: !!leagueId && !!selectedTeamId && (viewMode === "category" || viewMode === "overall"),
+    queryKey: [
+      "inflection-points",
+      leagueId,
+      selectedTeamId,
+      selectedSeason,
+      fromDate,
+      toDate,
+      inflectionCategory,
+    ],
+    queryFn: () =>
+      api.getInflectionPoints(parseInt(leagueId, 10), selectedTeamId!, {
+        season: selectedSeason,
+        from: fromDate,
+        to: toDate,
+        limit: 5,
+        categoryId: inflectionCategory,
+      }),
+    enabled:
+      !!leagueId &&
+      !!selectedTeamId &&
+      (viewMode === "category" || viewMode === "overall"),
   });
 
   // Hot/Cold trends
   const { data: hotColdData, isLoading: hotColdLoading } = useQuery({
     queryKey: ["hot-cold-trends", leagueId, selectedTeamId],
-    queryFn: () => api.getHotColdTrends(parseInt(leagueId, 10), selectedTeamId!, { days: 7 }),
+    queryFn: () =>
+      api.getHotColdTrends(parseInt(leagueId, 10), selectedTeamId!, {
+        days: 7,
+      }),
     enabled: !!leagueId && !!selectedTeamId && viewMode === "hotcold",
   });
 
   // Lineup efficiency
   const { data: efficiencyData, isLoading: efficiencyLoading } = useQuery({
     queryKey: ["lineup-efficiency", leagueId, selectedTeamId],
-    queryFn: () => api.getLineupEfficiency(parseInt(leagueId, 10), selectedTeamId!, { days: 7 }),
+    queryFn: () =>
+      api.getLineupEfficiency(parseInt(leagueId, 10), selectedTeamId!, {
+        days: 7,
+      }),
     enabled: !!leagueId && !!selectedTeamId && viewMode === "efficiency",
   });
 
   const teams = teamsData?.teams || [];
-  const teamMap = useMemo(() => new Map(teams.map((t) => [t.id, t.name])), [teams]);
+  const teamMap = useMemo(
+    () => new Map(teams.map((t) => [t.id, t.name])),
+    [teams],
+  );
 
   // Fetch league categories for dynamic category dropdown
   const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
@@ -318,7 +415,10 @@ export default function TrendsPage() {
 
   // Update selectedCategory when categories load if current selection is invalid
   useEffect(() => {
-    if (categories.length > 0 && !categories.find((c: any) => c.value === selectedCategory)) {
+    if (
+      categories.length > 0 &&
+      !categories.find((c: any) => c.value === selectedCategory)
+    ) {
       setSelectedCategory(categories[0].value);
     }
   }, [categories, selectedCategory]);
@@ -331,10 +431,10 @@ export default function TrendsPage() {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName =
-          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.overall_rank;
-        dateMap.get(point.snapshot_date)[`${teamName}_points`] = point.overall_points;
+        dateMap.get(point.snapshot_date)[`${teamName}_points`] =
+          point.overall_points;
       });
       return Array.from(dateMap.values()).sort((a, b) =>
         a.date.localeCompare(b.date),
@@ -345,8 +445,7 @@ export default function TrendsPage() {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName =
-          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.value;
       });
       return Array.from(dateMap.values()).sort((a, b) =>
@@ -358,8 +457,7 @@ export default function TrendsPage() {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName =
-          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] = point.rank;
       });
       return Array.from(dateMap.values()).sort((a, b) =>
@@ -371,8 +469,7 @@ export default function TrendsPage() {
         if (!dateMap.has(point.snapshot_date)) {
           dateMap.set(point.snapshot_date, { date: point.snapshot_date });
         }
-        const teamName =
-          teamMap.get(point.team_id) || `Team ${point.team_id}`;
+        const teamName = teamMap.get(point.team_id) || `Team ${point.team_id}`;
         dateMap.get(point.snapshot_date)[teamName] =
           point.projected_overall_rank;
       });
@@ -381,8 +478,19 @@ export default function TrendsPage() {
       );
     }
     return [];
-  }, [viewMode, overallData, categoryTotalData, categoryData, projectedData, teamMap]);
-  const isChartView = viewMode === "overall" || viewMode === "category" || viewMode === "projected" || viewMode === "values";
+  }, [
+    viewMode,
+    overallData,
+    categoryTotalData,
+    categoryData,
+    projectedData,
+    teamMap,
+  ]);
+  const isChartView =
+    viewMode === "overall" ||
+    viewMode === "category" ||
+    viewMode === "projected" ||
+    viewMode === "values";
   const isLoading =
     (viewMode === "overall" && overallLoading) ||
     (viewMode === "category" && categoryLoading) ||
@@ -394,7 +502,9 @@ export default function TrendsPage() {
 
   const teamNames =
     chartData.length > 0
-      ? Object.keys(chartData[0]).filter((k) => k !== "date" && !k.endsWith("_points"))
+      ? Object.keys(chartData[0]).filter(
+          (k) => k !== "date" && !k.endsWith("_points"),
+        )
       : [];
 
   const relevantAnnotations = annotationsData?.annotations || [];
@@ -404,7 +514,7 @@ export default function TrendsPage() {
       "whitespace-nowrap py-4 px-6 border-b-2 font-medium text-body-sm transition-colors",
       active
         ? "border-accent dark:border-shell-accent text-content dark:text-shell-text font-semibold"
-        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300 dark:hover:border-shell-border"
+        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300 dark:hover:border-shell-border",
     );
 
   // Sort hot/cold players: hot first, then cold, then neutral, then insufficient
@@ -417,8 +527,8 @@ export default function TrendsPage() {
       if (ao !== bo) return ao - bo;
       // Within same trend group, sort by deviation magnitude
       if (a.playerType === "hitter" && b.playerType === "hitter") {
-        const aRatio = Math.abs((a.ratios.opsRatio as number ?? 1) - 1);
-        const bRatio = Math.abs((b.ratios.opsRatio as number ?? 1) - 1);
+        const aRatio = Math.abs(((a.ratios.opsRatio as number) ?? 1) - 1);
+        const bRatio = Math.abs(((b.ratios.opsRatio as number) ?? 1) - 1);
         return bRatio - aRatio;
       }
       return 0;
@@ -490,7 +600,9 @@ export default function TrendsPage() {
               <div className="pr-6">
                 <select
                   value={selectedSeason || ""}
-                  onChange={(e) => setSelectedSeason(e.target.value || undefined)}
+                  onChange={(e) =>
+                    setSelectedSeason(e.target.value || undefined)
+                  }
                   className="rounded-lg border border-neutral-300 dark:border-shell-border px-3 py-2 text-body-sm bg-white dark:bg-shell-bg text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   <option value="">Current Season</option>
@@ -560,23 +672,26 @@ export default function TrendsPage() {
                   </label>
                 </div>
 
-                {selectedTeamId && (viewMode === "overall" || viewMode === "category") && (
-                  <div className="flex items-center">
-                    <input
-                      id="show-inflection-points"
-                      type="checkbox"
-                      checked={showInflectionPoints}
-                      onChange={(e) => setShowInflectionPoints(e.target.checked)}
-                      className="h-4 w-4 rounded border-neutral-300 text-accent dark:text-shell-accent focus:ring-accent dark:focus:ring-shell-accent"
-                    />
-                    <label
-                      htmlFor="show-inflection-points"
-                      className="ml-2 block text-body-sm text-content-secondary"
-                    >
-                      Show Inflection Points
-                    </label>
-                  </div>
-                )}
+                {selectedTeamId &&
+                  (viewMode === "overall" || viewMode === "category") && (
+                    <div className="flex items-center">
+                      <input
+                        id="show-inflection-points"
+                        type="checkbox"
+                        checked={showInflectionPoints}
+                        onChange={(e) =>
+                          setShowInflectionPoints(e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-neutral-300 text-accent dark:text-shell-accent focus:ring-accent dark:focus:ring-shell-accent"
+                      />
+                      <label
+                        htmlFor="show-inflection-points"
+                        className="ml-2 block text-body-sm text-content-secondary"
+                      >
+                        Show Inflection Points
+                      </label>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -587,7 +702,6 @@ export default function TrendsPage() {
       <div className="bg-white dark:bg-shell-panel shadow-card dark:shadow-none rounded-card border border-neutral-200 dark:border-shell-border p-6">
         {isLoading ? (
           <LoadingSpinner quips />
-
         ) : viewMode === "hotcold" ? (
           /* ── Hot/Cold Players Panel ─────────────────────────── */
           !selectedTeamId ? (
@@ -596,7 +710,10 @@ export default function TrendsPage() {
             </div>
           ) : hotColdData?.dataAvailable === false ? (
             <div className="text-center py-12 text-content-secondary">
-              <p>Insufficient trend data. Player period stats will accumulate after daily snapshots run.</p>
+              <p>
+                Insufficient trend data. Player period stats will accumulate
+                after daily snapshots run.
+              </p>
             </div>
           ) : (
             <div>
@@ -604,7 +721,8 @@ export default function TrendsPage() {
                 <Heading level={3}>7-Day Player Trends</Heading>
                 {hotColdData?.snapshotDate && (
                   <span className="text-body-sm text-content-tertiary">
-                    as of {new Date(hotColdData.snapshotDate).toLocaleDateString()}
+                    as of{" "}
+                    {new Date(hotColdData.snapshotDate).toLocaleDateString()}
                   </span>
                 )}
               </div>
@@ -613,12 +731,20 @@ export default function TrendsPage() {
                 <table className="w-full text-body-sm">
                   <thead>
                     <tr className="border-b border-neutral-200 dark:border-shell-border text-content-secondary">
-                      <th className="text-left py-3 px-3 font-medium">Player</th>
+                      <th className="text-left py-3 px-3 font-medium">
+                        Player
+                      </th>
                       <th className="text-left py-3 px-3 font-medium">Pos</th>
                       <th className="text-left py-3 px-3 font-medium">Trend</th>
-                      <th className="text-right py-3 px-3 font-medium">7-Day</th>
-                      <th className="text-right py-3 px-3 font-medium">Season</th>
-                      <th className="text-right py-3 px-3 font-medium">vs Season</th>
+                      <th className="text-right py-3 px-3 font-medium">
+                        7-Day
+                      </th>
+                      <th className="text-right py-3 px-3 font-medium">
+                        Season
+                      </th>
+                      <th className="text-right py-3 px-3 font-medium">
+                        vs Season
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -634,21 +760,28 @@ export default function TrendsPage() {
                           {player.rosterSlot || "-"}
                         </td>
                         <td className="py-3 px-3">
-                          <TrendBadge trend={player.trend} drivingStat={player.drivingStat} />
+                          <TrendBadge
+                            trend={player.trend}
+                            drivingStat={player.drivingStat}
+                          />
                         </td>
                         <td className="py-3 px-3 text-right font-mono">
                           {player.playerType === "hitter" ? (
                             <span>
                               {formatRate(player.sevenDay.ops)} OPS
                               {player.sevenDay.hr != null && (
-                                <span className="text-content-tertiary ml-2">{player.sevenDay.hr} HR</span>
+                                <span className="text-content-tertiary ml-2">
+                                  {player.sevenDay.hr} HR
+                                </span>
                               )}
                             </span>
                           ) : (
                             <span>
                               {formatRate(player.sevenDay.era, 2)} ERA
                               {player.sevenDay.kRate != null && (
-                                <span className="text-content-tertiary ml-2">{formatRate(player.sevenDay.kRate, 2)} K/IP</span>
+                                <span className="text-content-tertiary ml-2">
+                                  {formatRate(player.sevenDay.kRate, 2)} K/IP
+                                </span>
                               )}
                             </span>
                           )}
@@ -660,20 +793,34 @@ export default function TrendsPage() {
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-xs">
                           {player.playerType === "hitter" ? (
-                            <span className={cn(
-                              (player.ratios.opsRatio as number ?? 1) > 1.1 && "text-positive",
-                              (player.ratios.opsRatio as number ?? 1) < 0.9 && "text-negative",
-                            )}>
-                              {formatPct(player.ratios.opsRatio as number | null)}
+                            <span
+                              className={cn(
+                                ((player.ratios.opsRatio as number) ?? 1) >
+                                  1.1 && "text-positive",
+                                ((player.ratios.opsRatio as number) ?? 1) <
+                                  0.9 && "text-negative",
+                              )}
+                            >
+                              {formatPct(
+                                player.ratios.opsRatio as number | null,
+                              )}
                             </span>
                           ) : (
-                            <span className={cn(
-                              (player.ratios.eraRatio as number ?? 1) < 0.9 && "text-positive",
-                              (player.ratios.eraRatio as number ?? 1) > 1.1 && "text-negative",
-                            )}>
+                            <span
+                              className={cn(
+                                ((player.ratios.eraRatio as number) ?? 1) <
+                                  0.9 && "text-positive",
+                                ((player.ratios.eraRatio as number) ?? 1) >
+                                  1.1 && "text-negative",
+                              )}
+                            >
                               {player.ratios.eraRatio != null
-                                ? formatPct(player.ratios.eraRatio as number | null)
-                                : formatPct(player.ratios.kRateRatio as number | null)}
+                                ? formatPct(
+                                    player.ratios.eraRatio as number | null,
+                                  )
+                                : formatPct(
+                                    player.ratios.kRateRatio as number | null,
+                                  )}
                             </span>
                           )}
                         </td>
@@ -684,7 +831,6 @@ export default function TrendsPage() {
               </div>
             </div>
           )
-
         ) : viewMode === "efficiency" ? (
           /* ── Lineup Efficiency Panel ────────────────────────── */
           !selectedTeamId ? (
@@ -693,93 +839,115 @@ export default function TrendsPage() {
             </div>
           ) : efficiencyData?.dataAvailable === false ? (
             <div className="text-center py-12 text-content-secondary">
-              <p>Insufficient data. Lineup efficiency will appear after daily snapshots run.</p>
+              <p>
+                Insufficient data. Lineup efficiency will appear after daily
+                snapshots run.
+              </p>
             </div>
           ) : (
             <div>
-              <Heading level={3} className="mb-4">Lineup Efficiency &mdash; Last 7 Days</Heading>
+              <Heading level={3} className="mb-4">
+                Lineup Efficiency &mdash; Last 7 Days
+              </Heading>
 
               <div className="space-y-3">
-                {((efficiencyData?.days || []) as EfficiencyDay[]).map((day) => {
-                  const isExpanded = expandedDays.has(day.date);
-                  const hasWarnings = day.warnings.length > 0;
+                {((efficiencyData?.days || []) as EfficiencyDay[]).map(
+                  (day) => {
+                    const isExpanded = expandedDays.has(day.date);
+                    const hasWarnings = day.warnings.length > 0;
 
-                  return (
-                    <div
-                      key={day.date}
-                      className="border border-neutral-200 dark:border-shell-border rounded-lg overflow-hidden"
-                    >
-                      <button
-                        onClick={() => toggleDay(day.date)}
-                        className="w-full flex items-center justify-between p-4 dark:hover:bg-shell-bg transition-colors text-left"
+                    return (
+                      <div
+                        key={day.date}
+                        className="border border-neutral-200 dark:border-shell-border rounded-lg overflow-hidden"
                       >
-                        <div className="flex items-center gap-4">
-                          <span className="text-body-sm font-medium text-content dark:text-shell-text">
-                            {new Date(day.date).toLocaleDateString(undefined, {
-                              weekday: "short",
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                          <span className="text-body-sm font-mono text-content-secondary">
-                            Bench: {day.benchProduction.totalHR} HR, {day.benchProduction.totalSB} SB
-                            {day.benchProduction.totalOPS != null && (
-                              <>, {day.benchProduction.totalOPS.toFixed(3)} OPS</>
+                        <button
+                          onClick={() => toggleDay(day.date)}
+                          className="w-full flex items-center justify-between p-4 dark:hover:bg-shell-bg transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className="text-body-sm font-medium text-content dark:text-shell-text">
+                              {new Date(day.date).toLocaleDateString(
+                                undefined,
+                                {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                },
+                              )}
+                            </span>
+                            <span className="text-body-sm font-mono text-content-secondary">
+                              Bench: {day.benchProduction.totalHR} HR,{" "}
+                              {day.benchProduction.totalSB} SB
+                              {day.benchProduction.totalOPS != null && (
+                                <>
+                                  , {day.benchProduction.totalOPS.toFixed(3)}{" "}
+                                  OPS
+                                </>
+                              )}{" "}
+                              ({day.benchProduction.totalAB} AB)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {hasWarnings ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                                {day.warnings.length} warning
+                                {day.warnings.length !== 1 ? "s" : ""}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive border border-positive/20">
+                                No issues
+                              </span>
                             )}
-                            {" "}({day.benchProduction.totalAB} AB)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {hasWarnings ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
-                              {day.warnings.length} warning{day.warnings.length !== 1 ? "s" : ""}
+                            <span className="text-content-tertiary text-xs">
+                              {isExpanded ? "▲" : "▼"}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-positive/10 text-positive border border-positive/20">
-                              No issues
-                            </span>
-                          )}
-                          <span className="text-content-tertiary text-xs">
-                            {isExpanded ? "▲" : "▼"}
-                          </span>
-                        </div>
-                      </button>
+                          </div>
+                        </button>
 
-                      {isExpanded && (
-                        <div className="px-4 pb-4 border-t border-neutral-100 dark:border-shell-border/50">
-                          {hasWarnings ? (
-                            <div className="mt-3 space-y-2">
-                              {day.warnings.map((w, idx) => (
-                                <div
-                                  key={idx}
-                                  className="p-3 rounded-md bg-warning/5 border border-warning/20 text-body-sm"
-                                >
-                                  <span className="text-warning font-medium">
-                                    {w.benchPlayerName}
-                                  </span>
-                                  <span className="text-content-secondary"> (bench) outperformed </span>
-                                  <span className="text-content dark:text-shell-text font-medium">
-                                    {w.starterName}
-                                  </span>
-                                  <span className="text-content-secondary"> ({w.position}): </span>
-                                  <span className="font-mono text-warning text-xs">{w.reason}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="mt-3 text-body-sm text-positive">
-                              No lineup inefficiencies
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 border-t border-neutral-100 dark:border-shell-border/50">
+                            {hasWarnings ? (
+                              <div className="mt-3 space-y-2">
+                                {day.warnings.map((w, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3 rounded-md bg-warning/5 border border-warning/20 text-body-sm"
+                                  >
+                                    <span className="text-warning font-medium">
+                                      {w.benchPlayerName}
+                                    </span>
+                                    <span className="text-content-secondary">
+                                      {" "}
+                                      (bench) outperformed{" "}
+                                    </span>
+                                    <span className="text-content dark:text-shell-text font-medium">
+                                      {w.starterName}
+                                    </span>
+                                    <span className="text-content-secondary">
+                                      {" "}
+                                      ({w.position}):{" "}
+                                    </span>
+                                    <span className="font-mono text-warning text-xs">
+                                      {w.reason}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="mt-3 text-body-sm text-positive">
+                                No lineup inefficiencies
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
               </div>
             </div>
           )
-
         ) : chartData.length > 0 ? (
           /* ── Chart Views (Overall, Category, Projected, Values) ── */
           <div>
@@ -815,7 +983,11 @@ export default function TrendsPage() {
                   <YAxis
                     tick={chartTheme.axis.tick}
                     reversed={viewMode !== "values"}
-                    domain={viewMode === "values" ? ["auto", "auto"] : [1, teamNames.length]}
+                    domain={
+                      viewMode === "values"
+                        ? ["auto", "auto"]
+                        : [1, teamNames.length]
+                    }
                     label={{
                       value: viewMode === "values" ? selectedCategory : "Rank",
                       angle: -90,
@@ -838,17 +1010,21 @@ export default function TrendsPage() {
                     }
                     formatter={(value: any, name: string, props: any) => {
                       if (viewMode === "values") {
-                        const numVal = typeof value === "number" ? value : parseFloat(value);
-                        const formatted = numVal < 1 && numVal > 0
-                          ? numVal.toFixed(3)
-                          : numVal % 1 !== 0
-                          ? numVal.toFixed(2)
-                          : String(numVal);
+                        const numVal =
+                          typeof value === "number" ? value : parseFloat(value);
+                        const formatted =
+                          numVal < 1 && numVal > 0
+                            ? numVal.toFixed(3)
+                            : numVal % 1 !== 0
+                              ? numVal.toFixed(2)
+                              : String(numVal);
                         return [formatted, name];
                       }
                       if (viewMode === "overall") {
                         const points = props.payload?.[`${name}_points`];
-                        return points != null ? [`Rank ${value} (${points} pts)`, name] : [`Rank ${value}`, name];
+                        return points != null
+                          ? [`Rank ${value} (${points} pts)`, name]
+                          : [`Rank ${value}`, name];
                       }
                       return [`Rank ${value}`, name];
                     }}
@@ -864,7 +1040,9 @@ export default function TrendsPage() {
                         key={teamName}
                         type="monotone"
                         dataKey={teamName}
-                        stroke={chartTheme.colors[index % chartTheme.colors.length]}
+                        stroke={
+                          chartTheme.colors[index % chartTheme.colors.length]
+                        }
                         strokeWidth={isSelected ? 3 : 2}
                         opacity={isSelected ? 1 : 0.4}
                         dot={{ r: isSelected ? 4 : 2 }}
@@ -874,34 +1052,48 @@ export default function TrendsPage() {
                   })}
 
                   {/* Transaction annotations */}
-                  {showAnnotations && relevantAnnotations.map((annotation) => (
-                    <ReferenceLine
-                      key={annotation.id}
-                      x={annotation.event_date}
-                      stroke={
-                        annotation.event_type === "trade"
-                          ? chartTheme.colors[5]
-                          : annotation.event_type === "drop"
-                          ? chartTheme.colors[4]
-                          : chartTheme.colors[3]
-                      }
-                      strokeDasharray="3 3"
-                      strokeOpacity={0.5}
-                      label={<TransactionMarker annotation={annotation} />}
-                    />
-                  ))}
+                  {showAnnotations &&
+                    relevantAnnotations.map((annotation) => (
+                      <ReferenceLine
+                        key={annotation.id}
+                        x={annotation.event_date}
+                        stroke={
+                          annotation.event_type === "trade"
+                            ? chartTheme.colors[5]
+                            : annotation.event_type === "drop"
+                              ? chartTheme.colors[4]
+                              : chartTheme.colors[3]
+                        }
+                        strokeDasharray="3 3"
+                        strokeOpacity={0.5}
+                        label={<TransactionMarker annotation={annotation} />}
+                      />
+                    ))}
 
                   {/* Inflection point markers */}
-                  {(viewMode === "overall" || viewMode === "category") && selectedTeamId && showInflectionPoints && inflectionData?.inflectionPoints?.map((ip: InflectionPoint) => (
-                    <ReferenceLine
-                      key={`ip-${ip.date}`}
-                      x={ip.date}
-                      stroke={ip.rankDelta != null ? (ip.rankDelta > 0 ? chartTheme.colors[3] : chartTheme.colors[4]) : (ip.pointsDelta != null && ip.pointsDelta > 0 ? chartTheme.colors[3] : chartTheme.colors[4])}
-                      strokeDasharray="6 3"
-                      strokeOpacity={0.6}
-                      label={<InflectionPointMarker point={ip} />}
-                    />
-                  ))}
+                  {(viewMode === "overall" || viewMode === "category") &&
+                    selectedTeamId &&
+                    showInflectionPoints &&
+                    inflectionData?.inflectionPoints?.map(
+                      (ip: InflectionPoint) => (
+                        <ReferenceLine
+                          key={`ip-${ip.date}`}
+                          x={ip.date}
+                          stroke={
+                            ip.rankDelta != null
+                              ? ip.rankDelta > 0
+                                ? chartTheme.colors[3]
+                                : chartTheme.colors[4]
+                              : ip.pointsDelta != null && ip.pointsDelta > 0
+                                ? chartTheme.colors[3]
+                                : chartTheme.colors[4]
+                          }
+                          strokeDasharray="6 3"
+                          strokeOpacity={0.6}
+                          label={<InflectionPointMarker point={ip} />}
+                        />
+                      ),
+                    )}
                 </LineChart>
               </ResponsiveContainer>
             </div>

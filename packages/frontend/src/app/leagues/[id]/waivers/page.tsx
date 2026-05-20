@@ -1686,75 +1686,77 @@ export default function WaiversPage() {
           </Card>
 
           {/* Evaluation Results */}
-          {evaluationResult && (
-            <Card>
-              <CardHeader>
-                <Heading level={3}>Evaluation Result</Heading>
-              </CardHeader>
-              <CardContent>
-                {renderSwapVisualization(
-                  evaluationResult.dropPlayer.name,
-                  evaluationResult.addPlayer.name,
-                  evaluationResult.dropPlayer.positions,
-                  evaluationResult.addPlayer.positions,
-                )}
+          {evaluationResult &&
+            evaluationResult.dropPlayer &&
+            evaluationResult.addPlayer && (
+              <Card>
+                <CardHeader>
+                  <Heading level={3}>Evaluation Result</Heading>
+                </CardHeader>
+                <CardContent>
+                  {renderSwapVisualization(
+                    evaluationResult.dropPlayer.name,
+                    evaluationResult.addPlayer.name,
+                    evaluationResult.dropPlayer.positions,
+                    evaluationResult.addPlayer.positions,
+                  )}
 
-                <div className="mb-4">
-                  <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-1">
-                    <Term id="impact">Projected Impact</Term>
-                  </div>
-                  <div
-                    className={cn(
-                      "text-3xl font-bold font-mono",
-                      evaluationResult.deltaOverallPoints > 0
-                        ? "text-positive"
-                        : evaluationResult.deltaOverallPoints < 0
-                          ? "text-negative"
-                          : "text-content-secondary dark:text-shell-muted",
-                    )}
-                  >
-                    {evaluationResult.deltaOverallPoints > 0 ? "+" : ""}
-                    {evaluationResult.deltaOverallPoints.toFixed(1)} pts
-                  </div>
-                </div>
-
-                <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-4 leading-relaxed">
-                  {evaluationResult.explanation}
-                </p>
-
-                {evaluationResult.categoryImpacts.length > 0 && (
-                  <details className="group" open>
-                    <summary className="cursor-pointer text-body-sm font-medium text-accent dark:text-shell-accent hover:text-accent-hover dark:hover:text-shell-accent flex items-center py-2">
-                      <span>Category Breakdown</span>
-                      <ChevronDown className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" />
-                    </summary>
-                    {renderCategoryImpactTable(
-                      evaluationResult.categoryImpacts,
-                    )}
-                  </details>
-                )}
-
-                {!evaluationResult.isLegal &&
-                  evaluationResult.legalityIssues &&
-                  evaluationResult.legalityIssues.length > 0 &&
-                  renderLegalityWarning(evaluationResult.legalityIssues)}
-
-                {espnLeagueId && season && (
-                  <div className="mt-4">
-                    <a
-                      href={getESPNFreeAgentsUrl(espnLeagueId, season)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-4 py-2 bg-positive text-white rounded-lg hover:bg-emerald-700 font-medium text-body-sm gap-2"
+                  <div className="mb-4">
+                    <div className="text-body-sm font-medium text-content-secondary dark:text-shell-muted mb-1">
+                      <Term id="impact">Projected Impact</Term>
+                    </div>
+                    <div
+                      className={cn(
+                        "text-3xl font-bold font-mono",
+                        evaluationResult.deltaOverallPoints > 0
+                          ? "text-positive"
+                          : evaluationResult.deltaOverallPoints < 0
+                            ? "text-negative"
+                            : "text-content-secondary dark:text-shell-muted",
+                      )}
                     >
-                      View on ESPN
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
+                      {evaluationResult.deltaOverallPoints > 0 ? "+" : ""}
+                      {evaluationResult.deltaOverallPoints.toFixed(1)} pts
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+
+                  <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-4 leading-relaxed">
+                    {evaluationResult.explanation}
+                  </p>
+
+                  {evaluationResult.categoryImpacts.length > 0 && (
+                    <details className="group" open>
+                      <summary className="cursor-pointer text-body-sm font-medium text-accent dark:text-shell-accent hover:text-accent-hover dark:hover:text-shell-accent flex items-center py-2">
+                        <span>Category Breakdown</span>
+                        <ChevronDown className="w-4 h-4 ml-1 transform group-open:rotate-180 transition-transform" />
+                      </summary>
+                      {renderCategoryImpactTable(
+                        evaluationResult.categoryImpacts,
+                      )}
+                    </details>
+                  )}
+
+                  {!evaluationResult.isLegal &&
+                    evaluationResult.legalityIssues &&
+                    evaluationResult.legalityIssues.length > 0 &&
+                    renderLegalityWarning(evaluationResult.legalityIssues)}
+
+                  {espnLeagueId && season && (
+                    <div className="mt-4">
+                      <a
+                        href={getESPNFreeAgentsUrl(espnLeagueId, season)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-4 py-2 bg-positive text-white rounded-lg hover:bg-emerald-700 font-medium text-body-sm gap-2"
+                      >
+                        View on ESPN
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
         </div>
       )}
     </Container>

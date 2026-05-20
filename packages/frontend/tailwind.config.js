@@ -41,11 +41,11 @@ module.exports = {
           tertiary: '#6b7280',   // was #9ca3af — now 5.0:1 on white (WCAG AA)
           inverse: '#ffffff',
         },
-        // ONE primary accent color
+        // ONE primary accent color — teal in both light and dark
         accent: {
-          DEFAULT: '#111827',
-          hover: '#1f2937',
-          light: '#f3f4f6',
+          DEFAULT: '#0D9488',
+          hover: '#0f766e',
+          light: '#f0fdfa',
         },
         // Semantic colors (functional only, not decorative)
         positive: {

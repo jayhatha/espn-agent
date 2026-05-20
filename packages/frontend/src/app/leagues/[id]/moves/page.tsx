@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -32,7 +32,13 @@ import { FaabGauge } from "@/components/league/FaabGauge";
 import { Tooltip as InfoTooltip } from "@/components/ui/Tooltip";
 import { StatsTable, StatsTableColumn } from "@/components/ui/StatsTable";
 
-type TabView = "timeline" | "leaderboard" | "draft" | "trades" | "league" | "faab";
+type TabView =
+  | "timeline"
+  | "leaderboard"
+  | "draft"
+  | "trades"
+  | "league"
+  | "faab";
 type MoveFilter = "all" | "draft" | "add_drop" | "trade";
 
 interface Team {
@@ -148,7 +154,9 @@ const MOVE_TYPE_LABELS: Record<string, string> = {
   trade: "Trade",
 };
 
-function getMoveTypeBadgeVariant(moveType: string): "default" | "positive" | "negative" | "info" | "warning" {
+function getMoveTypeBadgeVariant(
+  moveType: string,
+): "default" | "positive" | "negative" | "info" | "warning" {
   if (moveType === "add_drop") return "positive";
   if (moveType === "trade") return "info";
   return "default";
@@ -158,7 +166,9 @@ export default function MovesPage() {
   const params = useParams();
   const leagueId = parseInt(params.id as string, 10);
 
-  const [selectedTeamId, setSelectedTeamId] = useLeagueTeam(leagueId);
+  const [selectedTeamId, setSelectedTeamId] = useLeagueTeam(
+    params.id as string,
+  );
   const [activeTab, setActiveTab] = useState<TabView>("league");
   const [moveFilter, setMoveFilter] = useState<MoveFilter>("all");
   const [expandedMoveId, setExpandedMoveId] = useState<number | null>(null);
@@ -186,9 +196,14 @@ export default function MovesPage() {
   }, [seasonsData, season]);
 
   // Fetch transaction impacts
-  const { data: impactData, isLoading: impactLoading, error: impactError } = useQuery({
+  const {
+    data: impactData,
+    isLoading: impactLoading,
+    error: impactError,
+  } = useQuery({
     queryKey: ["transaction-impacts", leagueId, selectedTeamId, season],
-    queryFn: () => api.getTransactionImpacts(leagueId, selectedTeamId!, { season: season! }),
+    queryFn: () =>
+      api.getTransactionImpacts(leagueId, selectedTeamId!, { season: season! }),
     enabled: !!selectedTeamId && !!season,
   });
 
@@ -200,16 +215,19 @@ export default function MovesPage() {
   });
 
   // Fetch league-wide impact summary
-  const { data: leagueSummaryData, isLoading: leagueSummaryLoading } = useQuery({
-    queryKey: ["league-impact-summary", leagueId, season],
-    queryFn: () => api.getLeagueImpactSummary(leagueId, season!),
-    enabled: !!leagueId && !!season && activeTab === "league",
-  });
+  const { data: leagueSummaryData, isLoading: leagueSummaryLoading } = useQuery(
+    {
+      queryKey: ["league-impact-summary", leagueId, season],
+      queryFn: () => api.getLeagueImpactSummary(leagueId, season!),
+      enabled: !!leagueId && !!season && activeTab === "league",
+    },
+  );
 
   // Fetch overall standings timeline for the chart
   const { data: timelineData } = useQuery({
     queryKey: ["timeline-overall", leagueId, season],
-    queryFn: () => api.getOverallTimeSeries(leagueId, { season: String(season!) }),
+    queryFn: () =>
+      api.getOverallTimeSeries(leagueId, { season: String(season!) }),
     enabled: !!leagueId && !!season && activeTab === "timeline",
   });
 
@@ -219,7 +237,9 @@ export default function MovesPage() {
   const computeMutation = useMutation({
     mutationFn: () => api.computeTransactionImpacts(leagueId, season!),
     onSuccess: (data: any) => {
-      setComputeStatus(`Done — ${data.totalMoves} moves, ${data.impactsComputed} impacts computed`);
+      setComputeStatus(
+        `Done — ${data.totalMoves} moves, ${data.impactsComputed} impacts computed`,
+      );
       queryClient.invalidateQueries({ queryKey: ["transaction-impacts"] });
       queryClient.invalidateQueries({ queryKey: ["league-impact-summary"] });
       queryClient.invalidateQueries({ queryKey: ["draft-report"] });
@@ -247,13 +267,15 @@ export default function MovesPage() {
       "whitespace-nowrap py-3 px-5 border-b-2 font-medium text-sm transition-colors",
       active
         ? "border-accent dark:border-shell-accent text-accent dark:text-shell-text font-semibold"
-        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-accent/40 dark:hover:border-shell-border"
+        : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-accent/40 dark:hover:border-shell-border",
     );
 
   return (
     <Container size="wide" className="py-6 sm:py-8">
       <div className="mb-6">
-        <h1 className="text-h3 font-semibold text-content dark:text-shell-text">Move Impact</h1>
+        <h1 className="text-h3 font-semibold text-content dark:text-shell-text">
+          Move Impact
+        </h1>
         <p className="text-body-sm text-content-secondary dark:text-shell-muted">
           See which roster moves helped or hurt your season
         </p>
@@ -262,7 +284,9 @@ export default function MovesPage() {
       {/* Team Selector */}
       <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border p-4 mb-6">
         <div className="flex items-center gap-4 flex-wrap">
-          <label className="text-body-sm font-medium text-content-secondary dark:text-shell-muted">Team:</label>
+          <label className="text-body-sm font-medium text-content-secondary dark:text-shell-muted">
+            Team:
+          </label>
           <select
             value={selectedTeamId || ""}
             onChange={(e) => handleTeamChange(parseInt(e.target.value, 10))}
@@ -276,14 +300,18 @@ export default function MovesPage() {
             ))}
           </select>
 
-          <label className="text-body-sm font-medium text-content-secondary dark:text-shell-muted">Season:</label>
+          <label className="text-body-sm font-medium text-content-secondary dark:text-shell-muted">
+            Season:
+          </label>
           <select
             value={season || ""}
             onChange={(e) => setSeason(parseInt(e.target.value, 10))}
             className="rounded-lg border border-shell-border text-body-sm px-3 py-2 bg-shell-bg dark:bg-shell-bg text-content dark:text-shell-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {seasonsData?.seasons?.map((s: number) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>
+                {s}
+              </option>
             ))}
           </select>
 
@@ -297,13 +325,15 @@ export default function MovesPage() {
               "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
               computeMutation.isPending
                 ? "bg-shell-border text-shell-muted cursor-wait"
-                : "bg-accent text-white hover:bg-accent/80"
+                : "bg-accent text-white hover:bg-accent/80",
             )}
           >
             {computeMutation.isPending ? "Computing..." : "Compute Impacts"}
           </button>
           {computeStatus && (
-            <span className="text-xs text-shell-muted ml-2">{computeStatus}</span>
+            <span className="text-xs text-shell-muted ml-2">
+              {computeStatus}
+            </span>
           )}
         </div>
       </div>
@@ -314,33 +344,65 @@ export default function MovesPage() {
           <span className="text-shell-muted">{summary.totalMoves} moves</span>
           <span className="font-mono text-positive dark:text-positive-dark">
             {summary.netRosterValue != null ? (
-              <>{summary.netRosterValue >= 0 ? "+" : ""}{summary.netRosterValue.toFixed(1)} pts</>
+              <>
+                {summary.netRosterValue >= 0 ? "+" : ""}
+                {summary.netRosterValue.toFixed(1)} pts
+              </>
             ) : (
-              <>{summary.sumOfIndividualImpacts >= 0 ? "+" : ""}{summary.sumOfIndividualImpacts.toFixed(1)} pts</>
+              <>
+                {summary.sumOfIndividualImpacts >= 0 ? "+" : ""}
+                {summary.sumOfIndividualImpacts.toFixed(1)} pts
+              </>
             )}
           </span>
-          <span className="text-shell-muted">avg <span className="font-mono">{summary.avgImpactPerMove >= 0 ? "+" : ""}{summary.avgImpactPerMove.toFixed(1)}</span>/move</span>
+          <span className="text-shell-muted">
+            avg{" "}
+            <span className="font-mono">
+              {summary.avgImpactPerMove >= 0 ? "+" : ""}
+              {summary.avgImpactPerMove.toFixed(1)}
+            </span>
+            /move
+          </span>
           {summary.bestMove && (
             <span className="text-shell-muted">
-              Best: <span className="text-shell-text font-medium">{summary.bestMove.playerName}</span>{" "}
-              <span className="text-positive dark:text-positive-dark font-mono">+{summary.bestMove.impact.toFixed(1)}</span>
+              Best:{" "}
+              <span className="text-shell-text font-medium">
+                {summary.bestMove.playerName}
+              </span>{" "}
+              <span className="text-positive dark:text-positive-dark font-mono">
+                +{summary.bestMove.impact.toFixed(1)}
+              </span>
             </span>
           )}
           {summary.worstMove && (
             <span className="text-shell-muted">
-              Worst: <span className="text-shell-text font-medium">{summary.worstMove.playerName}</span>{" "}
-              <span className="text-negative dark:text-negative-dark font-mono">{summary.worstMove.impact.toFixed(1)}</span>
+              Worst:{" "}
+              <span className="text-shell-text font-medium">
+                {summary.worstMove.playerName}
+              </span>{" "}
+              <span className="text-negative dark:text-negative-dark font-mono">
+                {summary.worstMove.impact.toFixed(1)}
+              </span>
             </span>
           )}
         </div>
       )}
 
-      {(selectedTeamId || activeTab === "league") ? (
+      {selectedTeamId || activeTab === "league" ? (
         <>
           {/* Tab Navigation */}
           <div className="bg-shell-panel dark:bg-shell-panel rounded-card border border-shell-border mb-6">
             <nav className="-mb-px flex border-b border-shell-border">
-              {(["league", "faab", "leaderboard", "trades", "draft", "timeline"] as const).map((tab) => {
+              {(
+                [
+                  "league",
+                  "faab",
+                  "leaderboard",
+                  "trades",
+                  "draft",
+                  "timeline",
+                ] as const
+              ).map((tab) => {
                 const labels: Record<string, string> = {
                   league: "League Summary",
                   faab: "FAAB Budget",
@@ -413,7 +475,8 @@ export default function MovesPage() {
         </>
       ) : (
         <div className="text-center py-12 text-content-secondary dark:text-shell-muted">
-          Select a team to view move impact analysis, or use the League Summary tab.
+          Select a team to view move impact analysis, or use the League Summary
+          tab.
         </div>
       )}
     </Container>
@@ -478,17 +541,28 @@ interface FaabBid {
   roi: number | null;
 }
 
-function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number | null }) {
-  const { data: faabSummary, isLoading: summaryLoading } = useQuery<FaabSummaryData>({
-    queryKey: ["faab-summary", leagueId, teamId],
-    queryFn: () => api.getFaabSummary(leagueId, teamId!) as Promise<FaabSummaryData>,
-    enabled: !!teamId,
-    staleTime: 5 * 60_000,
-  });
+function FaabBudgetTab({
+  leagueId,
+  teamId,
+}: {
+  leagueId: number;
+  teamId: number | null;
+}) {
+  const { data: faabSummary, isLoading: summaryLoading } =
+    useQuery<FaabSummaryData>({
+      queryKey: ["faab-summary", leagueId, teamId],
+      queryFn: () =>
+        api.getFaabSummary(leagueId, teamId!) as Promise<FaabSummaryData>,
+      enabled: !!teamId,
+      staleTime: 5 * 60_000,
+    });
 
-  const { data: historyData, isLoading: historyLoading } = useQuery<{ bids: FaabBid[] }>({
+  const { data: historyData, isLoading: historyLoading } = useQuery<{
+    bids: FaabBid[];
+  }>({
     queryKey: ["faab-history", leagueId, teamId],
-    queryFn: () => api.getFaabHistory(leagueId, teamId!) as Promise<{ bids: FaabBid[] }>,
+    queryFn: () =>
+      api.getFaabHistory(leagueId, teamId!) as Promise<{ bids: FaabBid[] }>,
     enabled: !!teamId,
     staleTime: 5 * 60_000,
   });
@@ -502,7 +576,11 @@ function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number 
   }
 
   if (summaryLoading) {
-    return <div className="flex justify-center py-8"><LoadingSpinner /></div>;
+    return (
+      <div className="flex justify-center py-8">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -510,7 +588,9 @@ function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number 
       {/* Budget Overview */}
       {faabSummary && (
         <div>
-          <h3 className="text-sm font-semibold text-shell-text mb-3">Budget Overview</h3>
+          <h3 className="text-sm font-semibold text-shell-text mb-3">
+            Budget Overview
+          </h3>
           <FaabGauge
             spent={faabSummary.faabSpent}
             total={faabSummary.faabTotal}
@@ -520,11 +600,13 @@ function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number 
             {faabSummary.spendRate > 0 ? (
               faabSummary.willRunOut ? (
                 <span className="text-red-400">
-                  Spending ${faabSummary.spendRate}/week — projected to run out by Week {faabSummary.projectedRunoutWeek}
+                  Spending ${faabSummary.spendRate}/week — projected to run out
+                  by Week {faabSummary.projectedRunoutWeek}
                 </span>
               ) : (
                 <span className="text-emerald-400">
-                  Spending ${faabSummary.spendRate}/week — on pace to finish with ${faabSummary.faabRemaining} remaining
+                  Spending ${faabSummary.spendRate}/week — on pace to finish
+                  with ${faabSummary.faabRemaining} remaining
                 </span>
               )
             ) : (
@@ -536,29 +618,54 @@ function FaabBudgetTab({ leagueId, teamId }: { leagueId: number; teamId: number 
 
       {/* Bid History */}
       <div>
-        <h3 className="text-sm font-semibold text-shell-text mb-3">Bid History</h3>
+        <h3 className="text-sm font-semibold text-shell-text mb-3">
+          Bid History
+        </h3>
         {historyLoading ? (
-          <div className="flex justify-center py-4"><LoadingSpinner /></div>
+          <div className="flex justify-center py-4">
+            <LoadingSpinner />
+          </div>
         ) : historyData?.bids && historyData.bids.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-shell-border text-left">
-                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Date</th>
-                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Player</th>
-                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">Bid</th>
-                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">Result</th>
-                  <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-right">ROI</th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">
+                    Date
+                  </th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">
+                    Player
+                  </th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide text-right">
+                    Bid
+                  </th>
+                  <th className="py-2 pr-4 text-xs text-shell-muted uppercase tracking-wide">
+                    Result
+                  </th>
+                  <th className="py-2 text-xs text-shell-muted uppercase tracking-wide text-right">
+                    ROI
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {historyData.bids.map((bid) => (
-                  <tr key={`${bid.playerId}-${bid.date}`} className="border-b border-shell-border/50">
-                    <td className="py-2 pr-4 font-mono text-xs text-shell-muted">{bid.date}</td>
-                    <td className="py-2 pr-4 text-shell-text">{bid.playerName}</td>
-                    <td className="py-2 pr-4 font-mono text-right text-shell-text">${bid.bidAmount}</td>
+                  <tr
+                    key={`${bid.playerId}-${bid.date}`}
+                    className="border-b border-shell-border/50"
+                  >
+                    <td className="py-2 pr-4 font-mono text-xs text-shell-muted">
+                      {bid.date}
+                    </td>
+                    <td className="py-2 pr-4 text-shell-text">
+                      {bid.playerName}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-right text-shell-text">
+                      ${bid.bidAmount}
+                    </td>
                     <td className="py-2 pr-4">
-                      <Badge variant="positive" className="text-xs">{bid.outcome}</Badge>
+                      <Badge variant="positive" className="text-xs">
+                        {bid.outcome}
+                      </Badge>
                     </td>
                     <td className="py-2 font-mono text-right text-shell-text">
                       {bid.roi !== null ? `${bid.roi}x` : "—"}
@@ -594,7 +701,8 @@ function LeagueSummaryTab({
   if (!data) {
     return (
       <div className="text-center py-8 text-content-secondary dark:text-shell-muted">
-        No impact data yet. Click "Compute Impacts" above to analyze roster moves. Requires at least 2 daily snapshots.
+        No impact data yet. Click "Compute Impacts" above to analyze roster
+        moves. Requires at least 2 daily snapshots.
       </div>
     );
   }
@@ -609,36 +717,68 @@ function LeagueSummaryTab({
     <div className="space-y-8">
       {/* League-wide stats */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-body-sm">
-        <span className="text-shell-muted">{data.totalMovesLeagueWide} moves league-wide</span>
+        <span className="text-shell-muted">
+          {data.totalMovesLeagueWide} moves league-wide
+        </span>
         {bestMoves[0] && (
           <span className="text-shell-muted">
-            Best: <span className="text-shell-text font-medium">{bestMoves[0].playerGained?.name || "—"}</span>{" "}
-            <span className="text-xs text-content-secondary dark:text-shell-muted">({bestMoves[0].teamName})</span>{" "}
-            <span className="text-positive dark:text-positive-dark font-mono">+{bestMoves[0].impact.toFixed(1)}</span>
+            Best:{" "}
+            <span className="text-shell-text font-medium">
+              {bestMoves[0].playerGained?.name || "—"}
+            </span>{" "}
+            <span className="text-xs text-content-secondary dark:text-shell-muted">
+              ({bestMoves[0].teamName})
+            </span>{" "}
+            <span className="text-positive dark:text-positive-dark font-mono">
+              +{bestMoves[0].impact.toFixed(1)}
+            </span>
           </span>
         )}
         {worstMoves[0] && (
           <span className="text-shell-muted">
-            Worst: <span className="text-shell-text font-medium">{worstMoves[0].playerGained?.name || worstMoves[0].playerLost?.name || "—"}</span>{" "}
-            <span className="text-xs text-content-secondary dark:text-shell-muted">({worstMoves[0].teamName})</span>{" "}
-            <span className="text-negative dark:text-negative-dark font-mono">{worstMoves[0].impact.toFixed(1)}</span>
+            Worst:{" "}
+            <span className="text-shell-text font-medium">
+              {worstMoves[0].playerGained?.name ||
+                worstMoves[0].playerLost?.name ||
+                "—"}
+            </span>{" "}
+            <span className="text-xs text-content-secondary dark:text-shell-muted">
+              ({worstMoves[0].teamName})
+            </span>{" "}
+            <span className="text-negative dark:text-negative-dark font-mono">
+              {worstMoves[0].impact.toFixed(1)}
+            </span>
           </span>
         )}
       </div>
 
       {/* Roster Manager Rankings */}
       <div>
-        <Heading level={3} className="mb-3">Roster Manager Rankings</Heading>
+        <Heading level={3} className="mb-3">
+          Roster Manager Rankings
+        </Heading>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-shell-border">
             <thead className="bg-shell-bg">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Rank</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Team</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Moves</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Net Roster Value</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Actual Pts</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Draft-Only Pts</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Rank
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Team
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Moves
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Net Roster Value
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Actual Pts
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                  Draft-Only Pts
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -647,25 +787,35 @@ function LeagueSummaryTab({
                   key={team.teamId}
                   className={cn(
                     "border-b border-shell-border hover:bg-shell-bg transition-colors",
-                    team.teamId === selectedTeamId && "bg-accent/10"
+                    team.teamId === selectedTeamId && "bg-accent/10",
                   )}
                 >
                   <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
                     {idx + 1}
-                    {idx === 0 && <span className="ml-1" title="Best roster manager">&#127942;</span>}
+                    {idx === 0 && (
+                      <span className="ml-1" title="Best roster manager">
+                        &#127942;
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">
                     {team.teamName}
                     {team.teamId === selectedTeamId && (
-                      <span className="ml-1 text-xs text-content-secondary dark:text-shell-muted">(you)</span>
+                      <span className="ml-1 text-xs text-content-secondary dark:text-shell-muted">
+                        (you)
+                      </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-body-sm text-content-secondary dark:text-shell-muted text-right">{team.moveCount}</td>
+                  <td className="px-4 py-3 text-body-sm text-content-secondary dark:text-shell-muted text-right">
+                    {team.moveCount}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     {team.netRosterValue != null ? (
                       <ImpactBadge impact={team.netRosterValue} size="sm" />
                     ) : (
-                      <span className="text-content-tertiary dark:text-shell-muted text-xs">N/A</span>
+                      <span className="text-content-tertiary dark:text-shell-muted text-xs">
+                        N/A
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-body-sm text-content-secondary dark:text-shell-muted text-right">
@@ -684,28 +834,42 @@ function LeagueSummaryTab({
       {/* Best Trades */}
       {bestTrades.length > 0 && (
         <div>
-          <Heading level={3} className="mb-3">Best Trades</Heading>
-          <TradePackageList packages={bestTrades} selectedTeamId={selectedTeamId} />
+          <Heading level={3} className="mb-3">
+            Best Trades
+          </Heading>
+          <TradePackageList
+            packages={bestTrades}
+            selectedTeamId={selectedTeamId}
+          />
         </div>
       )}
 
       {/* Worst Trades */}
       {worstTrades.length > 0 && (
         <div>
-          <Heading level={3} className="mb-3">Worst Trades</Heading>
-          <TradePackageList packages={worstTrades} selectedTeamId={selectedTeamId} />
+          <Heading level={3} className="mb-3">
+            Worst Trades
+          </Heading>
+          <TradePackageList
+            packages={worstTrades}
+            selectedTeamId={selectedTeamId}
+          />
         </div>
       )}
 
       {/* Best Moves */}
       <div>
-        <Heading level={3} className="mb-3 text-positive">Best Moves (All Types)</Heading>
+        <Heading level={3} className="mb-3 text-positive">
+          Best Moves (All Types)
+        </Heading>
         <MoveListTable moves={bestMoves} selectedTeamId={selectedTeamId} />
       </div>
 
       {/* Worst Moves */}
       <div>
-        <Heading level={3} className="mb-3 text-negative">Worst Moves (All Types)</Heading>
+        <Heading level={3} className="mb-3 text-negative">
+          Worst Moves (All Types)
+        </Heading>
         <MoveListTable moves={worstMoves} selectedTeamId={selectedTeamId} />
       </div>
     </div>
@@ -724,12 +888,24 @@ function MoveListTable({
       <table className="min-w-full divide-y divide-shell-border">
         <thead className="bg-shell-bg">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Date</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Team</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Gained</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Lost</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Impact</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Team
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Type
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Gained
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Lost
+            </th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+              Impact
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
@@ -738,14 +914,23 @@ function MoveListTable({
               key={m.id}
               className={cn(
                 "border-b border-shell-border hover:bg-shell-bg transition-colors",
-                m.teamId === selectedTeamId && "bg-accent/10"
+                m.teamId === selectedTeamId && "bg-accent/10",
               )}
             >
               <td className="px-4 py-3 text-body-sm text-content-secondary dark:text-shell-muted">
-                {new Date(m.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                {m.isIncomplete && <span className="ml-1 text-warning" title="Incomplete data">&#9888;</span>}
+                {new Date(m.effectiveDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+                {m.isIncomplete && (
+                  <span className="ml-1 text-warning" title="Incomplete data">
+                    &#9888;
+                  </span>
+                )}
               </td>
-              <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">{m.teamName}</td>
+              <td className="px-4 py-3 text-body-sm text-content dark:text-shell-text">
+                {m.teamName}
+              </td>
               <td className="px-4 py-3">
                 <Badge variant={getMoveTypeBadgeVariant(m.moveType)}>
                   {MOVE_TYPE_LABELS[m.moveType] || m.moveType}
@@ -754,17 +939,25 @@ function MoveListTable({
               <td className="px-4 py-3 text-body-sm font-medium text-content dark:text-shell-text">
                 {m.playerGained?.name || "—"}
                 {m.playerGained?.positions && (
-                  <span className="ml-1 text-xs text-content-secondary dark:text-shell-muted">({m.playerGained.positions.join(", ")})</span>
+                  <span className="ml-1 text-xs text-content-secondary dark:text-shell-muted">
+                    ({m.playerGained.positions.join(", ")})
+                  </span>
                 )}
               </td>
               <td className="px-4 py-3 text-body-sm text-content-secondary dark:text-shell-muted">
                 {m.playerLost?.name || "—"}
                 {m.playerLost?.positions && (
-                  <span className="ml-1 text-xs text-content-tertiary dark:text-shell-muted">({m.playerLost.positions.join(", ")})</span>
+                  <span className="ml-1 text-xs text-content-tertiary dark:text-shell-muted">
+                    ({m.playerLost.positions.join(", ")})
+                  </span>
                 )}
               </td>
               <td className="px-4 py-3 text-right">
-                <ImpactBadge impact={m.impact} isUncertain={m.isUncertain} size="sm" />
+                <ImpactBadge
+                  impact={m.impact}
+                  isUncertain={m.isUncertain}
+                  size="sm"
+                />
               </td>
             </tr>
           ))}
@@ -790,41 +983,80 @@ function TradePackageList({
             "border rounded-lg p-4",
             pkg.teamId === selectedTeamId
               ? "border-accent dark:border-shell-accent bg-accent/10 dark:bg-shell-accent/20"
-              : "border-shell-border"
+              : "border-shell-border",
           )}
         >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <span className="text-body-sm font-bold text-content-tertiary dark:text-shell-muted w-6">{idx + 1}.</span>
+              <span className="text-body-sm font-bold text-content-tertiary dark:text-shell-muted w-6">
+                {idx + 1}.
+              </span>
               <div>
-                <span className="text-body-sm font-semibold text-content dark:text-shell-text">{pkg.teamName}</span>
+                <span className="text-body-sm font-semibold text-content dark:text-shell-text">
+                  {pkg.teamName}
+                </span>
                 <span className="ml-2 text-xs text-content-secondary dark:text-shell-muted">
-                  {new Date(pkg.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {new Date(pkg.effectiveDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </span>
               </div>
             </div>
             <ImpactBadge impact={pkg.totalImpact} />
           </div>
           <div className="flex items-center gap-2 flex-wrap text-body-sm">
-            <span className="text-xs font-medium text-positive uppercase">Got</span>
+            <span className="text-xs font-medium text-positive uppercase">
+              Got
+            </span>
             {pkg.playersGained.map((p, i) => (
-              <span key={p.id} className="font-medium text-content dark:text-shell-text">
-                {i > 0 && <span className="text-content-tertiary dark:text-shell-muted">, </span>}
+              <span
+                key={p.id}
+                className="font-medium text-content dark:text-shell-text"
+              >
+                {i > 0 && (
+                  <span className="text-content-tertiary dark:text-shell-muted">
+                    ,{" "}
+                  </span>
+                )}
                 {p.name}
-                <span className="ml-0.5 text-xs text-content-secondary dark:text-shell-muted">({p.positions.join(", ")})</span>
+                <span className="ml-0.5 text-xs text-content-secondary dark:text-shell-muted">
+                  ({p.positions.join(", ")})
+                </span>
               </span>
             ))}
-            {pkg.playersGained.length === 0 && <span className="text-content-tertiary dark:text-shell-muted">—</span>}
-            <span className="text-content-tertiary dark:text-shell-muted mx-1">|</span>
-            <span className="text-xs font-medium text-negative uppercase">Gave</span>
+            {pkg.playersGained.length === 0 && (
+              <span className="text-content-tertiary dark:text-shell-muted">
+                —
+              </span>
+            )}
+            <span className="text-content-tertiary dark:text-shell-muted mx-1">
+              |
+            </span>
+            <span className="text-xs font-medium text-negative uppercase">
+              Gave
+            </span>
             {pkg.playersLost.map((p, i) => (
-              <span key={p.id} className="text-content-secondary dark:text-shell-muted">
-                {i > 0 && <span className="text-content-tertiary dark:text-shell-muted">, </span>}
+              <span
+                key={p.id}
+                className="text-content-secondary dark:text-shell-muted"
+              >
+                {i > 0 && (
+                  <span className="text-content-tertiary dark:text-shell-muted">
+                    ,{" "}
+                  </span>
+                )}
                 {p.name}
-                <span className="ml-0.5 text-xs text-content-tertiary dark:text-shell-muted">({p.positions.join(", ")})</span>
+                <span className="ml-0.5 text-xs text-content-tertiary dark:text-shell-muted">
+                  ({p.positions.join(", ")})
+                </span>
               </span>
             ))}
-            {pkg.playersLost.length === 0 && <span className="text-content-tertiary dark:text-shell-muted">—</span>}
+            {pkg.playersLost.length === 0 && (
+              <span className="text-content-tertiary dark:text-shell-muted">
+                —
+              </span>
+            )}
           </div>
         </div>
       ))}
@@ -859,7 +1091,7 @@ function LeaderboardTab({
               "px-3 py-1 rounded-full text-xs font-medium transition-colors",
               moveFilter === f
                 ? "bg-accent text-content-inverse"
-                : "bg-shell-bg text-content-secondary dark:text-shell-muted hover:bg-neutral-200 dark:hover:bg-shell-panel"
+                : "bg-shell-bg text-content-secondary dark:text-shell-muted hover:bg-neutral-200 dark:hover:bg-shell-panel",
             )}
           >
             {f === "all" ? "All" : MOVE_TYPE_LABELS[f] || f}
@@ -872,40 +1104,76 @@ function LeaderboardTab({
         <table className="min-w-full divide-y divide-shell-border">
           <thead className="bg-shell-bg">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Date</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Player Gained</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Player Lost</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Impact</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">Top Category</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Date
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Type
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Player Gained
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Player Lost
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Impact
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-content-secondary dark:text-shell-muted uppercase tracking-wide">
+                Top Category
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
             {impacts.map((move) => {
               const topSgp = move.sgpCategoryImpacts
-                ?.filter((c: SgpCategoryImpact) => Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01)
-                .sort((a: SgpCategoryImpact, b: SgpCategoryImpact) => Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) - Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0))[0] as SgpCategoryImpact | undefined;
-              const topCatDelta = topSgp ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0) : null;
+                ?.filter(
+                  (c: SgpCategoryImpact) =>
+                    Math.abs(c.shapleyDelta ?? c.sgpDelta ?? 0) >= 0.01,
+                )
+                .sort(
+                  (a: SgpCategoryImpact, b: SgpCategoryImpact) =>
+                    Math.abs(b.shapleyDelta ?? b.sgpDelta ?? 0) -
+                    Math.abs(a.shapleyDelta ?? a.sgpDelta ?? 0),
+                )[0] as SgpCategoryImpact | undefined;
+              const topCatDelta = topSgp
+                ? (topSgp.shapleyDelta ?? topSgp.sgpDelta ?? 0)
+                : null;
 
               // Use Shapley impact if available, else legacy impact
               const displayImpact = move.shapleyImpact ?? move.impactRotoPoints;
 
               return (
-                <tr key={move.id} className={cn("group", move.isUncertain && "opacity-80")}>
+                <tr
+                  key={move.id}
+                  className={cn("group", move.isUncertain && "opacity-80")}
+                >
                   <td colSpan={6} className="p-0">
                     <div
                       className="px-4 py-3 cursor-pointer hover:bg-shell-bg grid grid-cols-6 items-center transition-colors"
-                      onClick={() => setExpandedMoveId(expandedMoveId === move.id ? null : move.id)}
+                      onClick={() =>
+                        setExpandedMoveId(
+                          expandedMoveId === move.id ? null : move.id,
+                        )
+                      }
                     >
                       <div className="text-body-sm text-content-secondary dark:text-shell-muted">
-                        {new Date(move.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {new Date(move.effectiveDate).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric" },
+                        )}
                       </div>
                       <div>
                         <Badge variant={getMoveTypeBadgeVariant(move.moveType)}>
                           {MOVE_TYPE_LABELS[move.moveType] || move.moveType}
                         </Badge>
                         {move.isIncomplete && (
-                          <span className="ml-1 text-warning" title="Incomplete data">&#9888;</span>
+                          <span
+                            className="ml-1 text-warning"
+                            title="Incomplete data"
+                          >
+                            &#9888;
+                          </span>
                         )}
                       </div>
                       <div className="text-body-sm font-medium text-content dark:text-shell-text">
@@ -923,7 +1191,9 @@ function LeaderboardTab({
                         />
                       </div>
                       <div className="text-right text-xs text-content-secondary dark:text-shell-muted">
-                        {topSgp && topCatDelta !== null ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})` : "—"}
+                        {topSgp && topCatDelta !== null
+                          ? `${topSgp.categoryId} (${topCatDelta > 0 ? "+" : ""}${topCatDelta.toFixed(1)})`
+                          : "—"}
                       </div>
                     </div>
 
@@ -955,7 +1225,8 @@ function LeaderboardTab({
 
       {impacts.length === 0 && (
         <div className="text-center py-8 text-content-secondary dark:text-shell-muted">
-          No moves found. Click "Compute Impacts" above to derive roster moves and calculate their roto-point impact.
+          No moves found. Click "Compute Impacts" above to derive roster moves
+          and calculate their roto-point impact.
         </div>
       )}
     </div>
@@ -982,11 +1253,13 @@ function DraftReportTab({
 
   // Calculate draft skill (average replacement-level impact)
   const replacementImpacts = draftPicks
-    .map(p => p.replacementLevelImpact)
+    .map((p) => p.replacementLevelImpact)
     .filter((i): i is number => i != null);
-  const avgReplacementImpact = replacementImpacts.length > 0
-    ? replacementImpacts.reduce((sum, i) => sum + i, 0) / replacementImpacts.length
-    : null;
+  const avgReplacementImpact =
+    replacementImpacts.length > 0
+      ? replacementImpacts.reduce((sum, i) => sum + i, 0) /
+        replacementImpacts.length
+      : null;
 
   return (
     <div>
@@ -995,19 +1268,28 @@ function DraftReportTab({
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-body-sm mb-4">
           <span className="text-shell-muted">{summary.totalPicks} picks</span>
           <span className="font-mono text-positive dark:text-positive-dark">
-            {summary.totalDraftValue >= 0 ? "+" : ""}{summary.totalDraftValue.toFixed(1)} pts
+            {summary.totalDraftValue >= 0 ? "+" : ""}
+            {summary.totalDraftValue.toFixed(1)} pts
           </span>
           {summary.bestPick && (
             <span className="text-shell-muted">
-              Best: <span className="text-shell-text font-medium">{summary.bestPick.playerName}</span>{" "}
-              <span className="text-positive dark:text-positive-dark font-mono">+{summary.bestPick.impact.toFixed(1)}</span>
+              Best:{" "}
+              <span className="text-shell-text font-medium">
+                {summary.bestPick.playerName}
+              </span>{" "}
+              <span className="text-positive dark:text-positive-dark font-mono">
+                +{summary.bestPick.impact.toFixed(1)}
+              </span>
             </span>
           )}
           {avgReplacementImpact != null && (
             <span className="text-shell-muted">
-              Skill: <span className="font-mono text-positive dark:text-positive-dark">
-                {avgReplacementImpact >= 0 ? "+" : ""}{avgReplacementImpact.toFixed(1)}
-              </span> vs replacement
+              Skill:{" "}
+              <span className="font-mono text-positive dark:text-positive-dark">
+                {avgReplacementImpact >= 0 ? "+" : ""}
+                {avgReplacementImpact.toFixed(1)}
+              </span>{" "}
+              vs replacement
             </span>
           )}
         </div>
@@ -1061,14 +1343,16 @@ const draftTableColumns: StatsTableColumn[] = [
     label: "Pos",
     align: "left",
     sortable: false,
-    className: "text-content-secondary dark:text-shell-muted text-xs !font-sans",
+    className:
+      "text-content-secondary dark:text-shell-muted text-xs !font-sans",
   },
   {
     key: "keyStats",
     label: "Key Stats",
     align: "right",
     sortable: false,
-    className: "text-content-secondary dark:text-shell-muted text-xs !font-sans",
+    className:
+      "text-content-secondary dark:text-shell-muted text-xs !font-sans",
   },
   {
     key: "displayImpact",
@@ -1101,7 +1385,9 @@ const draftTableColumns: StatsTableColumn[] = [
       value != null ? (
         <ImpactBadge impact={value} size="sm" />
       ) : (
-        <span className="text-content-tertiary dark:text-shell-muted text-xs">&mdash;</span>
+        <span className="text-content-tertiary dark:text-shell-muted text-xs">
+          &mdash;
+        </span>
       ),
   },
   {
@@ -1113,7 +1399,9 @@ const draftTableColumns: StatsTableColumn[] = [
       value ? (
         <span className="text-positive">&#10003;</span>
       ) : (
-        <span className="text-content-tertiary dark:text-shell-muted">&#10007;</span>
+        <span className="text-content-tertiary dark:text-shell-muted">
+          &#10007;
+        </span>
       ),
   },
 ];
@@ -1154,7 +1442,10 @@ function groupTradesByDate(impacts: MoveImpact[]): TradeGroup[] {
     key: date,
     effectiveDate: date,
     legs,
-    totalImpact: legs.reduce((sum, l) => sum + (l.shapleyImpact ?? l.impactRotoPoints), 0),
+    totalImpact: legs.reduce(
+      (sum, l) => sum + (l.shapleyImpact ?? l.impactRotoPoints),
+      0,
+    ),
     isMultiPlayer: legs.length > 1,
   }));
 }
@@ -1169,7 +1460,10 @@ function TradesTab({
   setExpandedMoveId: (id: number | null) => void;
 }) {
   const tradeGroups = groupTradesByDate(impacts);
-  const netTradeImpact = impacts.reduce((sum, m) => sum + (m.shapleyImpact ?? m.impactRotoPoints), 0);
+  const netTradeImpact = impacts.reduce(
+    (sum, m) => sum + (m.shapleyImpact ?? m.impactRotoPoints),
+    0,
+  );
 
   // Sort groups by absolute total impact (descending)
   const sortedGroups = [...tradeGroups].sort(
@@ -1190,8 +1484,15 @@ function TradesTab({
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-body-sm mb-4">
         <span className="text-shell-muted">{tradeGroups.length} trades</span>
         <span className="font-mono">
-          <span className={netTradeImpact >= 0 ? "text-positive dark:text-positive-dark" : "text-negative dark:text-negative-dark"}>
-            {netTradeImpact >= 0 ? "+" : ""}{netTradeImpact.toFixed(1)} pts net
+          <span
+            className={
+              netTradeImpact >= 0
+                ? "text-positive dark:text-positive-dark"
+                : "text-negative dark:text-negative-dark"
+            }
+          >
+            {netTradeImpact >= 0 ? "+" : ""}
+            {netTradeImpact.toFixed(1)} pts net
           </span>
         </span>
       </div>
@@ -1202,10 +1503,16 @@ function TradesTab({
           const isExpanded = expandedMoveId === group.legs[0].id;
           const received = group.legs
             .map((l) => l.playerGained)
-            .filter(Boolean) as { id: number; name: string; positions: string[] }[];
-          const sent = group.legs
-            .map((l) => l.playerLost)
-            .filter(Boolean) as { id: number; name: string; positions: string[] }[];
+            .filter(Boolean) as {
+            id: number;
+            name: string;
+            positions: string[];
+          }[];
+          const sent = group.legs.map((l) => l.playerLost).filter(Boolean) as {
+            id: number;
+            name: string;
+            positions: string[];
+          }[];
 
           return (
             <div
@@ -1215,11 +1522,16 @@ function TradesTab({
               {/* Trade header row */}
               <div
                 className="px-4 py-3 cursor-pointer hover:bg-shell-bg flex items-center gap-4 transition-colors"
-                onClick={() => setExpandedMoveId(isExpanded ? null : group.legs[0].id)}
+                onClick={() =>
+                  setExpandedMoveId(isExpanded ? null : group.legs[0].id)
+                }
               >
                 {/* Date */}
                 <div className="text-body-sm text-content-secondary dark:text-shell-muted w-20 shrink-0">
-                  {new Date(group.effectiveDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {new Date(group.effectiveDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </div>
 
                 {/* Players involved */}
@@ -1227,10 +1539,19 @@ function TradesTab({
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Received */}
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-xs font-medium text-positive uppercase shrink-0">Got</span>
+                      <span className="text-xs font-medium text-positive uppercase shrink-0">
+                        Got
+                      </span>
                       {received.map((p, i) => (
-                        <span key={p.id} className="text-body-sm font-medium text-content dark:text-shell-text">
-                          {i > 0 && <span className="text-content-tertiary dark:text-shell-muted mr-1">,</span>}
+                        <span
+                          key={p.id}
+                          className="text-body-sm font-medium text-content dark:text-shell-text"
+                        >
+                          {i > 0 && (
+                            <span className="text-content-tertiary dark:text-shell-muted mr-1">
+                              ,
+                            </span>
+                          )}
                           {p.name}
                           <span className="ml-0.5 text-xs text-content-secondary dark:text-shell-muted">
                             ({p.positions.join(", ")})
@@ -1239,21 +1560,36 @@ function TradesTab({
                       ))}
                     </div>
 
-                    <span className="text-content-tertiary dark:text-shell-muted mx-1">|</span>
+                    <span className="text-content-tertiary dark:text-shell-muted mx-1">
+                      |
+                    </span>
 
                     {/* Sent */}
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-xs font-medium text-negative uppercase shrink-0">Gave</span>
+                      <span className="text-xs font-medium text-negative uppercase shrink-0">
+                        Gave
+                      </span>
                       {sent.map((p, i) => (
-                        <span key={p.id} className="text-body-sm text-content-secondary dark:text-shell-muted">
-                          {i > 0 && <span className="text-content-tertiary dark:text-shell-muted mr-1">,</span>}
+                        <span
+                          key={p.id}
+                          className="text-body-sm text-content-secondary dark:text-shell-muted"
+                        >
+                          {i > 0 && (
+                            <span className="text-content-tertiary dark:text-shell-muted mr-1">
+                              ,
+                            </span>
+                          )}
                           {p.name}
                           <span className="ml-0.5 text-xs text-content-tertiary dark:text-shell-muted">
                             ({p.positions.join(", ")})
                           </span>
                         </span>
                       ))}
-                      {sent.length === 0 && <span className="text-body-sm text-content-tertiary dark:text-shell-muted">—</span>}
+                      {sent.length === 0 && (
+                        <span className="text-body-sm text-content-tertiary dark:text-shell-muted">
+                          —
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1275,11 +1611,19 @@ function TradesTab({
                   {group.legs.map((leg, idx) => {
                     const legImpact = leg.shapleyImpact ?? leg.impactRotoPoints;
                     return (
-                      <div key={leg.id} className={idx > 0 ? "mt-4 pt-4 border-t border-shell-border" : ""}>
+                      <div
+                        key={leg.id}
+                        className={
+                          idx > 0
+                            ? "mt-4 pt-4 border-t border-shell-border"
+                            : ""
+                        }
+                      >
                         {group.isMultiPlayer && (
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-medium text-info uppercase">
-                              Leg {idx + 1}: {leg.playerGained?.name || "—"} for {leg.playerLost?.name || "—"}
+                              Leg {idx + 1}: {leg.playerGained?.name || "—"} for{" "}
+                              {leg.playerLost?.name || "—"}
                             </span>
                             <ImpactBadge impact={legImpact} size="sm" />
                           </div>
@@ -1329,7 +1673,8 @@ function TimelineTab({
   if (!timelineData?.data?.length) {
     return (
       <div className="text-center py-8 text-content-secondary dark:text-shell-muted">
-        No standings timeline data available yet. Take a few daily snapshots to build the timeline.
+        No standings timeline data available yet. Take a few daily snapshots to
+        build the timeline.
       </div>
     );
   }
@@ -1355,7 +1700,10 @@ function TimelineTab({
     <div>
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          >
             <CartesianGrid
               stroke={chartTheme.grid.stroke}
               strokeDasharray={chartTheme.grid.strokeDasharray}
@@ -1364,7 +1712,10 @@ function TimelineTab({
               dataKey="date"
               tick={chartTheme.axis.tick}
               tickFormatter={(date) =>
-                new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                new Date(date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
               }
             />
             <YAxis tick={chartTheme.axis.tick} />
@@ -1387,10 +1738,20 @@ function TimelineTab({
             />
             {/* Annotate move dates */}
             {Array.from(impactsByDate.entries()).map(([date, moves]) => {
-              const dataPoint = chartData.find((d: { date: string; points: number }) => d.date === date);
+              const dataPoint = chartData.find(
+                (d: { date: string; points: number }) => d.date === date,
+              );
               if (!dataPoint) return null;
-              const netImpact = moves.reduce((s, m) => s + m.impactRotoPoints, 0);
-              const color = netImpact > 0 ? chartTheme.colors[3] : netImpact < 0 ? chartTheme.colors[4] : chartTheme.colors[1];
+              const netImpact = moves.reduce(
+                (s, m) => s + m.impactRotoPoints,
+                0,
+              );
+              const color =
+                netImpact > 0
+                  ? chartTheme.colors[3]
+                  : netImpact < 0
+                    ? chartTheme.colors[4]
+                    : chartTheme.colors[1];
               return (
                 <ReferenceDot
                   key={date}
@@ -1410,13 +1771,16 @@ function TimelineTab({
       {/* Legend for annotations */}
       <div className="flex items-center gap-4 justify-center mt-4 text-xs text-content-secondary dark:text-shell-muted">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-positive" /> Positive impact
+          <span className="inline-block w-3 h-3 rounded-full bg-positive" />{" "}
+          Positive impact
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-negative" /> Negative impact
+          <span className="inline-block w-3 h-3 rounded-full bg-negative" />{" "}
+          Negative impact
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-full bg-neutral-400 dark:bg-shell-muted" /> Neutral
+          <span className="inline-block w-3 h-3 rounded-full bg-neutral-400 dark:bg-shell-muted" />{" "}
+          Neutral
         </span>
       </div>
     </div>

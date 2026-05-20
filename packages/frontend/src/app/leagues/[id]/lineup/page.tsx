@@ -5,16 +5,29 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useLeagueTeam } from "@/lib/hooks";
 import { api } from "@/lib/api";
-import { calculateAVG, calculateOBP, calculateERA, calculateWHIP } from "@espn-fantasy/shared";
+import {
+  calculateAVG,
+  calculateOBP,
+  calculateERA,
+  calculateWHIP,
+} from "@espn-fantasy/shared";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { LoadingSpinner, LoadingSkeleton } from "@/components/ui/LoadingSpinner";
+import {
+  LoadingSpinner,
+  LoadingSkeleton,
+} from "@/components/ui/LoadingSpinner";
 import { ErrorAlert } from "@/components/ui/ErrorAlert";
 import { TeamSelector } from "@/components/league/TeamSelector";
 import { Container } from "@/components/ui/Container";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
-import { CheckCircle, AlertTriangle, ArrowLeftRight, TrendingUp } from "lucide-react";
+import {
+  CheckCircle,
+  AlertTriangle,
+  ArrowLeftRight,
+  TrendingUp,
+} from "lucide-react";
 import { Term } from "@/components/ui/Term";
 
 interface Team {
@@ -61,7 +74,18 @@ function isPitcher(positions: string[]): boolean {
   return positions.some((p) => ["SP", "RP", "P"].includes(p));
 }
 
-const HITTER_SLOT_ORDER = ["C", "1B", "2B", "SS", "3B", "OF", "UTIL", "DH", "BE", "IL"];
+const HITTER_SLOT_ORDER = [
+  "C",
+  "1B",
+  "2B",
+  "SS",
+  "3B",
+  "OF",
+  "UTIL",
+  "DH",
+  "BE",
+  "IL",
+];
 const PITCHER_SLOT_ORDER = ["SP", "RP", "P", "BE", "IL"];
 
 function slotSortKey(slot: string, isPitcherSlot: boolean): number {
@@ -107,12 +131,7 @@ export default function LineupOptimizerPage() {
   });
 
   // Fetch lineup recommendations
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["lineup-recommendations", leagueId, selectedTeamId],
     queryFn: async () => {
       if (!selectedTeamId) {
@@ -121,7 +140,7 @@ export default function LineupOptimizerPage() {
 
       return api.getLineupRecommendations(
         parseInt(leagueId, 10),
-        selectedTeamId
+        selectedTeamId,
       ) as Promise<LineupData>;
     },
     enabled: !!selectedTeamId,
@@ -238,7 +257,8 @@ export default function LineupOptimizerPage() {
                         {data.recommendations.length !== 1 ? "s" : ""}
                       </h2>
                       <p className="text-body-sm text-content-secondary dark:text-shell-muted mt-1">
-                        Projected gain: +{data.totalProjectedGain.toFixed(2)} <Term id="sgp">SGP</Term>
+                        Projected gain: +{data.totalProjectedGain.toFixed(2)}{" "}
+                        <Term id="sgp">SGP</Term>
                       </p>
                     </div>
                   </div>
@@ -265,7 +285,10 @@ export default function LineupOptimizerPage() {
                       {/* Bench Player (Start) */}
                       <div className="border-2 border-positive-border rounded-lg p-4 bg-positive-light">
                         <div className="flex items-center mb-2">
-                          <Badge variant="positive" className="text-xs uppercase tracking-wide">
+                          <Badge
+                            variant="positive"
+                            className="text-xs uppercase tracking-wide"
+                          >
                             Start
                           </Badge>
                         </div>
@@ -288,7 +311,10 @@ export default function LineupOptimizerPage() {
                       {/* Starter Player (Sit) */}
                       <div className="border-2 border-negative-border rounded-lg p-4 bg-negative-light opacity-75">
                         <div className="flex items-center mb-2">
-                          <Badge variant="negative" className="text-xs uppercase tracking-wide">
+                          <Badge
+                            variant="negative"
+                            className="text-xs uppercase tracking-wide"
+                          >
                             Sit
                           </Badge>
                         </div>
@@ -306,10 +332,12 @@ export default function LineupOptimizerPage() {
 
                     {/* Reason and Gain */}
                     <div className="mt-4 pt-4 border-t border-neutral-100 dark:border-shell-border">
-                      <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-2">{rec.reason}</p>
+                      <p className="text-body-sm text-content-secondary dark:text-shell-muted mb-2">
+                        {rec.reason}
+                      </p>
                       <div className="inline-flex items-center px-3 py-1 rounded-full bg-positive-light border border-positive-border text-body-sm font-semibold text-positive">
-                        <TrendingUp className="w-4 h-4 mr-1" />
-                        +{rec.projectedGain.toFixed(2)} <Term id="sgp">SGP</Term>
+                        <TrendingUp className="w-4 h-4 mr-1" />+
+                        {rec.projectedGain.toFixed(2)} <Term id="sgp">SGP</Term>
                       </div>
                     </div>
                   </CardContent>
@@ -329,13 +357,19 @@ export default function LineupOptimizerPage() {
       {/* Roster Stats Section */}
       {selectedTeamId && rosterData?.roster && rosterData.roster.length > 0 && (
         <div className="mt-8 space-y-6">
-          <h2 className="text-h4 font-medium text-content dark:text-shell-text">Your Roster</h2>
+          <h2 className="text-h4 font-medium text-content dark:text-shell-text">
+            Your Roster
+          </h2>
 
           {/* Hitters Table */}
           {(() => {
             const hitters = rosterData.roster
               .filter((p) => !isPitcher(p.positions))
-              .sort((a, b) => slotSortKey(a.rosterSlot, false) - slotSortKey(b.rosterSlot, false));
+              .sort(
+                (a, b) =>
+                  slotSortKey(a.rosterSlot, false) -
+                  slotSortKey(b.rosterSlot, false),
+              );
             if (hitters.length === 0) return null;
             return (
               <Card>
@@ -347,23 +381,46 @@ export default function LineupOptimizerPage() {
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">Slot</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">HR</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">R</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">RBI</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">SB</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">AVG</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">OBP</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">
+                            Slot
+                          </th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            Player
+                          </th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            Team
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            HR
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            R
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            RBI
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            SB
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            AVG
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            OBP
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                         {hitters.map((player) => {
                           const proj = player.projections;
-                          const isBench = player.rosterSlot === "BE" || player.rosterSlot === "Bench";
+                          const isBench =
+                            player.rosterSlot === "BE" ||
+                            player.rosterSlot === "Bench";
                           return (
-                            <tr key={player.playerId} className={isBench ? "opacity-60" : ""}>
+                            <tr
+                              key={player.playerId}
+                              className={isBench ? "opacity-60" : ""}
+                            >
                               <td className="px-3 py-2 text-data font-medium text-content-secondary dark:text-shell-muted w-12">
                                 {player.rosterSlot}
                               </td>
@@ -389,10 +446,24 @@ export default function LineupOptimizerPage() {
                                 {proj ? formatStat(proj.SB) : "--"}
                               </td>
                               <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
-                                {proj ? formatRate(calculateAVG(proj), 3, "AB", proj) : "--"}
+                                {proj
+                                  ? formatRate(
+                                      calculateAVG(proj),
+                                      3,
+                                      "AB",
+                                      proj,
+                                    )
+                                  : "--"}
                               </td>
                               <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
-                                {proj ? formatRate(calculateOBP(proj), 3, "AB", proj) : "--"}
+                                {proj
+                                  ? formatRate(
+                                      calculateOBP(proj),
+                                      3,
+                                      "AB",
+                                      proj,
+                                    )
+                                  : "--"}
                               </td>
                             </tr>
                           );
@@ -409,7 +480,11 @@ export default function LineupOptimizerPage() {
           {(() => {
             const pitchers = rosterData.roster
               .filter((p) => isPitcher(p.positions))
-              .sort((a, b) => slotSortKey(a.rosterSlot, true) - slotSortKey(b.rosterSlot, true));
+              .sort(
+                (a, b) =>
+                  slotSortKey(a.rosterSlot, true) -
+                  slotSortKey(b.rosterSlot, true),
+              );
             if (pitchers.length === 0) return null;
             return (
               <Card>
@@ -421,23 +496,44 @@ export default function LineupOptimizerPage() {
                     <table className="min-w-full divide-y divide-neutral-200 dark:divide-shell-border">
                       <thead>
                         <tr>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">Slot</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Player</th>
-                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">Team</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">W</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">SV</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">K</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">ERA</th>
-                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">WHIP</th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase w-12">
+                            Slot
+                          </th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            Player
+                          </th>
+                          <th className="px-3 py-2 text-left text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            Team
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            W
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            SV
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            K
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            ERA
+                          </th>
+                          <th className="px-3 py-2 text-right text-data font-medium text-content-secondary dark:text-shell-muted uppercase">
+                            WHIP
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-shell-border">
                         {pitchers.map((player) => {
                           const proj = player.projections;
                           const ip = proj?.IP ?? 0;
-                          const isBench = player.rosterSlot === "BE" || player.rosterSlot === "Bench";
+                          const isBench =
+                            player.rosterSlot === "BE" ||
+                            player.rosterSlot === "Bench";
                           return (
-                            <tr key={player.playerId} className={isBench ? "opacity-60" : ""}>
+                            <tr
+                              key={player.playerId}
+                              className={isBench ? "opacity-60" : ""}
+                            >
                               <td className="px-3 py-2 text-data font-medium text-content-secondary dark:text-shell-muted w-12">
                                 {player.rosterSlot}
                               </td>
@@ -460,10 +556,14 @@ export default function LineupOptimizerPage() {
                                 {proj ? formatStat(proj.K) : "--"}
                               </td>
                               <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
-                                {proj && ip > 0 ? calculateERA(proj).toFixed(2) : "--"}
+                                {proj && ip > 0
+                                  ? calculateERA(proj).toFixed(2)
+                                  : "--"}
                               </td>
                               <td className="px-3 py-2 text-right text-data font-mono text-content-secondary dark:text-shell-muted">
-                                {proj && ip > 0 ? calculateWHIP(proj).toFixed(3) : "--"}
+                                {proj && ip > 0
+                                  ? calculateWHIP(proj).toFixed(3)
+                                  : "--"}
                               </td>
                             </tr>
                           );

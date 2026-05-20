@@ -28,22 +28,31 @@ interface StatsSectionProps {
   miniChartData: MiniChartPoint[];
 }
 
-export function StatsSection({ categories, totalTeams, miniChartData }: StatsSectionProps) {
+export function StatsSection({
+  categories,
+  totalTeams,
+  miniChartData,
+}: StatsSectionProps) {
   return (
     <section className="bg-white dark:bg-shell-panel py-8">
       <Container size="wide">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-grid-lg">
           <div className="lg:col-span-8">
-            <Heading level={2} className="mb-6 text-content dark:text-shell-text">Team Health</Heading>
+            <Heading
+              level={2}
+              className="mb-6 text-content dark:text-shell-text"
+            >
+              Team Health
+            </Heading>
             <TeamHealthOverview
               categories={categories}
               totalTeams={totalTeams}
             />
           </div>
           <div className="lg:col-span-4">
-            <h3 className="text-body font-semibold text-content dark:text-shell-text uppercase tracking-wider mb-4">
+            <Heading level={3} className="uppercase tracking-wider mb-4">
               Standings Trend
-            </h3>
+            </Heading>
             <Card>
               <CardContent>
                 <CategoryMiniChart data={miniChartData} />
