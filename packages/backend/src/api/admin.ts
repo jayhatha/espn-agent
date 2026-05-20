@@ -347,12 +347,9 @@ export async function adminRoutes(app: FastifyInstance) {
         getEspnAuthFromEnv();
       if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
-          return reply
-            .code(500)
-            .send({
-              error:
-                "ENCRYPTION_KEY not configured - cannot decrypt credentials",
-            });
+          return reply.code(500).send({
+            error: "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+          });
         }
         try {
           espnAuth = {
@@ -879,12 +876,9 @@ export async function adminRoutes(app: FastifyInstance) {
       let espnAuth: ESPNAuthCookies | undefined = getEspnAuthFromEnv();
       if (!espnAuth && league.espn_swid_encrypted && league.espn_s2_encrypted) {
         if (!hasEncryptionKey()) {
-          return reply
-            .code(500)
-            .send({
-              error:
-                "ENCRYPTION_KEY not configured - cannot decrypt credentials",
-            });
+          return reply.code(500).send({
+            error: "ENCRYPTION_KEY not configured - cannot decrypt credentials",
+          });
         }
         try {
           espnAuth = {

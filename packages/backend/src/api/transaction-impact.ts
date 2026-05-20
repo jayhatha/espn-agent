@@ -1,7 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { authenticate, requireLeagueAccess } from "../middleware/auth.js";
-import { requireAdmin } from "../middleware/auth.js";
+import {
+  authenticate,
+  requireAdmin,
+  requireLeagueAccess,
+} from "../middleware/auth.js";
 
 /**
  * Transaction Impact API Routes
@@ -22,11 +25,13 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
   }>(
     "/api/leagues/:leagueId/transaction-impacts/compute",
     {
-      onRequest: [requireAdmin],
+      onRequest: [authenticate, requireAdmin],
     },
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
+      const season = request.query.season
+        ? parseInt(request.query.season, 10)
+        : new Date().getFullYear();
 
       const agent = app.container.agents.transactionImpact(db, request.log);
 
@@ -61,7 +66,9 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
+      const season = request.query.season
+        ? parseInt(request.query.season, 10)
+        : new Date().getFullYear();
       const sortBy = request.query.sortBy || "impact";
 
       const startDate = `${season}-01-01`;
@@ -100,24 +107,36 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .where("ti.effective_date", "<=", endDate)
         .orderBy(
           sortBy === "impact"
-            ? (qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points")
+            ? (qb: any) =>
+                qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points")
             : "ti.effective_date",
           sortBy === "date" ? "asc" : "desc",
         )
         .execute();
 
       // Helper to get primary impact (Shapley if available, else legacy)
-      const primaryImpact = (i: any) => i.shapley_impact != null ? Number(i.shapley_impact) : Number(i.impact_roto_points);
+      const primaryImpact = (i: any) =>
+        i.shapley_impact != null
+          ? Number(i.shapley_impact)
+          : Number(i.impact_roto_points);
 
       // Compute summary
-      const sumOfIndividualImpacts = impacts.reduce((sum, i) => sum + primaryImpact(i), 0);
-      const avgImpactPerMove = impacts.length > 0 ? sumOfIndividualImpacts / impacts.length : 0;
+      const sumOfIndividualImpacts = impacts.reduce(
+        (sum, i) => sum + primaryImpact(i),
+        0,
+      );
+      const avgImpactPerMove =
+        impacts.length > 0 ? sumOfIndividualImpacts / impacts.length : 0;
       const bestMove = impacts.length > 0 ? impacts[0] : null;
       const worstMove = impacts.length > 0 ? impacts[impacts.length - 1] : null;
 
       // Compute Net Roster Management Value
       const agent = app.container.agents.transactionImpact(db, request.log);
-      const netResult = await agent.computeNetRosterValue(leagueId, season, teamId);
+      const netResult = await agent.computeNetRosterValue(
+        leagueId,
+        season,
+        teamId,
+      );
 
       return {
         impacts: impacts.map((i) => ({
@@ -130,12 +149,22 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           ciHigh: i.ci_high ? Number(i.ci_high) : null,
           isUncertain: i.is_uncertain ?? false,
           sgpCategoryImpacts: i.sgp_category_impacts,
-          replacementLevelImpact: i.replacement_level_impact ? Number(i.replacement_level_impact) : null,
+          replacementLevelImpact: i.replacement_level_impact
+            ? Number(i.replacement_level_impact)
+            : null,
           playerGained: i.player_gained_id
-            ? { id: i.player_gained_id, name: i.gained_player_name, positions: i.gained_player_positions }
+            ? {
+                id: i.player_gained_id,
+                name: i.gained_player_name,
+                positions: i.gained_player_positions,
+              }
             : null,
           playerLost: i.player_lost_id
-            ? { id: i.player_lost_id, name: i.lost_player_name, positions: i.lost_player_positions }
+            ? {
+                id: i.player_lost_id,
+                name: i.lost_player_name,
+                positions: i.lost_player_positions,
+              }
             : null,
           categoryImpacts: i.category_impacts,
           isIncomplete: i.is_incomplete,
@@ -146,12 +175,19 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           actualRotoPoints: netResult?.actualRotoPoints ?? null,
           draftOnlyRotoPoints: netResult?.draftOnlyRotoPoints ?? null,
           avgImpactPerMove: Math.round(avgImpactPerMove * 100) / 100,
-          sumOfIndividualImpacts: Math.round(sumOfIndividualImpacts * 100) / 100,
+          sumOfIndividualImpacts:
+            Math.round(sumOfIndividualImpacts * 100) / 100,
           bestMove: bestMove
-            ? { playerName: bestMove.gained_player_name, impact: primaryImpact(bestMove) }
+            ? {
+                playerName: bestMove.gained_player_name,
+                impact: primaryImpact(bestMove),
+              }
             : null,
           worstMove: worstMove
-            ? { playerName: worstMove.gained_player_name, impact: primaryImpact(worstMove) }
+            ? {
+                playerName: worstMove.gained_player_name,
+                impact: primaryImpact(worstMove),
+              }
             : null,
         },
       };
@@ -173,8 +209,12 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
-      const limit = request.query.limit ? parseInt(request.query.limit, 10) : 10;
+      const season = request.query.season
+        ? parseInt(request.query.season, 10)
+        : new Date().getFullYear();
+      const limit = request.query.limit
+        ? parseInt(request.query.limit, 10)
+        : 10;
 
       const startDate = `${season}-01-01`;
       const endDate = `${season}-12-31`;
@@ -183,7 +223,9 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const allImpacts: any[] = await db
         .selectFrom("transaction_impact as ti")
         .innerJoin("team as t", (join) =>
-          join.onRef("t.id", "=", "ti.team_id").on("t.league_id", "=", leagueId),
+          join
+            .onRef("t.id", "=", "ti.team_id")
+            .on("t.league_id", "=", leagueId),
         )
         .leftJoin("player as pg", "pg.id", "ti.player_gained_id")
         .leftJoin("player as pl", "pl.id", "ti.player_lost_id")
@@ -211,13 +253,16 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .where("ti.effective_date", "<=", endDate)
         .where("ti.move_type", "!=", "draft")
         .orderBy(
-          (qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
+          (qb: any) =>
+            qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
           "desc",
         )
         .execute();
 
       const primaryImpact = (i: any) =>
-        i.shapley_impact != null ? Number(i.shapley_impact) : Number(i.impact_roto_points);
+        i.shapley_impact != null
+          ? Number(i.shapley_impact)
+          : Number(i.impact_roto_points);
 
       const formatMove = (i: any) => ({
         id: i.id,
@@ -231,10 +276,18 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         ciHigh: i.ci_high ? Number(i.ci_high) : null,
         isIncomplete: i.is_incomplete,
         playerGained: i.player_gained_id
-          ? { id: i.player_gained_id, name: i.gained_player_name, positions: i.gained_player_positions }
+          ? {
+              id: i.player_gained_id,
+              name: i.gained_player_name,
+              positions: i.gained_player_positions,
+            }
           : null,
         playerLost: i.player_lost_id
-          ? { id: i.player_lost_id, name: i.lost_player_name, positions: i.lost_player_positions }
+          ? {
+              id: i.player_lost_id,
+              name: i.lost_player_name,
+              positions: i.lost_player_positions,
+            }
           : null,
       });
 
@@ -242,14 +295,21 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const worstMoves = allImpacts.slice(-limit).reverse().map(formatMove);
 
       // Per-team roster management summary
-      const teamMap = new Map<number, { name: string; totalImpact: number; moveCount: number }>();
+      const teamMap = new Map<
+        number,
+        { name: string; totalImpact: number; moveCount: number }
+      >();
       for (const i of allImpacts) {
         const existing = teamMap.get(i.team_id);
         if (existing) {
           existing.totalImpact += primaryImpact(i);
           existing.moveCount++;
         } else {
-          teamMap.set(i.team_id, { name: i.team_name, totalImpact: primaryImpact(i), moveCount: 1 });
+          teamMap.set(i.team_id, {
+            name: i.team_name,
+            totalImpact: primaryImpact(i),
+            moveCount: 1,
+          });
         }
       }
 
@@ -266,19 +326,33 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       }> = [];
 
       for (const [teamId, data] of teamMap) {
-        const netResult = await agent.computeNetRosterValue(leagueId, season, teamId);
+        const netResult = await agent.computeNetRosterValue(
+          leagueId,
+          season,
+          teamId,
+        );
         teamRankings.push({
           teamId,
           teamName: data.name,
           moveCount: data.moveCount,
-          netRosterValue: netResult ? Math.round(netResult.netRosterValue * 100) / 100 : null,
-          actualRotoPoints: netResult ? Math.round(netResult.actualRotoPoints * 100) / 100 : null,
-          draftOnlyRotoPoints: netResult ? Math.round(netResult.draftOnlyRotoPoints * 100) / 100 : null,
+          netRosterValue: netResult
+            ? Math.round(netResult.netRosterValue * 100) / 100
+            : null,
+          actualRotoPoints: netResult
+            ? Math.round(netResult.actualRotoPoints * 100) / 100
+            : null,
+          draftOnlyRotoPoints: netResult
+            ? Math.round(netResult.draftOnlyRotoPoints * 100) / 100
+            : null,
           sumOfImpacts: Math.round(data.totalImpact * 100) / 100,
         });
       }
 
-      teamRankings.sort((a, b) => (b.netRosterValue ?? b.sumOfImpacts) - (a.netRosterValue ?? a.sumOfImpacts));
+      teamRankings.sort(
+        (a, b) =>
+          (b.netRosterValue ?? b.sumOfImpacts) -
+          (a.netRosterValue ?? a.sumOfImpacts),
+      );
 
       // Build trade packages: group trade legs by team+date
       const tradeImpacts = allImpacts.filter((i) => i.move_type === "trade");
@@ -289,22 +363,32 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         tradePackageMap.get(key)!.push(t);
       }
 
-      const tradePackages = Array.from(tradePackageMap.entries()).map(([, legs]) => {
-        const totalImpact = legs.reduce((s, l) => s + primaryImpact(l), 0);
-        return {
-          teamId: legs[0].team_id,
-          teamName: legs[0].team_name,
-          effectiveDate: legs[0].effective_date,
-          totalImpact: Math.round(totalImpact * 100) / 100,
-          playersGained: legs
-            .filter((l) => l.player_gained_id)
-            .map((l) => ({ id: l.player_gained_id, name: l.gained_player_name, positions: l.gained_player_positions })),
-          playersLost: legs
-            .filter((l) => l.player_lost_id)
-            .map((l) => ({ id: l.player_lost_id, name: l.lost_player_name, positions: l.lost_player_positions })),
-          legs: legs.map(formatMove),
-        };
-      });
+      const tradePackages = Array.from(tradePackageMap.entries()).map(
+        ([, legs]) => {
+          const totalImpact = legs.reduce((s, l) => s + primaryImpact(l), 0);
+          return {
+            teamId: legs[0].team_id,
+            teamName: legs[0].team_name,
+            effectiveDate: legs[0].effective_date,
+            totalImpact: Math.round(totalImpact * 100) / 100,
+            playersGained: legs
+              .filter((l) => l.player_gained_id)
+              .map((l) => ({
+                id: l.player_gained_id,
+                name: l.gained_player_name,
+                positions: l.gained_player_positions,
+              })),
+            playersLost: legs
+              .filter((l) => l.player_lost_id)
+              .map((l) => ({
+                id: l.player_lost_id,
+                name: l.lost_player_name,
+                positions: l.lost_player_positions,
+              })),
+            legs: legs.map(formatMove),
+          };
+        },
+      );
 
       tradePackages.sort((a, b) => b.totalImpact - a.totalImpact);
       const bestTrades = tradePackages.slice(0, limit);
@@ -338,7 +422,9 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
     async (request) => {
       const leagueId = parseInt(request.params.leagueId, 10);
       const teamId = parseInt(request.params.teamId, 10);
-      const season = request.query.season ? parseInt(request.query.season, 10) : new Date().getFullYear();
+      const season = request.query.season
+        ? parseInt(request.query.season, 10)
+        : new Date().getFullYear();
 
       const startDate = `${season}-01-01`;
       const endDate = `${season}-12-31`;
@@ -370,7 +456,11 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
         .where("ti.move_type", "=", "draft")
         .where("ti.effective_date", ">=", startDate)
         .where("ti.effective_date", "<=", endDate)
-        .orderBy((qb: any) => qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"), "desc")
+        .orderBy(
+          (qb: any) =>
+            qb.fn.coalesce("ti.shapley_impact", "ti.impact_roto_points"),
+          "desc",
+        )
         .execute();
 
       // Check if each draft pick is still on the team (final roster snapshot)
@@ -393,9 +483,15 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
       const finalPlayerIds = new Set(finalRoster.map((r) => r.player_id));
 
       // Helper to get primary impact
-      const primaryImpact = (d: any) => d.shapley_impact != null ? Number(d.shapley_impact) : Number(d.impact_roto_points);
+      const primaryImpact = (d: any) =>
+        d.shapley_impact != null
+          ? Number(d.shapley_impact)
+          : Number(d.impact_roto_points);
 
-      const totalDraftValue = draftPicks.reduce((sum, d) => sum + primaryImpact(d), 0);
+      const totalDraftValue = draftPicks.reduce(
+        (sum, d) => sum + primaryImpact(d),
+        0,
+      );
 
       return {
         draftPicks: draftPicks.map((d) => ({
@@ -404,28 +500,37 @@ export async function transactionImpactRoutes(app: FastifyInstance) {
           positions: d.positions,
           impactRotoPoints: Number(d.impact_roto_points),
           shapleyImpact: d.shapley_impact ? Number(d.shapley_impact) : null,
-          replacementLevelImpact: d.replacement_level_impact ? Number(d.replacement_level_impact) : null,
+          replacementLevelImpact: d.replacement_level_impact
+            ? Number(d.replacement_level_impact)
+            : null,
           ciLow: d.ci_low ? Number(d.ci_low) : null,
           ciHigh: d.ci_high ? Number(d.ci_high) : null,
           isUncertain: d.is_uncertain ?? false,
           sgpCategoryImpacts: d.sgp_category_impacts,
           categoryImpacts: d.category_impacts,
           keyStats: d.gained_components,
-          stillOnTeam: d.player_gained_id ? finalPlayerIds.has(d.player_gained_id) : false,
+          stillOnTeam: d.player_gained_id
+            ? finalPlayerIds.has(d.player_gained_id)
+            : false,
           isIncomplete: d.is_incomplete,
         })),
         summary: {
           totalPicks: draftPicks.length,
           totalDraftValue: Math.round(totalDraftValue * 100) / 100,
-          bestPick: draftPicks.length > 0
-            ? { playerName: draftPicks[0].player_name, impact: primaryImpact(draftPicks[0]) }
-            : null,
-          worstPick: draftPicks.length > 0
-            ? {
-              playerName: draftPicks[draftPicks.length - 1].player_name,
-              impact: primaryImpact(draftPicks[draftPicks.length - 1]),
-            }
-            : null,
+          bestPick:
+            draftPicks.length > 0
+              ? {
+                  playerName: draftPicks[0].player_name,
+                  impact: primaryImpact(draftPicks[0]),
+                }
+              : null,
+          worstPick:
+            draftPicks.length > 0
+              ? {
+                  playerName: draftPicks[draftPicks.length - 1].player_name,
+                  impact: primaryImpact(draftPicks[draftPicks.length - 1]),
+                }
+              : null,
         },
       };
     },

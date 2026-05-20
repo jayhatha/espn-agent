@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { type ESPNAuthCookies, type ESPNScoringCategory } from "../adapters/espn.js";
+import {
+  type ESPNAuthCookies,
+  type ESPNScoringCategory,
+} from "../adapters/espn.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import {
   encryptToken,
@@ -77,7 +80,9 @@ async function upsertLeagueSettingsVersion(
     .executeTakeFirst();
 
   if (existing) {
-    if (JSON.stringify(existing.settings_json) !== JSON.stringify(settingsJson)) {
+    if (
+      JSON.stringify(existing.settings_json) !== JSON.stringify(settingsJson)
+    ) {
       await db
         .updateTable("league_settings_version")
         .set({ settings_json: settingsJson as any })
@@ -189,7 +194,12 @@ export async function leaguesRoutes(app: FastifyInstance) {
         // If league already exists, update it with team detection
         if (league) {
           // Store settings immediately so categories are available before snapshot
-          await upsertLeagueSettingsVersion(db, league.id, today, normalized.settings);
+          await upsertLeagueSettingsVersion(
+            db,
+            league.id,
+            today,
+            normalized.settings,
+          );
 
           // Update teams first
           let userTeamDbId: number | null = null;
@@ -292,7 +302,12 @@ export async function leaguesRoutes(app: FastifyInstance) {
           .executeTakeFirstOrThrow();
 
         // Store settings immediately so categories are available before snapshot
-        await upsertLeagueSettingsVersion(db, league.id, today, normalized.settings);
+        await upsertLeagueSettingsVersion(
+          db,
+          league.id,
+          today,
+          normalized.settings,
+        );
 
         // Create/update teams and find user's team DB ID
         let userTeamDbId: number | null = null;

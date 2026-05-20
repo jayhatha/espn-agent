@@ -36,7 +36,12 @@ function validateDraftConfig(params: any): {
       return { valid: false, error: "categories must be a non-empty array" };
     }
     for (const cat of categories) {
-      if (cat.category_id == null || !cat.stat_key || !cat.type || !cat.direction) {
+      if (
+        cat.category_id == null ||
+        !cat.stat_key ||
+        !cat.type ||
+        !cat.direction
+      ) {
         return { valid: false, error: "Invalid category format" };
       }
     }
@@ -478,8 +483,11 @@ export async function draftRoutes(app: FastifyInstance) {
         }
 
         const settings = latestSettings.settings_json;
-        const acquisitionRules = settings.acquisition_rules || {} as Record<string, unknown>;
-        const budget = (acquisitionRules as Record<string, unknown>).auction_budget as number || 260; // Default ESPN auction budget
+        const acquisitionRules =
+          settings.acquisition_rules || ({} as Record<string, unknown>);
+        const budget =
+          ((acquisitionRules as Record<string, unknown>)
+            .auction_budget as number) || 260; // Default ESPN auction budget
 
         // Fetch ESPN's global draft data (auction values + ADP)
         const espnAdapter = app.container.adapters.espn;
@@ -569,8 +577,7 @@ export async function draftRoutes(app: FastifyInstance) {
         // Calculate summary statistics
         const deltas = comparisons.map((c) => c.absoluteDelta);
         const sortedDeltas = [...deltas].sort((a, b) => a - b);
-        const meanDelta =
-          deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
+        const meanDelta = deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
         const medianDelta =
           sortedDeltas.length % 2 === 0
             ? (sortedDeltas[sortedDeltas.length / 2 - 1] +
@@ -579,8 +586,8 @@ export async function draftRoutes(app: FastifyInstance) {
             : sortedDeltas[Math.floor(sortedDeltas.length / 2)];
 
         // RMSE: sqrt(sum((ourValue - espnValue)^2) / n)
-        const squaredErrors = comparisons.map(
-          (c) => Math.pow(c.absoluteDelta, 2),
+        const squaredErrors = comparisons.map((c) =>
+          Math.pow(c.absoluteDelta, 2),
         );
         const rmse = Math.sqrt(
           squaredErrors.reduce((sum, e) => sum + e, 0) / comparisons.length,
@@ -597,8 +604,7 @@ export async function draftRoutes(app: FastifyInstance) {
 
         const covariance =
           comparisons.reduce(
-            (sum, c) =>
-              sum + (c.espnValue - meanEspn) * (c.ourValue - meanOur),
+            (sum, c) => sum + (c.espnValue - meanEspn) * (c.ourValue - meanOur),
             0,
           ) / comparisons.length;
 
@@ -662,10 +668,7 @@ export async function draftRoutes(app: FastifyInstance) {
 
         return result;
       } catch (error) {
-        request.log.error(
-          { error },
-          "Failed to validate auction values",
-        );
+        request.log.error({ error }, "Failed to validate auction values");
         return reply.code(500).send({
           error: "Failed to validate auction values",
           details: error instanceof Error ? error.message : String(error),
@@ -704,13 +707,8 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       const config = validation.config!;
-      const {
-        budget,
-        minBid,
-        projectionsRunId,
-        limit,
-        espnSeason,
-      } = request.query;
+      const { budget, minBid, projectionsRunId, limit, espnSeason } =
+        request.query;
 
       const auctionBudget = budget ? parseInt(budget, 10) : 260;
       const minimumBid = minBid ? parseInt(minBid, 10) : 1;
@@ -775,9 +773,7 @@ export async function draftRoutes(app: FastifyInstance) {
         );
 
         // Create maps of our valuations and projections by player ID
-        const ourValueMap = new Map(
-          ourValuations.map((v) => [v.playerId, v]),
-        );
+        const ourValueMap = new Map(ourValuations.map((v) => [v.playerId, v]));
 
         // Join on player ID and calculate deltas
         interface Comparison {
@@ -791,7 +787,10 @@ export async function draftRoutes(app: FastifyInstance) {
           absoluteDelta: number;
           percentDelta: number;
           ratio: number;
-          projectionComparison?: Record<string, { espn: number; fangraphs: number; delta: number }>;
+          projectionComparison?: Record<
+            string,
+            { espn: number; fangraphs: number; delta: number }
+          >;
         }
 
         const comparisons: Comparison[] = [];
@@ -801,17 +800,22 @@ export async function draftRoutes(app: FastifyInstance) {
           const ourData = ourValueMap.get(espnPlayer.playerId);
           if (!ourData) continue;
 
-          const absoluteDelta = ourData.dollarValue - espnPlayer.espnAuctionValue;
+          const absoluteDelta =
+            ourData.dollarValue - espnPlayer.espnAuctionValue;
           const percentDelta =
             (absoluteDelta / espnPlayer.espnAuctionValue) * 100;
           const ratio = ourData.dollarValue / espnPlayer.espnAuctionValue;
 
           // Build per-stat projection comparison if ESPN projected stats available
-          let projectionComparison: Record<string, { espn: number; fangraphs: number; delta: number }> | undefined;
+          let projectionComparison:
+            | Record<string, { espn: number; fangraphs: number; delta: number }>
+            | undefined;
           if (espnPlayer.espnProjectedStats && ourData.projectedStats) {
             projectionComparison = {};
             const fgStats = ourData.projectedStats as Record<string, number>;
-            for (const [key, espnVal] of Object.entries(espnPlayer.espnProjectedStats)) {
+            for (const [key, espnVal] of Object.entries(
+              espnPlayer.espnProjectedStats,
+            )) {
               const fgVal = fgStats[key];
               if (fgVal !== undefined && espnVal !== 0) {
                 projectionComparison[key] = {
@@ -849,8 +853,7 @@ export async function draftRoutes(app: FastifyInstance) {
         // Calculate summary statistics
         const deltas = comparisons.map((c) => c.absoluteDelta);
         const sortedDeltas = [...deltas].sort((a, b) => a - b);
-        const meanDelta =
-          deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
+        const meanDelta = deltas.reduce((sum, d) => sum + d, 0) / deltas.length;
         const medianDelta =
           sortedDeltas.length % 2 === 0
             ? (sortedDeltas[sortedDeltas.length / 2 - 1] +
@@ -859,8 +862,8 @@ export async function draftRoutes(app: FastifyInstance) {
             : sortedDeltas[Math.floor(sortedDeltas.length / 2)];
 
         // RMSE
-        const squaredErrors = comparisons.map(
-          (c) => Math.pow(c.absoluteDelta, 2),
+        const squaredErrors = comparisons.map((c) =>
+          Math.pow(c.absoluteDelta, 2),
         );
         const rmse = Math.sqrt(
           squaredErrors.reduce((sum, e) => sum + e, 0) / comparisons.length,
@@ -877,8 +880,7 @@ export async function draftRoutes(app: FastifyInstance) {
 
         const covariance =
           comparisons.reduce(
-            (sum, c) =>
-              sum + (c.espnValue - meanEspn) * (c.ourValue - meanOur),
+            (sum, c) => sum + (c.espnValue - meanEspn) * (c.ourValue - meanOur),
             0,
           ) / comparisons.length;
 
@@ -907,7 +909,11 @@ export async function draftRoutes(app: FastifyInstance) {
         )[0];
 
         // Count how many players have projection comparisons
-        const withProjections = comparisons.filter(c => c.projectionComparison && Object.keys(c.projectionComparison).length > 0).length;
+        const withProjections = comparisons.filter(
+          (c) =>
+            c.projectionComparison &&
+            Object.keys(c.projectionComparison).length > 0,
+        ).length;
 
         // Apply limit (sorted by absolute delta descending)
         const limitedComparisons = [...comparisons]
@@ -981,7 +987,12 @@ export async function draftRoutes(app: FastifyInstance) {
       const { config, rosters, projectionsRunId } = request.body;
 
       // Validate config
-      if (!config || !config.categories || !config.rosterSlots || !config.totalTeams) {
+      if (
+        !config ||
+        !config.categories ||
+        !config.rosterSlots ||
+        !config.totalTeams
+      ) {
         return reply.code(400).send({ error: "Invalid draft configuration" });
       }
 
@@ -991,7 +1002,11 @@ export async function draftRoutes(app: FastifyInstance) {
       }
 
       for (const roster of rosters) {
-        if (!roster.teamId || !roster.players || !Array.isArray(roster.players)) {
+        if (
+          !roster.teamId ||
+          !roster.players ||
+          !Array.isArray(roster.players)
+        ) {
           return reply.code(400).send({ error: "Invalid roster format" });
         }
       }
@@ -1009,7 +1024,7 @@ export async function draftRoutes(app: FastifyInstance) {
           standings: result.standings,
           meta: {
             totalTeams: config.totalTeams,
-            categories: config.categories.map(c => c.name),
+            categories: config.categories.map((c) => c.name),
             generatedAt: result.generatedAt,
           },
         };

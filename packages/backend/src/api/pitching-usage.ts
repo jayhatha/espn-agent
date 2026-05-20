@@ -1,7 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
 import { SitStartAdvisor } from "../agents/sit-start-advisor.js";
-import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
+import {
+  authenticate,
+  requireLeagueAccess,
+  requireTeamOwnership,
+} from "../middleware/auth.js";
 
 /**
  * Pitching Usage API Routes
@@ -30,8 +34,13 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
         const summary = await agent.getSeasonSummary(leagueId, teamId);
         return summary;
       } catch (error) {
-        request.log.error({ error, leagueId, teamId }, "Failed to get GS summary");
-        return reply.code(500).send({ error: "Failed to compute GS pacing summary" });
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to get GS summary",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to compute GS pacing summary" });
       }
     },
   );
@@ -53,11 +62,20 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
 
       try {
         const agent = app.container.agents.gsPacing(db, request.log);
-        const weekly = await agent.getWeeklySummary(leagueId, teamId, weekStart);
+        const weekly = await agent.getWeeklySummary(
+          leagueId,
+          teamId,
+          weekStart,
+        );
         return weekly;
       } catch (error) {
-        request.log.error({ error, leagueId, teamId }, "Failed to get weekly GS");
-        return reply.code(500).send({ error: "Failed to compute weekly GS breakdown" });
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to get weekly GS",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to compute weekly GS breakdown" });
       }
     },
   );
@@ -80,8 +98,13 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
         const plan = await agent.getStartPlan(leagueId, teamId);
         return plan;
       } catch (error) {
-        request.log.error({ error, leagueId, teamId }, "Failed to get start plan");
-        return reply.code(500).send({ error: "Failed to generate SP start plan" });
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to get start plan",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to generate SP start plan" });
       }
     },
   );
@@ -102,8 +125,13 @@ export async function pitchingUsageRoutes(app: FastifyInstance) {
         const agent = app.container.agents.gsPacing(db, request.log);
         return await agent.getLeagueGsOverview(leagueId);
       } catch (error) {
-        request.log.error({ error, leagueId }, "Failed to get league GS overview");
-        return reply.code(500).send({ error: "Failed to compute league GS overview" });
+        request.log.error(
+          { error, leagueId },
+          "Failed to get league GS overview",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to compute league GS overview" });
       }
     },
   );

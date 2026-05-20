@@ -1,6 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { getDb } from "../db/connection.js";
-import { authenticate, requireLeagueAccess, requireTeamOwnership } from "../middleware/auth.js";
+import {
+  authenticate,
+  requireLeagueAccess,
+  requireTeamOwnership,
+} from "../middleware/auth.js";
 
 /**
  * FAAB Tracking API Routes
@@ -29,8 +33,13 @@ export async function faabRoutes(app: FastifyInstance) {
         const summary = await agent.getSummary(leagueId, teamId);
         return summary;
       } catch (error) {
-        request.log.error({ error, leagueId, teamId }, "Failed to get FAAB summary");
-        return reply.code(500).send({ error: "Failed to compute FAAB summary" });
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to get FAAB summary",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to compute FAAB summary" });
       }
     },
   );
@@ -53,7 +62,10 @@ export async function faabRoutes(app: FastifyInstance) {
         const history = await agent.getBidHistory(leagueId, teamId);
         return { bids: history };
       } catch (error) {
-        request.log.error({ error, leagueId, teamId }, "Failed to get bid history");
+        request.log.error(
+          { error, leagueId, teamId },
+          "Failed to get bid history",
+        );
         return reply.code(500).send({ error: "Failed to fetch bid history" });
       }
     },
@@ -75,11 +87,20 @@ export async function faabRoutes(app: FastifyInstance) {
 
       try {
         const agent = app.container.agents.faabTracker(db, request.log);
-        const suggestion = await agent.getSuggestedBid(leagueId, teamId, playerId);
+        const suggestion = await agent.getSuggestedBid(
+          leagueId,
+          teamId,
+          playerId,
+        );
         return suggestion;
       } catch (error) {
-        request.log.error({ error, leagueId, teamId, playerId }, "Failed to get suggested bid");
-        return reply.code(500).send({ error: "Failed to compute suggested bid" });
+        request.log.error(
+          { error, leagueId, teamId, playerId },
+          "Failed to get suggested bid",
+        );
+        return reply
+          .code(500)
+          .send({ error: "Failed to compute suggested bid" });
       }
     },
   );

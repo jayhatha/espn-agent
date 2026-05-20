@@ -29,7 +29,9 @@ export async function simulationRoutes(app: FastifyInstance) {
     return run?.id ?? null;
   }
 
-  async function getLatestSnapshotDate(leagueId: number): Promise<string | null> {
+  async function getLatestSnapshotDate(
+    leagueId: number,
+  ): Promise<string | null> {
     const snapshot = await db
       .selectFrom("league_daily_snapshot")
       .select(["snapshot_date"])
@@ -76,8 +78,7 @@ export async function simulationRoutes(app: FastifyInstance) {
           .send({ error: "No snapshot found for this league" });
       }
 
-      const projectionsRunId =
-        bodyRunId ?? (await getLatestProjectionsRunId());
+      const projectionsRunId = bodyRunId ?? (await getLatestProjectionsRunId());
       if (!projectionsRunId) {
         return reply
           .code(404)
@@ -101,10 +102,7 @@ export async function simulationRoutes(app: FastifyInstance) {
         );
         return reply.code(200).send(result);
       } catch (err) {
-        request.log.error(
-          { err, leagueId, snapshotDate },
-          "Simulation failed",
-        );
+        request.log.error({ err, leagueId, snapshotDate }, "Simulation failed");
         return reply.code(500).send({ error: "Simulation failed" });
       }
     },
@@ -125,8 +123,7 @@ export async function simulationRoutes(app: FastifyInstance) {
       }
 
       const snapshotDate =
-        request.query.snapshotDate ??
-        (await getLatestSnapshotDate(leagueId));
+        request.query.snapshotDate ?? (await getLatestSnapshotDate(leagueId));
       if (!snapshotDate) {
         return reply
           .code(404)
@@ -135,7 +132,7 @@ export async function simulationRoutes(app: FastifyInstance) {
 
       const projectionsRunId = request.query.projectionsRunId
         ? parseInt(request.query.projectionsRunId, 10)
-        : (await getLatestProjectionsRunId());
+        : await getLatestProjectionsRunId();
       if (!projectionsRunId) {
         return reply
           .code(404)
