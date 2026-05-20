@@ -60,31 +60,7 @@ export class StandingsChangeLogAgent {
     const currDate = normDate(snapshots[0].snapshot_date);
     const prevDate = normDate(snapshots[1].snapshot_date);
 
-    // 2. Fetch all projected category values for both snapshots
-    const [prevRows, currRows] = await Promise.all([
-      this.db
-        .selectFrom("team_daily_projected_category")
-        .select(["team_id", "category_id", "projected_value"])
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", prevDate)
-        .execute(),
-      this.db
-        .selectFrom("team_daily_projected_category")
-        .select(["team_id", "category_id", "projected_value"])
-        .where("league_id", "=", leagueId)
-        .where("snapshot_date", "=", currDate)
-        .execute(),
-    ]);
-
-    if (prevRows.length === 0 || currRows.length === 0) {
-      this.logger.info(
-        { leagueId },
-        "StandingsChangeLogAgent: no projected category data, skipping",
-      );
-      return 0;
-    }
-
-    // 3. Fetch teams for this league
+    // 2. Fetch teams for this league (needed by both paths)
     const teams = await this.db
       .selectFrom("team")
       .select(["id", "name"])
@@ -94,7 +70,7 @@ export class StandingsChangeLogAgent {
     const teamMap = new Map(teams.map((t) => [t.id, t.name]));
     const numTeams = teams.length;
 
-    // 4. Fetch category settings to know direction (HIGHER_BETTER or LOWER_BETTER)
+    // 3. Fetch category settings for display names
     const settingsVersion = await this.db
       .selectFrom("league_settings_version")
       .select("settings_json")
@@ -106,7 +82,6 @@ export class StandingsChangeLogAgent {
     const categories =
       (settingsVersion?.settings_json as any)?.categories ?? [];
 
-    // Build direction map
     const directionMap = new Map<string, "HIGHER_BETTER" | "LOWER_BETTER">();
     const categoryNameMap = new Map<string, string>();
     for (const cat of categories) {
@@ -118,42 +93,7 @@ export class StandingsChangeLogAgent {
       );
     }
 
-    // 5. Group projected values by category
-    const prevByCat = new Map<string, Map<number, number>>();
-    for (const row of prevRows) {
-      if (!prevByCat.has(row.category_id))
-        prevByCat.set(row.category_id, new Map());
-      prevByCat
-        .get(row.category_id)!
-        .set(row.team_id, Number(row.projected_value));
-    }
-
-    const currByCat = new Map<string, Map<number, number>>();
-    for (const row of currRows) {
-      if (!currByCat.has(row.category_id))
-        currByCat.set(row.category_id, new Map());
-      currByCat
-        .get(row.category_id)!
-        .set(row.team_id, Number(row.projected_value));
-    }
-
-    // Helper: assign roto points (numTeams - rank + 1), rank 1 = best
-    function rankTeams(
-      valueMap: Map<number, number>,
-      direction: "HIGHER_BETTER" | "LOWER_BETTER",
-      n: number,
-    ): Map<number, number> {
-      const sorted = [...valueMap.entries()].sort((a, b) =>
-        direction === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
-      );
-      const pts = new Map<number, number>();
-      sorted.forEach(([teamId], idx) => {
-        pts.set(teamId, n - idx);
-      });
-      return pts;
-    }
-
-    // 5b. Pre-fetch existing events for currDate so we can detect intraday delta changes
+    // 4. Pre-fetch existing events for currDate so we can detect intraday delta changes
     const existingEventsToday = await this.db
       .selectFrom("standings_change_event")
       .select(["team_id", "category_id", "roto_delta"])
@@ -168,132 +108,289 @@ export class StandingsChangeLogAgent {
       ]),
     );
 
-    // 6. For each category, compute roto delta per team, emit events for significant changes
     let totalInserted = 0;
-    const allCategoryIds = new Set([...prevByCat.keys(), ...currByCat.keys()]);
 
-    for (const categoryId of allCategoryIds) {
-      const prevValues = prevByCat.get(categoryId);
-      const currValues = currByCat.get(categoryId);
-      if (!prevValues || !currValues) continue;
+    // Helper: build payload and upsert a single change event
+    const upsertEvent = async (
+      categoryId: string,
+      categoryName: string,
+      team: { id: number; name: string },
+      prevP: number,
+      currP: number,
+      prevRank: number,
+      currRank: number,
+      prevCatRankMap: Map<number, number>,
+      currCatRankMap: Map<number, number>,
+    ): Promise<void> => {
+      const rotoDelta = currP - prevP;
+      if (Math.abs(rotoDelta) < 0.5) return;
 
-      const catDirection = directionMap.get(categoryId) ?? "HIGHER_BETTER";
-      const categoryName = categoryNameMap.get(categoryId) ?? categoryId;
+      const directionLabel: "gained" | "lost" =
+        rotoDelta > 0 ? "gained" : "lost";
 
-      const prevPts = rankTeams(prevValues, catDirection, numTeams);
-      const currPts = rankTeams(currValues, catDirection, numTeams);
+      let passedTeamId: number | null = null;
+      let passedTeamName: string | null = null;
 
-      // Rank maps (1 = best)
-      const prevRankSorted = [...prevValues.entries()].sort((a, b) =>
-        catDirection === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
-      );
-      const currRankSorted = [...currValues.entries()].sort((a, b) =>
-        catDirection === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
-      );
-      const prevRankMap = new Map(
-        prevRankSorted.map(([tid], idx) => [tid, idx + 1]),
-      );
-      const currRankMap = new Map(
-        currRankSorted.map(([tid], idx) => [tid, idx + 1]),
-      );
-
-      for (const team of teams) {
-        const prevP = prevPts.get(team.id) ?? 0;
-        const currP = currPts.get(team.id) ?? 0;
-        const rotoDelta = currP - prevP;
-
-        if (Math.abs(rotoDelta) < 0.5) continue;
-
-        const directionLabel: "gained" | "lost" =
-          rotoDelta > 0 ? "gained" : "lost";
-
-        // Find passed team
-        let passedTeamId: number | null = null;
-        let passedTeamName: string | null = null;
-
-        const prevRank = prevRankMap.get(team.id) ?? numTeams;
-        const currRank = currRankMap.get(team.id) ?? numTeams;
-
-        if (directionLabel === "gained" && currRank < prevRank) {
-          // We moved up — find team we passed
-          for (const [otherId, otherPrevRank] of prevRankMap.entries()) {
-            if (otherId === team.id) continue;
-            const otherCurrRank = currRankMap.get(otherId) ?? numTeams;
-            // We passed them: their prev rank was above ours, now below
-            if (otherPrevRank <= prevRank && otherCurrRank >= currRank) {
-              passedTeamId = otherId;
-              passedTeamName = teamMap.get(otherId) ?? null;
-              break;
-            }
-          }
-        } else if (directionLabel === "lost" && currRank > prevRank) {
-          // We moved down — find team that passed us
-          for (const [otherId, otherPrevRank] of prevRankMap.entries()) {
-            if (otherId === team.id) continue;
-            const otherCurrRank = currRankMap.get(otherId) ?? numTeams;
-            if (otherPrevRank >= prevRank && otherCurrRank <= currRank) {
-              passedTeamId = otherId;
-              passedTeamName = teamMap.get(otherId) ?? null;
-              break;
-            }
+      if (directionLabel === "gained" && currRank < prevRank) {
+        for (const [otherId, otherPrevRank] of prevCatRankMap.entries()) {
+          if (otherId === team.id) continue;
+          const otherCurrRank = currCatRankMap.get(otherId) ?? numTeams;
+          if (otherPrevRank <= prevRank && otherCurrRank >= currRank) {
+            passedTeamId = otherId;
+            passedTeamName = teamMap.get(otherId) ?? null;
+            break;
           }
         }
+      } else if (directionLabel === "lost" && currRank > prevRank) {
+        for (const [otherId, otherPrevRank] of prevCatRankMap.entries()) {
+          if (otherId === team.id) continue;
+          const otherCurrRank = currCatRankMap.get(otherId) ?? numTeams;
+          if (otherPrevRank >= prevRank && otherCurrRank <= currRank) {
+            passedTeamId = otherId;
+            passedTeamName = teamMap.get(otherId) ?? null;
+            break;
+          }
+        }
+      }
 
-        // Build proximate cause (best effort)
-        const proximateCause = await this.buildProximateCause(
-          leagueId,
-          team.id,
-          categoryId,
-          categoryName,
-          currDate,
-          rotoDelta,
+      const proximateCause = await this.buildProximateCause(
+        leagueId,
+        team.id,
+        categoryId,
+        categoryName,
+        currDate,
+        rotoDelta,
+      );
+
+      const payload: StandingsChangeEventPayload = {
+        league_id: leagueId,
+        team_id: team.id,
+        snapshot_date: currDate,
+        category_id: categoryId,
+        category_name: categoryName,
+        prev_roto_pts: prevP,
+        curr_roto_pts: currP,
+        roto_delta: rotoDelta,
+        passed_team_id: passedTeamId,
+        passed_team_name: passedTeamName,
+        direction: directionLabel,
+        event_source: eventSource,
+        proximate_cause: proximateCause,
+      };
+
+      const eventKey = `${team.id}:${categoryId}`;
+      const existingDelta = existingDeltaMap.get(eventKey);
+      const isNewOrChanged =
+        existingDelta === undefined ||
+        Math.abs(existingDelta - rotoDelta) >= 0.01;
+
+      const result = await this.db
+        .insertInto("standings_change_event")
+        .values(payload)
+        .onConflict((oc) =>
+          oc.constraint("sce_unique_event").doUpdateSet({
+            curr_roto_pts: sql`EXCLUDED.curr_roto_pts`,
+            roto_delta: sql`EXCLUDED.roto_delta`,
+            direction: sql`EXCLUDED.direction`,
+            passed_team_id: sql`EXCLUDED.passed_team_id`,
+            passed_team_name: sql`EXCLUDED.passed_team_name`,
+            proximate_cause: sql`EXCLUDED.proximate_cause`,
+            occurred_at: sql`NOW()`,
+          }),
+        )
+        .returning("id")
+        .executeTakeFirst();
+
+      if (result && isNewOrChanged) {
+        totalInserted++;
+        existingDeltaMap.set(eventKey, rotoDelta);
+      }
+    };
+
+    if (eventSource === "live") {
+      // Live path: compare actual current category roto_points (team_daily_category_ranks).
+      // Projected season-end values barely move during a single game; actual roto standings
+      // reflect real rank changes as live stats accumulate today vs yesterday's baseline.
+      const [prevRankRows, currRankRows] = await Promise.all([
+        this.db
+          .selectFrom("team_daily_category_ranks")
+          .select(["team_id", "category_id", "rank", "roto_points"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", prevDate)
+          .execute(),
+        this.db
+          .selectFrom("team_daily_category_ranks")
+          .select(["team_id", "category_id", "rank", "roto_points"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", currDate)
+          .execute(),
+      ]);
+
+      if (prevRankRows.length === 0 || currRankRows.length === 0) {
+        this.logger.info(
+          { leagueId },
+          "StandingsChangeLogAgent: no category rank data for live events, skipping",
+        );
+        return 0;
+      }
+
+      type RankEntry = { rank: number; pts: number };
+      const prevRankByCat = new Map<string, Map<number, RankEntry>>();
+      for (const row of prevRankRows) {
+        if (!prevRankByCat.has(row.category_id))
+          prevRankByCat.set(row.category_id, new Map());
+        prevRankByCat
+          .get(row.category_id)!
+          .set(row.team_id, { rank: row.rank, pts: Number(row.roto_points ?? 0) });
+      }
+
+      const currRankByCat = new Map<string, Map<number, RankEntry>>();
+      for (const row of currRankRows) {
+        if (!currRankByCat.has(row.category_id))
+          currRankByCat.set(row.category_id, new Map());
+        currRankByCat
+          .get(row.category_id)!
+          .set(row.team_id, { rank: row.rank, pts: Number(row.roto_points ?? 0) });
+      }
+
+      const allCategoryIds = new Set([
+        ...prevRankByCat.keys(),
+        ...currRankByCat.keys(),
+      ]);
+
+      for (const categoryId of allCategoryIds) {
+        const prevCat = prevRankByCat.get(categoryId);
+        const currCat = currRankByCat.get(categoryId);
+        if (!prevCat || !currCat) continue;
+
+        const categoryName = categoryNameMap.get(categoryId) ?? categoryId;
+
+        // Build rank-only maps for the passed-team helper
+        const prevCatRankMap = new Map(
+          [...prevCat.entries()].map(([tid, e]) => [tid, e.rank]),
+        );
+        const currCatRankMap = new Map(
+          [...currCat.entries()].map(([tid, e]) => [tid, e.rank]),
         );
 
-        const payload: StandingsChangeEventPayload = {
-          league_id: leagueId,
-          team_id: team.id,
-          snapshot_date: currDate,
-          category_id: categoryId,
-          category_name: categoryName,
-          prev_roto_pts: prevP,
-          curr_roto_pts: currP,
-          roto_delta: rotoDelta,
-          passed_team_id: passedTeamId,
-          passed_team_name: passedTeamName,
-          direction: directionLabel,
-          event_source: eventSource,
-          proximate_cause: proximateCause,
-        };
+        for (const team of teams) {
+          const prevEntry = prevCat.get(team.id);
+          const currEntry = currCat.get(team.id);
+          if (!prevEntry || !currEntry) continue;
 
-        // Upsert: insert new events or update existing ones when the delta changes intraday.
-        // isNewOrChanged drives SSE emission — only signal clients when data actually changed.
-        const eventKey = `${team.id}:${categoryId}`;
-        const existingDelta = existingDeltaMap.get(eventKey);
-        const isNewOrChanged =
-          existingDelta === undefined ||
-          Math.abs(existingDelta - rotoDelta) >= 0.01;
+          await upsertEvent(
+            categoryId,
+            categoryName,
+            team,
+            prevEntry.pts,
+            currEntry.pts,
+            prevEntry.rank,
+            currEntry.rank,
+            prevCatRankMap,
+            currCatRankMap,
+          );
+        }
+      }
+    } else {
+      // Snapshot path: use projected season-end values to detect projection changes
+      // between daily snapshots.
+      const [prevRows, currRows] = await Promise.all([
+        this.db
+          .selectFrom("team_daily_projected_category")
+          .select(["team_id", "category_id", "projected_value"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", prevDate)
+          .execute(),
+        this.db
+          .selectFrom("team_daily_projected_category")
+          .select(["team_id", "category_id", "projected_value"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", currDate)
+          .execute(),
+      ]);
 
-        const result = await this.db
-          .insertInto("standings_change_event")
-          .values(payload)
-          .onConflict((oc) =>
-            oc.constraint("sce_unique_event").doUpdateSet({
-              curr_roto_pts: sql`EXCLUDED.curr_roto_pts`,
-              roto_delta: sql`EXCLUDED.roto_delta`,
-              direction: sql`EXCLUDED.direction`,
-              passed_team_id: sql`EXCLUDED.passed_team_id`,
-              passed_team_name: sql`EXCLUDED.passed_team_name`,
-              proximate_cause: sql`EXCLUDED.proximate_cause`,
-              occurred_at: sql`NOW()`,
-            }),
-          )
-          .returning("id")
-          .executeTakeFirst();
+      if (prevRows.length === 0 || currRows.length === 0) {
+        this.logger.info(
+          { leagueId },
+          "StandingsChangeLogAgent: no projected category data, skipping",
+        );
+        return 0;
+      }
 
-        if (result && isNewOrChanged) {
-          totalInserted++;
-          // Update the local map so subsequent categories in this same call don't re-emit
-          existingDeltaMap.set(eventKey, rotoDelta);
+      const prevByCat = new Map<string, Map<number, number>>();
+      for (const row of prevRows) {
+        if (!prevByCat.has(row.category_id))
+          prevByCat.set(row.category_id, new Map());
+        prevByCat
+          .get(row.category_id)!
+          .set(row.team_id, Number(row.projected_value));
+      }
+
+      const currByCat = new Map<string, Map<number, number>>();
+      for (const row of currRows) {
+        if (!currByCat.has(row.category_id))
+          currByCat.set(row.category_id, new Map());
+        currByCat
+          .get(row.category_id)!
+          .set(row.team_id, Number(row.projected_value));
+      }
+
+      function rankTeams(
+        valueMap: Map<number, number>,
+        direction: "HIGHER_BETTER" | "LOWER_BETTER",
+        n: number,
+      ): Map<number, number> {
+        const sorted = [...valueMap.entries()].sort((a, b) =>
+          direction === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
+        );
+        const pts = new Map<number, number>();
+        sorted.forEach(([teamId], idx) => {
+          pts.set(teamId, n - idx);
+        });
+        return pts;
+      }
+
+      const allCategoryIds = new Set([
+        ...prevByCat.keys(),
+        ...currByCat.keys(),
+      ]);
+
+      for (const categoryId of allCategoryIds) {
+        const prevValues = prevByCat.get(categoryId);
+        const currValues = currByCat.get(categoryId);
+        if (!prevValues || !currValues) continue;
+
+        const catDirection = directionMap.get(categoryId) ?? "HIGHER_BETTER";
+        const categoryName = categoryNameMap.get(categoryId) ?? categoryId;
+
+        const prevPts = rankTeams(prevValues, catDirection, numTeams);
+        const currPts = rankTeams(currValues, catDirection, numTeams);
+
+        const prevRankSorted = [...prevValues.entries()].sort((a, b) =>
+          catDirection === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
+        );
+        const currRankSorted = [...currValues.entries()].sort((a, b) =>
+          catDirection === "HIGHER_BETTER" ? b[1] - a[1] : a[1] - b[1],
+        );
+        const prevRankMap = new Map(
+          prevRankSorted.map(([tid], idx) => [tid, idx + 1]),
+        );
+        const currRankMap = new Map(
+          currRankSorted.map(([tid], idx) => [tid, idx + 1]),
+        );
+
+        for (const team of teams) {
+          await upsertEvent(
+            categoryId,
+            categoryName,
+            team,
+            prevPts.get(team.id) ?? 0,
+            currPts.get(team.id) ?? 0,
+            prevRankMap.get(team.id) ?? numTeams,
+            currRankMap.get(team.id) ?? numTeams,
+            prevRankMap,
+            currRankMap,
+          );
         }
       }
     }
