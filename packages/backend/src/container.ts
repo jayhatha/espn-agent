@@ -18,11 +18,20 @@ export interface Container {
     advancedStats: AdvancedStatsAdapter;
   };
   agents: {
-    draftRankings: (db: Kysely<Database>, log: BaseLogger) => DraftRankingsAgent;
+    draftRankings: (
+      db: Kysely<Database>,
+      log: BaseLogger,
+    ) => DraftRankingsAgent;
     faabTracker: (db: Kysely<Database>, log: BaseLogger) => FaabTrackerAgent;
     gsPacing: (db: Kysely<Database>, log: BaseLogger) => GsPacingAgent;
-    tradeRecommendation: (db: Kysely<Database>, log: BaseLogger) => TradeRecommendationAgent;
-    transactionImpact: (db: Kysely<Database>, log: BaseLogger) => TransactionImpactAgent;
+    tradeRecommendation: (
+      db: Kysely<Database>,
+      log: BaseLogger,
+    ) => TradeRecommendationAgent;
+    transactionImpact: (
+      db: Kysely<Database>,
+      log: BaseLogger,
+    ) => TransactionImpactAgent;
   };
 }
 

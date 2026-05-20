@@ -47,6 +47,7 @@ export async function requireAdmin(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
+  if (process.env.SINGLE_USER_MODE === "true") return;
   if (process.env.NODE_ENV !== "development") {
     const user = (request as any).user;
     if (!user || user.role !== "admin") {

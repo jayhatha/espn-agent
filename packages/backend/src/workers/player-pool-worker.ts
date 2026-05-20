@@ -3,7 +3,12 @@ import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { PlayerPoolSyncAgent } from "../agents/player-pool-sync.js";
 import { ESPNAdapter } from "../adapters/espn.js";
-import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
+import {
+  createRedisConnection,
+  createQueue,
+  createWorker,
+  registerShutdown,
+} from "./worker-runtime.js";
 
 const logger = pino({
   level: process.env.LOG_LEVEL || "info",
@@ -105,13 +110,5 @@ worker.on("failed", (job, err) => {
 
 // Graceful shutdown
 registerShutdown([worker], [connection], logger);
-});
-
-process.on("SIGINT", async () => {
-  logger.info("SIGINT received, shutting down player pool worker");
-  await worker.close();
-  await connection.quit();
-  process.exit(0);
-});
 
 logger.info("Player pool worker started");

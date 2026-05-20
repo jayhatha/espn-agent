@@ -1,4 +1,10 @@
-import { Queue, Worker, type Processor, type WorkerOptions, type QueueOptions } from "bullmq";
+import {
+  Queue,
+  Worker,
+  type Processor,
+  type WorkerOptions,
+  type QueueOptions,
+} from "bullmq";
 import IORedis from "ioredis";
 import type { BaseLogger } from "pino";
 
@@ -28,7 +34,10 @@ export function createWorker<T = unknown>(
   connection: IORedis,
   opts?: Omit<WorkerOptions, "connection">,
 ): Worker<T> {
-  return new Worker<T>(name, processor, { connection: connection as any, ...opts });
+  return new Worker<T>(name, processor, {
+    connection: connection as any,
+    ...opts,
+  });
 }
 
 export function registerShutdown(

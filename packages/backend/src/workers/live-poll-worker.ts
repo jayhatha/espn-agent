@@ -2,7 +2,11 @@ import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { LivePollAgent } from "../agents/live-poll.js";
-import { createRedisConnection, createQueue, createWorker } from "./worker-runtime.js";
+import {
+  createRedisConnection,
+  createQueue,
+  createWorker,
+} from "./worker-runtime.js";
 
 /**
  * Live Poll Worker

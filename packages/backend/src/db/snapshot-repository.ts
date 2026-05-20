@@ -184,7 +184,9 @@ export class SnapshotRepository {
    */
   async getProjectionsByDate(snapshotDate: string): Promise<{
     runId: number | null;
-    projections: Awaited<ReturnType<SnapshotRepository["getPlayerProjections"]>>;
+    projections: Awaited<
+      ReturnType<SnapshotRepository["getPlayerProjections"]>
+    >;
   }> {
     const run = await this.db
       .selectFrom("projections_run")

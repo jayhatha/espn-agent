@@ -3,7 +3,12 @@ import pino from "pino";
 import { getDb } from "../db/connection.js";
 import { SnapshotOrchestratorAgent } from "../agents/snapshot-orchestrator.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
-import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
+import {
+  createRedisConnection,
+  createQueue,
+  createWorker,
+  registerShutdown,
+} from "./worker-runtime.js";
 
 // Import backfill worker so it runs in the same process
 import "./backfill-worker.js";
@@ -23,8 +28,21 @@ const logger = pino({
 const connection = createRedisConnection();
 
 // Create queue and DLQ
-export const snapshotQueue = createQueue("snapshots", connection);
-export const snapshotDLQ = createQueue("snapshots-dlq", connection);
+interface DLQJobData {
+  originalJobId: string | undefined;
+  originalJobName: string;
+  originalData: SnapshotJobData;
+  errorMessage: string;
+  errorStack: string | undefined;
+  failedAt: string;
+  attemptsMade: number;
+}
+
+export const snapshotQueue = createQueue<SnapshotJobData>(
+  "snapshots",
+  connection,
+);
+export const snapshotDLQ = createQueue<DLQJobData>("snapshots-dlq", connection);
 
 interface SnapshotJobData {
   leagueId: number;
@@ -63,6 +81,7 @@ const worker = createWorker<SnapshotJobData>(
       throw error;
     }
   },
+  connection,
   { concurrency: 3 },
 );
 

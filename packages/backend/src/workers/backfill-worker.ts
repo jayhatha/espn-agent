@@ -1,9 +1,17 @@
 import { type Job } from "bullmq";
 import pino from "pino";
 import { getDb } from "../db/connection.js";
-import { HistoricalBackfillAgent, type BackfillProgress } from "../agents/historical-backfill.js";
+import {
+  HistoricalBackfillAgent,
+  type BackfillProgress,
+} from "../agents/historical-backfill.js";
 import { getEspnAuthFromEnv } from "../utils/espn-env.js";
-import { createRedisConnection, createQueue, createWorker, registerShutdown } from "./worker-runtime.js";
+import {
+  createRedisConnection,
+  createQueue,
+  createWorker,
+  registerShutdown,
+} from "./worker-runtime.js";
 
 /**
  * Background worker for historical backfill jobs
@@ -17,7 +25,10 @@ const logger = pino({
 const connection = createRedisConnection();
 
 // Create queue for backfills (separate from snapshot queue)
-export const backfillQueue = createQueue("backfills", connection);
+export const backfillQueue = createQueue<BackfillJobData>(
+  "backfills",
+  connection,
+);
 
 export interface BackfillJobData {
   leagueId: number;
@@ -68,7 +79,10 @@ const worker = createWorker<BackfillJobData>(
         },
       });
 
-      logger.info({ jobId: job.id, leagueId, result }, "Backfill job completed");
+      logger.info(
+        { jobId: job.id, leagueId, result },
+        "Backfill job completed",
+      );
       return result;
     } catch (error) {
       logger.error({ error, jobId: job.id, leagueId }, "Backfill job failed");
