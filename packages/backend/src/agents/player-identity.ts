@@ -135,26 +135,57 @@ export class PlayerIdentityResolutionAgent {
     const cached = await this.db
       .selectFrom("player_identity_map")
       .innerJoin("player", "player.id", "player_identity_map.player_id")
-      .select(["player_identity_map.player_id", "player_identity_map.confidence", "player_identity_map.resolution_method"])
+      .select([
+        "player_identity_map.player_id",
+        "player_identity_map.confidence",
+        "player_identity_map.resolution_method",
+      ])
       .where("player_identity_map.fangraphs_key", "=", fangraphsKey)
       .executeTakeFirst();
 
     if (cached) {
-      const matchType = cached.resolution_method === "exact_match" ? "exact" as const : "fuzzy" as const;
-      this.logger?.debug({ playerName, playerId: cached.player_id, confidence: cached.confidence, matchType }, "Using cached identity mapping");
+      const matchType =
+        cached.resolution_method === "exact_match"
+          ? ("exact" as const)
+          : ("fuzzy" as const);
+      this.logger?.debug(
+        {
+          playerName,
+          playerId: cached.player_id,
+          confidence: cached.confidence,
+          matchType,
+        },
+        "Using cached identity mapping",
+      );
       return { playerId: cached.player_id, matchType };
     }
 
     // 2. Fuzzy match fallback
-    const match = await this.findBestMatch(fangraphsKey, playerName, team, positions);
+    const match = await this.findBestMatch(
+      fangraphsKey,
+      playerName,
+      team,
+      positions,
+    );
     if (!match) {
-      this.logger?.warn({ playerName, team, positions }, "No match found for player");
+      this.logger?.warn(
+        { playerName, team, positions },
+        "No match found for player",
+      );
       return null;
     }
 
     // 3. Apply confidence threshold
     if (match.confidence < FUZZY_MATCH_CONFIDENCE_THRESHOLD) {
-      this.logger?.warn({ playerName, matchedId: match.playerId, confidence: match.confidence, threshold: FUZZY_MATCH_CONFIDENCE_THRESHOLD }, "Fuzzy match below confidence threshold, rejecting");
+      this.logger?.warn(
+        {
+          playerName,
+          matchedId: match.playerId,
+          confidence: match.confidence,
+          threshold: FUZZY_MATCH_CONFIDENCE_THRESHOLD,
+        },
+        "Fuzzy match below confidence threshold, rejecting",
+      );
       return null;
     }
 
@@ -178,8 +209,17 @@ export class PlayerIdentityResolutionAgent {
       )
       .execute();
 
-    const matchType = match.method === "exact_match" ? "exact" as const : "fuzzy" as const;
-    this.logger?.debug({ playerName, matchedId: match.playerId, confidence: match.confidence, method: match.method }, "New player identity mapping created via fuzzy matching");
+    const matchType =
+      match.method === "exact_match" ? ("exact" as const) : ("fuzzy" as const);
+    this.logger?.debug(
+      {
+        playerName,
+        matchedId: match.playerId,
+        confidence: match.confidence,
+        method: match.method,
+      },
+      "New player identity mapping created via fuzzy matching",
+    );
     return { playerId: match.playerId, matchType };
   }
 

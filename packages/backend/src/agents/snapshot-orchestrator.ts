@@ -131,7 +131,11 @@ export class SnapshotOrchestratorAgent {
           ),
         );
 
-      await this.computeProjections(leagueId, snapshotDate, ctx.projectionsRun?.id);
+      await this.computeProjections(
+        leagueId,
+        snapshotDate,
+        ctx.projectionsRun?.id,
+      );
 
       try {
         await this.fetchAndStoreFreeAgents(
@@ -149,9 +153,15 @@ export class SnapshotOrchestratorAgent {
       }
 
       await this.emitChangeLog(leagueId, snapshotDate);
-      this.logger?.info({ leagueId, snapshotDate }, "Snapshot job completed successfully");
+      this.logger?.info(
+        { leagueId, snapshotDate },
+        "Snapshot job completed successfully",
+      );
     } catch (error) {
-      this.logger?.error({ error, leagueId, snapshotDate }, "Snapshot job failed");
+      this.logger?.error(
+        { error, leagueId, snapshotDate },
+        "Snapshot job failed",
+      );
       throw error;
     }
   }
@@ -192,7 +202,15 @@ export class SnapshotOrchestratorAgent {
       snapshotDate,
     );
 
-    return { league, espnData, normalized, settingsVersionId, projectionsRun, isDegraded, degradedReasons };
+    return {
+      league,
+      espnData,
+      normalized,
+      settingsVersionId,
+      projectionsRun,
+      isDegraded,
+      degradedReasons,
+    };
   }
 
   private async fetchAndArchive(

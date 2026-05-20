@@ -96,7 +96,12 @@ export class ScenarioEvaluationAgent {
     };
 
     this.logger?.debug(
-      { leagueId: input.leagueId, teamId: input.teamId, addPlayerId: input.addPlayerId, dropPlayerId: input.dropPlayerId },
+      {
+        leagueId: input.leagueId,
+        teamId: input.teamId,
+        addPlayerId: input.addPlayerId,
+        dropPlayerId: input.dropPlayerId,
+      },
       "Evaluating waiver scenario deterministically",
     );
 
@@ -161,7 +166,11 @@ export class ScenarioEvaluationAgent {
     snapshotDate: string,
     projectionsRunId: number,
   ): Promise<SimulationState> {
-    return this.seasonAgent.buildState(leagueId, snapshotDate, projectionsRunId);
+    return this.seasonAgent.buildState(
+      leagueId,
+      snapshotDate,
+      projectionsRunId,
+    );
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────

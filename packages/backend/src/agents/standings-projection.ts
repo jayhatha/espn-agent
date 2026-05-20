@@ -99,7 +99,11 @@ export function computeCategoryProjections(
 
       const ci = confidenceMap[category.stat_key];
       const confidence: ConfidenceInterval | undefined = ci
-        ? { p10: currentValue + ci.p10, p50: finalValue, p90: currentValue + ci.p90 }
+        ? {
+            p10: currentValue + ci.p10,
+            p50: finalValue,
+            p90: currentValue + ci.p90,
+          }
         : undefined;
 
       categoryProjections.set(category.category_id, {
@@ -109,9 +113,11 @@ export function computeCategoryProjections(
         confidence,
       });
     } else if (category.type === "RATE") {
-      const currentComponents = (currentTotal?.components_json || {}) as StatComponents;
+      const currentComponents = (currentTotal?.components_json ||
+        {}) as StatComponents;
       const denominatorKey = isPitchingCat ? "IP" : "AB";
-      const projectedDenominator = (projectedComponents[denominatorKey] as number) ?? 0;
+      const projectedDenominator =
+        (projectedComponents[denominatorKey] as number) ?? 0;
 
       if (projectedDenominator <= 0) {
         categoryProjections.set(category.category_id, {
@@ -127,18 +133,30 @@ export function computeCategoryProjections(
             projectedComponents,
           );
 
-          const combinedComponents = combineComponents(currentComponents, projectedComponents);
+          const combinedComponents = combineComponents(
+            currentComponents,
+            projectedComponents,
+          );
 
-          const formulaId = category.formula_id || category.stat_key.toLowerCase();
+          const formulaId =
+            category.formula_id || category.stat_key.toLowerCase();
           const rateFn = (c: StatComponents) => {
-            try { return calculateFinalRate(formulaId, {}, c); } catch { return 0; }
+            try {
+              return calculateFinalRate(formulaId, {}, c);
+            } catch {
+              return 0;
+            }
           };
           const componentKeys = Object.keys(projectedComponents).filter(
             (k) =>
               typeof projectedComponents[k] === "number" &&
               (projectedComponents[k] as number) > 0,
           );
-          const rateCI = computeRateConfidence(combinedComponents, rateFn, componentKeys);
+          const rateCI = computeRateConfidence(
+            combinedComponents,
+            rateFn,
+            componentKeys,
+          );
 
           categoryProjections.set(category.category_id, {
             value: finalValue,

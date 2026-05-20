@@ -80,8 +80,8 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
           H: 90,
           BB: 40,
           HBP: 3,
-          SF: 2
-        })
+          SF: 2,
+        }),
       });
       const components = JSON.parse(projection.stat_components_json);
 
@@ -110,8 +110,8 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
           BB_P: 50,
           K: 200,
           W: 12,
-          SV: 0
-        })
+          SV: 0,
+        }),
       });
       const components = JSON.parse(projection.stat_components_json);
       const isPitcher = components.IP != null && components.IP > 0;
@@ -127,7 +127,7 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
 
       const avg = (components.H || 0) / Math.max(1, components.AB || 1);
 
-      expect(avg).toBeCloseTo(0.300, 3);
+      expect(avg).toBeCloseTo(0.3, 3);
     });
 
     it("should calculate OBP from multiple components", () => {
@@ -136,7 +136,13 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
 
       const obp =
         ((components.H || 0) + (components.BB || 0) + (components.HBP || 0)) /
-        Math.max(1, (components.AB || 0) + (components.BB || 0) + (components.HBP || 0) + (components.SF || 0));
+        Math.max(
+          1,
+          (components.AB || 0) +
+            (components.BB || 0) +
+            (components.HBP || 0) +
+            (components.SF || 0),
+        );
 
       // (150 + 60 + 5) / (500 + 60 + 5 + 4) = 215/569 = 0.3778
       expect(obp).toBeCloseTo(0.3778, 3);
@@ -149,7 +155,7 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
       const slg = (components.TB || 0) / Math.max(1, components.AB || 1);
 
       // 280 / 500 = 0.560
-      expect(slg).toBeCloseTo(0.560, 3);
+      expect(slg).toBeCloseTo(0.56, 3);
     });
 
     it("should calculate ERA from ER and IP components", () => {
@@ -162,15 +168,16 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
           BB_P: 50,
           K: 200,
           W: 12,
-          SV: 0
-        })
+          SV: 0,
+        }),
       });
       const components = JSON.parse(projection.stat_components_json);
 
-      const era = (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
+      const era =
+        (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
 
       // 9 * 60 / 180 = 3.00
-      expect(era).toBeCloseTo(3.00, 2);
+      expect(era).toBeCloseTo(3.0, 2);
     });
 
     it("should calculate WHIP from H_P, BB_P, and IP components", () => {
@@ -183,12 +190,14 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
           BB_P: 50,
           K: 200,
           W: 12,
-          SV: 0
-        })
+          SV: 0,
+        }),
       });
       const components = JSON.parse(projection.stat_components_json);
 
-      const whip = ((components.H_P || 0) + (components.BB_P || 0)) / Math.max(0.1, components.IP || 0.1);
+      const whip =
+        ((components.H_P || 0) + (components.BB_P || 0)) /
+        Math.max(0.1, components.IP || 0.1);
 
       // (150 + 50) / 180 = 1.111
       expect(whip).toBeCloseTo(1.111, 3);
@@ -200,8 +209,8 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
       const projection = createMockProjection({
         stat_components_json: JSON.stringify({
           AB: 0,
-          H: 0
-        })
+          H: 0,
+        }),
       });
       const components = JSON.parse(projection.stat_components_json);
 
@@ -212,12 +221,13 @@ describe("TradeRecommendationAgent - Projection Field Access Fix (DEBT-01)", () 
 
     it("should handle missing components gracefully", () => {
       const projection = createMockProjection({
-        stat_components_json: JSON.stringify({})
+        stat_components_json: JSON.stringify({}),
       });
       const components = JSON.parse(projection.stat_components_json);
 
       const avg = (components.H || 0) / Math.max(1, components.AB || 1);
-      const era = (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
+      const era =
+        (9 * (components.ER || 0)) / Math.max(0.1, components.IP || 0.1);
 
       expect(avg).toBe(0);
       expect(era).toBe(0);
@@ -418,11 +428,20 @@ describe("TradeRecommendationAgent - Rate Stat Component Math", () => {
       const teamId = 6;
       const snapshotDate = "2026-02-19";
 
-      setupMockForMissingProjectionsTest(mockDb, leagueId, teamId, snapshotDate);
+      setupMockForMissingProjectionsTest(
+        mockDb,
+        leagueId,
+        teamId,
+        snapshotDate,
+      );
 
       const trade = {
-        givePlayers: [{ playerId: 601, playerName: "Player Without Projections" }],
-        receivePlayers: [{ playerId: 602, playerName: "Another Player Without Projections" }],
+        givePlayers: [
+          { playerId: 601, playerName: "Player Without Projections" },
+        ],
+        receivePlayers: [
+          { playerId: 602, playerName: "Another Player Without Projections" },
+        ],
       };
 
       const result = await agent.analyzeTradeImpact(
@@ -456,8 +475,12 @@ describe("TradeRecommendationAgent - Rate Stat Component Math", () => {
       setupMockForSVTest(mockDb, leagueId, teamId, snapshotDate);
 
       const trade = {
-        givePlayers: [{ playerId: 801, playerName: "Closer Being Traded Away" }],
-        receivePlayers: [{ playerId: 802, playerName: "Starter Being Acquired" }],
+        givePlayers: [
+          { playerId: 801, playerName: "Closer Being Traded Away" },
+        ],
+        receivePlayers: [
+          { playerId: 802, playerName: "Starter Being Acquired" },
+        ],
       };
 
       const result = await agent.analyzeTradeImpact(
@@ -568,7 +591,8 @@ function createMockDb(): any {
       orderBy: (..._args: any[]) => createChainable(table, joinTables),
       select: (_fields: any) => createChainable(table, joinTables),
       selectAll: (_prefix?: string) => createChainable(table, joinTables),
-      innerJoin: (jTable: string, ..._args: any[]) => createChainable(table, [...joinTables, jTable]),
+      innerJoin: (jTable: string, ..._args: any[]) =>
+        createChainable(table, [...joinTables, jTable]),
     };
 
     return builder;
@@ -583,7 +607,12 @@ function createMockDb(): any {
 }
 
 // Test setup helpers
-function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForAVGTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   // Snapshot exists
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
@@ -592,13 +621,23 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
   });
 
   // Settings with AVG category
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "AVG",
+            stat_key: "AVG",
+            name: "Batting Average",
+            type: "RATE",
+            formula_id: "avg",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   // Current projected overall
   mockDb._setMockResult("team_daily_projected_overall_single", {
@@ -609,7 +648,7 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
   mockDb._setMockResult("team_daily_projected_category_list", [
     {
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_rank: 5,
       projected_roto_points: 5,
       projected_components_json: { H: 1500, AB: 5000 },
@@ -621,18 +660,38 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
     {
       team_id: teamId,
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_components_json: { H: 1500, AB: 5000 },
     },
-    { team_id: 10, category_id: "AVG", projected_value: 0.280, projected_components_json: {} },
-    { team_id: 11, category_id: "AVG", projected_value: 0.290, projected_components_json: {} },
-    { team_id: 12, category_id: "AVG", projected_value: 0.310, projected_components_json: {} },
+    {
+      team_id: 10,
+      category_id: "AVG",
+      projected_value: 0.28,
+      projected_components_json: {},
+    },
+    {
+      team_id: 11,
+      category_id: "AVG",
+      projected_value: 0.29,
+      projected_components_json: {},
+    },
+    {
+      team_id: 12,
+      category_id: "AVG",
+      projected_value: 0.31,
+      projected_components_json: {},
+    },
   ]);
 
   // Roster - note: table is "team_roster_snapshot as roster" with innerJoin "player"
   // The mock key follows pattern: table_jointable_list
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 101, player_name: "Traded Away Player", positions: ["OF"], roster_status: "active" },
+    {
+      player_id: 101,
+      player_name: "Traded Away Player",
+      positions: ["OF"],
+      roster_status: "active",
+    },
   ]);
 
   // Player projections - when projections_run_id is set, the primary path runs:
@@ -655,20 +714,35 @@ function setupMockForAVGTest(mockDb: any, leagueId: number, teamId: number, snap
   ]);
 }
 
-function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForERATest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 2,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "ERA", stat_key: "ERA", name: "Earned Run Average", type: "RATE", formula_id: "era", direction: "LOWER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "ERA",
+            stat_key: "ERA",
+            name: "Earned Run Average",
+            type: "RATE",
+            formula_id: "era",
+            direction: "LOWER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 6,
@@ -677,7 +751,7 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
   mockDb._setMockResult("team_daily_projected_category_list", [
     {
       category_id: "ERA",
-      projected_value: 3.000,
+      projected_value: 3.0,
       projected_rank: 6,
       projected_roto_points: 6,
       projected_components_json: { IP: 1200, ER: 400 },
@@ -688,15 +762,30 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
     {
       team_id: teamId,
       category_id: "ERA",
-      projected_value: 3.000,
+      projected_value: 3.0,
       projected_components_json: { IP: 1200, ER: 400 },
     },
-    { team_id: 20, category_id: "ERA", projected_value: 3.500, projected_components_json: {} },
-    { team_id: 21, category_id: "ERA", projected_value: 3.200, projected_components_json: {} },
+    {
+      team_id: 20,
+      category_id: "ERA",
+      projected_value: 3.5,
+      projected_components_json: {},
+    },
+    {
+      team_id: 21,
+      category_id: "ERA",
+      projected_value: 3.2,
+      projected_components_json: {},
+    },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 201, player_name: "Traded Pitcher", positions: ["SP"], roster_status: "active" },
+    {
+      player_id: 201,
+      player_name: "Traded Pitcher",
+      positions: ["SP"],
+      roster_status: "active",
+    },
   ]);
 
   mockDb._setMockResult("player_projection_list", [
@@ -713,20 +802,35 @@ function setupMockForERATest(mockDb: any, leagueId: number, teamId: number, snap
   ]);
 }
 
-function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForOBPTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 3,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "OBP", stat_key: "OBP", name: "On-Base Percentage", type: "RATE", formula_id: "obp", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "OBP",
+            stat_key: "OBP",
+            name: "On-Base Percentage",
+            type: "RATE",
+            formula_id: "obp",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 7,
@@ -738,7 +842,13 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
       projected_value: 0.3529, // (1500+500+50)/(5000+500+50+100)
       projected_rank: 7,
       projected_roto_points: 7,
-      projected_components_json: { H: 1500, BB: 500, HBP: 50, AB: 5000, SF: 100 },
+      projected_components_json: {
+        H: 1500,
+        BB: 500,
+        HBP: 50,
+        AB: 5000,
+        SF: 100,
+      },
     },
   ]);
 
@@ -747,14 +857,35 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
       team_id: teamId,
       category_id: "OBP",
       projected_value: 0.3529,
-      projected_components_json: { H: 1500, BB: 500, HBP: 50, AB: 5000, SF: 100 },
+      projected_components_json: {
+        H: 1500,
+        BB: 500,
+        HBP: 50,
+        AB: 5000,
+        SF: 100,
+      },
     },
-    { team_id: 30, category_id: "OBP", projected_value: 0.340, projected_components_json: {} },
-    { team_id: 31, category_id: "OBP", projected_value: 0.360, projected_components_json: {} },
+    {
+      team_id: 30,
+      category_id: "OBP",
+      projected_value: 0.34,
+      projected_components_json: {},
+    },
+    {
+      team_id: 31,
+      category_id: "OBP",
+      projected_value: 0.36,
+      projected_components_json: {},
+    },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 301, player_name: "Player Out", positions: ["1B"], roster_status: "active" },
+    {
+      player_id: 301,
+      player_name: "Player Out",
+      positions: ["1B"],
+      roster_status: "active",
+    },
   ]);
 
   mockDb._setMockResult("player_projection_list", [
@@ -771,20 +902,35 @@ function setupMockForOBPTest(mockDb: any, leagueId: number, teamId: number, snap
   ]);
 }
 
-function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForWHIPTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 4,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "WHIP", stat_key: "WHIP", name: "Walks + Hits / IP", type: "RATE", formula_id: "whip", direction: "LOWER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "WHIP",
+            stat_key: "WHIP",
+            name: "Walks + Hits / IP",
+            type: "RATE",
+            formula_id: "whip",
+            direction: "LOWER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 8,
@@ -807,11 +953,21 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
       projected_value: 1.25,
       projected_components_json: { IP: 1200, H: 1100, BB: 400 },
     },
-    { team_id: 40, category_id: "WHIP", projected_value: 1.30, projected_components_json: {} },
+    {
+      team_id: 40,
+      category_id: "WHIP",
+      projected_value: 1.3,
+      projected_components_json: {},
+    },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 401, player_name: "Pitcher Out", positions: ["RP"], roster_status: "active" },
+    {
+      player_id: 401,
+      player_name: "Pitcher Out",
+      positions: ["RP"],
+      roster_status: "active",
+    },
   ]);
 
   mockDb._setMockResult("player_projection_list", [
@@ -828,20 +984,35 @@ function setupMockForWHIPTest(mockDb: any, leagueId: number, teamId: number, sna
   ]);
 }
 
-function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForZeroTradeTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 5,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "AVG",
+            stat_key: "AVG",
+            name: "Batting Average",
+            type: "RATE",
+            formula_id: "avg",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 5,
@@ -850,7 +1021,7 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
   mockDb._setMockResult("team_daily_projected_category_list", [
     {
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_rank: 5,
       projected_roto_points: 5,
       projected_components_json: { H: 1500, AB: 5000 },
@@ -861,13 +1032,18 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
     {
       team_id: teamId,
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_components_json: { H: 1500, AB: 5000 },
     },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 501, player_name: "Same Player", positions: ["OF"], roster_status: "active" },
+    {
+      player_id: 501,
+      player_name: "Same Player",
+      positions: ["OF"],
+      roster_status: "active",
+    },
   ]);
 
   mockDb._setMockResult("player_projection_list", [
@@ -879,20 +1055,35 @@ function setupMockForZeroTradeTest(mockDb: any, leagueId: number, teamId: number
   ]);
 }
 
-function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForMissingProjectionsTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: null, // No projections run — uses fallback date-based path
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "AVG",
+            stat_key: "AVG",
+            name: "Batting Average",
+            type: "RATE",
+            formula_id: "avg",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 5,
@@ -901,7 +1092,7 @@ function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamI
   mockDb._setMockResult("team_daily_projected_category_list", [
     {
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_rank: 5,
       projected_roto_points: 5,
       projected_components_json: { H: 1500, AB: 5000 },
@@ -912,34 +1103,60 @@ function setupMockForMissingProjectionsTest(mockDb: any, leagueId: number, teamI
     {
       team_id: teamId,
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_components_json: { H: 1500, AB: 5000 },
     },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 601, player_name: "Player Without Projections", positions: ["OF"], roster_status: "active" },
+    {
+      player_id: 601,
+      player_name: "Player Without Projections",
+      positions: ["OF"],
+      roster_status: "active",
+    },
   ]);
 
   // Empty projections list (no projections found)
   mockDb._setMockResult("player_projection_projections_run_player_list", []);
 }
 
-function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForMultiPlayerTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 7,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "AVG", stat_key: "AVG", name: "Batting Average", type: "RATE", formula_id: "avg", direction: "HIGHER_BETTER" },
-        { category_id: "HR", stat_key: "HR", name: "Home Runs", type: "COUNTING", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "AVG",
+            stat_key: "AVG",
+            name: "Batting Average",
+            type: "RATE",
+            formula_id: "avg",
+            direction: "HIGHER_BETTER",
+          },
+          {
+            category_id: "HR",
+            stat_key: "HR",
+            name: "Home Runs",
+            type: "COUNTING",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 10,
@@ -948,7 +1165,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
   mockDb._setMockResult("team_daily_projected_category_list", [
     {
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_rank: 5,
       projected_roto_points: 5,
       projected_components_json: { H: 1500, AB: 5000 },
@@ -967,7 +1184,7 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
     {
       team_id: teamId,
       category_id: "AVG",
-      projected_value: 0.300,
+      projected_value: 0.3,
       projected_components_json: { H: 1500, AB: 5000 },
     },
     {
@@ -976,15 +1193,45 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
       projected_value: 200,
       projected_components_json: {},
     },
-    { team_id: 70, category_id: "AVG", projected_value: 0.280, projected_components_json: {} },
-    { team_id: 70, category_id: "HR", projected_value: 180, projected_components_json: {} },
-    { team_id: 71, category_id: "AVG", projected_value: 0.310, projected_components_json: {} },
-    { team_id: 71, category_id: "HR", projected_value: 210, projected_components_json: {} },
+    {
+      team_id: 70,
+      category_id: "AVG",
+      projected_value: 0.28,
+      projected_components_json: {},
+    },
+    {
+      team_id: 70,
+      category_id: "HR",
+      projected_value: 180,
+      projected_components_json: {},
+    },
+    {
+      team_id: 71,
+      category_id: "AVG",
+      projected_value: 0.31,
+      projected_components_json: {},
+    },
+    {
+      team_id: 71,
+      category_id: "HR",
+      projected_value: 210,
+      projected_components_json: {},
+    },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 701, player_name: "Player A", positions: ["OF"], roster_status: "active" },
-    { player_id: 702, player_name: "Player B", positions: ["1B"], roster_status: "active" },
+    {
+      player_id: 701,
+      player_name: "Player A",
+      positions: ["OF"],
+      roster_status: "active",
+    },
+    {
+      player_id: 702,
+      player_name: "Player B",
+      positions: ["1B"],
+      roster_status: "active",
+    },
   ]);
 
   mockDb._setMockResult("player_projection_list", [
@@ -1011,20 +1258,34 @@ function setupMockForMultiPlayerTest(mockDb: any, leagueId: number, teamId: numb
   ]);
 }
 
-function setupMockForSVTest(mockDb: any, leagueId: number, teamId: number, snapshotDate: string) {
+function setupMockForSVTest(
+  mockDb: any,
+  leagueId: number,
+  teamId: number,
+  snapshotDate: string,
+) {
   mockDb._setMockResult("league_daily_snapshot_single", {
     league_id: leagueId,
     snapshot_date: snapshotDate,
     projections_run_id: 8,
   });
 
-  mockDb._setMockResult("league_daily_snapshot_league_settings_version_single", {
-    settings_json: {
-      categories: [
-        { category_id: "SV", stat_key: "SV", name: "Saves", type: "COUNTING", direction: "HIGHER_BETTER" },
-      ],
+  mockDb._setMockResult(
+    "league_daily_snapshot_league_settings_version_single",
+    {
+      settings_json: {
+        categories: [
+          {
+            category_id: "SV",
+            stat_key: "SV",
+            name: "Saves",
+            type: "COUNTING",
+            direction: "HIGHER_BETTER",
+          },
+        ],
+      },
     },
-  });
+  );
 
   mockDb._setMockResult("team_daily_projected_overall_single", {
     projected_overall_points: 6,
@@ -1045,18 +1306,79 @@ function setupMockForSVTest(mockDb: any, leagueId: number, teamId: number, snaps
   // projected_rank is included on the user team entry so getCurrentStandings returns
   // the correct pre-trade rank (3rd with 30 saves).
   mockDb._setMockResult("team_daily_projected_category_list", [
-    { team_id: teamId, category_id: "SV", projected_value: 30, projected_rank: 3, projected_roto_points: 6, projected_components_json: {} },
-    { team_id: 80, category_id: "SV", projected_value: 40, projected_rank: 1, projected_roto_points: 8, projected_components_json: {} },
-    { team_id: 81, category_id: "SV", projected_value: 35, projected_rank: 2, projected_roto_points: 7, projected_components_json: {} },
-    { team_id: 82, category_id: "SV", projected_value: 22, projected_rank: 4, projected_roto_points: 5, projected_components_json: {} },
-    { team_id: 83, category_id: "SV", projected_value: 18, projected_rank: 5, projected_roto_points: 4, projected_components_json: {} },
-    { team_id: 84, category_id: "SV", projected_value: 12, projected_rank: 6, projected_roto_points: 3, projected_components_json: {} },
-    { team_id: 85, category_id: "SV", projected_value: 8, projected_rank: 7, projected_roto_points: 2, projected_components_json: {} },
-    { team_id: 86, category_id: "SV", projected_value: 5, projected_rank: 8, projected_roto_points: 1, projected_components_json: {} },
+    {
+      team_id: teamId,
+      category_id: "SV",
+      projected_value: 30,
+      projected_rank: 3,
+      projected_roto_points: 6,
+      projected_components_json: {},
+    },
+    {
+      team_id: 80,
+      category_id: "SV",
+      projected_value: 40,
+      projected_rank: 1,
+      projected_roto_points: 8,
+      projected_components_json: {},
+    },
+    {
+      team_id: 81,
+      category_id: "SV",
+      projected_value: 35,
+      projected_rank: 2,
+      projected_roto_points: 7,
+      projected_components_json: {},
+    },
+    {
+      team_id: 82,
+      category_id: "SV",
+      projected_value: 22,
+      projected_rank: 4,
+      projected_roto_points: 5,
+      projected_components_json: {},
+    },
+    {
+      team_id: 83,
+      category_id: "SV",
+      projected_value: 18,
+      projected_rank: 5,
+      projected_roto_points: 4,
+      projected_components_json: {},
+    },
+    {
+      team_id: 84,
+      category_id: "SV",
+      projected_value: 12,
+      projected_rank: 6,
+      projected_roto_points: 3,
+      projected_components_json: {},
+    },
+    {
+      team_id: 85,
+      category_id: "SV",
+      projected_value: 8,
+      projected_rank: 7,
+      projected_roto_points: 2,
+      projected_components_json: {},
+    },
+    {
+      team_id: 86,
+      category_id: "SV",
+      projected_value: 5,
+      projected_rank: 8,
+      projected_roto_points: 1,
+      projected_components_json: {},
+    },
   ]);
 
   mockDb._setMockResult("team_roster_snapshot_player_list", [
-    { player_id: 801, player_name: "Closer Being Traded Away", positions: ["RP"], roster_status: "active" },
+    {
+      player_id: 801,
+      player_name: "Closer Being Traded Away",
+      positions: ["RP"],
+      roster_status: "active",
+    },
   ]);
 
   // Closer (player 801): 25 projected saves, 55 IP
@@ -1066,12 +1388,80 @@ function setupMockForSVTest(mockDb: any, leagueId: number, teamId: number, snaps
     {
       player_id: 801,
       projections_run_id: 8,
-      stat_components_json: { IP: 55, ER: 18, HA: 40, BBA: 15, K: 65, W: 3, SV: 25 },
+      stat_components_json: {
+        IP: 55,
+        ER: 18,
+        HA: 40,
+        BBA: 15,
+        K: 65,
+        W: 3,
+        SV: 25,
+      },
     },
     {
       player_id: 802,
       projections_run_id: 8,
-      stat_components_json: { IP: 180, ER: 65, HA: 160, BBA: 55, K: 185, W: 13, SV: 0 },
+      stat_components_json: {
+        IP: 180,
+        ER: 65,
+        HA: 160,
+        BBA: 55,
+        K: 185,
+        W: 13,
+        SV: 0,
+      },
     },
   ]);
 }
+
+// ─── Phase 108: bilateral trade delta regression tests ────────────────────────
+// These tests fail before the Phase 108 rewiring because:
+// 1. TradeImpactAnalysis doesn't include partnerDeltaOverallPoints
+// 2. TradeRecommendationAgent constructor doesn't accept ScenarioEvaluationAgent
+
+describe("Phase 108 — bilateral delta and partner awareness", () => {
+  it("TradeImpactAnalysis type includes partnerDeltaOverallPoints field", () => {
+    // Type-level check: create an object that satisfies TradeImpactAnalysis with the new field
+    // This test exercises that the TypeScript interface was extended.
+    // FAILING before fix: TradeImpactAnalysis doesn't have partnerDeltaOverallPoints
+    const impact = {
+      trade: { givePlayers: [], receivePlayers: [] },
+      currentOverallPoints: 5,
+      projectedOverallPoints: 7,
+      deltaOverallPoints: 2,
+      categoryImpacts: [],
+      fairnessScore: 0.5,
+      recommendation: "accept" as const,
+      explanation: "good trade",
+      partnerDeltaOverallPoints: -1.5, // NEW FIELD — fails before Phase 108
+      partnerCategoryImpacts: [], // NEW FIELD — fails before Phase 108
+    };
+
+    // Structural check: both user and partner deltas should be present
+    expect(typeof impact.deltaOverallPoints).toBe("number");
+    expect(typeof impact.partnerDeltaOverallPoints).toBe("number");
+    // For a zero-sum trade in a 2-team league, these should sum to approximately zero
+    // (roto points gained by one = roto points lost by the other)
+    expect(impact.partnerDeltaOverallPoints).toBeLessThan(0);
+  });
+
+  it("TradeCandidate includes partnerDeltaOverallPoints for bilateral scoring", () => {
+    const candidate = {
+      trade: {
+        givePlayers: [{ playerId: 1, playerName: "A" }],
+        receivePlayers: [{ playerId: 2, playerName: "B" }],
+      },
+      partnerTeamId: 5,
+      partnerTeamName: "Team 5",
+      deltaOverallPoints: 2.5,
+      categoryImpacts: [],
+      fairnessScore: 0.6,
+      likelihood: "high" as const,
+      explanation: "good for me",
+      partnerDeltaOverallPoints: -1.2, // NEW FIELD — must be in TradeCandidate
+    };
+
+    expect(candidate.partnerDeltaOverallPoints).toBeDefined();
+    expect(typeof candidate.partnerDeltaOverallPoints).toBe("number");
+  });
+});

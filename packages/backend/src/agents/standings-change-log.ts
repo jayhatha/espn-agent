@@ -275,21 +275,7 @@ export class StandingsChangeLogAgent {
 
         const result = await this.db
           .insertInto("standings_change_event")
-          .values({
-            league_id: leagueId,
-            team_id: team.id,
-            snapshot_date: currDate,
-            category_id: categoryId,
-            category_name: categoryName,
-            prev_roto_pts: prevP,
-            curr_roto_pts: currP,
-            roto_delta: rotoDelta,
-            passed_team_id: passedTeamId,
-            passed_team_name: passedTeamName,
-            direction: directionLabel,
-            event_source: eventSource,
-            proximate_cause: proximateCause,
-          })
+          .values(payload)
           .onConflict((oc) =>
             oc.constraint("sce_unique_event").doUpdateSet({
               curr_roto_pts: sql`EXCLUDED.curr_roto_pts`,
