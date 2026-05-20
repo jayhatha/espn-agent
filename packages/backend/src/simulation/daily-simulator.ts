@@ -7,7 +7,11 @@ import {
   REPLACEMENT_PITCHER_DAILY,
 } from "./churn.js";
 import type { Rng } from "./prng.js";
-import type { TeamOpportunityStream, PlayerOpportunity, TeamRunResult } from "./types.js";
+import type {
+  TeamOpportunityStream,
+  PlayerOpportunity,
+  TeamRunResult,
+} from "./types.js";
 
 function addComp(target: StatComponents, source: StatComponents): void {
   for (const [key, value] of Object.entries(source)) {
@@ -24,7 +28,8 @@ function addComp(target: StatComponents, source: StatComponents): void {
  */
 function estimateDays(components: StatComponents): number {
   if ((components.IP ?? 0) > 0) return Math.max(1, (components.IP ?? 1) / 1.0);
-  if ((components.AB ?? 0) > 0) return Math.max(1, (components.AB ?? 3.5) / 3.5);
+  if ((components.AB ?? 0) > 0)
+    return Math.max(1, (components.AB ?? 3.5) / 3.5);
   return 1;
 }
 
@@ -117,7 +122,11 @@ export function simulateTeamRun(
   });
 
   // Step 5: Apply GS cap to SP totals (GS-01)
-  const { scaledProjections: cappedSPs } = applyGsCap(gsUsed, gsCap, spProjections);
+  const { scaledProjections: cappedSPs } = applyGsCap(
+    gsUsed,
+    gsCap,
+    spProjections,
+  );
 
   const pitcherRoS: StatComponents = {};
   for (const sp of cappedSPs) {
@@ -169,8 +178,14 @@ export function simulateTeamRun(
   }
 
   // ── Step 6: Combine RoS with season-to-date actuals ─────────────────────
-  const batterComponents = combineComponents(currentBatterComponents, batterRoS);
-  const pitcherComponents = combineComponents(currentPitcherComponents, pitcherRoS);
+  const batterComponents = combineComponents(
+    currentBatterComponents,
+    batterRoS,
+  );
+  const pitcherComponents = combineComponents(
+    currentPitcherComponents,
+    pitcherRoS,
+  );
 
   const starterDays = hitters.length + pitchers.length;
 

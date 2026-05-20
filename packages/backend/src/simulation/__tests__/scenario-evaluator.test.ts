@@ -47,12 +47,24 @@ function makeTeam(
   rbiPerSeason: number,
   ab: number,
   h: number,
-  roster: Array<{ playerId: number; positions: string[]; hr: number; rbi: number; abProj: number; hProj: number }> = [],
+  roster: Array<{
+    playerId: number;
+    positions: string[];
+    hr: number;
+    rbi: number;
+    abProj: number;
+    hProj: number;
+  }> = [],
 ): TeamSimInput {
   return {
     teamId: id,
     teamName: `Team ${id}`,
-    currentBatterComponents: { HR: hrPerSeason, RBI: rbiPerSeason, AB: ab, H: h },
+    currentBatterComponents: {
+      HR: hrPerSeason,
+      RBI: rbiPerSeason,
+      AB: ab,
+      H: h,
+    },
     currentPitcherComponents: {},
     roster: roster.map((r) => ({
       playerId: r.playerId,
@@ -92,7 +104,10 @@ function daysBetween(from: string, to: string): number {
   s.setHours(0, 0, 0, 0);
   const e = new Date(to);
   e.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+  return Math.max(
+    0,
+    Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)),
+  );
 }
 
 // ─── Tests: waiver scoring ────────────────────────────────────────────────────
@@ -101,17 +116,24 @@ describe("evaluateDeterministicScenario — waiver mutations", () => {
   it("legal flex replacement yields positive delta for a clearly better player", () => {
     // 3-team league: team 1 has low HR projection; adding a high-HR player via drop
     const teams = [
-      makeTeam(
-        1,
-        20,
-        60,
-        200,
-        50,
-        [
-          { playerId: 11, positions: ["OF"], hr: 5, rbi: 15, abProj: 80, hProj: 20 }, // the player being dropped
-          { playerId: 12, positions: ["1B"], hr: 10, rbi: 30, abProj: 150, hProj: 42 },
-        ],
-      ),
+      makeTeam(1, 20, 60, 200, 50, [
+        {
+          playerId: 11,
+          positions: ["OF"],
+          hr: 5,
+          rbi: 15,
+          abProj: 80,
+          hProj: 20,
+        }, // the player being dropped
+        {
+          playerId: 12,
+          positions: ["1B"],
+          hr: 10,
+          rbi: 30,
+          abProj: 150,
+          hProj: 42,
+        },
+      ]),
       makeTeam(2, 35, 90, 200, 58, []),
       makeTeam(3, 30, 80, 200, 55, []),
     ];
@@ -136,18 +158,25 @@ describe("evaluateDeterministicScenario — waiver mutations", () => {
   it("illegal swap surfacing blocking issues when no valid slot exists", () => {
     // Team has only 1 OF slot filled — dropping the only eligible OF leaves a gap
     const teams = [
-      makeTeam(
-        1,
-        20,
-        60,
-        200,
-        50,
-        [
-          // Only one OF on the roster filling the single OF slot
-          { playerId: 11, positions: ["OF"], hr: 10, rbi: 30, abProj: 150, hProj: 42 },
-          { playerId: 12, positions: ["C"], hr: 5, rbi: 20, abProj: 80, hProj: 22 },
-        ],
-      ),
+      makeTeam(1, 20, 60, 200, 50, [
+        // Only one OF on the roster filling the single OF slot
+        {
+          playerId: 11,
+          positions: ["OF"],
+          hr: 10,
+          rbi: 30,
+          abProj: 150,
+          hProj: 42,
+        },
+        {
+          playerId: 12,
+          positions: ["C"],
+          hr: 5,
+          rbi: 20,
+          abProj: 80,
+          hProj: 22,
+        },
+      ]),
       makeTeam(2, 35, 90, 200, 58, []),
     ];
 
@@ -174,14 +203,16 @@ describe("evaluateDeterministicScenario — waiver mutations", () => {
 
   it("delta is zero when added player has identical projections to dropped player", () => {
     const teams = [
-      makeTeam(
-        1,
-        20,
-        60,
-        200,
-        50,
-        [{ playerId: 11, positions: ["OF"], hr: 15, rbi: 45, abProj: 150, hProj: 42 }],
-      ),
+      makeTeam(1, 20, 60, 200, 50, [
+        {
+          playerId: 11,
+          positions: ["OF"],
+          hr: 15,
+          rbi: 45,
+          abProj: 150,
+          hProj: 42,
+        },
+      ]),
       makeTeam(2, 25, 70, 200, 55, []),
     ];
 
@@ -207,17 +238,24 @@ describe("evaluateDeterministicScenario — trade mutations", () => {
   it("bilateral trade returns both user delta and partner delta", () => {
     // Team 1 gives a power hitter (HR) to team 2; receives an average hitter (AVG)
     const teams = [
-      makeTeam(
-        1,
-        30,
-        90,
-        300,
-        90,
-        [
-          { playerId: 11, positions: ["OF"], hr: 20, rbi: 60, abProj: 300, hProj: 90 }, // giving
-          { playerId: 12, positions: ["1B"], hr: 10, rbi: 30, abProj: 150, hProj: 45 },
-        ],
-      ),
+      makeTeam(1, 30, 90, 300, 90, [
+        {
+          playerId: 11,
+          positions: ["OF"],
+          hr: 20,
+          rbi: 60,
+          abProj: 300,
+          hProj: 90,
+        }, // giving
+        {
+          playerId: 12,
+          positions: ["1B"],
+          hr: 10,
+          rbi: 30,
+          abProj: 150,
+          hProj: 45,
+        },
+      ]),
       makeTeam(
         2,
         10,
@@ -225,8 +263,22 @@ describe("evaluateDeterministicScenario — trade mutations", () => {
         300,
         99, // team 2 leads in AVG
         [
-          { playerId: 21, positions: ["SS"], hr: 2, rbi: 20, abProj: 280, hProj: 92 }, // receiving
-          { playerId: 22, positions: ["OF"], hr: 5, rbi: 25, abProj: 200, hProj: 60 },
+          {
+            playerId: 21,
+            positions: ["SS"],
+            hr: 2,
+            rbi: 20,
+            abProj: 280,
+            hProj: 92,
+          }, // receiving
+          {
+            playerId: 22,
+            positions: ["OF"],
+            hr: 5,
+            rbi: 25,
+            abProj: 200,
+            hProj: 60,
+          },
         ],
       ),
       makeTeam(3, 20, 65, 300, 78, []),
@@ -256,22 +308,26 @@ describe("evaluateDeterministicScenario — trade mutations", () => {
   it("trade is illegal when post-trade user roster cannot fill required slots", () => {
     const state: SimulationState = {
       ...makeState([
-        makeTeam(
-          1,
-          20,
-          60,
-          200,
-          55,
-          [{ playerId: 11, positions: ["C"], hr: 5, rbi: 15, abProj: 100, hProj: 28 }],
-        ),
-        makeTeam(
-          2,
-          25,
-          70,
-          200,
-          58,
-          [{ playerId: 21, positions: ["OF"], hr: 10, rbi: 30, abProj: 150, hProj: 42 }],
-        ),
+        makeTeam(1, 20, 60, 200, 55, [
+          {
+            playerId: 11,
+            positions: ["C"],
+            hr: 5,
+            rbi: 15,
+            abProj: 100,
+            hProj: 28,
+          },
+        ]),
+        makeTeam(2, 25, 70, 200, 58, [
+          {
+            playerId: 21,
+            positions: ["OF"],
+            hr: 10,
+            rbi: 30,
+            abProj: 150,
+            hProj: 42,
+          },
+        ]),
       ]),
       // 1 C slot required
       rosterSlots: { ...ROSTER_SLOTS, C: 1 },
@@ -292,25 +348,29 @@ describe("evaluateDeterministicScenario — trade mutations", () => {
   });
 
   it("summed user + partner deltas approximately equal zero for fair value swaps", () => {
-    // If league has only 2 teams and they swap equivalent players, 
+    // If league has only 2 teams and they swap equivalent players,
     // user gains what partner loses and vice versa (zero-sum in roto points)
     const teams = [
-      makeTeam(
-        1,
-        20,
-        60,
-        200,
-        55,
-        [{ playerId: 11, positions: ["OF"], hr: 15, rbi: 45, abProj: 200, hProj: 58 }],
-      ),
-      makeTeam(
-        2,
-        20,
-        60,
-        200,
-        55,
-        [{ playerId: 21, positions: ["OF"], hr: 15, rbi: 45, abProj: 200, hProj: 58 }],
-      ),
+      makeTeam(1, 20, 60, 200, 55, [
+        {
+          playerId: 11,
+          positions: ["OF"],
+          hr: 15,
+          rbi: 45,
+          abProj: 200,
+          hProj: 58,
+        },
+      ]),
+      makeTeam(2, 20, 60, 200, 55, [
+        {
+          playerId: 21,
+          positions: ["OF"],
+          hr: 15,
+          rbi: 45,
+          abProj: 200,
+          hProj: 58,
+        },
+      ]),
     ];
 
     const state = makeState(teams);

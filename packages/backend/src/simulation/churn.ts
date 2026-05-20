@@ -12,11 +12,11 @@ const AVAILABILITY_NOISE_SD = 0.03;
 export const REPLACEMENT_HITTER_DAILY: StatComponents = {
   AB: 3.5,
   H: 0.88,
-  R: 0.40,
+  R: 0.4,
   HR: 0.05,
   RBI: 0.35,
   BB: 0.35,
-  TB: 1.20,
+  TB: 1.2,
   SB: 0.04,
   HBP: 0.03,
   SF: 0.02,
@@ -25,11 +25,11 @@ export const REPLACEMENT_HITTER_DAILY: StatComponents = {
 /** Replacement-level per-day production (pitchers) */
 export const REPLACEMENT_PITCHER_DAILY: StatComponents = {
   IP: 1.0,
-  ER: 0.50,
+  ER: 0.5,
   W: 0.05,
   K: 0.85,
-  HA: 1.10,
-  BBA: 0.40,
+  HA: 1.1,
+  BBA: 0.4,
 };
 
 /**

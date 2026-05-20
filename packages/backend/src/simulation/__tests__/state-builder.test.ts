@@ -10,7 +10,10 @@ function daysBetween(from: string, to: string): number {
   start.setHours(0, 0, 0, 0);
   const end = new Date(to);
   end.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+  return Math.max(
+    0,
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+  );
 }
 
 /** Minimal chainable Kysely mock. `tableData` keys are bare table names (no alias). */
@@ -19,7 +22,11 @@ function createMockDb(tableData: Record<string, unknown | unknown[]> = {}) {
     selectFrom: vi.fn((table: string) => {
       const base = table.split(" as ")[0].trim();
       const data = tableData[base];
-      const arr: unknown[] = Array.isArray(data) ? data : data != null ? [data] : [];
+      const arr: unknown[] = Array.isArray(data)
+        ? data
+        : data != null
+          ? [data]
+          : [];
       const first = arr[0] ?? null;
       const chain: Record<string, unknown> = {
         selectAll: vi.fn().mockReturnThis(),
@@ -47,7 +54,10 @@ describe("buildSimulationState — snapshot-date-derived horizon", () => {
     // Use a historic snapshotDate that is certainly different from today
     const snapshotDate = "2026-05-01";
     const expectedDays = daysBetween(snapshotDate, DEFAULT_SEASON_END);
-    const todayDays = daysBetween(new Date().toISOString().split("T")[0], DEFAULT_SEASON_END);
+    const todayDays = daysBetween(
+      new Date().toISOString().split("T")[0],
+      DEFAULT_SEASON_END,
+    );
 
     const db = createMockDb({
       league_daily_snapshot: null,
@@ -145,7 +155,9 @@ describe("SnapshotRepository.getHistoricalRawPayload", () => {
         return chain;
       }),
       orderBy: vi.fn().mockReturnThis(),
-      executeTakeFirst: vi.fn().mockResolvedValue({ response_json: { teams: [] } }),
+      executeTakeFirst: vi
+        .fn()
+        .mockResolvedValue({ response_json: { teams: [] } }),
     };
 
     const db = {
@@ -185,8 +197,8 @@ describe("SnapshotRepository.getHistoricalRawPayload", () => {
 
 describe("buildSimulationState — snapshot-scoped GS data wins over latest raw payload", () => {
   it("records degraded reason when raw payload falls back to historical (not snapshot-scoped)", async () => {
-    // When the historical payload is the only source (no snapshot-specific data), 
-    // the state should NOT include a degraded reason for raw payload usage 
+    // When the historical payload is the only source (no snapshot-specific data),
+    // the state should NOT include a degraded reason for raw payload usage
     // (it's expected). But if no payload exists at all, GS data will be missing.
     const db = createMockDb({
       league_daily_snapshot: null,

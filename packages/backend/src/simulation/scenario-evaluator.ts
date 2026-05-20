@@ -115,10 +115,7 @@ function computeRotoPoints(
     let i = 0;
     while (i < values.length) {
       let j = i;
-      while (
-        j + 1 < values.length &&
-        values[j + 1].value === values[i].value
-      ) {
+      while (j + 1 < values.length && values[j + 1].value === values[i].value) {
         j++;
       }
       // Tied ranks i+1 through j+1
@@ -176,7 +173,8 @@ function computeDelta(
   const { rotoPoints: mutRoto, categoryPoints: mutCatPoints } =
     computeRotoPoints(combinedResults, categories, numTeams);
 
-  const deltaOverallPoints = (mutRoto.get(teamId) ?? 0) - (baseRoto.get(teamId) ?? 0);
+  const deltaOverallPoints =
+    (mutRoto.get(teamId) ?? 0) - (baseRoto.get(teamId) ?? 0);
   const categoryDeltas: CategoryDeltaMap = {};
 
   for (const cat of categories) {
@@ -273,7 +271,11 @@ function applyTradeMutation(
   for (const [id, proj] of givenProjections) partnerProjections.set(id, proj);
 
   return {
-    mutatedUser: { ...userTeam, roster: userRoster, playerProjections: userProjections },
+    mutatedUser: {
+      ...userTeam,
+      roster: userRoster,
+      playerProjections: userProjections,
+    },
     mutatedPartner: {
       ...partnerTeam,
       roster: partnerRoster,
@@ -366,10 +368,7 @@ export function evaluateDeterministicScenario(
     const mutatedUser = applyWaiverMutation(userTeam, mutation);
 
     // Legality check on mutated roster
-    const { isLegal, blockingIssues, gaps } = checkLegality(
-      mutatedUser,
-      state,
-    );
+    const { isLegal, blockingIssues, gaps } = checkLegality(mutatedUser, state);
 
     // Compute new run result for mutated user team
     const mutatedResults = new Map<number, TeamRunResult>([
@@ -420,10 +419,7 @@ export function evaluateDeterministicScenario(
   );
 
   // Legality check on user's post-trade roster
-  const { isLegal, blockingIssues, gaps } = checkLegality(
-    mutatedUser,
-    state,
-  );
+  const { isLegal, blockingIssues, gaps } = checkLegality(mutatedUser, state);
 
   // Compute mutated results for both teams
   const mutatedResults = new Map<number, TeamRunResult>([

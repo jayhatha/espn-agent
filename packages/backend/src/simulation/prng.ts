@@ -22,7 +22,9 @@ function mulberry32(seed: number): () => number {
  * Box-Muller transform: converts two uniform [0,1] samples to N(0,1).
  */
 function boxMuller(u1: number, u2: number): number {
-  return Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2);
+  return (
+    Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2)
+  );
 }
 
 export interface Rng {
