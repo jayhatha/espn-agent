@@ -29,23 +29,48 @@ interface NavItem {
   badgeKey?: "waivers" | "trades";
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "", icon: LayoutDashboard },
-  { label: "Standings", href: "/standings", icon: Trophy },
-  { label: "Streaming Results", href: "/changelog", icon: ScrollText },
-  { label: "Categories", href: "/trends", icon: BarChart3 },
-  { label: "Roster", href: "/lineup", icon: Users },
-  { label: "Waivers", href: "/waivers", icon: RefreshCw, badgeKey: "waivers" },
-  { label: "FAAB Market", href: "/moves", icon: DollarSign },
-  { label: "Pitching Usage", href: "/streaming", icon: Activity },
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Trades",
-    href: "/trades",
-    icon: ArrowLeftRight,
-    badgeKey: "trades",
+    label: "Analyze",
+    items: [
+      { label: "Dashboard", href: "", icon: LayoutDashboard },
+      { label: "Standings", href: "/standings", icon: Trophy },
+      { label: "Categories", href: "/trends", icon: BarChart3 },
+      { label: "Streaming Log", href: "/changelog", icon: ScrollText },
+    ],
   },
-  { label: "Settings", href: "/settings", icon: Settings },
+  {
+    label: "Act",
+    items: [
+      { label: "Roster", href: "/lineup", icon: Users },
+      {
+        label: "Waivers",
+        href: "/waivers",
+        icon: RefreshCw,
+        badgeKey: "waivers",
+      },
+      { label: "FAAB Market", href: "/moves", icon: DollarSign },
+      { label: "Pitcher Usage", href: "/streaming", icon: Activity },
+      {
+        label: "Trades",
+        href: "/trades",
+        icon: ArrowLeftRight,
+        badgeKey: "trades",
+      },
+    ],
+  },
 ];
+
+const SETTINGS_ITEM: NavItem = {
+  label: "Settings",
+  href: "/settings",
+  icon: Settings,
+};
 
 export function LeagueNav() {
   const pathname = usePathname();
@@ -180,38 +205,70 @@ export function LeagueNav() {
           </span>
         </div>
 
-        {/* Nav items */}
-        <ul className="flex-1 px-2 py-3 space-y-0.5">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item.href);
-            const href = `/leagues/${id}${item.href}`;
-            const Icon = item.icon;
-            const count = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
+        {/* Nav groups */}
+        <div className="flex-1 px-2 py-3 overflow-y-auto">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label} className="mb-4">
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-shell-muted/60 select-none">
+                {group.label}
+              </p>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = isActive(item.href);
+                  const href = `/leagues/${id}${item.href}`;
+                  const Icon = item.icon;
+                  const count = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
 
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={href}
+                        onClick={() => setMobileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md text-sm transition-colors",
+                          active
+                            ? "bg-shell-accent/20 text-shell-accent font-medium"
+                            : "text-shell-muted hover:text-shell-text hover:bg-shell-panel",
+                        )}
+                      >
+                        <Icon size={18} className="flex-shrink-0" />
+                        <span className="flex-1">{item.label}</span>
+                        {count > 0 && (
+                          <span className="bg-shell-accent text-shell-bg text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium">
+                            {count}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Settings pinned to footer */}
+        <div className="px-2 pb-3 border-t border-shell-border pt-2 flex-shrink-0">
+          {(() => {
+            const active = isActive(SETTINGS_ITEM.href);
+            const href = `/leagues/${id}${SETTINGS_ITEM.href}`;
             return (
-              <li key={item.href}>
-                <Link
-                  href={href}
-                  onClick={() => setMobileOpen(false)}
-                  className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md text-sm transition-colors",
-                    active
-                      ? "bg-shell-accent/20 text-shell-accent font-medium"
-                      : "text-shell-muted hover:text-shell-text hover:bg-shell-panel",
-                  )}
-                >
-                  <Icon size={18} className="flex-shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {count > 0 && (
-                    <span className="bg-shell-accent text-shell-bg text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-medium">
-                      {count}
-                    </span>
-                  )}
-                </Link>
-              </li>
+              <Link
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-md text-sm transition-colors",
+                  active
+                    ? "bg-shell-accent/20 text-shell-accent font-medium"
+                    : "text-shell-muted hover:text-shell-text hover:bg-shell-panel",
+                )}
+              >
+                <Settings size={18} className="flex-shrink-0" />
+                <span>Settings</span>
+              </Link>
             );
-          })}
-        </ul>
+          })()}
+        </div>
       </nav>
     </>
   );

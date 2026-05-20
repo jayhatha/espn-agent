@@ -4,7 +4,11 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Navigation } from "./navigation";
 
-const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -13,9 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ESPN Fantasy Baseball Assistant",
+  title: "Fantasy CMD — ESPN Baseball",
   description:
-    "Draft assistance, trade advice, waiver wire suggestions, and RoS standings projections",
+    "FanGraphs-powered projected standings, waiver wire scoring, and trade analysis for ESPN fantasy baseball.",
 };
 
 export default function RootLayout({
@@ -24,7 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans">
         <a href="#main-content" className="skip-to-content">
           Skip to content

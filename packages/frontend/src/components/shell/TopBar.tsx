@@ -4,7 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Calendar, DollarSign, BarChart2, TrendingUp, type LucideIcon } from "lucide-react";
+import {
+  Calendar,
+  DollarSign,
+  BarChart2,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 
@@ -62,16 +68,22 @@ function StatItem({
     <div
       className={cn(
         "flex items-center gap-2",
-        href ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
+        href ? "cursor-pointer hover:text-shell-accent transition-colors" : "",
       )}
       title={warningTitle}
     >
-      <Icon size={14} className="text-shell-muted flex-shrink-0" aria-hidden="true" />
-      <span className="text-shell-muted text-xs uppercase tracking-wide">{label}</span>
+      <Icon
+        size={14}
+        className="text-shell-muted flex-shrink-0"
+        aria-hidden="true"
+      />
+      <span className="text-shell-muted text-xs uppercase tracking-wide">
+        {label}
+      </span>
       <span
         className={cn(
           "font-mono text-sm",
-          warning ? "text-negative font-semibold" : "text-shell-text"
+          warning ? "text-negative font-semibold" : "text-shell-text",
         )}
       >
         {value}
@@ -111,7 +123,8 @@ export function TopBar() {
   // FAAB remaining
   const { data: faabData } = useQuery<FaabSummaryResponse>({
     queryKey: ["faab-summary", leagueId, teamId],
-    queryFn: () => api.getFaabSummary(leagueId, teamId!) as Promise<FaabSummaryResponse>,
+    queryFn: () =>
+      api.getFaabSummary(leagueId, teamId!) as Promise<FaabSummaryResponse>,
     enabled: !!id && !!teamId,
     staleTime: 5 * 60_000,
   });
@@ -119,7 +132,8 @@ export function TopBar() {
   // GS pacing
   const { data: gsData } = useQuery<GsSummaryResponse>({
     queryKey: ["gs-summary", leagueId, teamId],
-    queryFn: () => api.getGsSummary(leagueId, teamId!) as Promise<GsSummaryResponse>,
+    queryFn: () =>
+      api.getGsSummary(leagueId, teamId!) as Promise<GsSummaryResponse>,
     enabled: !!id && !!teamId,
     staleTime: 5 * 60_000,
   });
@@ -127,19 +141,27 @@ export function TopBar() {
   // Projected standings for selected team rank
   const { data: standingsData } = useQuery<ProjectedStandingsResponse>({
     queryKey: ["topbar-projected", leagueId],
-    queryFn: () => api.getProjectedStandings(leagueId) as Promise<ProjectedStandingsResponse>,
+    queryFn: () =>
+      api.getProjectedStandings(
+        leagueId,
+      ) as Promise<ProjectedStandingsResponse>,
     enabled: !!id && !!teamId,
     staleTime: 5 * 60_000,
   });
 
   const projectedValue = useMemo(() => {
     if (!standingsData?.overallStandings || !teamId) return "--";
-    const myTeam = standingsData.overallStandings.find(t => t.team_id === teamId);
+    const myTeam = standingsData.overallStandings.find(
+      (t) => t.team_id === teamId,
+    );
     return myTeam ? `#${myTeam.projected_overall_rank}` : "--";
   }, [standingsData, teamId]);
 
   const leagueName = data?.league?.name ?? "--";
-  const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
   const gp = data?.gamesPlayed;
   const seasonProgress = gp != null ? `${gp}/162` : "--";
 
@@ -179,6 +201,25 @@ export function TopBar() {
           icon={TrendingUp}
           href={id ? `/leagues/${id}/standings` : undefined}
         />
+        {/* Command palette hint */}
+        <button
+          className="hidden sm:flex items-center gap-1.5 text-shell-muted hover:text-shell-text transition-colors"
+          onClick={() => {
+            window.dispatchEvent(
+              new KeyboardEvent("keydown", {
+                key: "k",
+                metaKey: true,
+                bubbles: true,
+              }),
+            );
+          }}
+          aria-label="Open command palette"
+          title="Open command palette"
+        >
+          <kbd className="inline-flex items-center rounded border border-shell-border px-1.5 py-0.5 font-mono text-[10px] text-shell-muted select-none">
+            ⌘K
+          </kbd>
+        </button>
       </div>
     </header>
   );
