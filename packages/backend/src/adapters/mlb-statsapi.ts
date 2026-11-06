@@ -43,6 +43,37 @@ export interface ProbablePitcherInfo {
   venue: string;
   gameDate: string;
   gamePk: number;
+  opponentWoba?: number;
+  parkFactor?: number;
+  platoonAdvantage?: number;
+}
+
+export interface MLBLineupPlayer {
+  mlbPlayerId: number;
+  fullName: string;
+  battingOrder: number;
+}
+
+export interface MLBTeamBattingContext {
+  teamId: number;
+  teamName: string;
+  teamAbbreviation?: string;
+  gamePk: number;
+  lineupStatus: "confirmed" | "unavailable";
+  starters: MLBLineupPlayer[];
+  opponentProbablePitcher?: {
+    mlbPlayerId: number;
+    fullName: string;
+    throws?: "L" | "R";
+  };
+  venue: string;
+  parkFactor?: number;
+}
+
+export interface MLBDailyBattingContext {
+  status: "available" | "partial" | "unavailable";
+  teams: MLBTeamBattingContext[];
+  unavailableGamePks: number[];
 }
 
 export class MLBStatsAPIAdapter {
@@ -60,10 +91,7 @@ export class MLBStatsAPIAdapter {
    */
   async getSchedule(startDate: string, endDate: string): Promise<MLBGame[]> {
     try {
-      this.logger?.debug(
-        { startDate, endDate },
-        "Fetching MLB schedule",
-      );
+      this.logger?.debug({ startDate, endDate }, "Fetching MLB schedule");
 
       const response = await this.client.get("/schedule", {
         params: {
@@ -74,9 +102,10 @@ export class MLBStatsAPIAdapter {
         },
       });
 
-      const games: MLBGame[] = response.data.dates?.flatMap(
-        (dateEntry: any) => dateEntry.games || []
-      ) || [];
+      const games: MLBGame[] =
+        response.data.dates?.flatMap(
+          (dateEntry: any) => dateEntry.games || [],
+        ) || [];
 
       this.logger?.info(
         { startDate, endDate, gameCount: games.length },
@@ -139,13 +168,56 @@ export class MLBStatsAPIAdapter {
     return pitchers;
   }
 
+  async getDailyBattingContext(
+    date: string,
+    suppliedSchedule?: MLBGame[],
+  ): Promise<MLBDailyBattingContext> {
+    const schedule = suppliedSchedule ?? (await this.getSchedule(date, date));
+    if (schedule.length === 0) {
+      return { status: "unavailable", teams: [], unavailableGamePks: [] };
+    }
+
+    const feeds = new Map<number, Record<string, any>>();
+    const unavailableGamePks: number[] = [];
+    await Promise.all(
+      schedule.map(async (game) => {
+        try {
+          const response = await this.client.get(
+            `/game/${game.gamePk}/feed/live`,
+          );
+          feeds.set(game.gamePk, response.data as Record<string, any>);
+        } catch (error: any) {
+          unavailableGamePks.push(game.gamePk);
+          this.logger?.warn(
+            { error: error.message, gamePk: game.gamePk },
+            "MLB batting lineup context unavailable",
+          );
+        }
+      }),
+    );
+
+    const teams = parseDailyBattingContexts(schedule, feeds);
+    const confirmedCount = teams.filter(
+      (team) => team.lineupStatus === "confirmed",
+    ).length;
+    const status =
+      confirmedCount === teams.length && unavailableGamePks.length === 0
+        ? "available"
+        : confirmedCount > 0 || teams.length > 0
+          ? confirmedCount > 0
+            ? "partial"
+            : "unavailable"
+          : "unavailable";
+    return { status, teams, unavailableGamePks };
+  }
+
   /**
    * Get schedule for a specific team
    */
   async getTeamSchedule(
     teamId: number,
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<TeamScheduleEntry[]> {
     const schedule = await this.getSchedule(startDate, endDate);
     const teamSchedule: TeamScheduleEntry[] = [];
@@ -187,7 +259,7 @@ export class MLBStatsAPIAdapter {
    */
   async getMultiStartPitchers(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<Map<string, number>> {
     const schedule = await this.getSchedule(startDate, endDate);
     const teamGameCounts = new Map<string, number>();
@@ -243,3 +315,97 @@ export class MLBStatsAPIAdapter {
     }
   }
 }
+
+export function parseDailyBattingContexts(
+  schedule: MLBGame[],
+  feeds: Map<number, Record<string, any>>,
+): MLBTeamBattingContext[] {
+  const contexts: MLBTeamBattingContext[] = [];
+  for (const game of schedule) {
+    const feed = feeds.get(game.gamePk);
+    for (const side of ["away", "home"] as const) {
+      const opponentSide = side === "home" ? "away" : "home";
+      const team = game.teams[side].team;
+      const boxscorePlayers =
+        feed?.liveData?.boxscore?.teams?.[side]?.players ?? {};
+      const starters = Object.values(boxscorePlayers)
+        .map((entry: any) => ({
+          mlbPlayerId: Number(entry?.person?.id),
+          fullName: String(entry?.person?.fullName ?? ""),
+          battingOrder: Number(entry?.battingOrder),
+        }))
+        .filter(
+          (player) =>
+            Number.isFinite(player.mlbPlayerId) &&
+            player.fullName.length > 0 &&
+            Number.isFinite(player.battingOrder) &&
+            player.battingOrder > 0,
+        )
+        .sort((left, right) => left.battingOrder - right.battingOrder);
+      const probablePitcher = game.teams[opponentSide].probablePitcher;
+      const probablePlayer = probablePitcher
+        ? feed?.gameData?.players?.[`ID${probablePitcher.id}`]
+        : undefined;
+      const throws = probablePlayer?.pitchHand?.code;
+      const rawParkFactor =
+        feed?.gameData?.venue?.parkFactor ??
+        feed?.gameData?.venue?.parkFactors?.overall;
+      const parkFactor =
+        typeof rawParkFactor === "number" && Number.isFinite(rawParkFactor)
+          ? rawParkFactor
+          : undefined;
+
+      contexts.push({
+        teamId: team.id,
+        teamName: team.name,
+        teamAbbreviation: team.abbreviation ?? MLB_TEAM_ABBREVIATIONS[team.id],
+        gamePk: game.gamePk,
+        lineupStatus: starters.length > 0 ? "confirmed" : "unavailable",
+        starters,
+        opponentProbablePitcher: probablePitcher
+          ? {
+              mlbPlayerId: probablePitcher.id,
+              fullName: probablePitcher.fullName,
+              throws: throws === "L" || throws === "R" ? throws : undefined,
+            }
+          : undefined,
+        venue: game.venue.name,
+        parkFactor,
+      });
+    }
+  }
+  return contexts;
+}
+
+const MLB_TEAM_ABBREVIATIONS: Record<number, string> = {
+  108: "LAA",
+  109: "ARI",
+  110: "BAL",
+  111: "BOS",
+  112: "CHC",
+  113: "CIN",
+  114: "CLE",
+  115: "COL",
+  116: "DET",
+  117: "HOU",
+  118: "KC",
+  119: "LAD",
+  120: "WSH",
+  121: "NYM",
+  133: "OAK",
+  134: "PIT",
+  135: "SD",
+  136: "SEA",
+  137: "SF",
+  138: "STL",
+  139: "TB",
+  140: "TEX",
+  141: "TOR",
+  142: "MIN",
+  143: "PHI",
+  144: "ATL",
+  145: "CWS",
+  146: "MIA",
+  147: "NYY",
+  158: "MIL",
+};

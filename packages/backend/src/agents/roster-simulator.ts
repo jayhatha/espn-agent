@@ -1,13 +1,16 @@
 import {
-  calculateFinalRate,
-  PITCHING_STAT_KEYS,
-  isPitcherProjection,
   type Category,
   type StatComponents,
 } from "../../../shared/dist/index.js";
 import { allocateProjections } from "../projection/allocator.js";
 import { canFillSlot } from "../projection/slot-eligibility.js";
-import type { AllocationInput, RosterGap } from "../projection/types.js";
+import type {
+  AllocationInput,
+  RosteredPlayer,
+  RosterGap,
+} from "../projection/types.js";
+import { assignRanksWithTies } from "../utils/roto-ranking.js";
+import { computeCategoryProjections } from "./standings-projection.js";
 import type {
   CategoryImpact,
   ProposedTrade,
@@ -18,14 +21,25 @@ import type {
 
 export interface TradeSimContext {
   categories: Category[];
-  /** Map from teamId → categoryId → { value, components } */
+  /** Map from teamId → categoryId → stored baseline projection. */
   teamCategoryMap: Map<
     number,
-    Map<string, { value: number; components?: any }>
+    Map<
+      string,
+      {
+        value: number;
+        components?: StatComponents;
+        rank?: number;
+        rotoPoints?: number;
+      }
+    >
   >;
   teamId: number;
-  /** Current projected category impacts — used for old rank lookup */
+  /** Current projected category impacts — retained for API compatibility. */
   currentCategoryImpacts: CategoryImpact[];
+  allocationInput: AllocationInput;
+  currentTotals: CurrentCategoryTotal[];
+  incomingPlayersById: Map<number, RosteredPlayer>;
 }
 
 export interface AddDropSimContext {
@@ -36,6 +50,15 @@ export interface AddDropSimContext {
   allTeamsProjections: any[];
   numTeams: number;
   teamId: number;
+  allocationInput: AllocationInput;
+  currentTotals: CurrentCategoryTotal[];
+  playersById: Map<number, RosteredPlayer>;
+}
+
+interface CurrentCategoryTotal {
+  category_id: string;
+  value: unknown;
+  components_json: unknown;
 }
 
 export type GapDetectionInput = AllocationInput;
@@ -86,119 +109,51 @@ export class RosterSimulator {
   simulateTrade(
     ctx: TradeSimContext,
     trade: ProposedTrade,
-    projections: Map<number, any>,
+    _projections: Map<number, any>,
   ): TradeSimResult {
-    const { categories, teamCategoryMap, teamId, currentCategoryImpacts } = ctx;
-
-    // Deep-copy the user team's category map so we do not mutate the original
-    const userTeamCategories = new Map<
-      string,
-      { value: number; components?: any }
-    >();
-    const originalTeamMap =
-      teamCategoryMap.get(teamId) ??
-      new Map<string, { value: number; components?: any }>();
-    for (const [k, v] of originalTeamMap.entries()) {
-      userTeamCategories.set(k, {
-        value: v.value,
-        components: v.components ? { ...v.components } : undefined,
-      });
-    }
-
-    // Snapshot original values for CategoryImpact.currentValue
-    const originalValues = new Map<string, number>();
-    for (const category of categories) {
-      originalValues.set(
-        category.category_id,
-        userTeamCategories.get(category.category_id)?.value ?? 0,
+    const { categories, teamCategoryMap, teamId } = ctx;
+    const giveIds = new Set(trade.givePlayers.map((p) => p.playerId));
+    const rosterIds = new Set(
+      ctx.allocationInput.roster.map((player) => player.playerId),
+    );
+    const mutationPlayerIds = new Set([
+      ...trade.givePlayers
+        .map((player) => player.playerId)
+        .filter((playerId) => rosterIds.has(playerId)),
+      ...trade.receivePlayers.map((player) => player.playerId),
+    ]);
+    const missingProjectionIds = [...mutationPlayerIds].filter(
+      (playerId) =>
+        ctx.allocationInput.projectionsByPlayerId.get(playerId) == null,
+    );
+    if (missingProjectionIds.length > 0) {
+      throw new Error(
+        `Trade simulation degraded: missing projection for player(s) ${missingProjectionIds.join(", ")}`,
       );
     }
 
-    // Build working team map with user team replaced by mutable copy
-    const workingTeamMap = new Map<
-      number,
-      Map<string, { value: number; components?: any }>
-    >();
-    for (const [tid, catMap] of teamCategoryMap.entries()) {
-      workingTeamMap.set(tid, tid === teamId ? userTeamCategories : catMap);
-    }
-
-    // Apply trade adjustments to user team's projected category values
-    for (const category of categories) {
-      const catId = category.category_id;
-      const current = userTeamCategories.get(catId) ?? {
-        value: 0,
-        components: null,
-      };
-
-      if (category.type === "RATE") {
-        const adjustedComponents: Record<string, number> = current.components
-          ? { ...current.components }
-          : {};
-
-        for (const givePlayer of trade.givePlayers) {
-          const proj = projections.get(givePlayer.playerId);
-          if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents =
-              proj.stat_components_json as StatComponents;
-            for (const [key, value] of Object.entries(playerComponents)) {
-              adjustedComponents[key] =
-                (adjustedComponents[key] ?? 0) - (Number(value) || 0);
-            }
-          }
-        }
-
-        for (const receivePlayer of trade.receivePlayers) {
-          const proj = projections.get(receivePlayer.playerId);
-          if (proj && this.isCategoryRelevant(category, proj)) {
-            const playerComponents =
-              proj.stat_components_json as StatComponents;
-            for (const [key, value] of Object.entries(playerComponents)) {
-              adjustedComponents[key] =
-                (adjustedComponents[key] ?? 0) + (Number(value) || 0);
-            }
-          }
-        }
-
-        let projectedValue: number;
-        try {
-          projectedValue = calculateFinalRate(
-            category.formula_id!,
-            {},
-            adjustedComponents,
-          );
-        } catch {
-          projectedValue = current.value;
-        }
-
-        userTeamCategories.set(catId, {
-          value: projectedValue,
-          components: adjustedComponents,
-        });
-      } else {
-        // Counting stats
-        let giveDelta = 0;
-        for (const givePlayer of trade.givePlayers) {
-          const proj = projections.get(givePlayer.playerId);
-          if (proj && this.isCategoryRelevant(category, proj)) {
-            giveDelta += this.getProjectedCategoryValue(category, proj);
-          }
-        }
-
-        let receiveDelta = 0;
-        for (const receivePlayer of trade.receivePlayers) {
-          const proj = projections.get(receivePlayer.playerId);
-          if (proj && this.isCategoryRelevant(category, proj)) {
-            receiveDelta += this.getProjectedCategoryValue(category, proj);
-          }
-        }
-
-        userTeamCategories.set(catId, {
-          value: current.value + receiveDelta - giveDelta,
-          components: current.components,
-        });
+    const mutatedRoster = ctx.allocationInput.roster.filter(
+      (player) => !giveIds.has(player.playerId),
+    );
+    for (const player of trade.receivePlayers) {
+      const incoming = ctx.incomingPlayersById.get(player.playerId);
+      if (!incoming) {
+        throw new Error(
+          `Trade simulation degraded: missing roster metadata for incoming player ${player.playerId}`,
+        );
       }
+      mutatedRoster.push({ ...incoming });
     }
+
+    const allocation = allocateProjections({
+      ...ctx.allocationInput,
+      roster: mutatedRoster,
+    });
+    const mutatedCategories = computeCategoryProjections(
+      allocation,
+      ctx.currentTotals,
+      categories,
+    );
 
     // Re-rank all teams in each category and build CategoryImpact[]
     const newCategoryImpacts: CategoryImpact[] = [];
@@ -208,8 +163,14 @@ export class RosterSimulator {
       const catId = category.category_id;
 
       const teamValues: Array<{ teamId: number; value: number }> = [];
-      for (const [tId, catMap] of workingTeamMap.entries()) {
-        teamValues.push({ teamId: tId, value: catMap.get(catId)?.value ?? 0 });
+      for (const [tId, catMap] of teamCategoryMap.entries()) {
+        teamValues.push({
+          teamId: tId,
+          value:
+            tId === teamId
+              ? (mutatedCategories.get(catId)?.value ?? 0)
+              : (catMap.get(catId)?.value ?? 0),
+        });
       }
 
       const lowerBetter = this.isLowerBetter(category);
@@ -218,22 +179,19 @@ export class RosterSimulator {
       );
 
       const numTeams = teamValues.length;
-      const teamRanks = new Map<number, number>();
-      teamValues.forEach((tv, idx) => teamRanks.set(tv.teamId, idx + 1));
-
-      const currentRank =
-        currentCategoryImpacts.find((ci) => ci.categoryId === catId)
-          ?.currentRank ?? numTeams;
-      const projectedRank = teamRanks.get(teamId) ?? numTeams;
-
-      const currentPoints = Math.max(0, numTeams - currentRank + 1);
-      const projectedPoints = Math.max(0, numTeams - projectedRank + 1);
+      const ranked = assignRanksWithTies(teamValues, numTeams);
+      const projected = ranked.find((row) => row.teamId === teamId);
+      const baseline = teamCategoryMap.get(teamId)?.get(catId);
+      const currentRank = baseline?.rank ?? numTeams;
+      const projectedRank = projected?.rank ?? numTeams;
+      const currentPoints = baseline?.rotoPoints ?? 0;
+      const projectedPoints = projected?.rotoPoints ?? 0;
 
       newCategoryImpacts.push({
         categoryId: catId,
         categoryName: category.name,
-        currentValue: originalValues.get(catId) ?? 0,
-        projectedValue: userTeamCategories.get(catId)?.value ?? 0,
+        currentValue: baseline?.value ?? 0,
+        projectedValue: mutatedCategories.get(catId)?.value ?? 0,
         currentRank,
         projectedRank,
         deltaRank: projectedRank - currentRank,
@@ -268,15 +226,30 @@ export class RosterSimulator {
     } = ctx;
 
     const addProjection = projectionMap.get(addPlayerId);
-    const dropProjection = projectionMap.get(dropPlayerId);
-    if (!addProjection || !dropProjection) return null;
+    const addedPlayer = ctx.playersById.get(addPlayerId);
+    if (!addProjection || !addedPlayer) return null;
 
-    const addComponents = addProjection.stat_components_json as StatComponents;
-    const dropComponents =
-      dropProjection.stat_components_json as StatComponents;
-
-    const addIsPitcher = isPitcherProjection(addComponents);
-    const dropIsPitcher = isPitcherProjection(dropComponents);
+    const mutatedRoster = ctx.allocationInput.roster
+      .filter((player) => player.playerId !== dropPlayerId)
+      .concat({ ...addedPlayer });
+    const projectionsByPlayerId = new Map(
+      ctx.allocationInput.projectionsByPlayerId,
+    );
+    projectionsByPlayerId.delete(dropPlayerId);
+    projectionsByPlayerId.set(
+      addPlayerId,
+      addProjection.stat_components_json as StatComponents,
+    );
+    const allocation = allocateProjections({
+      ...ctx.allocationInput,
+      roster: mutatedRoster,
+      projectionsByPlayerId,
+    });
+    const mutatedCategories = computeCategoryProjections(
+      allocation,
+      ctx.currentTotals,
+      categories,
+    );
 
     const categoryImpacts: AddDropSimResult["categoryImpacts"] = [];
     let totalDeltaPoints = 0;
@@ -287,56 +260,8 @@ export class RosterSimulator {
       );
       if (!currentProj) continue;
 
-      const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-      const categoryMatchesAdd = isPitchingCat ? addIsPitcher : !addIsPitcher;
-      const categoryMatchesDrop = isPitchingCat
-        ? dropIsPitcher
-        : !dropIsPitcher;
-
-      if (!categoryMatchesAdd && !categoryMatchesDrop) {
-        categoryImpacts.push({
-          categoryId: category.category_id,
-          categoryName: category.name,
-          deltaRank: 0,
-          deltaPoints: 0,
-        });
-        continue;
-      }
-
-      let newValue: number;
-
-      if (category.type === "COUNTING") {
-        const delta =
-          (addComponents[category.stat_key] || 0) -
-          (dropComponents[category.stat_key] || 0);
-        newValue = Number(currentProj.projected_value) + delta;
-      } else if (category.type === "RATE" && category.formula_id) {
-        const currentComponents = (currentProj.projected_components_json ||
-          {}) as StatComponents;
-
-        const withoutDrop: StatComponents = {};
-        for (const key of Object.keys(currentComponents)) {
-          withoutDrop[key] =
-            (currentComponents[key] || 0) - (dropComponents[key] || 0);
-        }
-
-        const withAdd: StatComponents = {};
-        const allKeys = new Set([
-          ...Object.keys(withoutDrop),
-          ...Object.keys(addComponents),
-        ]);
-        for (const key of allKeys) {
-          withAdd[key] = (withoutDrop[key] || 0) + (addComponents[key] || 0);
-        }
-
-        try {
-          newValue = calculateFinalRate(category.formula_id, {}, withAdd);
-        } catch {
-          continue;
-        }
-      } else {
-        continue;
-      }
+      const newValue = mutatedCategories.get(category.category_id)?.value;
+      if (newValue === undefined) continue;
 
       const categoryValues = allTeamsProjections
         .filter((p) => p.category_id === category.category_id)
@@ -351,10 +276,12 @@ export class RosterSimulator {
           : a.value - b.value,
       );
 
+      const ranked = assignRanksWithTies(categoryValues, numTeams);
+      const newStanding = ranked.find((row) => row.teamId === teamId);
       const oldRank = currentProj.projected_rank;
-      const newRank = categoryValues.findIndex((v) => v.teamId === teamId) + 1;
-      const oldPoints = numTeams - oldRank + 1;
-      const newPoints = numTeams - newRank + 1;
+      const newRank = newStanding?.rank ?? numTeams;
+      const oldPoints = Number(currentProj.projected_roto_points);
+      const newPoints = newStanding?.rotoPoints ?? 0;
       const deltaPoints = newPoints - oldPoints;
 
       totalDeltaPoints += deltaPoints;
@@ -592,26 +519,6 @@ export class RosterSimulator {
   }
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
-
-  private isCategoryRelevant(category: any, projection: any): boolean {
-    const components = projection.stat_components_json as StatComponents;
-    const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-    return isPitchingCat
-      ? (components.IP ?? 0) > 0 || components.ER !== undefined
-      : (components.AB ?? 0) > 0;
-  }
-
-  private getProjectedCategoryValue(category: any, projection: any): number {
-    const components = projection.stat_components_json as StatComponents;
-    if (category.type === "RATE" && category.formula_id) {
-      try {
-        return calculateFinalRate(category.formula_id, {}, components);
-      } catch {
-        return 0;
-      }
-    }
-    return components[category.stat_key] ?? 0;
-  }
 
   private isLowerBetter(category: any): boolean {
     return category.direction === "LOWER_BETTER";

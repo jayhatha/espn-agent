@@ -32,6 +32,15 @@ describe("scaleComponents", () => {
 });
 
 describe("applyGsCap", () => {
+  it("does not scale starts when the league explicitly has no cap", () => {
+    const sps = [
+      { playerId: 1, components: { IP: 180, K: 200, GS: 32 }, projectedGS: 32 },
+    ];
+    const result = applyGsCap(500, null, sps);
+    expect(result.scaleFactor).toBe(1);
+    expect(result.scaledProjections[0].scaledComponents.IP).toBe(180);
+  });
+
   it("returns empty array with scaleFactor=1.0 for empty SP array", () => {
     const { scaledProjections, scaleFactor } = applyGsCap(0, 200, []);
     expect(scaledProjections).toEqual([]);
@@ -70,7 +79,11 @@ describe("applyGsCap", () => {
   it("zeros SP components when gsUsed >= gsCap (cap exhausted)", () => {
     // gsUsed=200, gsCap=200: gsRemaining=0, scaleFactor=0
     const sps = [
-      { playerId: 1, components: { IP: 150, K: 120, ER: 50, W: 10 }, projectedGS: 25 },
+      {
+        playerId: 1,
+        components: { IP: 150, K: 120, ER: 50, W: 10 },
+        projectedGS: 25,
+      },
     ];
     const { scaledProjections, scaleFactor } = applyGsCap(200, 200, sps);
     expect(scaleFactor).toBe(0);
@@ -95,7 +108,11 @@ describe("applyGsCap", () => {
     // but this test documents that the CALLER is responsible for filtering SPs only.
     // The function should return same scaleFactor for any input that is within budget.
     const rps = [
-      { playerId: 99, components: { IP: 60, K: 70, SV: 30, W: 5 }, projectedGS: 0 },
+      {
+        playerId: 99,
+        components: { IP: 60, K: 70, SV: 30, W: 5 },
+        projectedGS: 0,
+      },
     ];
     // RP with projectedGS=0: totalProjectedGS=0 <= gsRemaining=200 → scaleFactor=1.0
     const { scaleFactor } = applyGsCap(0, 200, rps);
@@ -106,10 +123,44 @@ describe("applyGsCap", () => {
     // IP=120 → estimateGS = round(120/6) = 20; gsUsed=190; gsCap=200; remaining=10
     // totalProjectedGS = 20; scaleFactor = 10/20 = 0.5
     const sps = [
-      { playerId: 1, components: { IP: 120, K: 100, ER: 40, W: 10 }, projectedGS: null },
+      {
+        playerId: 1,
+        components: { IP: 120, K: 100, ER: 40, W: 10 },
+        projectedGS: null,
+      },
     ];
     const { scaleFactor } = applyGsCap(190, 200, sps);
     expect(scaleFactor).toBeCloseTo(0.5);
+  });
+
+  it("uses GS fallback when ingest supplies zero for a starter", () => {
+    const sps = [
+      {
+        playerId: 1,
+        components: { IP: 120, K: 100, GS: 0 },
+        projectedGS: 0,
+        positions: ["SP"],
+      },
+    ];
+    const { scaleFactor, scaledProjections } = applyGsCap(190, 200, sps);
+
+    expect(scaleFactor).toBeCloseTo(0.5);
+    expect(scaledProjections[0].scaledComponents.IP).toBeCloseTo(60);
+  });
+
+  it("does not scale an explicit reliever even with high IP and zero GS", () => {
+    const rps = [
+      {
+        playerId: 1,
+        components: { IP: 100, K: 120, SV: 30, GS: 0 },
+        projectedGS: 0,
+        positions: ["RP"],
+      },
+    ];
+    const { scaleFactor, scaledProjections } = applyGsCap(200, 200, rps);
+
+    expect(scaleFactor).toBe(1);
+    expect(scaledProjections[0].scaledComponents).toEqual(rps[0].components);
   });
 
   it("treats projectedGS as 0 when IP <= 80 (reliever-level IP)", () => {
@@ -124,8 +175,16 @@ describe("applyGsCap", () => {
 
   it("returns all playerId entries in scaledProjections matching input order", () => {
     const sps = [
-      { playerId: 10, components: { IP: 180, K: 200, ER: 60 }, projectedGS: 32 },
-      { playerId: 20, components: { IP: 150, K: 160, ER: 50 }, projectedGS: 28 },
+      {
+        playerId: 10,
+        components: { IP: 180, K: 200, ER: 60 },
+        projectedGS: 32,
+      },
+      {
+        playerId: 20,
+        components: { IP: 150, K: 160, ER: 50 },
+        projectedGS: 28,
+      },
     ];
     const { scaledProjections } = applyGsCap(0, 200, sps);
     expect(scaledProjections.map((sp) => sp.playerId)).toEqual([10, 20]);

@@ -48,11 +48,81 @@ describe("allocateProjections", () => {
     const rp1 = makePlayer(7, ["RP"], "active");
 
     const projections = new Map([
-      [1, { AB: 300, H: 80, HR: 15, RBI: 60, R: 50, SB: 3, BB: 30, HBP: 5, SF: 4, TB: 130 }],
-      [2, { AB: 350, H: 95, HR: 12, RBI: 55, R: 70, SB: 25, BB: 40, HBP: 3, SF: 3, TB: 140 }],
-      [3, { AB: 400, H: 110, HR: 35, RBI: 110, R: 90, SB: 2, BB: 50, HBP: 6, SF: 5, TB: 220 }],
-      [4, { AB: 380, H: 100, HR: 20, RBI: 80, R: 85, SB: 15, BB: 45, HBP: 4, SF: 3, TB: 170 }],
-      [5, { AB: 360, H: 95, HR: 18, RBI: 75, R: 80, SB: 20, BB: 40, HBP: 5, SF: 4, TB: 160 }],
+      [
+        1,
+        {
+          AB: 300,
+          H: 80,
+          HR: 15,
+          RBI: 60,
+          R: 50,
+          SB: 3,
+          BB: 30,
+          HBP: 5,
+          SF: 4,
+          TB: 130,
+        },
+      ],
+      [
+        2,
+        {
+          AB: 350,
+          H: 95,
+          HR: 12,
+          RBI: 55,
+          R: 70,
+          SB: 25,
+          BB: 40,
+          HBP: 3,
+          SF: 3,
+          TB: 140,
+        },
+      ],
+      [
+        3,
+        {
+          AB: 400,
+          H: 110,
+          HR: 35,
+          RBI: 110,
+          R: 90,
+          SB: 2,
+          BB: 50,
+          HBP: 6,
+          SF: 5,
+          TB: 220,
+        },
+      ],
+      [
+        4,
+        {
+          AB: 380,
+          H: 100,
+          HR: 20,
+          RBI: 80,
+          R: 85,
+          SB: 15,
+          BB: 45,
+          HBP: 4,
+          SF: 3,
+          TB: 170,
+        },
+      ],
+      [
+        5,
+        {
+          AB: 360,
+          H: 95,
+          HR: 18,
+          RBI: 75,
+          R: 80,
+          SB: 20,
+          BB: 40,
+          HBP: 5,
+          SF: 4,
+          TB: 160,
+        },
+      ],
       [6, { IP: 180, ER: 60, HA: 150, BBA: 50, K: 200, W: 14, SV: 0, GS: 30 }],
       [7, { IP: 65, ER: 25, HA: 55, BBA: 22, K: 70, W: 5, SV: 30, GS: 0 }],
     ]);
@@ -81,8 +151,36 @@ describe("allocateProjections", () => {
     const benchPlayer = makePlayer(2, ["OF"], "bench");
 
     const projections = new Map([
-      [1, { AB: 400, H: 110, HR: 35, RBI: 110, R: 90, SB: 2, BB: 50, HBP: 6, SF: 5, TB: 220 }],
-      [2, { AB: 380, H: 100, HR: 30, RBI: 80, R: 85, SB: 15, BB: 45, HBP: 4, SF: 3, TB: 170 }],
+      [
+        1,
+        {
+          AB: 400,
+          H: 110,
+          HR: 35,
+          RBI: 110,
+          R: 90,
+          SB: 2,
+          BB: 50,
+          HBP: 6,
+          SF: 5,
+          TB: 220,
+        },
+      ],
+      [
+        2,
+        {
+          AB: 380,
+          H: 100,
+          HR: 30,
+          RBI: 80,
+          R: 85,
+          SB: 15,
+          BB: 45,
+          HBP: 4,
+          SF: 3,
+          TB: 170,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -96,7 +194,7 @@ describe("allocateProjections", () => {
 
     // Naive sum: 35 + 30 = 65
     const naiveSum = 35 + 30;
-    expect((result.batterComponents.HR ?? 0)).toBeLessThanOrEqual(naiveSum);
+    expect(result.batterComponents.HR ?? 0).toBeLessThanOrEqual(naiveSum);
     // Allocated should only include the starter's HR (35), not bench player's
     expect(result.batterComponents.HR).toBeCloseTo(35, 1);
   });
@@ -107,7 +205,29 @@ describe("allocateProjections", () => {
     const ohtani = makePlayer(100, ["1B", "SP"], "active");
 
     const projections = new Map([
-      [100, { AB: 300, H: 85, HR: 30, RBI: 90, R: 80, SB: 5, BB: 35, HBP: 3, SF: 4, TB: 175, IP: 100, ER: 35, HA: 80, BBA: 30, K: 150, W: 8, SV: 0, GS: 18 }],
+      [
+        100,
+        {
+          AB: 300,
+          H: 85,
+          HR: 30,
+          RBI: 90,
+          R: 80,
+          SB: 5,
+          BB: 35,
+          HBP: 3,
+          SF: 4,
+          TB: 175,
+          IP: 100,
+          ER: 35,
+          HA: 80,
+          BBA: 30,
+          K: 150,
+          W: 8,
+          SV: 0,
+          GS: 18,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -131,7 +251,21 @@ describe("allocateProjections", () => {
     const hitter = makePlayer(1, ["1B"], "active");
 
     const projections = new Map([
-      [1, { AB: 400, H: 110, HR: 35, RBI: 110, R: 90, SB: 2, BB: 50, HBP: 6, SF: 5, TB: 220 }],
+      [
+        1,
+        {
+          AB: 400,
+          H: 110,
+          HR: 35,
+          RBI: 110,
+          R: 90,
+          SB: 2,
+          BB: 50,
+          HBP: 6,
+          SF: 5,
+          TB: 220,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -192,8 +326,36 @@ describe("allocateProjections", () => {
     const firstBaseman = makePlayer(2, ["1B"], "active");
 
     const projections = new Map([
-      [1, { AB: 300, H: 80, HR: 15, RBI: 60, R: 50, SB: 3, BB: 30, HBP: 5, SF: 4, TB: 130 }],
-      [2, { AB: 400, H: 110, HR: 35, RBI: 110, R: 90, SB: 2, BB: 50, HBP: 6, SF: 5, TB: 220 }],
+      [
+        1,
+        {
+          AB: 300,
+          H: 80,
+          HR: 15,
+          RBI: 60,
+          R: 50,
+          SB: 3,
+          BB: 30,
+          HBP: 5,
+          SF: 4,
+          TB: 130,
+        },
+      ],
+      [
+        2,
+        {
+          AB: 400,
+          H: 110,
+          HR: 35,
+          RBI: 110,
+          R: 90,
+          SB: 2,
+          BB: 50,
+          HBP: 6,
+          SF: 5,
+          TB: 220,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -215,7 +377,21 @@ describe("allocateProjections", () => {
     // In the scenario where SS player is active, the allocator puts them in SS slot
     const ssPlayer = makePlayer(1, ["SS"], "active");
     const projections = new Map([
-      [1, { AB: 350, H: 95, HR: 12, RBI: 55, R: 70, SB: 25, BB: 40, HBP: 3, SF: 3, TB: 140 }],
+      [
+        1,
+        {
+          AB: 350,
+          H: 95,
+          HR: 12,
+          RBI: 55,
+          R: 70,
+          SB: 25,
+          BB: 40,
+          HBP: 3,
+          SF: 3,
+          TB: 140,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -233,7 +409,21 @@ describe("allocateProjections", () => {
   it("prorate factor stored in result.prorateFactor", () => {
     const hitter = makePlayer(1, ["1B"], "active");
     const projections = new Map([
-      [1, { AB: 400, H: 110, HR: 35, RBI: 110, R: 90, SB: 2, BB: 50, HBP: 6, SF: 5, TB: 220 }],
+      [
+        1,
+        {
+          AB: 400,
+          H: 110,
+          HR: 35,
+          RBI: 110,
+          R: 90,
+          SB: 2,
+          BB: 50,
+          HBP: 6,
+          SF: 5,
+          TB: 220,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -319,13 +509,41 @@ describe("allocateProjections", () => {
     expect(result.pitcherComponents.K).toBeCloseTo(65, 1); // 130 * 0.5
   });
 
-  it("bench player does not contribute to batterComponents", () => {
+  it("higher-projected bench player can replace active hitter in RoS allocation", () => {
     const starter = makePlayer(1, ["OF"], "active");
     const benchPlayer = makePlayer(2, ["OF"], "bench");
 
     const projections = new Map([
-      [1, { AB: 380, H: 100, HR: 20, RBI: 80, R: 85, SB: 15, BB: 45, HBP: 4, SF: 3, TB: 170 }],
-      [2, { AB: 380, H: 100, HR: 99, RBI: 99, R: 99, SB: 99, BB: 45, HBP: 4, SF: 3, TB: 170 }],
+      [
+        1,
+        {
+          AB: 380,
+          H: 100,
+          HR: 20,
+          RBI: 80,
+          R: 85,
+          SB: 15,
+          BB: 45,
+          HBP: 4,
+          SF: 3,
+          TB: 170,
+        },
+      ],
+      [
+        2,
+        {
+          AB: 380,
+          H: 100,
+          HR: 99,
+          RBI: 99,
+          R: 99,
+          SB: 99,
+          BB: 45,
+          HBP: 4,
+          SF: 3,
+          TB: 170,
+        },
+      ],
     ]);
 
     const input: AllocationInput = {
@@ -337,7 +555,6 @@ describe("allocateProjections", () => {
 
     const result = allocateProjections(input);
 
-    // Bench player's ridiculous HR=99 should NOT be in batterComponents
-    expect(result.batterComponents.HR).toBeCloseTo(20, 1);
+    expect(result.batterComponents.HR).toBeCloseTo(99, 1);
   });
 });

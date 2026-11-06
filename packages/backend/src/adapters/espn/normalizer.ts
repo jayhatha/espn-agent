@@ -11,6 +11,11 @@ import type {
   ESPNScoringCategory,
   ESPNRosterEntry,
 } from "./types.js";
+import {
+  normalizeAcquisitionRules,
+  normalizeScoringFormat,
+  resolveSeasonDates,
+} from "../../utils/league-settings.js";
 
 export class EspnDataNormalizer {
   private logger?: BaseLogger;
@@ -23,6 +28,15 @@ export class EspnDataNormalizer {
     const settings = raw.settings as Record<string, any>;
     const teams = (raw.teams as any[]) || [];
     const schedule = (raw.schedule as any[]) || [];
+    const season = Number(
+      raw.seasonId ?? raw.season ?? new Date().getFullYear(),
+    );
+    const seasonDates = resolveSeasonDates({
+      season,
+      settings,
+      schedule,
+      status: raw.status as Record<string, any> | undefined,
+    });
 
     // Parse scoring categories from scoringItems
     const scoringItems = settings?.scoringSettings?.scoringItems || [];
@@ -42,16 +56,17 @@ export class EspnDataNormalizer {
     return {
       settings: {
         name: settings?.name || "Unknown League",
-        scoringFormat: settings?.scoringType || "roto",
+        scoringFormat:
+          normalizeScoringFormat(settings?.scoringSettings?.scoringType) ??
+          normalizeScoringFormat(settings?.scoringType) ??
+          "unknown",
         categories,
         rosterSlots: this.mapRosterSlotIds(
           settings?.rosterSettings?.lineupSlotCounts || {},
         ),
-        acquisitionRules: {
-          waiverType: settings?.acquisitionSettings?.waiverProcessDays,
-          acquisitionLimit: settings?.acquisitionSettings?.acquisitionLimit,
-          tradeDeadline: settings?.tradeSettings?.deadlineDate,
-        },
+        acquisitionRules: normalizeAcquisitionRules(settings),
+        seasonStartDate: seasonDates.startDate,
+        seasonEndDate: seasonDates.endDate,
       },
       teams: teams.map((t: any) => {
         // Handle both minimal team data (from mSettings) and full team data (from mTeam/mRoster)
@@ -77,6 +92,8 @@ export class EspnDataNormalizer {
           let rosterStatus: ESPNRosterEntry["rosterStatus"] = "unknown";
           if (lineupSlotId === 16) rosterStatus = "bench";
           else if (lineupSlotId === 17) rosterStatus = "il";
+          else if (lineupSlotId === 20 || lineupSlotId === 21)
+            rosterStatus = "na";
           // Slot 19 = IF utility — treated as active roster slot
           else if (
             (lineupSlotId >= 0 && lineupSlotId <= 15) ||

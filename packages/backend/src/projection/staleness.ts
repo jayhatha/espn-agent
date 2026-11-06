@@ -8,14 +8,20 @@
 export function computeProrateFactor(
   asOfDate: string,
   today: string,
-  seasonEndDate: string = "2026-09-28",
+  seasonEndDate: string = `${new Date(today).getUTCFullYear()}-10-01`,
 ): number {
   const asOf = new Date(asOfDate);
   const now = new Date(today);
   const end = new Date(seasonEndDate);
 
-  const remainingFromAsOf = Math.max(0, (end.getTime() - asOf.getTime()) / (1000 * 60 * 60 * 24));
-  const remainingFromToday = Math.max(0, (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingFromAsOf = Math.max(
+    0,
+    (end.getTime() - asOf.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  const remainingFromToday = Math.max(
+    0,
+    (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
 
   if (remainingFromAsOf <= 0) return 0;
   if (now <= asOf) return 1.0;

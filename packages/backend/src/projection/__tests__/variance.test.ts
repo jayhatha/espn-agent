@@ -1,14 +1,134 @@
 import { describe, it, expect } from "vitest";
-import { computeConfidenceIntervals, computeRateConfidence, STAT_CV } from "../variance.js";
+import {
+  computeConfidenceIntervals,
+  computeRateConfidence,
+  monteCarloRotoPoints,
+  sampleCoherentComponents,
+  STAT_CV,
+} from "../variance.js";
 import { calculateERA, calculateWHIP } from "../../../../shared/dist/index.js";
+import { createRng } from "../../simulation/prng.js";
 
 describe("STAT_CV", () => {
   it("contains expected CV values for key stats", () => {
-    expect(STAT_CV.HR).toBe(0.30);
+    expect(STAT_CV.HR).toBe(0.3);
     expect(STAT_CV.SB).toBe(0.35);
     expect(STAT_CV.K).toBe(0.15);
     expect(STAT_CV.SV).toBe(0.35);
-    expect(STAT_CV.W).toBe(0.30);
+    expect(STAT_CV.W).toBe(0.3);
+  });
+});
+
+describe("sampleCoherentComponents", () => {
+  it("preserves batting and pitching invariants across seeded samples", () => {
+    const components = {
+      AB: 500,
+      H: 140,
+      BB: 60,
+      HBP: 8,
+      SF: 6,
+      HR: 35,
+      TB: 270,
+      SB: 120,
+      R: 110,
+      RBI: 130,
+      IP: 180,
+      ER: 65,
+      HA: 155,
+      BBA: 50,
+      K: 300,
+      G: 32,
+      GS: 32,
+      W: 25,
+      SV: 10,
+      HLD: 12,
+      QS: 30,
+    };
+    const rng = createRng(707);
+
+    for (let run = 0; run < 500; run++) {
+      const sampled = sampleCoherentComponents(components, rng);
+      const timesOnBase = Math.min(
+        sampled.AB ?? 0,
+        (sampled.H ?? 0) + (sampled.BB ?? 0) + (sampled.HBP ?? 0),
+      );
+      const appearances = sampled.G ?? 0;
+      expect(sampled.H).toBeLessThanOrEqual(sampled.AB ?? 0);
+      expect(
+        (sampled["1B"] ?? 0) +
+          (sampled["2B"] ?? 0) +
+          (sampled["3B"] ?? 0) +
+          (sampled.HR ?? 0),
+      ).toBeCloseTo(sampled.H ?? 0, 8);
+      expect(sampled.SB).toBeLessThanOrEqual(timesOnBase);
+      expect(sampled.R).toBeLessThanOrEqual(timesOnBase);
+      expect(sampled.RBI).toBeLessThanOrEqual(
+        4 *
+          ((sampled.AB ?? 0) +
+            (sampled.BB ?? 0) +
+            (sampled.HBP ?? 0) +
+            (sampled.SF ?? 0)),
+      );
+      expect(sampled.K).toBeLessThanOrEqual(3 * (sampled.IP ?? 0));
+      expect((sampled.W ?? 0) + (sampled.L ?? 0)).toBeLessThanOrEqual(
+        appearances,
+      );
+      expect((sampled.SV ?? 0) + (sampled.HLD ?? 0)).toBeLessThanOrEqual(
+        Math.max(0, appearances - (sampled.GS ?? 0)),
+      );
+      expect(sampled.QS).toBeLessThanOrEqual(sampled.GS ?? 0);
+      expect(sampled.ER).toBeGreaterThanOrEqual(0);
+      expect(sampled.HA).toBeGreaterThanOrEqual(0);
+      expect(sampled.BBA).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("jointly caps pitching outcomes while preserving baseline shares", () => {
+    const sampled = sampleCoherentComponents(
+      {
+        IP: 180,
+        G: 30,
+        GS: 10,
+        W: 24,
+        L: 12,
+        SV: 18,
+        HLD: 12,
+        QS: 9,
+      },
+      { normal: () => 1 },
+    );
+
+    expect((sampled.W ?? 0) + (sampled.L ?? 0)).toBeLessThanOrEqual(
+      sampled.G ?? 0,
+    );
+    expect((sampled.SV ?? 0) + (sampled.HLD ?? 0)).toBeLessThanOrEqual(
+      (sampled.G ?? 0) - (sampled.GS ?? 0),
+    );
+    expect(sampled.QS).toBeLessThanOrEqual(sampled.GS ?? 0);
+    expect((sampled.W ?? 0) / (sampled.L ?? 0)).toBeCloseTo(2, 10);
+    expect((sampled.SV ?? 0) / (sampled.HLD ?? 0)).toBeCloseTo(1.5, 10);
+  });
+});
+
+describe("monteCarloRotoPoints", () => {
+  it("shares average roto points for exact ties in every run", () => {
+    const result = monteCarloRotoPoints(
+      [
+        { teamId: 1, categoryId: "HR", projectedValue: 30 },
+        { teamId: 2, categoryId: "HR", projectedValue: 30 },
+        { teamId: 3, categoryId: "HR", projectedValue: 30 },
+      ],
+      [{ categoryId: "HR", direction: "HIGHER_BETTER" }],
+      3,
+    );
+
+    expect(result).toEqual(
+      new Map([
+        [1, { p10: 2, p50: 2, p90: 2 }],
+        [2, { p10: 2, p50: 2, p90: 2 }],
+        [3, { p10: 2, p50: 2, p90: 2 }],
+      ]),
+    );
   });
 });
 
@@ -74,7 +194,10 @@ describe("computeConfidenceIntervals", () => {
 
   it("unknown stat key defaults to CV=0.25", () => {
     // Using a stat key not in STAT_CV table
-    const result = computeConfidenceIntervals([{ CUSTOM_STAT: 100 }], ["CUSTOM_STAT"]);
+    const result = computeConfidenceIntervals(
+      [{ CUSTOM_STAT: 100 }],
+      ["CUSTOM_STAT"],
+    );
     // CV = 0.25, variance = (100 * 0.25)^2 = 625, SD = 25
     // P10 = 100 - 1.28 * 25 = 68
     // P90 = 100 + 1.28 * 25 = 132
@@ -105,11 +228,10 @@ describe("computeRateConfidence", () => {
   it("computes ERA confidence by varying IP and ER components", () => {
     // Team totals: IP=180, ER=60 => ERA = 9 * 60 / 180 = 3.00
     const components = { IP: 180, ER: 60 };
-    const result = computeRateConfidence(
-      components,
-      calculateERA,
-      ["IP", "ER"],
-    );
+    const result = computeRateConfidence(components, calculateERA, [
+      "IP",
+      "ER",
+    ]);
 
     expect(result.p50).toBeCloseTo(3.0, 2);
     // Lower ERA is better (favorable), P10 < P50 < P90 for ERA interval width
@@ -119,22 +241,16 @@ describe("computeRateConfidence", () => {
 
   it("computes WHIP confidence by varying IP, HA, BBA components", () => {
     // Team totals: IP=180, HA=150, BBA=50 => WHIP = (150+50)/180 = 1.111
-    // Note: IP (CV=0.20), HA (CV=0.20), BBA (CV=0.20) all have the same CV.
-    // When numerator and denominator scale proportionally, the ratio stays constant.
-    // The interval captures the range [min(rate@p10, rate@p90), max(rate@p10, rate@p90)].
-    // With equal CVs, P10 and P90 component rates are equal to p50, so p10=p50=p90=1.111.
-    // This is correct mathematical behavior — components with equal CV produce a stable rate.
     const components = { IP: 180, HA: 150, BBA: 50 };
-    const result = computeRateConfidence(
-      components,
-      calculateWHIP,
-      ["IP", "HA", "BBA"],
-    );
+    const result = computeRateConfidence(components, calculateWHIP, [
+      "IP",
+      "HA",
+      "BBA",
+    ]);
 
     expect(result.p50).toBeCloseTo(1.111, 2);
-    // With equal CVs for all components, rate stays constant across component scenarios
-    expect(result.p10).toBeCloseTo(result.p50, 2);
-    expect(result.p90).toBeCloseTo(result.p50, 2);
+    expect(result.p10).toBeLessThan(result.p50);
+    expect(result.p90).toBeGreaterThan(result.p50);
   });
 
   it("computes WHIP confidence when HA/BBA have higher CV than IP", () => {
@@ -145,11 +261,10 @@ describe("computeRateConfidence", () => {
     // or ensure numerator keys have higher CV than denominator.
     // ERA is better test: IP (CV=0.20) vs ER (CV=0.25) produces actual variance
     const components = { IP: 180, ER: 60 }; // ERA = 9*60/180 = 3.00
-    const result = computeRateConfidence(
-      components,
-      calculateERA,
-      ["IP", "ER"],
-    );
+    const result = computeRateConfidence(components, calculateERA, [
+      "IP",
+      "ER",
+    ]);
 
     expect(result.p50).toBeCloseTo(3.0, 2);
     // ER (CV=0.25) varies more than IP (CV=0.20) => rate interval has spread
@@ -160,7 +275,10 @@ describe("computeRateConfidence", () => {
 
   it("zero components produce P10=P50=P90=0", () => {
     const components = { IP: 0, ER: 0 };
-    const result = computeRateConfidence(components, calculateERA, ["IP", "ER"]);
+    const result = computeRateConfidence(components, calculateERA, [
+      "IP",
+      "ER",
+    ]);
     expect(result.p10).toBe(0);
     expect(result.p50).toBe(0);
     expect(result.p90).toBe(0);

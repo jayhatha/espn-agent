@@ -11,6 +11,7 @@ import type { StatComponents } from "./types.js";
 /** All stat keys that belong to pitching categories */
 export const PITCHING_STAT_KEYS = new Set([
   // Counting stats
+  "IP",
   "K",
   "W",
   "L",

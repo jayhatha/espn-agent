@@ -398,13 +398,17 @@ export async function recommendationsRoutes(app: FastifyInstance) {
         runId = latestRun.id;
       }
 
+      if (dropPlayerId == null) {
+        return reply.code(400).send({ error: "dropPlayerId is required" });
+      }
+
       try {
         const waiverAgent = createWaiverAgent(db, request.log, espnAdapter);
         const result = await waiverAgent.evaluateAddDropImpact({
           leagueId,
           teamId,
           snapshotDate: date,
-          projectionsRunId: runId,
+          projectionsRunId: runId as number,
           addPlayerId,
           dropPlayerId,
         });

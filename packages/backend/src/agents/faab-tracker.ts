@@ -6,6 +6,7 @@ import type {
   FaabBidEntry,
   FaabSuggestedBid,
 } from "../../../shared/dist/index.js";
+import { getFaabBudget } from "../utils/league-settings.js";
 
 /**
  * FAAB Tracker Agent
@@ -14,8 +15,60 @@ import type {
  * spend-rate projections, and suggested bid amounts.
  */
 
-const DEFAULT_FAAB_BUDGET = 1000;
 const MLB_SEASON_WEEKS = 26;
+
+export interface FaabBidModelInput {
+  leagueBudget: number;
+  teamRemaining: number;
+  playerValueAboveReplacement: number;
+  maxValueAboveReplacement: number;
+  categoryLeverage: number;
+  competitorRemaining: number[];
+  weeksRemaining: number;
+}
+
+export function calculateSuggestedFaabBid(input: FaabBidModelInput): number {
+  if (input.leagueBudget <= 0 || input.teamRemaining <= 0) return 0;
+
+  const valuePercentile =
+    input.maxValueAboveReplacement > 0
+      ? Math.min(
+          1,
+          input.playerValueAboveReplacement / input.maxValueAboveReplacement,
+        )
+      : 0;
+  const baseBudgetShare =
+    input.playerValueAboveReplacement > 0
+      ? 0.02 + 0.28 * valuePercentile ** 1.5
+      : 0.01;
+  const sortedCompetitors = [...input.competitorRemaining].sort(
+    (a, b) => a - b,
+  );
+  const competitorP75 =
+    sortedCompetitors.length > 0
+      ? sortedCompetitors[
+          Math.min(
+            sortedCompetitors.length - 1,
+            Math.floor(sortedCompetitors.length * 0.75),
+          )
+        ]
+      : 0;
+  const marketPressure = Math.min(
+    1.25,
+    Math.max(0.8, competitorP75 / input.leagueBudget + 0.5),
+  );
+  const timePressure =
+    input.weeksRemaining < 4 ? 1.25 : input.weeksRemaining > 15 ? 0.8 : 1;
+  const modeledBid = Math.round(
+    input.leagueBudget *
+      baseBudgetShare *
+      Math.min(1.75, Math.max(0.75, input.categoryLeverage)) *
+      marketPressure *
+      timePressure,
+  );
+
+  return Math.min(input.teamRemaining, Math.max(1, modeledBid));
+}
 
 export class FaabTrackerAgent {
   constructor(
@@ -59,18 +112,18 @@ export class FaabTrackerAgent {
     // League average remaining — use ESPN faab_spent where available
     let totalLeagueRemaining = 0;
     for (const t of teams) {
-      const spent = t.faab_spent !== null && t.faab_spent !== undefined
-        ? Number(t.faab_spent)
-        : 0;
+      const spent =
+        t.faab_spent !== null && t.faab_spent !== undefined
+          ? Number(t.faab_spent)
+          : 0;
       totalLeagueRemaining += faabTotal - spent;
     }
     const leagueAvgRemaining =
       teams.length > 0 ? totalLeagueRemaining / teams.length : faabTotal;
 
     // Compute weeks elapsed from first snapshot
-    const { weeksElapsed, weeksRemaining } = await this.getSeasonProgress(
-      leagueId,
-    );
+    const { weeksElapsed, weeksRemaining } =
+      await this.getSeasonProgress(leagueId);
 
     // Spend rate and projected runout
     const spendRate = weeksElapsed > 0 ? mySpent / weeksElapsed : 0;
@@ -109,11 +162,7 @@ export class FaabTrackerAgent {
     // Get all waiver transactions with bid amounts for this team
     const transactions = await this.db
       .selectFrom("league_transaction_event")
-      .select([
-        "event_date",
-        "players_added",
-        "raw_event_json",
-      ])
+      .select(["event_date", "players_added", "raw_event_json"])
       .where("league_id", "=", leagueId)
       .where("team_id", "=", teamId)
       .where("event_type", "in", ["waiver", "add"])
@@ -214,64 +263,149 @@ export class FaabTrackerAgent {
       .executeTakeFirst();
 
     let playerValue = 0;
-    let totalPoolValue = 0;
+    let replacementValue = 0;
+    let maxValueAboveReplacement = 0;
+    let categoryLeverage = 1;
+    let availablePoolSize = 0;
 
     if (latestRun) {
-      // Get this player's value
-      const projection = await this.db
-        .selectFrom("player_projection")
-        .select("stat_components_json")
-        .where("projections_run_id", "=", latestRun.id)
-        .where("player_id", "=", playerId)
+      const latestFreeAgentSnapshot = await this.db
+        .selectFrom("league_free_agent_snapshot")
+        .select("snapshot_date")
+        .where("league_id", "=", leagueId)
+        .orderBy("snapshot_date", "desc")
         .executeTakeFirst();
+      const availableIds = latestFreeAgentSnapshot
+        ? (
+            await this.db
+              .selectFrom("league_free_agent_snapshot")
+              .select("player_id")
+              .where("league_id", "=", leagueId)
+              .where(
+                "snapshot_date",
+                "=",
+                latestFreeAgentSnapshot.snapshot_date,
+              )
+              .execute()
+          ).map((row) => row.player_id)
+        : [];
 
-      if (projection) {
-        playerValue = this.computePlayerValue(
-          projection.stat_components_json as Record<string, number>,
+      if (availableIds.includes(playerId)) {
+        const [poolProjections, latestProjectedDate, settings] =
+          await Promise.all([
+            this.db
+              .selectFrom("player_projection")
+              .select(["player_id", "stat_components_json"])
+              .where("projections_run_id", "=", latestRun.id)
+              .where("player_id", "in", availableIds)
+              .execute(),
+            this.db
+              .selectFrom("team_daily_projected_category")
+              .select("snapshot_date")
+              .where("league_id", "=", leagueId)
+              .orderBy("snapshot_date", "desc")
+              .executeTakeFirst(),
+            this.db
+              .selectFrom("league_settings_version")
+              .select("settings_json")
+              .where("league_id", "=", leagueId)
+              .orderBy("effective_date", "desc")
+              .executeTakeFirst(),
+          ]);
+        const categories = (settings?.settings_json as any)?.categories ?? [];
+        const standings = latestProjectedDate
+          ? await this.db
+              .selectFrom("team_daily_projected_category")
+              .select(["team_id", "category_id", "projected_roto_points"])
+              .where("league_id", "=", leagueId)
+              .where("snapshot_date", "=", latestProjectedDate.snapshot_date)
+              .execute()
+          : [];
+        const targetProjection = poolProjections.find(
+          (row) => row.player_id === playerId,
         );
-      }
-
-      // Get total pool value (all free agent projections)
-      const allProjections = await this.db
-        .selectFrom("player_projection")
-        .select("stat_components_json")
-        .where("projections_run_id", "=", latestRun.id)
-        .execute();
-
-      for (const p of allProjections) {
-        totalPoolValue += this.computePlayerValue(
-          p.stat_components_json as Record<string, number>,
-        );
+        if (targetProjection) {
+          const targetComponents =
+            targetProjection.stat_components_json as Record<string, number>;
+          categoryLeverage = this.computeCategoryLeverage(
+            teamId,
+            targetComponents,
+            categories,
+            standings,
+          );
+          const targetIsPitcher = (targetComponents.IP ?? 0) > 0;
+          const comparableValues = poolProjections
+            .filter((row) => {
+              const components = row.stat_components_json as Record<
+                string,
+                number
+              >;
+              return (components.IP ?? 0) > 0 === targetIsPitcher;
+            })
+            .map((row) => ({
+              playerId: row.player_id,
+              value: this.computePlayerValue(
+                row.stat_components_json as Record<string, number>,
+              ),
+            }));
+          const replacementValues = comparableValues
+            .filter((row) => row.playerId !== playerId)
+            .map((row) => row.value)
+            .sort((a, b) => a - b);
+          availablePoolSize = comparableValues.length;
+          playerValue = this.computePlayerValue(targetComponents);
+          replacementValue = this.percentile(replacementValues, 0.6);
+          const maxPoolValue = Math.max(
+            playerValue,
+            ...comparableValues.map((row) => row.value),
+          );
+          maxValueAboveReplacement = Math.max(
+            0,
+            maxPoolValue - replacementValue,
+          );
+        }
       }
     }
 
-    // Base bid: player's share of remaining budget
-    let suggestedBid = 1;
+    const teamRows = await this.db
+      .selectFrom("team")
+      .select(["id", "faab_spent"])
+      .where("league_id", "=", leagueId)
+      .execute();
+    const leagueBudget = Number(summary.faabTotal);
+    const teamRemaining = Number(summary.faabRemaining);
+    const competitorRemaining = teamRows
+      .filter((team) => team.id !== teamId)
+      .map((team) => Math.max(0, leagueBudget - Number(team.faab_spent ?? 0)));
+    const valueAboveReplacement = Math.max(0, playerValue - replacementValue);
+    const suggestedBid =
+      availablePoolSize > 0
+        ? calculateSuggestedFaabBid({
+            leagueBudget,
+            teamRemaining,
+            playerValueAboveReplacement: valueAboveReplacement,
+            maxValueAboveReplacement,
+            categoryLeverage,
+            competitorRemaining,
+            weeksRemaining: summary.weeksRemaining,
+          })
+        : 0;
     const reasons: string[] = [];
-
-    if (totalPoolValue > 0 && (summary as any).faabRemaining > 0) {
-      const valueShare = playerValue / totalPoolValue;
-      suggestedBid = Math.max(1, Math.round(valueShare * (summary as any).faabRemaining));
-
-      // Adjust for time pressure
-      if (summary.weeksRemaining < 4) {
-        suggestedBid = Math.round(suggestedBid * 1.5);
-        reasons.push("Urgency premium (+50%) — less than 4 weeks remaining");
-      } else if (summary.weeksRemaining > 15) {
-        suggestedBid = Math.round(suggestedBid * 0.7);
-        reasons.push("Patience discount (-30%) — more than 15 weeks remaining");
-      }
-
-      // Cap at remaining budget
-      suggestedBid = Math.min(suggestedBid, (summary as any).faabRemaining);
+    if (availablePoolSize === 0) {
+      reasons.push("Player is not in latest league free-agent pool");
+    } else if (valueAboveReplacement <= 0) {
+      reasons.push("Projection is at or below available replacement level");
     } else {
-      reasons.push("No projection data available — minimum bid recommended");
+      reasons.push(
+        `${Math.round(valueAboveReplacement)} value above replacement among ${availablePoolSize} comparable free agents`,
+      );
+      reasons.push(`${categoryLeverage.toFixed(2)}x standings leverage`);
+      reasons.push(
+        `competitor median remaining ${Math.round(this.percentile(competitorRemaining, 0.5))}/${leagueBudget}`,
+      );
     }
 
-    const rationale =
-      reasons.length > 0
-        ? reasons.join(". ")
-        : `Based on ${Math.round((playerValue / totalPoolValue) * 100)}% of remaining pool value`;
+    const rationale = reasons.join(". ");
 
     return {
       playerId,
@@ -293,28 +427,12 @@ export class FaabTrackerAgent {
       .executeTakeFirst();
 
     if (settings?.settings_json) {
-      const json = settings.settings_json as unknown as Record<string, unknown>;
-      const acqRules = json.acquisition_rules as Record<string, unknown> | undefined;
-
-      // Check multiple possible field names for FAAB budget
-      const candidates: (unknown | undefined)[] = [
-        acqRules?.acquisition_budget,
-        acqRules?.acquisitionBudget,
-        acqRules?.budget,
-        acqRules?.faab_budget,
-        (json as Record<string, unknown>).acquisitionBudget,
-        (json as Record<string, unknown>).acquisition_budget,
-      ];
-
-      for (const val of candidates) {
-        if (val !== undefined && val !== null && typeof val === "number" && val > 0) {
-          return val;
-        }
-      }
+      const budget = getFaabBudget(settings.settings_json);
+      if (budget !== null) return budget;
     }
 
-    this.logger?.warn({ leagueId }, "FAAB budget not found in settings, using default");
-    return DEFAULT_FAAB_BUDGET;
+    this.logger?.warn({ leagueId }, "FAAB budget not enabled or unavailable");
+    return 0;
   }
 
   private async getTeamBids(
@@ -386,5 +504,51 @@ export class FaabTrackerAgent {
 
     // Simple additive value — each stat weighted roughly equally
     return hr * 3 + rbi + r + sb * 2 + k * 0.5 + w * 5 + sv * 4;
+  }
+
+  private computeCategoryLeverage(
+    teamId: number,
+    components: Record<string, number>,
+    categories: Array<{ category_id: string; stat_key: string }>,
+    standings: Array<{
+      team_id: number;
+      category_id: string;
+      projected_roto_points: unknown;
+    }>,
+  ): number {
+    const isPitcher = (components.IP ?? 0) > 0;
+    const relevant = categories.filter((category) => {
+      const pitchingKeys = new Set([
+        "K",
+        "W",
+        "SV",
+        "HLD",
+        "QS",
+        "ERA",
+        "WHIP",
+      ]);
+      return pitchingKeys.has(category.stat_key) === isPitcher;
+    });
+    if (relevant.length === 0) return 1;
+    const numTeams = new Set(standings.map((row) => row.team_id)).size;
+    if (numTeams === 0) return 1;
+    const leverage = relevant.map((category) => {
+      const row = standings.find(
+        (standing) =>
+          standing.team_id === teamId &&
+          standing.category_id === category.category_id,
+      );
+      const points = Number(row?.projected_roto_points ?? numTeams / 2);
+      return 0.75 + (numTeams - points) / numTeams;
+    });
+    return leverage.reduce((sum, value) => sum + value, 0) / leverage.length;
+  }
+
+  private percentile(values: number[], percentile: number): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[
+      Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * percentile))
+    ];
   }
 }

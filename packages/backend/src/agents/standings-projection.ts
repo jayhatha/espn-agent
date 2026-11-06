@@ -8,7 +8,10 @@ import {
   combineComponents,
   PITCHING_STAT_KEYS,
 } from "../../../shared/dist/index.js";
-import { assignRanksWithTies } from "../utils/roto-ranking.js";
+import {
+  assignCompetitionRanks,
+  assignRanksWithTies,
+} from "../utils/roto-ranking.js";
 import { allocateProjections } from "../projection/allocator.js";
 import { computeRateConfidence } from "../projection/variance.js";
 import type {
@@ -17,6 +20,11 @@ import type {
   RosteredPlayer,
   ConfidenceInterval,
 } from "../projection/types.js";
+import {
+  getGsCap,
+  normalizeScoringFormat,
+  resolveSeasonDates,
+} from "../utils/league-settings.js";
 
 /**
  * Standings Projection Agent
@@ -38,8 +46,6 @@ interface TeamProjection {
     }
   >;
 }
-
-const DEFAULT_GS_CAP = 200;
 
 /**
  * Compute category projections from a completed allocation result.
@@ -219,6 +225,41 @@ export class StandingsProjectionAgent {
       .where("id", "=", snapshot.settings_version_id)
       .executeTakeFirstOrThrow();
 
+    const scoringFormat = normalizeScoringFormat(
+      settings.settings_json.scoring_format,
+    );
+    if (scoringFormat !== "roto") {
+      const reasons = new Set<string>(
+        Array.isArray(snapshot.degraded_reasons)
+          ? (snapshot.degraded_reasons as string[])
+          : [],
+      );
+      reasons.add("unsupported_scoring_format");
+      await Promise.all([
+        this.db
+          .deleteFrom("team_daily_projected_category")
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .execute(),
+        this.db
+          .deleteFrom("team_daily_projected_overall")
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .execute(),
+      ]);
+      await this.db
+        .updateTable("league_daily_snapshot")
+        .set({ is_degraded: true, degraded_reasons: [...reasons] })
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", snapshotDate)
+        .execute();
+      this.logger?.warn(
+        { leagueId, snapshotDate, scoringFormat },
+        "Skipping roto projection for unsupported scoring format",
+      );
+      return;
+    }
+
     const categories = settings.settings_json.categories as Category[];
     const rosterSlots =
       ((settings.settings_json as any).roster_slots as Record<
@@ -236,21 +277,25 @@ export class StandingsProjectionAgent {
     // Fetch shared data once for all teams (parallel)
     const [
       projectionAsOfDate,
-      gsCap,
       latestPayload,
+      league,
       teamEspnIds,
       allCategoryTotals,
       allRosterEntries,
       allProjections,
     ] = await Promise.all([
       this.getProjectionAsOfDate(projectionsRunId),
-      this.getGsCap(leagueId),
       this.db
         .selectFrom("league_raw_payload")
         .select(["response_json"])
         .where("league_id", "=", leagueId)
         .orderBy("fetched_at", "desc")
         .executeTakeFirst(),
+      this.db
+        .selectFrom("league")
+        .select("season")
+        .where("id", "=", leagueId)
+        .executeTakeFirstOrThrow(),
       this.db
         .selectFrom("team")
         .select(["id", "espn_team_id"])
@@ -263,6 +308,14 @@ export class StandingsProjectionAgent {
       // Pre-fetch ALL player projections for this run in one query
       this.repo.getPlayerProjections(projectionsRunId),
     ]);
+    const rawPayload = latestPayload?.response_json as any;
+    const gsCap = getGsCap(settings.settings_json, rawPayload?.settings);
+    const seasonDates = resolveSeasonDates({
+      season: league.season,
+      settings: settings.settings_json as Record<string, any>,
+      schedule: rawPayload?.schedule,
+      status: rawPayload?.status,
+    });
 
     // Group category totals by team_id
     const categoryTotalsByTeam = new Map<number, typeof allCategoryTotals>();
@@ -292,7 +345,6 @@ export class StandingsProjectionAgent {
     // Batch extract GS used per team from single ESPN payload (0 extra queries)
     const espnIdMap = new Map(teamEspnIds.map((t) => [t.id, t.espn_team_id]));
     const gsUsedByTeam = new Map<number, number>();
-    const rawPayload = latestPayload?.response_json as any;
     for (const team of teams) {
       const espnTeamId = espnIdMap.get(team.id);
       const espnTeam = rawPayload?.teams?.find((t: any) => t.id === espnTeamId);
@@ -311,6 +363,7 @@ export class StandingsProjectionAgent {
           gsCap,
           projectionAsOfDate,
           snapshotDate,
+          seasonDates.endDate,
           categoryTotalsByTeam,
           rosterByTeam,
           projectionsByPlayerId,
@@ -341,9 +394,10 @@ export class StandingsProjectionAgent {
     categories: Category[],
     rosterSlots: Record<string, number>,
     gsUsed: number,
-    gsCap: number,
+    gsCap: number | null,
     projectionAsOfDate: string,
     snapshotDate: string,
+    seasonEndDate: string,
     categoryTotalsByTeam: Map<
       number,
       Array<{
@@ -393,6 +447,7 @@ export class StandingsProjectionAgent {
       gsCap,
       projectionAsOfDate,
       snapshotDate,
+      seasonEndDate,
     };
 
     const allocResult = allocateProjections(allocationInput);
@@ -511,49 +566,27 @@ export class StandingsProjectionAgent {
     }
 
     // Rank overall
-    const overallRankings = Array.from(teamOverallPoints.entries())
-      .map(([teamId, points]) => ({ teamId, points }))
-      .sort((a, b) => b.points - a.points);
+    const overallRankings = assignCompetitionRanks(
+      Array.from(teamOverallPoints.entries())
+        .map(([teamId, points]) => ({ teamId, points }))
+        .sort((a, b) => b.points - a.points),
+    );
 
     // Batch insert overall projections
     if (overallRankings.length > 0) {
       await this.db
         .insertInto("team_daily_projected_overall")
         .values(
-          overallRankings.map((ranking, i) => ({
+          overallRankings.map((ranking) => ({
             league_id: leagueId,
             snapshot_date: snapshotDate,
             team_id: ranking.teamId,
             projected_overall_points: ranking.points,
-            projected_overall_rank: i + 1,
+            projected_overall_rank: ranking.rank,
           })),
         )
         .execute();
     }
-  }
-
-  /**
-   * Get GS cap for the league from settings or use default 200
-   */
-  private async getGsCap(leagueId: number): Promise<number> {
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .select("settings_json")
-      .where("league_id", "=", leagueId)
-      .orderBy("effective_date", "desc")
-      .executeTakeFirst();
-
-    if (settings?.settings_json) {
-      const json = settings.settings_json as unknown as Record<string, unknown>;
-      const rosterSlots = json.roster_slots as
-        | Record<string, number>
-        | undefined;
-      if (rosterSlots?.GS_LIMIT !== undefined) {
-        return rosterSlots.GS_LIMIT;
-      }
-    }
-
-    return DEFAULT_GS_CAP;
   }
 
   /**

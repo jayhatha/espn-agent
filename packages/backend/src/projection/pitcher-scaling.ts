@@ -4,7 +4,10 @@ import type { StatComponents } from "../../../shared/dist/index.js";
  * Scale all numeric fields in stat components by a factor.
  * Undefined fields are left undefined (not set to 0).
  */
-export function scaleComponents(components: StatComponents, factor: number): StatComponents {
+export function scaleComponents(
+  components: StatComponents,
+  factor: number,
+): StatComponents {
   const scaled: StatComponents = {};
   for (const [key, value] of Object.entries(components)) {
     if (typeof value === "number") {
@@ -19,6 +22,8 @@ interface SPProjection {
   playerId: number;
   components: StatComponents;
   projectedGS: number | null; // null = not parsed from CSV
+  positions?: string[];
+  role?: string | null;
 }
 
 /**
@@ -26,10 +31,35 @@ interface SPProjection {
  * Fallback: GS ~ IP / 6 for SP with IP > 80.
  * Returns 0 for relievers (IP <= 80) or missing IP.
  */
-function estimateGS(components: StatComponents): number {
+function estimateGS(components: StatComponents, forceStarter = false): number {
   const ip = components.IP ?? 0;
-  if (ip > 80) return Math.round(ip / 6);
+  if (forceStarter || ip > 80) return Math.round(ip / 6);
   return 0;
+}
+
+function isExplicitReliever(projection: SPProjection): boolean {
+  const role = projection.role?.toUpperCase();
+  const positions = new Set(
+    projection.positions?.map((position) => position.toUpperCase()),
+  );
+  return (
+    role === "RP" ||
+    role === "RELIEVER" ||
+    (positions.has("RP") && !positions.has("SP"))
+  );
+}
+
+function projectedStarts(projection: SPProjection): number {
+  if (isExplicitReliever(projection)) return 0;
+  if ((projection.projectedGS ?? 0) > 0) return projection.projectedGS!;
+  const role = projection.role?.toUpperCase();
+  const positions = new Set(
+    projection.positions?.map((position) => position.toUpperCase()),
+  );
+  return estimateGS(
+    projection.components,
+    role === "SP" || role === "STARTER" || positions.has("SP"),
+  );
 }
 
 /**
@@ -49,20 +79,27 @@ function estimateGS(components: StatComponents): number {
  */
 export function applyGsCap(
   gsUsed: number,
-  gsCap: number,
+  gsCap: number | null,
   spProjections: SPProjection[],
-): { scaledProjections: Array<{ playerId: number; scaledComponents: StatComponents }>; scaleFactor: number } {
-  const gsRemaining = Math.max(0, gsCap - gsUsed);
+): {
+  scaledProjections: Array<{
+    playerId: number;
+    scaledComponents: StatComponents;
+  }>;
+  scaleFactor: number;
+} {
+  const gsRemaining =
+    gsCap === null ? Number.POSITIVE_INFINITY : Math.max(0, gsCap - gsUsed);
 
   if (spProjections.length === 0) {
     return { scaledProjections: [], scaleFactor: 1.0 };
   }
 
-  // Calculate total projected GS, using estimateGS as fallback
-  const totalProjectedGS = spProjections.reduce((sum, sp) => {
-    const gs = sp.projectedGS !== null ? sp.projectedGS : estimateGS(sp.components);
-    return sum + gs;
-  }, 0);
+  const startsByPlayer = spProjections.map(projectedStarts);
+  const totalProjectedGS = startsByPlayer.reduce(
+    (sum, starts) => sum + starts,
+    0,
+  );
 
   // If projected GS fits within remaining budget, no scaling needed
   if (totalProjectedGS <= gsRemaining) {
@@ -79,9 +116,12 @@ export function applyGsCap(
   const scaleFactor = totalProjectedGS > 0 ? gsRemaining / totalProjectedGS : 0;
 
   return {
-    scaledProjections: spProjections.map((sp) => ({
+    scaledProjections: spProjections.map((sp, index) => ({
       playerId: sp.playerId,
-      scaledComponents: scaleComponents(sp.components, scaleFactor),
+      scaledComponents:
+        startsByPlayer[index] > 0
+          ? scaleComponents(sp.components, scaleFactor)
+          : { ...sp.components },
     })),
     scaleFactor,
   };

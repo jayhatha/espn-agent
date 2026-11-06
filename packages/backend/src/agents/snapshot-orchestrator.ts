@@ -687,6 +687,8 @@ export class SnapshotOrchestratorAgent {
       categories,
       roster_slots: settings.rosterSlots || {},
       acquisition_rules: settings.acquisitionRules || {},
+      season_start_date: settings.seasonStartDate,
+      season_end_date: settings.seasonEndDate,
     };
 
     // Check if settings for this exact date already exist

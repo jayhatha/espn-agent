@@ -65,4 +65,20 @@ describe("canFillSlot", () => {
   it("returns true for OF slot with RF player", () => {
     expect(canFillSlot(["RF"], "OF")).toBe(true);
   });
+
+  it("does not allow a pitcher in UTIL or DH", () => {
+    expect(canFillSlot(["SP"], "UTIL")).toBe(false);
+    expect(canFillSlot(["RP"], "DH")).toBe(false);
+  });
+
+  it("allows any infielder in IF", () => {
+    expect(canFillSlot(["1B"], "IF")).toBe(true);
+    expect(canFillSlot(["SS"], "IF")).toBe(true);
+    expect(canFillSlot(["OF"], "IF")).toBe(false);
+  });
+
+  it("canonicalizes ESPN bench and injured-list aliases", () => {
+    expect(canFillSlot(["OF"], "BE")).toBe(true);
+    expect(canFillSlot(["SP"], "IL60")).toBe(true);
+  });
 });

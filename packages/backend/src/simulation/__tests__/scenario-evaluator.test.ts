@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { evaluateDeterministicScenario } from "../scenario-evaluator.js";
 import type { SimulationState, TeamSimInput } from "../types.js";
-import { DEFAULT_SEASON_END } from "../types.js";
 import type { Category } from "../../../../shared/dist/index.js";
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -84,15 +83,19 @@ function makeTeam(
 }
 
 function makeState(teams: TeamSimInput[]): SimulationState {
+  const seasonEndDate = "2026-10-01";
   return {
     leagueId: 1,
     snapshotDate: "2026-05-01",
     projectionsRunId: 1,
     categories: HITTER_CATEGORIES,
+    scoringFormat: "roto",
     rosterSlots: ROSTER_SLOTS,
     gsCap: 200,
     projectionAsOfDate: "2026-05-01",
-    daysRemaining: daysBetween("2026-05-01", DEFAULT_SEASON_END),
+    seasonStartDate: "2026-03-20",
+    seasonEndDate,
+    daysRemaining: daysBetween("2026-05-01", seasonEndDate),
     teams,
     degradedReasons: [],
     isViable: true,

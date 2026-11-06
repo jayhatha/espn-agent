@@ -8,11 +8,8 @@ import type {
   DraftRanking,
   DraftConfiguration,
 } from "../../../shared/dist/index.js";
-import {
-  getReplacementLevel,
-  calculateVBD,
-  calculateFinalRate,
-} from "../../../shared/dist/index.js";
+import { calculateFinalRate } from "../../../shared/dist/index.js";
+import { calculateRosterBasedValues } from "./draft-value-model.js";
 
 /**
  * Draft Rankings Agent
@@ -20,22 +17,6 @@ import {
  *
  * Produces VBD-ranked player list with position-specific replacement levels
  */
-
-/** Stat keys that belong to pitching categories */
-const PITCHING_STAT_KEYS = new Set([
-  "K", "W", "L", "SV", "HLD", "QS", "CG", "BLSV", "SVO",
-  "ER", "OUTS", "HA", "BBA", "HRA",
-  "ERA", "WHIP", "K9", "WPCT",
-]);
-
-interface PlayerWithProjection {
-  playerId: number;
-  playerName: string;
-  positions: string[];
-  projectedStats: StatComponents;
-  sgpTotal: number;
-  categorySGPs: Record<string, number>;
-}
 
 export class DraftRankingsAgent {
   constructor(
@@ -119,7 +100,10 @@ export class DraftRankingsAgent {
       const latestRun = await this.db
         .selectFrom("projections_run")
         .select(["id", "staleness"])
-        .orderBy(sql`CASE staleness WHEN 'fresh' THEN 0 WHEN 'stale' THEN 1 ELSE 2 END`, "asc")
+        .orderBy(
+          sql`CASE staleness WHEN 'fresh' THEN 0 WHEN 'stale' THEN 1 ELSE 2 END`,
+          "asc",
+        )
         .orderBy("as_of_date", "desc")
         .executeTakeFirst();
 
@@ -161,240 +145,34 @@ export class DraftRankingsAgent {
       "Loaded player projections",
     );
 
-    // Split projections into batter and pitcher pools for SGP calculation
-    // This prevents cross-type dilution (batters with 0 ERA dragging pitcher means down)
-    const allProjections = projections.map(
-      (p) => p.stat_components_json as StatComponents,
+    const rosterValues = calculateRosterBasedValues(
+      projections.map((projection) => ({
+        playerId: projection.player_id,
+        positions: projection.positions,
+        projectedStats: projection.stat_components_json as StatComponents,
+      })),
+      categories,
+      rosterSlots,
+      totalTeams,
     );
-    const allBatterProjections = allProjections.filter((p) => (p.AB ?? 0) > 0);
-    const allPitcherProjections = allProjections.filter((p) => (p.IP ?? 0) > 0);
-
-    // Batter slot keys (used for UTIL replacement level calculation)
-    // UTIL excluded — computed separately to prevent double-counting in replacement level
-    const batterSlotKeys = ["C", "1B", "2B", "SS", "3B", "OF", "CI", "MI", "IF"];
-
-    // Use full type-split pools for SGP calculation
-    // The scarce stat filter (>50% zeros → compare only among contributors)
-    // handles skewed distributions like SV without needing pool trimming
-    const batterProjections = allBatterProjections;
-    const pitcherProjections = allPitcherProjections;
-
-    this.logger?.info(
-      {
-        totalPlayers: allProjections.length,
-        batters: batterProjections.length,
-        pitchers: pitcherProjections.length,
-      },
-      "Split player pools for SGP calculation",
+    const valuesByPlayer = new Map(
+      rosterValues.map((value) => [value.playerId, value]),
     );
-
-    // DIAGNOSTIC: Log category-level statistics to validate SGP spread
-    const categoryStats: Record<string, { mean: number; stdDev: number; min: number; max: number; poolSize: number; scarce: boolean }> = {};
-    for (const category of categories) {
-      const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-      const pool = isPitchingCat ? pitcherProjections : batterProjections;
-      let allValues: number[];
-      let isScarce = false;
-
-      if (category.type === "COUNTING") {
-        const rawValues = pool.map((p) => p[category.stat_key] || 0);
-        const nonZeroValues = rawValues.filter((v) => v > 0);
-        const zeroRatio = 1 - nonZeroValues.length / rawValues.length;
-        isScarce = zeroRatio > 0.5;
-        allValues = isScarce ? nonZeroValues : rawValues;
-        if (allValues.length === 0) continue;
-      } else if (category.type === "RATE" && category.formula_id) {
-        allValues = pool.map((p) => {
-          try {
-            return calculateFinalRate(category.formula_id!, {}, p);
-          } catch {
-            return 0;
-          }
-        });
-      } else {
-        continue;
-      }
-
-      const sum = allValues.reduce((acc, val) => acc + val, 0);
-      const mean = sum / allValues.length;
-      const squaredDiffs = allValues.map((val) => Math.pow(val - mean, 2));
-      const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / allValues.length;
-      const stdDev = Math.sqrt(variance);
-      const min = Math.min(...allValues);
-      const max = Math.max(...allValues);
-
-      categoryStats[category.category_id] = { mean, stdDev, min, max, poolSize: allValues.length, scarce: isScarce };
-    }
-
-    this.logger?.info(
-      {
-        categories: Object.entries(categoryStats).map(([catId, stats]) => ({
-          categoryId: catId,
-          mean: stats.mean.toFixed(2),
-          stdDev: stats.stdDev.toFixed(2),
-          min: stats.min.toFixed(2),
-          max: stats.max.toFixed(2),
-          range: (stats.max - stats.min).toFixed(2),
-          poolSize: stats.poolSize,
-          scarce: stats.scarce,
-        })),
-      },
-      "Category statistics for SGP calculation (type-split pools)",
-    );
-
-    const playersWithSGP: PlayerWithProjection[] = projections.map((p) => {
-      const projectedStats = p.stat_components_json as StatComponents;
-      const categorySGPs: Record<string, number> = {};
-      let sgpTotal = 0;
-
-      const isBatter = (projectedStats.AB ?? 0) > 0;
-      const isPitcher = (projectedStats.IP ?? 0) > 0;
-
-      // Calculate SGP per category using type-appropriate pool
-      // Only evaluate categories the player can contribute to
-      for (const category of categories) {
-        const isPitchingCat = PITCHING_STAT_KEYS.has(category.stat_key);
-
-        // Skip categories the player can't contribute to
-        // (batters skip pitching cats, pitchers skip batting cats)
-        // Two-way players (Ohtani) get both
-        if (isPitchingCat && !isPitcher) {
-          categorySGPs[category.category_id] = 0;
-          continue;
-        }
-        if (!isPitchingCat && !isBatter) {
-          categorySGPs[category.category_id] = 0;
-          continue;
-        }
-
-        const pool = isPitchingCat ? pitcherProjections : batterProjections;
-
-        const sgp = this.calculateCategorySGPForPlayer(
-          projectedStats,
-          pool,
-          category,
-        );
-        categorySGPs[category.category_id] = sgp;
-        sgpTotal += sgp;
-      }
-
+    const rankedPlayers: DraftRanking[] = projections.map((projection) => {
+      const value = valuesByPlayer.get(projection.player_id)!;
       return {
-        playerId: p.player_id,
-        playerName: p.name,
-        positions: p.positions,
-        projectedStats,
-        sgpTotal,
-        categorySGPs,
-      };
-    });
-
-    // Group players by position and calculate replacement levels
-    const replacementSGPs: Record<string, number> = {};
-
-    // Get all unique positions from roster slots
-    const positions = Object.keys(rosterSlots);
-
-    for (const pos of positions) {
-      // Find players eligible at this position
-      // UTIL = any batter (AB > 0), P = any pitcher (IP > 0)
-      let eligiblePlayers: PlayerWithProjection[];
-      let replacementIndex: number;
-
-      if (pos === "UTIL") {
-        // UTIL can be filled by any batter — replacement level is after all
-        // dedicated hitter slots are consumed across the league
-        eligiblePlayers = playersWithSGP.filter((p) => (p.projectedStats.AB ?? 0) > 0);
-        const allBatterSlots = batterSlotKeys.reduce((sum, k) => sum + (rosterSlots[k] || 0), 0);
-        replacementIndex = allBatterSlots * totalTeams + 1;
-      } else if (pos === "P") {
-        // Generic P slot can be filled by any pitcher — replacement level is
-        // after all dedicated pitcher slots (SP + RP) are consumed
-        eligiblePlayers = playersWithSGP.filter((p) => (p.projectedStats.IP ?? 0) > 0);
-        const dedicatedPitcherSlots = (rosterSlots["SP"] || 0) + (rosterSlots["RP"] || 0);
-        replacementIndex = (dedicatedPitcherSlots + (rosterSlots["P"] || 0)) * totalTeams + 1;
-      } else {
-        eligiblePlayers = playersWithSGP.filter((p) => p.positions.includes(pos));
-        replacementIndex = getReplacementLevel(pos, rosterSlots, totalTeams);
-      }
-
-      if (eligiblePlayers.length === 0) {
-        replacementSGPs[pos] = 0;
-        continue;
-      }
-
-      // Sort by SGP descending
-      eligiblePlayers.sort((a, b) => b.sgpTotal - a.sgpTotal);
-
-      // Get replacement player's SGP
-      // replacementIndex is 1-based, convert to 0-based array index
-      if (replacementIndex <= eligiblePlayers.length) {
-        replacementSGPs[pos] = eligiblePlayers[replacementIndex - 1].sgpTotal;
-      } else {
-        // Sparse position: not enough projected players to fill all rosters.
-        // Use the worst available player as the replacement level
-        replacementSGPs[pos] = eligiblePlayers[eligiblePlayers.length - 1].sgpTotal;
-      }
-
-      // DIAGNOSTIC: Always log replacement level details
-      this.logger?.info(
-        {
-          position: pos,
-          slotCount: rosterSlots[pos],
-          eligibleCount: eligiblePlayers.length,
-          replacementIndex,
-          replacementSGP: replacementSGPs[pos].toFixed(2),
-          isSparse: replacementIndex > eligiblePlayers.length,
-        },
-        "Calculated replacement level for position",
-      );
-    }
-
-    // DIAGNOSTIC: Log overall replacement level summary
-    this.logger?.info(
-      {
-        replacementSGPs: Object.fromEntries(
-          Object.entries(replacementSGPs).map(([pos, sgp]) => [pos, sgp.toFixed(2)])
-        ),
-      },
-      "Replacement level summary",
-    );
-
-    // Calculate VBD for each player (max across all eligible positions)
-    const rankedPlayers: DraftRanking[] = (playersWithSGP as any[]).map((player): any => {
-      let maxVBD = 0;
-      let primaryPosition = player.positions[0] || "UTIL";
-
-      // Calculate VBD for each position the player is eligible for
-      // Map DH → UTIL since DH isn't a roster slot (DH players compete for UTIL)
-      const rosterPositions = new Set<string>();
-      for (const pos of player.positions) {
-        if (pos in replacementSGPs) {
-          rosterPositions.add(pos);
-        } else if (pos === "DH" && "UTIL" in replacementSGPs) {
-          rosterPositions.add("UTIL");
-        }
-      }
-
-      for (const pos of rosterPositions) {
-        const replacementSGP = replacementSGPs[pos];
-        const vbd = calculateVBD(player.sgpTotal, replacementSGP);
-
-        if (vbd > maxVBD) {
-          maxVBD = vbd;
-          primaryPosition = pos;
-        }
-      }
-
-      return {
-        playerId: player.playerId,
-        playerName: player.playerName,
-        positions: player.positions,
-        primaryPosition,
-        vbdScore: maxVBD,
-        sgpTotal: player.sgpTotal,
-        categorySGPs: player.categorySGPs,
-        projectedStats: player.projectedStats,
-        tier: 0, // Will assign below
+        playerId: projection.player_id,
+        playerName: projection.name,
+        positions: value.positions,
+        primaryPosition: value.primaryPosition,
+        position: value.primaryPosition,
+        rank: 0,
+        dollarValue: 0,
+        vbdScore: Math.max(0, value.sgpTotal),
+        sgpTotal: value.sgpTotal,
+        categorySGPs: value.categorySGPs,
+        projectedStats: projection.stat_components_json as StatComponents,
+        tier: 0,
       };
     });
 
@@ -408,6 +186,7 @@ export class DraftRankingsAgent {
     const tier3Cutoff = Math.floor(totalPlayers * 0.5);
 
     rankedPlayers.forEach((player, index) => {
+      player.rank = index + 1;
       if (index < tier1Cutoff) {
         player.tier = 1;
       } else if (index < tier2Cutoff) {
@@ -435,101 +214,12 @@ export class DraftRankingsAgent {
         totalRanked: rankedPlayers.length,
         filtered: filteredPlayers.length,
         returned: result.length,
-        replacementLevels: Object.keys(replacementSGPs).length,
+        replacementLevels: Object.keys(rosterSlots).length,
       },
       "Draft rankings generated",
     );
 
     return result;
-  }
-
-  /**
-   * Calculate SGP for a single category (for detailed tracking)
-   */
-  private calculateCategorySGPForPlayer(
-    projection: StatComponents,
-    allProjections: StatComponents[],
-    category: Category,
-  ): number {
-    let statValue: number;
-    let allValues: number[];
-
-    if (category.type === "COUNTING") {
-      statValue = projection[category.stat_key] || 0;
-      const rawValues = allProjections.map((p) => p[category.stat_key] || 0);
-      const nonZeroValues = rawValues.filter((v) => v > 0);
-      const zeroRatio = 1 - nonZeroValues.length / rawValues.length;
-
-      // For scarce counting stats (>50% of pool has 0, e.g., SV, HLD),
-      // compare only among players who accumulate the stat.
-      // Players with 0 get SGP = 0 (they don't contribute to this category).
-      // This prevents closers from getting +13 SGP just from saves.
-      if (zeroRatio > 0.5) {
-        if (statValue === 0) return 0;
-        allValues = nonZeroValues;
-      } else {
-        allValues = rawValues;
-      }
-    } else if (category.type === "RATE" && category.formula_id) {
-      try {
-        statValue = calculateFinalRate(category.formula_id, {}, projection);
-        allValues = allProjections.map((p) => {
-          try {
-            return calculateFinalRate(category.formula_id!, {}, p);
-          } catch {
-            return 0;
-          }
-        });
-      } catch {
-        return 0;
-      }
-    } else {
-      return 0;
-    }
-
-    // Calculate mean
-    const sum = allValues.reduce((acc, val) => acc + val, 0);
-    const mean = sum / allValues.length;
-
-    // Calculate population standard deviation
-    const squaredDiffs = allValues.map((val) => Math.pow(val - mean, 2));
-    const variance =
-      squaredDiffs.reduce((acc, val) => acc + val, 0) / allValues.length;
-    const stdDev = Math.sqrt(variance);
-
-    if (stdDev === 0) return 0;
-
-    let sgp = (statValue - mean) / stdDev;
-
-    // Invert for LOWER_BETTER
-    if (category.direction === "LOWER_BETTER") {
-      sgp = -sgp;
-    }
-
-    // Dampen rate stat SGP for low-volume players (primarily RPs).
-    // In roto, a closer's elite ERA/WHIP barely moves team totals because
-    // they pitch ~60 IP vs a SP's ~180 IP. We use mean volume as the
-    // reference (pulled up by SPs to ~100 IP) and cap weight at 1.0 so
-    // SPs (above mean) keep raw SGP while RPs are reduced proportionally.
-    if (category.type === "RATE") {
-      const isPitchingRate = PITCHING_STAT_KEYS.has(category.stat_key);
-      const volumeKey = isPitchingRate ? "IP" : "AB";
-      const playerVolume = projection[volumeKey] || 0;
-
-      const poolVolumes = allProjections
-        .map((p) => p[volumeKey] || 0)
-        .filter((v) => v > 0);
-      if (poolVolumes.length > 0) {
-        const meanVolume =
-          poolVolumes.reduce((s, v) => s + v, 0) / poolVolumes.length;
-        if (meanVolume > 0) {
-          const volumeWeight = Math.min(1.0, playerVolume / meanVolume);
-          sgp *= volumeWeight;
-        }
-      }
-    }
-
-    return sgp;
   }
 
   /**
@@ -543,7 +233,10 @@ export class DraftRankingsAgent {
       projectionsRunId?: number;
     },
   ): Promise<ProjectedStandingsResult> {
-    this.logger?.info({ numTeams: rosters.length }, "Calculating projected standings");
+    this.logger?.info(
+      { numTeams: rosters.length },
+      "Calculating projected standings",
+    );
 
     // Determine projections run ID
     let projectionsRunId = options?.projectionsRunId;
@@ -566,7 +259,7 @@ export class DraftRankingsAgent {
     const teamTotals: TeamProjectedStats[] = [];
 
     for (const roster of rosters) {
-      const playerIds = roster.players.map(p => p.playerId);
+      const playerIds = roster.players.map((p) => p.playerId);
 
       if (playerIds.length === 0) {
         // Team with no players - all zero stats
@@ -582,17 +275,14 @@ export class DraftRankingsAgent {
       const projections = await this.db
         .selectFrom("player_projection")
         .innerJoin("player", "player.id", "player_projection.player_id")
-        .select([
-          "player.id",
-          "player_projection.stat_components_json",
-        ])
+        .select(["player.id", "player_projection.stat_components_json"])
         .where("player.id", "in", playerIds)
         .where("player_projection.projections_run_id", "=", projectionsRunId)
         .execute();
 
       // Aggregate stats using component math
       const aggregated = this.aggregateTeamStats(
-        projections.map(p => p.stat_components_json as StatComponents),
+        projections.map((p) => p.stat_components_json as StatComponents),
       );
 
       teamTotals.push({
@@ -603,7 +293,11 @@ export class DraftRankingsAgent {
     }
 
     // Rank teams per category
-    const standings = this.rankTeams(teamTotals, config.categories, config.totalTeams);
+    const standings = this.rankTeams(
+      teamTotals,
+      config.categories,
+      config.totalTeams,
+    );
 
     return {
       standings,
@@ -614,9 +308,7 @@ export class DraftRankingsAgent {
   /**
    * Aggregate team stats using component-based addition
    */
-  private aggregateTeamStats(
-    playerStats: StatComponents[],
-  ): StatComponents {
+  private aggregateTeamStats(playerStats: StatComponents[]): StatComponents {
     // Use component-based aggregation (never average rates)
     const components: StatComponents = {};
 
@@ -679,7 +371,9 @@ export class DraftRankingsAgent {
     }
 
     // Sort by total points, assign overall rank
-    standings.sort((a, b) => b.projected_overall_points - a.projected_overall_points);
+    standings.sort(
+      (a, b) => b.projected_overall_points - a.projected_overall_points,
+    );
     standings.forEach((team, index) => {
       team.projected_overall_rank = index + 1;
     });

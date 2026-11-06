@@ -5,7 +5,7 @@ import {
 } from "../projection/staleness.js";
 import { allocateLineup } from "../projection/hitter-allocation.js";
 import type { RosteredPlayer } from "../projection/types.js";
-import { STAT_CV } from "../projection/variance.js";
+import { sampleCoherentComponents } from "../projection/variance.js";
 import type { Rng } from "./prng.js";
 import type {
   SimulationState,
@@ -13,7 +13,6 @@ import type {
   TeamOpportunityStream,
   PlayerOpportunity,
 } from "./types.js";
-import { DEFAULT_SEASON_END } from "./types.js";
 
 function hasPitchingComponents(components: StatComponents | null): boolean {
   return !!components && (components.IP ?? 0) > 0;
@@ -22,12 +21,17 @@ function hasPitchingComponents(components: StatComponents | null): boolean {
 function isSPSlot(
   slot: string | null,
   components: StatComponents | null,
+  positions: string[] = [],
 ): boolean {
   if (slot === "SP") return true;
   if (slot === "RP") return false;
   if (slot === "P" && components) {
     if ((components.GS ?? 0) > 0) return true;
-    if ((components.IP ?? 0) > 80 && components.GS === undefined) return true;
+    const positionSet = new Set(
+      positions.map((position) => position.toUpperCase()),
+    );
+    if (positionSet.has("RP") && !positionSet.has("SP")) return false;
+    if (positionSet.has("SP") || (components.IP ?? 0) > 80) return true;
   }
   return false;
 }
@@ -46,7 +50,7 @@ export function buildTeamOpportunityStream(
   const prorateFactor = computeProrateFactor(
     state.projectionAsOfDate,
     state.snapshotDate,
-    DEFAULT_SEASON_END,
+    state.seasonEndDate,
   );
 
   // Prorate all player projections to remaining season
@@ -66,7 +70,10 @@ export function buildTeamOpportunityStream(
   const assignments = allocateLineup(playersWithProj, state.rosterSlots);
   const assignmentMap = new Map(assignments.map((a) => [a.playerId, a]));
 
-  const gsCapRemaining = Math.max(0, state.gsCap - teamInput.gsUsed);
+  const gsCapRemaining =
+    state.gsCap === null
+      ? Number.POSITIVE_INFINITY
+      : Math.max(0, state.gsCap - teamInput.gsUsed);
 
   const hitters: PlayerOpportunity[] = [];
   const pitchers: PlayerOpportunity[] = [];
@@ -83,8 +90,9 @@ export function buildTeamOpportunityStream(
       playerId: player.playerId,
       rosComponents: prorated,
       activeSlot: slot,
+      positions: player.positions,
       isActive,
-      isSP: isActive && isSPSlot(slot, prorated),
+      isSP: isActive && isSPSlot(slot, prorated, player.positions),
       availabilityRate: 1.0, // Phase 106 will modify this
     };
 
@@ -121,19 +129,7 @@ export function samplePlayerComponents(
   rng: Rng | null,
 ): StatComponents {
   if (!rng) return { ...components };
-
-  const result: StatComponents = {};
-  for (const [key, value] of Object.entries(components)) {
-    if (typeof value !== "number" || value === 0) {
-      result[key] = value;
-      continue;
-    }
-    const cv = STAT_CV[key] ?? 0.25;
-    const sigma = value * cv;
-    const sampled = value + sigma * rng.normal();
-    result[key] = Math.max(0, sampled);
-  }
-  return result;
+  return sampleCoherentComponents(components, rng);
 }
 
 /**

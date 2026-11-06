@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { buildSimulationState } from "../state-builder.js";
-import { DEFAULT_SEASON_END } from "../types.js";
+import {
+  aggregateCurrentComponents,
+  buildSimulationState,
+} from "../state-builder.js";
+import type { Category } from "../../../../shared/dist/index.js";
 import { SnapshotRepository } from "../../db/snapshot-repository.js";
+
+const SEASON_END = "2026-10-01";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,16 +52,120 @@ function createMockDb(tableData: Record<string, unknown | unknown[]> = {}) {
   } as any;
 }
 
+describe("aggregateCurrentComponents", () => {
+  it("routes counting IP to pitcher components", () => {
+    const categories: Category[] = [
+      {
+        category_id: "IP",
+        name: "IP",
+        stat_key: "IP",
+        type: "COUNTING",
+        direction: "HIGHER_BETTER",
+      },
+    ];
+
+    expect(
+      aggregateCurrentComponents(
+        [{ category_id: "IP", value: 100, components_json: null }],
+        categories,
+      ),
+    ).toEqual({ batter: {}, pitcher: { IP: 100 } });
+  });
+
+  it("includes counting totals and merges shared rate components once", () => {
+    const categories: Category[] = [
+      {
+        category_id: "HR",
+        name: "HR",
+        stat_key: "HR",
+        type: "COUNTING",
+        direction: "HIGHER_BETTER",
+      },
+      {
+        category_id: "AVG",
+        name: "AVG",
+        stat_key: "AVG",
+        type: "RATE",
+        direction: "HIGHER_BETTER",
+      },
+      {
+        category_id: "OBP",
+        name: "OBP",
+        stat_key: "OBP",
+        type: "RATE",
+        direction: "HIGHER_BETTER",
+      },
+      {
+        category_id: "K",
+        name: "K",
+        stat_key: "K",
+        type: "COUNTING",
+        direction: "HIGHER_BETTER",
+      },
+      {
+        category_id: "ERA",
+        name: "ERA",
+        stat_key: "ERA",
+        type: "RATE",
+        direction: "LOWER_BETTER",
+      },
+      {
+        category_id: "WHIP",
+        name: "WHIP",
+        stat_key: "WHIP",
+        type: "RATE",
+        direction: "LOWER_BETTER",
+      },
+    ];
+    const result = aggregateCurrentComponents(
+      [
+        { category_id: "HR", value: 40, components_json: null },
+        {
+          category_id: "AVG",
+          value: 0.25,
+          components_json: { AB: 1000, H: 250 },
+        },
+        {
+          category_id: "OBP",
+          value: 0.32,
+          components_json: { AB: 1000, H: 250, BB: 100 },
+        },
+        { category_id: "K", value: 500, components_json: null },
+        {
+          category_id: "ERA",
+          value: 3.5,
+          components_json: { IP: 600, ER: 233.33 },
+        },
+        {
+          category_id: "WHIP",
+          value: 1.2,
+          components_json: { IP: 600, HA: 550, BBA: 170 },
+        },
+      ],
+      categories,
+    );
+
+    expect(result.batter).toMatchObject({ HR: 40, AB: 1000, H: 250, BB: 100 });
+    expect(result.pitcher).toMatchObject({
+      K: 500,
+      IP: 600,
+      ER: 233.33,
+      HA: 550,
+      BBA: 170,
+    });
+  });
+});
+
 // ─── Tests: snapshotDate-derived horizon ─────────────────────────────────────
 
 describe("buildSimulationState — snapshot-date-derived horizon", () => {
   it("daysRemaining equals days from snapshotDate to season end, not from today", async () => {
     // Use a historic snapshotDate that is certainly different from today
     const snapshotDate = "2026-05-01";
-    const expectedDays = daysBetween(snapshotDate, DEFAULT_SEASON_END);
+    const expectedDays = daysBetween(snapshotDate, SEASON_END);
     const todayDays = daysBetween(
       new Date().toISOString().split("T")[0],
-      DEFAULT_SEASON_END,
+      SEASON_END,
     );
 
     const db = createMockDb({
@@ -82,8 +191,8 @@ describe("buildSimulationState — snapshot-date-derived horizon", () => {
   it("two calls with different snapshotDates return different daysRemaining values", async () => {
     const snapshotDateA = "2026-04-01";
     const snapshotDateB = "2026-08-01";
-    const expectedA = daysBetween(snapshotDateA, DEFAULT_SEASON_END);
-    const expectedB = daysBetween(snapshotDateB, DEFAULT_SEASON_END);
+    const expectedA = daysBetween(snapshotDateA, SEASON_END);
+    const expectedB = daysBetween(snapshotDateB, SEASON_END);
 
     const dbA = createMockDb({
       league_daily_snapshot: null,

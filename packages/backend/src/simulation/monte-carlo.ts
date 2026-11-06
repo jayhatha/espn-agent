@@ -250,6 +250,11 @@ export function runMonteCarlo(
   state: SimulationState,
   config: SimulationConfig = {},
 ): MonteCarloResult {
+  if (!state.isViable || state.scoringFormat !== "roto") {
+    throw new Error(
+      "Monte Carlo simulation requires a viable roto league state",
+    );
+  }
   const runs = config.runs ?? DEFAULT_RUNS;
   const seed = config.seed ?? 0;
   const enableChurn = config.enableChurn ?? true;

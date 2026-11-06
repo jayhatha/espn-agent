@@ -1,4 +1,5 @@
 import type { StatComponents } from "../../../shared/dist/index.js";
+import { assignRanksWithTies } from "../utils/roto-ranking.js";
 
 /**
  * Coefficients of variation per stat type.
@@ -6,31 +7,58 @@ import type { StatComponents } from "../../../shared/dist/index.js";
  * CV represents the expected standard deviation as a fraction of the mean.
  */
 export const STAT_CV: Record<string, number> = {
-  HR: 0.30,
-  R: 0.20,
-  RBI: 0.20,
+  HR: 0.3,
+  R: 0.2,
+  RBI: 0.2,
   SB: 0.35,
   K: 0.15,
-  W: 0.30,
+  W: 0.3,
   SV: 0.35,
-  IP: 0.20,
-  H: 0.15,     // hits (for rate stat component variance)
-  AB: 0.10,    // plate appearances are relatively stable
-  BB: 0.20,
+  IP: 0.2,
+  H: 0.15, // hits (for rate stat component variance)
+  AB: 0.1, // plate appearances are relatively stable
+  BB: 0.2,
   ER: 0.25,
-  HA: 0.20,    // hits allowed
-  BBA: 0.20,   // walks allowed
+  HA: 0.2, // hits allowed
+  BBA: 0.2, // walks allowed
   HLD: 0.35,
-  QS: 0.30,
+  QS: 0.3,
 };
 
 /** Default CV for stat keys not in the STAT_CV table */
 const DEFAULT_CV = 0.25;
+const PITCHING_COMPONENT_KEYS = new Set([
+  "IP",
+  "ER",
+  "HA",
+  "BBA",
+  "K",
+  "W",
+  "L",
+  "SV",
+  "HLD",
+  "QS",
+  "GS",
+  "HRA",
+]);
+const BATTING_COMPONENT_KEYS = new Set([
+  "AB",
+  "H",
+  "1B",
+  "2B",
+  "3B",
+  "HR",
+  "TB",
+  "BB",
+  "HBP",
+  "SF",
+  "R",
+  "RBI",
+  "SB",
+]);
 
-/** Z-score for 10th percentile (normal distribution) */
+/** Z-scores for counting-stat normal approximation */
 const Z_P10 = -1.28;
-
-/** Z-score for 90th percentile (normal distribution) */
 const Z_P90 = 1.28;
 
 /** Number of Monte Carlo simulation runs */
@@ -41,10 +69,281 @@ const MC_RUNS = 500;
  * Returns a value from N(0,1).
  */
 function randn(): number {
-  let u = 0, v = 0;
+  let u = 0,
+    v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+interface NormalSource {
+  normal(): number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function noisyRate(rate: number, cv: number, rng: NormalSource): number {
+  return Math.max(0, rate * (1 + cv * rng.normal()));
+}
+
+function sampleRateCount(
+  value: number | undefined,
+  baselineOpportunity: number,
+  sampledOpportunity: number,
+  statKey: string,
+  rng: NormalSource,
+): number {
+  if (typeof value !== "number" || baselineOpportunity <= 0) return 0;
+  return (
+    noisyRate(
+      value / baselineOpportunity,
+      STAT_CV[statKey] ?? DEFAULT_CV,
+      rng,
+    ) * sampledOpportunity
+  );
+}
+
+function sampleJointOutcomeCounts(
+  first: number | undefined,
+  second: number | undefined,
+  baselineOpportunity: number,
+  sampledOpportunity: number,
+  capacity: number,
+  firstKey: string,
+  secondKey: string,
+  rng: NormalSource,
+): [number, number] {
+  const baselineFirst = first ?? 0;
+  const baselineSecond = second ?? 0;
+  const baselineTotal = baselineFirst + baselineSecond;
+  if (
+    baselineTotal <= 0 ||
+    baselineOpportunity <= 0 ||
+    sampledOpportunity <= 0
+  ) {
+    return [0, 0];
+  }
+  const cv =
+    (baselineFirst * (STAT_CV[firstKey] ?? DEFAULT_CV) +
+      baselineSecond * (STAT_CV[secondKey] ?? DEFAULT_CV)) /
+    baselineTotal;
+  const sampledTotal = Math.min(
+    capacity,
+    noisyRate(baselineTotal / baselineOpportunity, cv, rng) *
+      sampledOpportunity,
+  );
+  const firstShare = baselineFirst / baselineTotal;
+  return [sampledTotal * firstShare, sampledTotal * (1 - firstShare)];
+}
+
+export function sampleCoherentComponents(
+  components: StatComponents,
+  rng: NormalSource,
+): StatComponents {
+  const sampled: StatComponents = {};
+  const hasBatting = (components.AB ?? 0) > 0;
+  const hasPitching = (components.IP ?? 0) > 0;
+
+  if (hasBatting) {
+    const baselineAB = components.AB ?? 0;
+    const ab = Math.max(
+      0,
+      baselineAB * (1 + (STAT_CV.AB ?? 0.1) * rng.normal()),
+    );
+    const hitRate = clamp(
+      noisyRate((components.H ?? 0) / baselineAB, 0.08, rng),
+      0,
+      1,
+    );
+    const hits = ab * hitRate;
+    const baselineHits = Math.max(components.H ?? 0, 1e-9);
+    const baselineTriples = components["3B"] ?? 0;
+    const inferredDoubles = Math.max(
+      0,
+      (components.TB ?? components.H ?? 0) -
+        (components.H ?? 0) -
+        3 * (components.HR ?? 0) -
+        2 * baselineTriples,
+    );
+    const baselineDoubles = components["2B"] ?? inferredDoubles;
+    let homeRuns =
+      hits *
+      clamp(noisyRate((components.HR ?? 0) / baselineHits, 0.2, rng), 0, 1);
+    let doubles =
+      hits * clamp(noisyRate(baselineDoubles / baselineHits, 0.15, rng), 0, 1);
+    let triples =
+      hits * clamp(noisyRate(baselineTriples / baselineHits, 0.2, rng), 0, 1);
+    const extraBaseHits = homeRuns + doubles + triples;
+    if (extraBaseHits > hits && extraBaseHits > 0) {
+      const scale = hits / extraBaseHits;
+      homeRuns *= scale;
+      doubles *= scale;
+      triples *= scale;
+    }
+    const singles = Math.max(0, hits - homeRuns - doubles - triples);
+
+    Object.assign(sampled, {
+      AB: ab,
+      H: hits,
+      "1B": singles,
+      "2B": doubles,
+      "3B": triples,
+      HR: homeRuns,
+      TB: singles + 2 * doubles + 3 * triples + 4 * homeRuns,
+    });
+
+    const walks = sampleRateCount(components.BB, baselineAB, ab, "BB", rng);
+    const hitByPitch = sampleRateCount(
+      components.HBP,
+      baselineAB,
+      ab,
+      "HBP",
+      rng,
+    );
+    const sacrificeFlies = Math.min(
+      ab,
+      sampleRateCount(components.SF, baselineAB, ab, "SF", rng),
+    );
+    const timesOnBase = Math.min(ab, hits + walks + hitByPitch);
+    const plateAppearances = ab + walks + hitByPitch + sacrificeFlies;
+    Object.assign(sampled, {
+      BB: walks,
+      HBP: hitByPitch,
+      SF: sacrificeFlies,
+      SB: Math.min(
+        timesOnBase,
+        sampleRateCount(components.SB, baselineAB, ab, "SB", rng),
+      ),
+      R: Math.min(
+        timesOnBase,
+        sampleRateCount(components.R, baselineAB, ab, "R", rng),
+      ),
+      RBI: Math.min(
+        4 * plateAppearances,
+        sampleRateCount(components.RBI, baselineAB, ab, "RBI", rng),
+      ),
+    });
+    for (const [key, value] of Object.entries(components)) {
+      if (
+        BATTING_COMPONENT_KEYS.has(key) ||
+        PITCHING_COMPONENT_KEYS.has(key) ||
+        typeof value !== "number"
+      )
+        continue;
+      sampled[key] = value * (ab / baselineAB);
+    }
+  }
+
+  if (hasPitching) {
+    const baselineIP = components.IP ?? 0;
+    const ip = Math.max(
+      0,
+      baselineIP * (1 + (STAT_CV.IP ?? 0.2) * rng.normal()),
+    );
+    sampled.IP = ip;
+    for (const key of ["ER", "HA", "BBA"] as const) {
+      const value = components[key];
+      if (typeof value === "number") {
+        sampled[key] =
+          noisyRate(value / baselineIP, STAT_CV[key] ?? DEFAULT_CV, rng) * ip;
+      }
+    }
+    const outs = ip * 3;
+    const gs = Math.min(
+      outs,
+      sampleRateCount(components.GS, baselineIP, ip, "GS", rng),
+    );
+    const baselineAppearances = Math.max(
+      components.G ?? 0,
+      components.GS ?? 0,
+      baselineIP / ((components.GS ?? 0) > 0 ? 5.5 : 1),
+    );
+    const appearances = Math.max(
+      gs,
+      typeof components.G === "number"
+        ? sampleRateCount(components.G, baselineIP, ip, "G", rng)
+        : baselineAppearances * (ip / baselineIP),
+    );
+    const reliefAppearances = Math.max(0, appearances - gs);
+    const baselineReliefAppearances = Math.max(
+      0,
+      baselineAppearances - (components.GS ?? 0),
+    );
+    const [wins, losses] = sampleJointOutcomeCounts(
+      components.W,
+      components.L,
+      baselineAppearances,
+      appearances,
+      appearances,
+      "W",
+      "L",
+      rng,
+    );
+    const [saves, holds] = sampleJointOutcomeCounts(
+      components.SV,
+      components.HLD,
+      baselineReliefAppearances,
+      reliefAppearances,
+      reliefAppearances,
+      "SV",
+      "HLD",
+      rng,
+    );
+    Object.assign(sampled, {
+      GS: gs,
+      G: appearances,
+      K: Math.min(
+        outs,
+        sampleRateCount(components.K, baselineIP, ip, "K", rng),
+      ),
+      W: wins,
+      L: losses,
+      SV: saves,
+      HLD: holds,
+      QS: Math.min(
+        gs,
+        sampleRateCount(components.QS, components.GS ?? 0, gs, "QS", rng),
+      ),
+    });
+    if (typeof components.HRA === "number") {
+      sampled.HRA = Math.min(
+        sampled.HA ?? Number.POSITIVE_INFINITY,
+        sampleRateCount(components.HRA, baselineIP, ip, "HRA", rng),
+      );
+    }
+    for (const [key, value] of Object.entries(components)) {
+      if (
+        PITCHING_COMPONENT_KEYS.has(key) ||
+        BATTING_COMPONENT_KEYS.has(key) ||
+        sampled[key] !== undefined ||
+        typeof value !== "number"
+      )
+        continue;
+      sampled[key] = value * (ip / baselineIP);
+    }
+  }
+
+  if (!hasBatting && !hasPitching) {
+    const opportunityFactor = Math.max(0, 1 + DEFAULT_CV * rng.normal());
+    for (const [key, value] of Object.entries(components)) {
+      if (typeof value === "number") {
+        sampled[key] = value * opportunityFactor;
+      }
+    }
+  }
+
+  return sampled;
+}
+
+function percentile(sorted: number[], fraction: number): number {
+  if (sorted.length === 0) return 0;
+  const index = fraction * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
 }
 
 export interface ConfidenceInterval {
@@ -128,30 +427,20 @@ export function computeRateConfidence(
   componentKeys: string[],
 ): ConfidenceInterval {
   const p50 = rateFn(totalComponents);
-
-  // Build P10 and P90 component sets by varying each component
-  const p10Components: StatComponents = { ...totalComponents };
-  const p90Components: StatComponents = { ...totalComponents };
-
-  for (const key of componentKeys) {
-    const value = totalComponents[key] ?? 0;
-    if (value === 0) continue;
-    const cv = STAT_CV[key] ?? DEFAULT_CV;
-    const sd = value * cv;
-    p10Components[key] = Math.max(0, value + Z_P10 * sd);
-    p90Components[key] = value + Z_P90 * sd;
+  if (componentKeys.every((key) => (totalComponents[key] ?? 0) === 0)) {
+    return { p10: p50, p50, p90: p50 };
   }
-
-  // For "lower is better" rates (ERA, WHIP), P10 of the rate corresponds to
-  // the favorable (low) end and P90 to the unfavorable (high) end.
-  // min/max ensures P10 is always the lower bound of the interval.
-  const rateAtP10Components = rateFn(p10Components);
-  const rateAtP90Components = rateFn(p90Components);
+  const rng: NormalSource = { normal: randn };
+  const rates = Array.from({ length: MC_RUNS }, () =>
+    rateFn(sampleCoherentComponents(totalComponents, rng)),
+  )
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
 
   return {
-    p10: Math.min(rateAtP10Components, rateAtP90Components),
+    p10: percentile(rates, 0.1),
     p50,
-    p90: Math.max(rateAtP10Components, rateAtP90Components),
+    p90: percentile(rates, 0.9),
   };
 }
 
@@ -187,12 +476,18 @@ export interface TeamCategoryValue {
  */
 export function monteCarloRotoPoints(
   teamCategoryValues: TeamCategoryValue[],
-  categories: Array<{ categoryId: string; direction: "HIGHER_BETTER" | "LOWER_BETTER" }>,
+  categories: Array<{
+    categoryId: string;
+    direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  }>,
   numTeams: number,
 ): Map<number, ConfidenceInterval> {
   // Build lookup: categoryId → teamId → { projectedValue, sd }
   const teamIds = [...new Set(teamCategoryValues.map((v) => v.teamId))];
-  const catLookup = new Map<string, Map<number, { projected: number; sd: number }>>();
+  const catLookup = new Map<
+    string,
+    Map<number, { projected: number; sd: number }>
+  >();
 
   for (const tcv of teamCategoryValues) {
     if (!catLookup.has(tcv.categoryId)) {
@@ -236,9 +531,8 @@ export function monteCarloRotoPoints(
           continue;
         }
         // Perturb: value = projected + randn() * SD
-        const perturbed = data.sd > 0
-          ? data.projected + randn() * data.sd
-          : data.projected;
+        const perturbed =
+          data.sd > 0 ? data.projected + randn() * data.sd : data.projected;
         perturbedValues.push({ teamId: tid, value: perturbed });
       }
 
@@ -249,11 +543,9 @@ export function monteCarloRotoPoints(
           : a.value - b.value,
       );
 
-      // Assign roto points: rank 1 gets numTeams points, rank N gets 1
-      for (let i = 0; i < perturbedValues.length; i++) {
-        const rotoPoints = numTeams - i;
-        const current = runPoints.get(perturbedValues[i].teamId) ?? 0;
-        runPoints.set(perturbedValues[i].teamId, current + rotoPoints);
+      for (const ranked of assignRanksWithTies(perturbedValues, numTeams)) {
+        const current = runPoints.get(ranked.teamId) ?? 0;
+        runPoints.set(ranked.teamId, current + ranked.rotoPoints);
       }
     }
 
@@ -267,9 +559,9 @@ export function monteCarloRotoPoints(
   const result = new Map<number, ConfidenceInterval>();
   for (const [tid, dist] of pointsDistributions) {
     dist.sort((a, b) => a - b);
-    const p10Idx = Math.floor(dist.length * 0.10);
-    const p50Idx = Math.floor(dist.length * 0.50);
-    const p90Idx = Math.floor(dist.length * 0.90);
+    const p10Idx = Math.floor(dist.length * 0.1);
+    const p50Idx = Math.floor(dist.length * 0.5);
+    const p90Idx = Math.floor(dist.length * 0.9);
     result.set(tid, {
       p10: dist[p10Idx],
       p50: dist[p50Idx],

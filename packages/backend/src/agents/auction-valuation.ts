@@ -4,12 +4,17 @@ import type { Database } from "../db/schema.js";
 import type {
   AuctionValue,
   DraftConfiguration,
+  StatComponents,
 } from "../../../shared/dist/index.js";
 import {
   calculateSpendingPool,
   calculateAuctionDollarValue,
 } from "../../../shared/dist/index.js";
 import { DraftRankingsAgent } from "./draft-rankings.js";
+import {
+  getDraftableRosterSlots,
+  selectRosterFeasiblePlayers,
+} from "./draft-value-model.js";
 
 /**
  * Auction Valuation Agent
@@ -133,8 +138,8 @@ export class AuctionValuationAgent {
       return [];
     }
 
-    // Calculate total roster size
-    const rosterSize = Object.values(config.rosterSlots).reduce(
+    const draftableRosterSlots = getDraftableRosterSlots(config.rosterSlots);
+    const rosterSize = Object.values(draftableRosterSlots).reduce(
       (sum, count) => sum + (count as number),
       0,
     );
@@ -149,13 +154,28 @@ export class AuctionValuationAgent {
       minBid,
     );
 
-    // FIX: Only calculate dollar values for rostered players (top N by VBD)
-    // This prevents dilution when there are many fringe players with small positive VBD
     const rosteredCount = totalTeams * rosterSize;
-    const rosteredRankings = rankings.slice(0, rosteredCount);
+    const feasiblePlayers = selectRosterFeasiblePlayers(
+      rankings.map((ranking) => ({
+        playerId: ranking.playerId,
+        positions: ranking.positions as string[],
+        projectedStats: ranking.projectedStats as StatComponents,
+        ranking,
+      })),
+      draftableRosterSlots,
+      totalTeams,
+      (player) => Number(player.ranking.vbdScore ?? 0),
+    );
+    const rosteredRankings = feasiblePlayers.map((player) => player.ranking);
+    const rosteredPlayerIds = new Set(
+      rosteredRankings.map((ranking) => ranking.playerId),
+    );
 
     // Calculate total VBD from rostered players only
-    const totalVBD = rosteredRankings.reduce((sum, r) => (r as any).vbdScore > 0 ? sum + (r as any).vbdScore : sum, 0);
+    const totalVBD = rosteredRankings.reduce(
+      (sum, r) => ((r as any).vbdScore > 0 ? sum + (r as any).vbdScore : sum),
+      0,
+    );
 
     // DIAGNOSTIC: Log intermediate calculations for debugging
     this.logger?.info(
@@ -167,7 +187,9 @@ export class AuctionValuationAgent {
         minBid,
         spendingPool,
         totalVBD,
-        playersAboveReplacement: rosteredRankings.filter((r) => (r as any).vbdScore > 0).length,
+        playersAboveReplacement: rosteredRankings.filter(
+          (r) => (r as any).vbdScore > 0,
+        ).length,
         totalRankings: rankings.length,
       },
       "Calculated auction parameters",
@@ -191,36 +213,42 @@ export class AuctionValuationAgent {
     }
 
     // Convert VBD to dollar values for rostered players
-    const rosteredValuations: AuctionValue[] = (rosteredRankings as any[]).map((ranking): any => {
-      let dollarValue: number;
+    const rosteredValuations: AuctionValue[] = (rosteredRankings as any[]).map(
+      (ranking): any => {
+        let dollarValue: number;
 
-      if (ranking.vbdScore > 0) {
-        dollarValue = calculateAuctionDollarValue(
-          ranking.vbdScore,
-          totalVBD,
-          spendingPool,
-          minBid,
-        );
-      } else {
-        // Players below replacement get minimum bid
-        dollarValue = minBid;
-      }
+        if (ranking.vbdScore > 0) {
+          dollarValue = calculateAuctionDollarValue(
+            ranking.vbdScore,
+            totalVBD,
+            spendingPool,
+            minBid,
+          );
+        } else {
+          // Players below replacement get minimum bid
+          dollarValue = minBid;
+        }
 
-      return {
-        playerId: ranking.playerId,
-        playerName: ranking.playerName,
-        positions: ranking.positions,
-        primaryPosition: ranking.primaryPosition,
-        dollarValue,
-        vbdScore: ranking.vbdScore,
-        sgpTotal: ranking.sgpTotal,
-        projectedStats: ranking.projectedStats,
-      };
-    });
+        return {
+          playerId: ranking.playerId,
+          playerName: ranking.playerName,
+          positions: ranking.positions,
+          primaryPosition: ranking.primaryPosition,
+          dollarValue,
+          vbdScore: ranking.vbdScore,
+          sgpTotal: ranking.sgpTotal,
+          projectedStats: ranking.projectedStats,
+        };
+      },
+    );
 
     // Add non-rostered players at minimum bid (free agents)
-    const freeAgentRankings = rankings.slice(rosteredCount);
-    const freeAgentValuations: AuctionValue[] = (freeAgentRankings as any[]).map((ranking): any => ({
+    const freeAgentRankings = rankings.filter(
+      (ranking) => !rosteredPlayerIds.has(ranking.playerId),
+    );
+    const freeAgentValuations: AuctionValue[] = (
+      freeAgentRankings as any[]
+    ).map((ranking): any => ({
       playerId: ranking.playerId,
       playerName: ranking.playerName,
       positions: ranking.positions,
@@ -238,7 +266,9 @@ export class AuctionValuationAgent {
     valuations.sort((a, b) => b.dollarValue - a.dollarValue);
 
     // AUDIT FIX: Validate budget sum for rostered players
-    const topRosteredPlayers = valuations.slice(0, rosteredCount);
+    const topRosteredPlayers = valuations.filter((valuation) =>
+      rosteredPlayerIds.has(valuation.playerId),
+    );
     const totalValuation = topRosteredPlayers.reduce(
       (sum, v) => sum + v.dollarValue,
       0,
@@ -290,8 +320,10 @@ export class AuctionValuationAgent {
 
     // Industry benchmark validation for standard 12-team $260 leagues
     if (totalTeams === 12 && budget === 260 && rosteredCount === 300) {
-      const top5Avg = valuations.slice(0, 5).reduce((sum, v) => sum + v.dollarValue, 0) / 5;
-      const top20Avg = valuations.slice(0, 20).reduce((sum, v) => sum + v.dollarValue, 0) / 20;
+      const top5Avg =
+        valuations.slice(0, 5).reduce((sum, v) => sum + v.dollarValue, 0) / 5;
+      const top20Avg =
+        valuations.slice(0, 20).reduce((sum, v) => sum + v.dollarValue, 0) / 20;
       const topPlayer = valuations[0]?.dollarValue || 0;
 
       this.logger?.info(

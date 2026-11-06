@@ -5,7 +5,7 @@ import type { RosteredPlayer } from "../types.js";
 function makePlayer(
   playerId: number,
   positions: string[],
-  rosterStatus: "active" | "bench" | "il",
+  rosterStatus: "active" | "bench" | "il" | "na",
   projectedComponents: Record<string, number> | null = null,
 ): RosteredPlayer {
   return {
@@ -40,24 +40,68 @@ describe("allocateLineup", () => {
     expect(result).toEqual([]);
   });
 
-  it("assigns bench player weight=0.0 and slot=BN", () => {
+  it("allows a stronger bench player to win a RoS starting slot", () => {
     const players: RosteredPlayer[] = [
-      makePlayer(1, ["C"], "bench", { HR: 20, RBI: 80, R: 70, SB: 5 }),
+      makePlayer(1, ["C"], "active", { HR: 5, RBI: 20, R: 20, SB: 1 }),
+      makePlayer(2, ["C"], "bench", { HR: 20, RBI: 80, R: 70, SB: 5 }),
     ];
     const result = allocateLineup(players, { C: 1, BN: 3 });
-    const assignment = result.find((a) => a.playerId === 1)!;
-    expect(assignment.contributionWeight).toBe(0.0);
-    expect(assignment.slot).toBe("BN");
+    expect(result.find((a) => a.playerId === 2)).toMatchObject({
+      contributionWeight: 1,
+      slot: "C",
+    });
+    expect(result.find((a) => a.playerId === 1)?.contributionWeight).toBe(0);
   });
 
-  it("assigns IL player weight=0.0 and slot=IL", () => {
+  it("keeps C-only player at C while assigning stronger C/1B player to 1B", () => {
+    const players: RosteredPlayer[] = [
+      makePlayer(1, ["C", "1B"], "bench", {
+        HR: 30,
+        RBI: 100,
+        R: 90,
+        SB: 5,
+      }),
+      makePlayer(2, ["C"], "active", { HR: 5, RBI: 25, R: 20, SB: 1 }),
+    ];
+
+    const result = allocateLineup(players, { C: 1, "1B": 1, BN: 2 });
+
+    expect(result.find((assignment) => assignment.slot === "C")?.playerId).toBe(
+      2,
+    );
+    expect(
+      result.find((assignment) => assignment.slot === "1B")?.playerId,
+    ).toBe(1);
+  });
+
+  it("allows an IL player with RoS stats to win a projected starting slot", () => {
     const players: RosteredPlayer[] = [
       makePlayer(1, ["1B"], "il", { HR: 20, RBI: 80, R: 70, SB: 5 }),
+      makePlayer(2, ["1B"], "active", { HR: 5, RBI: 20, R: 20, SB: 1 }),
     ];
     const result = allocateLineup(players, { "1B": 1, IL: 2 });
-    const assignment = result.find((a) => a.playerId === 1)!;
-    expect(assignment.contributionWeight).toBe(0.0);
-    expect(assignment.slot).toBe("IL");
+    expect(result.find((a) => a.playerId === 1)).toMatchObject({
+      contributionWeight: 1,
+      slot: "1B",
+    });
+    expect(result.find((a) => a.playerId === 2)?.contributionWeight).toBe(0);
+  });
+
+  it("keeps an IL player without RoS stats unavailable", () => {
+    const players: RosteredPlayer[] = [makePlayer(1, ["1B"], "il", null)];
+    const result = allocateLineup(players, { "1B": 1, IL: 2 });
+    expect(result.find((a) => a.playerId === 1)).toMatchObject({
+      contributionWeight: 0,
+      slot: "IL",
+    });
+  });
+
+  it("excludes NA players from RoS starting slots", () => {
+    const result = allocateLineup(
+      [makePlayer(1, ["1B"], "na", { HR: 50, RBI: 120, R: 100 })],
+      { "1B": 1, IL: 1 },
+    );
+    expect(result[0]).toMatchObject({ slot: "NA", contributionWeight: 0 });
   });
 
   it("assigns starting slot players weight=1.0", () => {
@@ -135,9 +179,7 @@ describe("allocateLineup", () => {
   });
 
   it("assigns player with no projection (null components) to slot but still starts (weight=1.0)", () => {
-    const players: RosteredPlayer[] = [
-      makePlayer(1, ["C"], "active", null),
-    ];
+    const players: RosteredPlayer[] = [makePlayer(1, ["C"], "active", null)];
     const rosterSlots = { C: 1, BN: 3 };
     const result = allocateLineup(players, rosterSlots);
     const assignment = result.find((a) => a.playerId === 1)!;
@@ -146,9 +188,24 @@ describe("allocateLineup", () => {
   });
 
   it("OF slot accepts LF, CF, RF, and OF positions", () => {
-    const lf = makePlayer(1, ["LF"], "active", { HR: 30, RBI: 100, R: 90, SB: 10 });
-    const cf = makePlayer(2, ["CF"], "active", { HR: 10, RBI: 50, R: 80, SB: 30 });
-    const rf = makePlayer(3, ["RF"], "active", { HR: 25, RBI: 85, R: 75, SB: 15 });
+    const lf = makePlayer(1, ["LF"], "active", {
+      HR: 30,
+      RBI: 100,
+      R: 90,
+      SB: 10,
+    });
+    const cf = makePlayer(2, ["CF"], "active", {
+      HR: 10,
+      RBI: 50,
+      R: 80,
+      SB: 30,
+    });
+    const rf = makePlayer(3, ["RF"], "active", {
+      HR: 25,
+      RBI: 85,
+      R: 75,
+      SB: 15,
+    });
     const rosterSlots = { OF: 3, BN: 2 };
     const result = allocateLineup([lf, cf, rf], rosterSlots);
 
@@ -159,8 +216,18 @@ describe("allocateLineup", () => {
 
   it("skips pitcher-only players when assigning hitter slots (pitcher with IP > 0, AB = 0)", () => {
     // SP-only pitcher should not fill 1B slot
-    const sp = makePlayer(1, ["SP"], "active", { IP: 180, K: 200, W: 15, ER: 60 });
-    const firstBaseman = makePlayer(2, ["1B"], "active", { HR: 30, RBI: 100, R: 90, SB: 5 });
+    const sp = makePlayer(1, ["SP"], "active", {
+      IP: 180,
+      K: 200,
+      W: 15,
+      ER: 60,
+    });
+    const firstBaseman = makePlayer(2, ["1B"], "active", {
+      HR: 30,
+      RBI: 100,
+      R: 90,
+      SB: 5,
+    });
     const rosterSlots = { "1B": 1, SP: 1, BN: 2 };
     const result = allocateLineup([sp, firstBaseman], rosterSlots);
 
@@ -176,8 +243,18 @@ describe("allocateLineup", () => {
   it("greedy fills most-constrained slot first (C before UTIL)", () => {
     // C-only player (id=1) must go to C slot — they can't fill UTIL
     // Actually all positions can fill UTIL, so test that C-only player fills C not UTIL
-    const cPlayer = makePlayer(1, ["C"], "active", { HR: 15, RBI: 60, R: 55, SB: 3 });
-    const utilPlayer = makePlayer(2, ["1B"], "active", { HR: 35, RBI: 110, R: 95, SB: 5 });
+    const cPlayer = makePlayer(1, ["C"], "active", {
+      HR: 15,
+      RBI: 60,
+      R: 55,
+      SB: 3,
+    });
+    const utilPlayer = makePlayer(2, ["1B"], "active", {
+      HR: 35,
+      RBI: 110,
+      R: 95,
+      SB: 5,
+    });
     const rosterSlots = { C: 1, UTIL: 1, BN: 2 };
     const result = allocateLineup([cPlayer, utilPlayer], rosterSlots);
 

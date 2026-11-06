@@ -1,13 +1,19 @@
 import type { Kysely } from "kysely";
 import type { BaseLogger } from "pino";
-import type { Category, StatComponents } from "../../../shared/dist/index.js";
+import {
+  PITCHING_STAT_KEYS,
+  type Category,
+  type StatComponents,
+} from "../../../shared/dist/index.js";
 import type { Database } from "../db/schema.js";
 import { SnapshotRepository } from "../db/snapshot-repository.js";
 import type { RosteredPlayer } from "../projection/types.js";
 import type { SimulationState, TeamSimInput } from "./types.js";
-import { DEFAULT_SEASON_END } from "./types.js";
-
-const DEFAULT_GS_CAP = 200;
+import {
+  getGsCap,
+  normalizeScoringFormat,
+  resolveSeasonDates,
+} from "../utils/league-settings.js";
 
 /**
  * Compute days between snapshotDate and the season end date.
@@ -63,16 +69,15 @@ export async function buildSimulationState(
     : undefined;
 
   const categories = (settings?.settings_json?.categories ?? []) as Category[];
+  const scoringFormat = normalizeScoringFormat(
+    settings?.settings_json?.scoring_format,
+  );
   const rosterSlots = ((settings?.settings_json as any)?.roster_slots ??
     {}) as Record<string, number>;
 
   if (categories.length === 0) degradedReasons.push("settings_missing");
-
-  const gsCap: number = (() => {
-    const acq = (settings?.settings_json as any)?.acquisition_rules;
-    const cap = acq?.max_starts ?? acq?.gs_cap ?? DEFAULT_GS_CAP;
-    return typeof cap === "number" ? cap : DEFAULT_GS_CAP;
-  })();
+  if (scoringFormat !== "roto")
+    degradedReasons.push("unsupported_scoring_format");
 
   // ── Projection run metadata ───────────────────────────────────────────────
   const projectionsRun = await db
@@ -86,7 +91,11 @@ export async function buildSimulationState(
 
   if (!projectionsRun) degradedReasons.push("projections_missing");
 
-  const daysRemaining = daysFromSnapshotDate(snapshotDate, DEFAULT_SEASON_END);
+  const league = await db
+    .selectFrom("league")
+    .select("season")
+    .where("id", "=", leagueId)
+    .executeTakeFirst();
 
   // ── Teams ─────────────────────────────────────────────────────────────────
   const teams = await db
@@ -117,6 +126,11 @@ export async function buildSimulationState(
   if (allRosterEntries.length === 0) degradedReasons.push("rosters_missing");
   if (allProjections.length === 0) degradedReasons.push("projections_empty");
 
+  const gsCap = getGsCap(
+    settings?.settings_json,
+    (latestPayload?.response_json as any)?.settings,
+  );
+
   // ── Index by team ─────────────────────────────────────────────────────────
   const categoryTotalsByTeam = new Map<number, typeof allCategoryTotals>();
   for (const row of allCategoryTotals) {
@@ -144,6 +158,15 @@ export async function buildSimulationState(
   const espnIdMap = new Map(teamEspnIds.map((t) => [t.id, t.espn_team_id]));
   const gsUsedByTeam = new Map<number, number>();
   const rawPayload = latestPayload?.response_json as any;
+  const seasonDates = resolveSeasonDates({
+    season: league?.season ?? new Date(snapshotDate).getUTCFullYear(),
+    settings: settings?.settings_json as Record<string, any> | undefined,
+    schedule: rawPayload?.schedule,
+    status: rawPayload?.status,
+  });
+  if (seasonDates.derivedFromFallback)
+    degradedReasons.push("season_dates_inferred");
+  const daysRemaining = daysFromSnapshotDate(snapshotDate, seasonDates.endDate);
   for (const team of teams) {
     const espnTeamId = espnIdMap.get(team.id);
     const espnTeam = rawPayload?.teams?.find((t: any) => t.id === espnTeamId);
@@ -156,28 +179,17 @@ export async function buildSimulationState(
     const catTotals = categoryTotalsByTeam.get(team.id) ?? [];
     const roster = rosterByTeam.get(team.id) ?? [];
 
-    // Aggregate current batter + pitcher components from category totals
-    const currentBatterComponents: StatComponents = {};
-    const currentPitcherComponents: StatComponents = {};
-    for (const cat of catTotals) {
-      const components = (cat.components_json ?? {}) as StatComponents;
-      const isPitcherCat =
-        "IP" in components || "ER" in components || "HA" in components;
-      const target = isPitcherCat
-        ? currentPitcherComponents
-        : currentBatterComponents;
-      for (const [key, val] of Object.entries(components)) {
-        if (typeof val === "number") {
-          (target as Record<string, number>)[key] =
-            ((target as Record<string, number>)[key] ?? 0) + val;
-        }
-      }
-    }
+    const {
+      batter: currentBatterComponents,
+      pitcher: currentPitcherComponents,
+    } = aggregateCurrentComponents(catTotals, categories);
 
     const rosterPlayers: RosteredPlayer[] = roster.map((r) => ({
       playerId: r.player_id,
       positions: (r.positions as string[]) || [],
-      rosterStatus: (r.roster_status as "active" | "bench" | "il") || "active",
+      rosterStatus:
+        (r.roster_status as "active" | "bench" | "il" | "na" | "unknown") ||
+        "unknown",
       rosterSlot: r.roster_slot || null,
       projectedComponents: null,
     }));
@@ -201,6 +213,7 @@ export async function buildSimulationState(
 
   const isViable =
     categories.length > 0 &&
+    scoringFormat === "roto" &&
     teams.length > 0 &&
     !degradedReasons.includes("snapshot_missing") &&
     !degradedReasons.includes("settings_missing");
@@ -215,12 +228,48 @@ export async function buildSimulationState(
     snapshotDate,
     projectionsRunId,
     categories,
+    scoringFormat,
     rosterSlots,
     gsCap,
     projectionAsOfDate,
+    seasonStartDate: seasonDates.startDate,
+    seasonEndDate: seasonDates.endDate,
     daysRemaining,
     teams: teamInputs,
     degradedReasons,
     isViable,
   };
+}
+
+export function aggregateCurrentComponents(
+  totals: Array<{
+    category_id: string;
+    value: unknown;
+    components_json: unknown;
+  }>,
+  categories: Category[],
+): { batter: StatComponents; pitcher: StatComponents } {
+  const batter: StatComponents = {};
+  const pitcher: StatComponents = {};
+  const categoryById = new Map(
+    categories.map((category) => [category.category_id, category]),
+  );
+
+  for (const total of totals) {
+    const category = categoryById.get(total.category_id);
+    if (!category) continue;
+    const target = PITCHING_STAT_KEYS.has(category.stat_key) ? pitcher : batter;
+    const value = Number(total.value);
+    if (category.type === "COUNTING" && Number.isFinite(value)) {
+      target[category.stat_key] = value;
+    }
+    const components = (total.components_json ?? {}) as StatComponents;
+    for (const [key, component] of Object.entries(components)) {
+      if (typeof component === "number" && target[key] === undefined) {
+        target[key] = component;
+      }
+    }
+  }
+
+  return { batter, pitcher };
 }

@@ -241,7 +241,10 @@ export class StandingsChangeLogAgent {
           prevRankByCat.set(row.category_id, new Map());
         prevRankByCat
           .get(row.category_id)!
-          .set(row.team_id, { rank: row.rank, pts: Number(row.roto_points ?? 0) });
+          .set(row.team_id, {
+            rank: row.rank,
+            pts: Number(row.roto_points ?? 0),
+          });
       }
 
       const currRankByCat = new Map<string, Map<number, RankEntry>>();
@@ -250,7 +253,10 @@ export class StandingsChangeLogAgent {
           currRankByCat.set(row.category_id, new Map());
         currRankByCat
           .get(row.category_id)!
-          .set(row.team_id, { rank: row.rank, pts: Number(row.roto_points ?? 0) });
+          .set(row.team_id, {
+            rank: row.rank,
+            pts: Number(row.roto_points ?? 0),
+          });
       }
 
       const allCategoryIds = new Set([

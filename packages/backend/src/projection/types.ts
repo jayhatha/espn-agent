@@ -3,7 +3,7 @@ import type { StatComponents } from "../../../shared/dist/index.js";
 export interface RosteredPlayer {
   playerId: number;
   positions: string[];
-  rosterStatus: "active" | "bench" | "il";
+  rosterStatus: "active" | "bench" | "il" | "na" | "unknown";
   rosterSlot: string | null;
   projectedComponents: StatComponents | null;
 }
@@ -25,10 +25,10 @@ export interface AllocationInput {
   rosterSlots: Record<string, number>;
   projectionsByPlayerId: Map<number, StatComponents>;
   gsUsed: number;
-  gsCap: number;
+  gsCap: number | null;
   projectionAsOfDate: string;
   snapshotDate: string;
-  seasonEndDate?: string; // default "2026-09-28"
+  seasonEndDate?: string;
 }
 
 export interface ConfidenceInterval {

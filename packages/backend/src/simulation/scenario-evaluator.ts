@@ -18,7 +18,6 @@ import { buildTeamOpportunityStream } from "./opportunity.js";
 import { simulateTeamRun } from "./daily-simulator.js";
 import { allocateProjections } from "../projection/allocator.js";
 import type { RosteredPlayer, RosterGap } from "../projection/types.js";
-import { DEFAULT_SEASON_END } from "./types.js";
 import type {
   SimulationState,
   TeamSimInput,
@@ -304,7 +303,7 @@ function checkLegality(
     gsCap: state.gsCap,
     projectionAsOfDate: state.projectionAsOfDate,
     snapshotDate: state.snapshotDate,
-    seasonEndDate: DEFAULT_SEASON_END,
+    seasonEndDate: state.seasonEndDate,
   });
 
   const gaps = result.gaps.filter((g) => g.severity === "empty");

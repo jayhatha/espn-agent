@@ -10,6 +10,7 @@ import type {
   PaceStatus,
 } from "../../../shared/dist/index.js";
 import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
+import { getGsCap, resolveSeasonDates } from "../utils/league-settings.js";
 
 /**
  * GS Pacing Agent
@@ -19,7 +20,6 @@ import { MLBStatsAPIAdapter } from "../adapters/mlb-statsapi.js";
  * decisions to optimize GS pacing.
  */
 
-const DEFAULT_GS_CAP = 200;
 const MLB_SEASON_WEEKS = 26;
 
 /** Roster slot names that indicate an active SP */
@@ -51,19 +51,24 @@ export class GsPacingAgent {
     const { weeksElapsed, weeksRemaining } =
       await this.getSeasonProgress(leagueId);
 
-    const gsRemaining = Math.max(0, gsCap - gsUsed);
+    const gsRemaining = gsCap === null ? null : Math.max(0, gsCap - gsUsed);
     const pacePerWeek = weeksElapsed > 0 ? gsUsed / weeksElapsed : 0;
     const targetPacePerWeek =
-      weeksElapsed + weeksRemaining > 0
-        ? gsCap / (weeksElapsed + weeksRemaining)
-        : gsCap / MLB_SEASON_WEEKS;
-    const projectedFinal = Math.round(pacePerWeek * (weeksElapsed + weeksRemaining));
+      gsCap === null
+        ? pacePerWeek
+        : weeksElapsed + weeksRemaining > 0
+          ? gsCap / (weeksElapsed + weeksRemaining)
+          : gsCap / MLB_SEASON_WEEKS;
+    const projectedFinal = Math.round(
+      pacePerWeek * (weeksElapsed + weeksRemaining),
+    );
 
     // Determine pace status
     // Pre-season (no weeks elapsed or no starts used): always "on_track"
     let paceStatus: PaceStatus = "on_track" as any;
-    if (weeksElapsed > 0 && gsUsed > 0) {
-      const paceRatio = targetPacePerWeek > 0 ? pacePerWeek / targetPacePerWeek : 1;
+    if (gsCap !== null && weeksElapsed > 0 && gsUsed > 0) {
+      const paceRatio =
+        targetPacePerWeek > 0 ? pacePerWeek / targetPacePerWeek : 1;
       if (paceRatio > 1.1) {
         paceStatus = "burning_fast";
       } else if (paceRatio < 0.9) {
@@ -135,7 +140,9 @@ export class GsPacingAgent {
       .where("trs.league_id", "=", leagueId)
       .where("trs.team_id", "=", teamId)
       .where("trs.snapshot_date", "=", snapshotDate)
-      .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
+      .where(({ eb }) =>
+        eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`),
+      )
       .execute();
 
     // Fetch probable pitchers for the week from MLB StatsAPI
@@ -226,10 +233,7 @@ export class GsPacingAgent {
   /**
    * Get SP start/sit recommendations
    */
-  async getStartPlan(
-    leagueId: number,
-    teamId: number,
-  ): Promise<GsStartPlan> {
+  async getStartPlan(leagueId: number, teamId: number): Promise<GsStartPlan> {
     this.logger?.info({ leagueId, teamId }, "Generating SP start plan");
 
     const season = await this.getSeasonSummary(leagueId, teamId);
@@ -276,8 +280,8 @@ export class GsPacingAgent {
       .executeTakeFirst();
 
     // Batch-fetch all SP projections upfront (avoids N+1 query per pitcher)
-    const spEligiblePitchers = rosterPitchers.filter(
-      (p) => ((p.positions as string[]) ?? []).includes("SP"),
+    const spEligiblePitchers = rosterPitchers.filter((p) =>
+      ((p.positions as string[]) ?? []).includes("SP"),
     );
     const spPlayerIds = spEligiblePitchers.map((p) => p.player_id);
 
@@ -291,7 +295,10 @@ export class GsPacingAgent {
         .execute();
 
       for (const proj of projections) {
-        projectionMap.set(proj.player_id, proj.stat_components_json as Record<string, number>);
+        projectionMap.set(
+          proj.player_id,
+          proj.stat_components_json as Record<string, number>,
+        );
       }
     }
 
@@ -342,7 +349,8 @@ export class GsPacingAgent {
       } else if (season.paceStatus === "too_slow") {
         if (pitcher.roster_slot === "BE") {
           action = "start";
-          reason = "Activate to increase GS pace — currently underutilizing starts";
+          reason =
+            "Activate to increase GS pace — currently underutilizing starts";
         } else {
           action = "start";
           reason = "Start all SPs to catch up on GS pace";
@@ -403,7 +411,7 @@ export class GsPacingAgent {
 
   // --- Private helpers ---
 
-  private async getGsCap(leagueId: number): Promise<number> {
+  private async getGsCap(leagueId: number): Promise<number | null> {
     const settings = await this.db
       .selectFrom("league_settings_version")
       .select("settings_json")
@@ -411,16 +419,7 @@ export class GsPacingAgent {
       .orderBy("effective_date", "desc")
       .executeTakeFirst();
 
-    if (settings?.settings_json) {
-      const json = settings.settings_json as unknown as Record<string, unknown>;
-      // Check for GS cap in settings
-      const rosterSlots = json.roster_slots as Record<string, number> | undefined;
-      if (rosterSlots?.GS_LIMIT !== undefined) {
-        return rosterSlots.GS_LIMIT;
-      }
-    }
-
-    return DEFAULT_GS_CAP;
+    return getGsCap(settings?.settings_json);
   }
 
   /**
@@ -470,7 +469,8 @@ export class GsPacingAgent {
     }
 
     // 2. Fallback: sum GS from tenure-scoped player_period_stats (current season only)
-    const currentSeasonStart = `${new Date().getFullYear()}-01-01`;
+    const seasonDates = await this.getSeasonDates(leagueId);
+    const currentSeasonStart = seasonDates.startDate;
     const tenureRows = await this.db
       .selectFrom("player_period_stats")
       .select(["player_id", "components_json"])
@@ -495,16 +495,8 @@ export class GsPacingAgent {
     }
 
     // 3. Last resort: estimate from roster days
-    const league = await this.db
-      .selectFrom("league")
-      .select("season")
-      .where("id", "=", leagueId)
-      .executeTakeFirst();
-
-    if (!league) return 0;
-
-    const seasonStart = `${league.season}-01-01`;
-    const seasonEnd = `${league.season}-12-31`;
+    const seasonStart = seasonDates.startDate;
+    const seasonEnd = seasonDates.endDate;
 
     const pitcherDays = await this.db
       .selectFrom("team_roster_snapshot as trs")
@@ -519,7 +511,9 @@ export class GsPacingAgent {
       .where("trs.snapshot_date", "<=", seasonEnd)
       .where("trs.roster_status", "=", "active")
       .where("trs.roster_slot", "in", SP_ROSTER_SLOTS)
-      .where(({ eb }) => eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`))
+      .where(({ eb }) =>
+        eb(sql`p.positions @> ARRAY['SP']::text[]`, "=", sql`true`),
+      )
       .groupBy(["trs.player_id"])
       .execute();
 
@@ -529,27 +523,19 @@ export class GsPacingAgent {
       totalGS += Math.round(daysRostered / 5) || (daysRostered > 0 ? 1 : 0);
     }
 
-    this.logger?.info({ teamId, totalGS, source: "roster-estimate" }, "GS count estimated from roster days");
+    this.logger?.info(
+      { teamId, totalGS, source: "roster-estimate" },
+      "GS count estimated from roster days",
+    );
     return totalGS;
   }
 
   private async getSeasonProgress(
     leagueId: number,
   ): Promise<{ weeksElapsed: number; weeksRemaining: number }> {
-    // Use the league's season year to determine the current season window
-    const league = await this.db
-      .selectFrom("league")
-      .select("season")
-      .where("id", "=", leagueId)
-      .executeTakeFirst();
-
-    if (!league) {
-      return { weeksElapsed: 0, weeksRemaining: MLB_SEASON_WEEKS };
-    }
-
-    // MLB season typically runs late March through late September
-    const seasonOpeningDay = new Date(`${league.season}-03-27`);
-    const seasonEnd = new Date(`${league.season}-09-28`);
+    const seasonDates = await this.getSeasonDates(leagueId);
+    const seasonOpeningDay = new Date(seasonDates.startDate);
+    const seasonEnd = new Date(seasonDates.endDate);
     const now = new Date();
 
     // If before opening day, season hasn't started
@@ -568,6 +554,35 @@ export class GsPacingAgent {
     const weeksRemaining = Math.max(0, totalSeasonWeeks - weeksElapsed);
 
     return { weeksElapsed, weeksRemaining };
+  }
+
+  private async getSeasonDates(leagueId: number) {
+    const [league, settings, payload] = await Promise.all([
+      this.db
+        .selectFrom("league")
+        .select("season")
+        .where("id", "=", leagueId)
+        .executeTakeFirst(),
+      this.db
+        .selectFrom("league_settings_version")
+        .select("settings_json")
+        .where("league_id", "=", leagueId)
+        .orderBy("effective_date", "desc")
+        .executeTakeFirst(),
+      this.db
+        .selectFrom("league_raw_payload")
+        .select("response_json")
+        .where("league_id", "=", leagueId)
+        .orderBy("fetched_at", "desc")
+        .executeTakeFirst(),
+    ]);
+    const raw = payload?.response_json as any;
+    return resolveSeasonDates({
+      season: league?.season ?? new Date().getUTCFullYear(),
+      settings: settings?.settings_json as Record<string, any> | undefined,
+      schedule: raw?.schedule,
+      status: raw?.status,
+    });
   }
 
   private getMonday(date: Date): Date {
@@ -591,7 +606,7 @@ export class GsPacingAgent {
       k: number;
       kPerGs: number | null;
     }>;
-    gsCap: number;
+    gsCap: number | null;
   }> {
     const gsCap = await this.getGsCap(leagueId);
 
@@ -624,7 +639,10 @@ export class GsPacingAgent {
     `.execute(this.db);
 
     const espnStatMap = new Map(
-      espnStatRows.map((r) => [Number(r.espn_id), { gs: Number(r.gs), k: Number(r.k) }]),
+      espnStatRows.map((r) => [
+        Number(r.espn_id),
+        { gs: Number(r.gs), k: Number(r.k) },
+      ]),
     );
 
     const result = teams.map((team) => {
@@ -635,7 +653,8 @@ export class GsPacingAgent {
         teamName: team.name,
         gs: stats.gs,
         k: stats.k,
-        kPerGs: stats.gs > 0 ? Math.round((stats.k / stats.gs) * 100) / 100 : null,
+        kPerGs:
+          stats.gs > 0 ? Math.round((stats.k / stats.gs) * 100) / 100 : null,
       };
     });
 

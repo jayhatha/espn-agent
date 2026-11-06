@@ -59,3 +59,16 @@ export function computeOverallRotoPoints(
   }
   return overall;
 }
+
+export function assignCompetitionRanks<T extends { points: number }>(
+  sorted: T[],
+): Array<T & { rank: number }> {
+  let previousPoints: number | undefined;
+  let previousRank = 0;
+  return sorted.map((row, index) => {
+    const rank = row.points === previousPoints ? previousRank : index + 1;
+    previousPoints = row.points;
+    previousRank = rank;
+    return { ...row, rank };
+  });
+}

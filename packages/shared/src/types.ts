@@ -52,7 +52,11 @@ export interface LeagueSettings {
     waiver_type?: string;
     acquisition_limit?: number;
     trade_deadline?: string;
+    gs_cap?: number | null;
+    faab_budget?: number | null;
   };
+  season_start_date?: string;
+  season_end_date?: string;
 }
 
 // Component stats for rate calculation
@@ -294,7 +298,13 @@ export interface TransactionImpact {
 }
 
 // Move type for transaction tracking
-export type MoveType = "add" | "drop" | "trade_in" | "trade_out" | "draft" | "unknown";
+export type MoveType =
+  | "add"
+  | "drop"
+  | "trade_in"
+  | "trade_out"
+  | "draft"
+  | "unknown";
 
 // Draft types
 export interface AuctionValue {
@@ -343,12 +353,17 @@ export interface FaabSuggestedBid {
 }
 
 // GS Pacing types
-export type PaceStatus = "on_pace" | "burning_fast" | "too_slow" | "leaving_starts" | "unknown";
+export type PaceStatus =
+  | "on_pace"
+  | "burning_fast"
+  | "too_slow"
+  | "leaving_starts"
+  | "unknown";
 
 export interface GsSeasonSummary {
   gsUsed: number;
-  gsCap: number;
-  gsRemaining: number;
+  gsCap: number | null;
+  gsRemaining: number | null;
   paceStatus: PaceStatus;
   projectedTotal: number;
   [key: string]: unknown;

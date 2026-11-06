@@ -7,6 +7,7 @@ import {
   OVERFLOW_SLOT_TYPES,
   BENCH_SLOT_TYPES,
 } from "./slot-eligibility.js";
+import { findMaximumWeightAssignment } from "./maximum-weight-assignment.js";
 
 /**
  * Slot processing tiers: most constrained first.
@@ -59,21 +60,23 @@ function isPitcherSlot(slotType: string): boolean {
   return slotType === "SP" || slotType === "RP" || slotType === "P";
 }
 
+function canAssignPlayer(player: RosteredPlayer, slotType: string): boolean {
+  if (isPitcherSlot(slotType)) {
+    return canFillSlot(player.positions, slotType);
+  }
+  if (
+    isPitcherOnly(player.projectedComponents) &&
+    player.positions.every((pos) => pos === "SP" || pos === "RP")
+  ) {
+    return false;
+  }
+  return canFillSlot(player.positions, slotType);
+}
+
 /**
- * Greedy lineup allocation: fills most-constrained slots first.
- *
- * Slot processing order:
- *   Tier 1 (specific): C, 1B, 2B, 3B, SS, LF, CF, RF, OF, SP, RP
- *   Tier 2 (flex): MI, CI, P, DH
- *   Tier 3 (universal): UTIL
- *   Tier 4 (overflow): BN, BE, IL
- *
- * Within each slot, pick the eligible player with the HIGHEST
- * scorePlayer() who has not been assigned yet.
- *
- * Players with rosterStatus="bench" or "il" are immediately assigned
- * to their bench/IL slot with contributionWeight=0.0 without competing
- * for starting slots.
+ * Deterministic maximum-weight feasible assignment across projected RoS slots.
+ * Active, bench, and projected IL players compete; NA/unknown and unprojected
+ * IL players are unavailable.
  */
 export function allocateLineup(
   players: RosteredPlayer[],
@@ -84,15 +87,21 @@ export function allocateLineup(
   const assignments: SlotAssignment[] = [];
   const assignedPlayerIds = new Set<number>();
 
-  // Separate bench/IL players — they never compete for starting slots
-  const benchPlayers = players.filter(
-    (p) => p.rosterStatus === "bench" || p.rosterStatus === "il",
+  const unavailablePlayers = players.filter(
+    (p) =>
+      (p.rosterStatus === "il" && p.projectedComponents === null) ||
+      p.rosterStatus === "na" ||
+      p.rosterStatus === "unknown",
   );
-  const activePlayers = players.filter((p) => p.rosterStatus === "active");
+  const availablePlayers = players.filter(
+    (p) =>
+      p.rosterStatus === "active" ||
+      p.rosterStatus === "bench" ||
+      (p.rosterStatus === "il" && p.projectedComponents !== null),
+  );
 
-  // Handle bench/IL players immediately
-  for (const player of benchPlayers) {
-    const slot = player.rosterStatus === "il" ? "IL" : "BN";
+  for (const player of unavailablePlayers) {
+    const slot = player.rosterStatus === "na" ? "NA" : "IL";
     assignments.push({
       playerId: player.playerId,
       slot,
@@ -101,7 +110,6 @@ export function allocateLineup(
     assignedPlayerIds.add(player.playerId);
   }
 
-  // Build ordered list of starting slot types (tier 1 → 2 → 3)
   const slotKeys = Object.keys(rosterSlots);
 
   const specificSlotKeys = slotKeys.filter((s) => SPECIFIC_SLOTS.has(s));
@@ -115,58 +123,38 @@ export function allocateLineup(
     ...overflowSlotKeys,
   ];
 
-  // Score active players for sorting
   const playerScores = new Map<number, number>();
-  for (const player of activePlayers) {
+  for (const player of availablePlayers) {
     const pitcherOnly = isPitcherOnly(player.projectedComponents);
     const score = scorePlayer(player.projectedComponents, pitcherOnly);
     playerScores.set(player.playerId, score);
   }
 
-  // Sort players by score descending (higher scored players fill slots first)
-  const sortedActivePlayers = [...activePlayers].sort(
+  const sortedActivePlayers = [...availablePlayers].sort(
     (a, b) =>
-      (playerScores.get(b.playerId) ?? 0) - (playerScores.get(a.playerId) ?? 0),
+      (playerScores.get(b.playerId) ?? 0) -
+        (playerScores.get(a.playerId) ?? 0) || a.playerId - b.playerId,
   );
 
-  // Greedy assignment: for each starting slot type, fill N slots
-  for (const slotType of orderedStartingSlots) {
-    const count = rosterSlots[slotType] ?? 0;
-    const isSlotPitcherOnly = isPitcherSlot(slotType);
-
-    for (let i = 0; i < count; i++) {
-      // Find best unassigned eligible player for this slot
-      const eligible = sortedActivePlayers.filter((p) => {
-        if (assignedPlayerIds.has(p.playerId)) return false;
-
-        // Pitcher-only slots: only pitcher-only players (or players with pitcher positions)
-        // Hitter slots: pitcher-only players should not fill hitter slots
-        if (isSlotPitcherOnly) {
-          // SP/RP/P slots: player must have SP or RP position
-          return canFillSlot(p.positions, slotType);
-        } else {
-          // Hitter slots: pitcher-only players should not fill them
-          // (Two-way players with both AB and IP can fill hitter slots)
-          if (
-            isPitcherOnly(p.projectedComponents) &&
-            p.positions.every((pos) => pos === "SP" || pos === "RP")
-          ) {
-            return false;
-          }
-          return canFillSlot(p.positions, slotType);
-        }
-      });
-
-      if (eligible.length > 0) {
-        const best = eligible[0]; // already sorted by score descending
-        assignments.push({
-          playerId: best.playerId,
-          slot: slotType,
-          contributionWeight: 1.0,
-        });
-        assignedPlayerIds.add(best.playerId);
-      }
-    }
+  const startingSlots = orderedStartingSlots.flatMap((slotType) =>
+    Array.from({ length: rosterSlots[slotType] ?? 0 }, () => slotType),
+  );
+  const assignedPlayerBySlot = findMaximumWeightAssignment(
+    sortedActivePlayers,
+    startingSlots,
+    (player) => playerScores.get(player.playerId) ?? 0,
+    canAssignPlayer,
+  );
+  for (let slotIndex = 0; slotIndex < startingSlots.length; slotIndex++) {
+    const playerIndex = assignedPlayerBySlot.get(slotIndex);
+    if (playerIndex === undefined) continue;
+    const player = sortedActivePlayers[playerIndex];
+    assignments.push({
+      playerId: player.playerId,
+      slot: startingSlots[slotIndex],
+      contributionWeight: 1.0,
+    });
+    assignedPlayerIds.add(player.playerId);
   }
 
   // Handle bench slot overflow (BN/BE/IL capacity)

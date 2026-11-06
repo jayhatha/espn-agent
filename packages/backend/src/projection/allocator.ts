@@ -52,14 +52,18 @@ function isPitcherSlot(slotType: string): boolean {
 function shouldTreatAsSP(
   slotType: string,
   components: StatComponents | null,
+  positions: string[] = [],
 ): boolean {
   if (slotType === "SP") return true;
   if (slotType === "RP") return false;
   // "P" slot: classify by projected GS or IP threshold
   if (slotType === "P" && components) {
     if ((components.GS ?? 0) > 0) return true;
-    // Fallback: high IP without GS data suggests starter
-    if ((components.IP ?? 0) > 80 && components.GS === undefined) return true;
+    const positionSet = new Set(
+      positions.map((position) => position.toUpperCase()),
+    );
+    if (positionSet.has("RP") && !positionSet.has("SP")) return false;
+    if (positionSet.has("SP") || (components.IP ?? 0) > 80) return true;
   }
   return false;
 }
@@ -70,7 +74,7 @@ function shouldTreatAsSP(
  * Execution order:
  *   1. Prorate: Apply staleness prorate factor to all player projections
  *   2. Prepare roster: Attach prorated projections to each RosteredPlayer
- *   3. Allocate lineup: Greedy assignment of players to starting slots
+ *   3. Allocate lineup: Maximum-weight assignment of players to starting slots
  *   4. Detect two-way players: Split batting/pitching components
  *   5. Split pitchers: Separate SP and RP by position
  *   6. Apply GS cap: Scale SP components by remaining GS budget
@@ -127,7 +131,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     projectedComponents: proratedProjections.get(player.playerId) ?? null,
   }));
 
-  // ── 4. Allocate lineup via greedy slot assignment ────────────────────────────
+  // ── 4. Allocate lineup via maximum-weight assignment ────────────────────────
   const assignments = allocateLineup(playersWithProjections, rosterSlots);
 
   // ── 5. Split assignments into starters (weight > 0) ─────────────────────────
@@ -148,6 +152,7 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
     playerId: number;
     components: StatComponents;
     projectedGS: number | null;
+    positions?: string[];
   }> = [];
   const rpStarterIds = new Set<number>();
 
@@ -158,12 +163,15 @@ export function allocateProjections(input: AllocationInput): AllocationResult {
 
     if (!isPitcherSlot(slotType)) continue;
 
-    if (shouldTreatAsSP(slotType, player.projectedComponents)) {
+    if (
+      shouldTreatAsSP(slotType, player.projectedComponents, player.positions)
+    ) {
       const gs = player.projectedComponents.GS ?? null;
       spProjections.push({
         playerId: player.playerId,
         components: player.projectedComponents,
         projectedGS: gs,
+        positions: player.positions,
       });
     } else {
       rpStarterIds.add(player.playerId);

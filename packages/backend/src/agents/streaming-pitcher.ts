@@ -1,8 +1,15 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
-import type { Category, StatComponents, ExternalRankingEntry } from "../../../shared/dist/index.js";
-import { MLBStatsAPIAdapter, ProbablePitcherInfo } from "../adapters/mlb-statsapi.js";
+import type {
+  Category,
+  StatComponents,
+  ExternalRankingEntry,
+} from "../../../shared/dist/index.js";
+import {
+  MLBStatsAPIAdapter,
+  ProbablePitcherInfo,
+} from "../adapters/mlb-statsapi.js";
 import { normalizeName } from "./sit-start-advisor.js";
 import { RotoballerAdapter } from "../adapters/rotoballer.js";
 
@@ -35,6 +42,8 @@ export interface StreamingCandidate {
   rotoballerGrade?: number;
   rotoballerSourceUrl?: string;
   pickupDeadline?: string; // ISO date string of latest Tue/Fri before gameDate
+  projectionBasis: "per_start" | "per_appearance";
+  matchupContext: "opponent_adjusted" | "schedule_only";
 }
 
 export interface StreamingResult {
@@ -84,7 +93,7 @@ export class StreamingPitcherAgent {
       startDate?: string; // Default: today
       lookAheadDays?: number; // Default: 7
       limit?: number; // Default: 20
-    }
+    },
   ): Promise<StreamingResult> {
     const {
       startDate = new Date().toISOString().split("T")[0],
@@ -118,11 +127,14 @@ export class StreamingPitcherAgent {
     // 2. Get probable pitchers for the date range
     const probablePitchers = await this.getProbablePitchersForRange(
       startDate,
-      endDateStr
+      endDateStr,
     );
 
     if (probablePitchers.length === 0) {
-      this.logger?.warn({ startDate, endDateStr }, "No probable pitchers found");
+      this.logger?.warn(
+        { startDate, endDateStr },
+        "No probable pitchers found",
+      );
       return {
         candidates: [],
         dateRange: { start: startDate, end: endDateStr },
@@ -130,11 +142,8 @@ export class StreamingPitcherAgent {
       };
     }
 
-    // 3. Get multi-start map
-    const multiStartMap = await this.mlbAdapter.getMultiStartPitchers(
-      startDate,
-      endDateStr
-    );
+    const probableAppearanceCounts =
+      countProbablePitcherAppearances(probablePitchers);
 
     // 3b. Fetch Rotoballer rankings (if adapter provided)
     let rotoballerRankings: ExternalRankingEntry[] = [];
@@ -150,14 +159,23 @@ export class StreamingPitcherAgent {
             scrapedAt: first.scrapedAt,
           };
         }
-        this.logger?.info({ count: rotoballerRankings.length }, "Rotoballer rankings loaded for streaming filter");
+        this.logger?.info(
+          { count: rotoballerRankings.length },
+          "Rotoballer rankings loaded for streaming filter",
+        );
       } catch (err) {
-        this.logger?.warn({ error: err instanceof Error ? err.message : String(err) }, "Rotoballer fetch failed — skipping verdict filter");
+        this.logger?.warn(
+          { error: err instanceof Error ? err.message : String(err) },
+          "Rotoballer fetch failed — skipping verdict filter",
+        );
       }
     }
 
     // 4. Load all rostered player IDs (to exclude from recommendations)
-    const rosteredPlayerIds = await this.getRosteredPlayerIds(leagueId, startDate);
+    const rosteredPlayerIds = await this.getRosteredPlayerIds(
+      leagueId,
+      startDate,
+    );
 
     // 5. Load pitcher projections
     const latestProjection = await this.db
@@ -189,8 +207,10 @@ export class StreamingPitcherAgent {
       .execute();
 
     // Filter to pitcher projections only (have IP or K stats)
-    const projections = allProjections.filter(p =>
-      (p.stat_components_json.IP ?? 0) > 0 || (p.stat_components_json.K ?? 0) > 0
+    const projections = allProjections.filter(
+      (p) =>
+        (p.stat_components_json.IP ?? 0) > 0 ||
+        (p.stat_components_json.K ?? 0) > 0,
     );
 
     // 6. Match probable pitchers to projections
@@ -200,7 +220,7 @@ export class StreamingPitcherAgent {
       // Fuzzy match pitcher name
       const projection = this.findMatchingProjection(
         probable.fullName,
-        projections
+        projections,
       );
 
       if (!projection) continue;
@@ -209,22 +229,25 @@ export class StreamingPitcherAgent {
       if (rosteredPlayerIds.has(projection.player_id)) continue;
 
       // Calculate scores
-      const projectionScore = this.calculateProjectionScore(
+      const scaledProjection = scalePitcherProjection(
         projection.stat_components_json,
-        categories
+      );
+      const projectionScore = this.calculateProjectionScore(
+        scaledProjection.components,
+        categories,
       );
 
-      const opponentScore = this.calculateOpponentScore(probable);
+      const opponent = this.calculateOpponentScore(probable);
 
-      // Multi-start bonus: check if pitcher's team has multiple games
-      const teamGameCount = multiStartMap.get(projection.mlb_team || "") || 0;
-      const multiStartBonus = teamGameCount >= 7 ? 15 : 0;
+      const appearanceKey = pitcherIdentityKey(probable);
+      const weekStarts = probableAppearanceCounts.get(appearanceKey) ?? 1;
+      const multiStartBonus = weekStarts >= 2 ? 15 : 0;
 
-      const compositeScore = projectionScore + opponentScore + multiStartBonus;
+      const compositeScore = projectionScore + opponent.score + multiStartBonus;
 
       // Match to Rotoballer ranking
       const rbMatch = rotoballerRankings.find(
-        (e) => normalizeName(e.playerName) === normalizeName(projection.name)
+        (e) => normalizeName(e.playerName) === normalizeName(projection.name),
       );
 
       const pickupDeadline = getPickupDeadline(probable.gameDate);
@@ -238,28 +261,32 @@ export class StreamingPitcherAgent {
         venue: probable.venue,
         gameDate: probable.gameDate,
         compositeScore,
-        projectedStats: projection.stat_components_json,
-        weekStarts: teamGameCount,
+        projectedStats: scaledProjection.components,
+        weekStarts,
         ownership: null, // Could be populated from ESPN data
         scoreBreakdown: {
           projectionScore,
-          opponentScore,
+          opponentScore: opponent.score,
           multiStartBonus,
         },
         rotoballerVerdict: rbMatch?.verdict,
         rotoballerGrade: rbMatch?.grade,
         rotoballerSourceUrl: rbMatch?.sourceUrl,
         pickupDeadline,
+        projectionBasis: scaledProjection.basis,
+        matchupContext: opponent.context,
       });
     }
 
     // 6b. Filter: must have a valid pickup deadline (Tue/Fri before game)
-    let filtered = candidates.filter(c => c.pickupDeadline !== undefined);
+    let filtered = candidates.filter((c) => c.pickupDeadline !== undefined);
 
     // 6c. Filter by Rotoballer verdict (only if rankings were available)
     if (rotoballerRankings.length > 0) {
-      filtered = filtered.filter(c =>
-        c.rotoballerVerdict === "start" || c.rotoballerVerdict === "lean_start"
+      filtered = filtered.filter(
+        (c) =>
+          c.rotoballerVerdict === "start" ||
+          c.rotoballerVerdict === "lean_start",
       );
     }
     // If rotoballerRankings is empty, skip verdict filter per D-05 (graceful degradation)
@@ -299,7 +326,7 @@ export class StreamingPitcherAgent {
 
   private async getProbablePitchersForRange(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<ProbablePitcherInfo[]> {
     const allPitchers: ProbablePitcherInfo[] = [];
 
@@ -319,7 +346,7 @@ export class StreamingPitcherAgent {
 
   private async getRosteredPlayerIds(
     leagueId: number,
-    snapshotDate: string
+    snapshotDate: string,
   ): Promise<Set<number>> {
     const rostered = await this.db
       .selectFrom("team_roster_snapshot")
@@ -328,7 +355,7 @@ export class StreamingPitcherAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
-    return new Set(rostered.map(r => r.player_id));
+    return new Set(rostered.map((r) => r.player_id));
   }
 
   private findMatchingProjection(
@@ -338,11 +365,11 @@ export class StreamingPitcherAgent {
       stat_components_json: StatComponents;
       name: string;
       mlb_team: string | null;
-    }>
+    }>,
   ) {
     const searchName = normalizeName(probablePitcherName);
 
-    return projections.find(p => {
+    return projections.find((p) => {
       const projName = normalizeName(p.name);
       return projName === searchName;
     });
@@ -350,22 +377,21 @@ export class StreamingPitcherAgent {
 
   private calculateProjectionScore(
     components: StatComponents,
-    categories: Category[]
+    categories: Category[],
   ): number {
     let score = 0;
 
-    // Per-start estimates (divide RoS by ~30 starts)
-    const perStartIP = (components.IP || 0) / 30;
-    const perStartK = (components.K || 0) / 30;
-    const perStartER = (components.ER || 0) / 30;
+    const perStartIP = components.IP ?? 0;
+    const perStartK = components.K ?? 0;
+    const perStartER = components.ER ?? 0;
 
     // K score: 2 points per strikeout (max ~20pts for elite 10K pitcher)
-    if (categories.some(c => c.stat_key === "K")) {
+    if (categories.some((c) => c.stat_key === "K")) {
       score += perStartK * 2;
     }
 
     // ERA bonus: (5.0 - projected_ERA) * 5 if under 5.0
-    if (categories.some(c => c.stat_key === "ERA")) {
+    if (categories.some((c) => c.stat_key === "ERA")) {
       const era = perStartIP > 0 ? (9 * perStartER) / perStartIP : 5.0;
       if (era < 5.0) {
         score += (5.0 - era) * 5;
@@ -373,9 +399,9 @@ export class StreamingPitcherAgent {
     }
 
     // WHIP bonus: approximated from components
-    if (categories.some(c => c.stat_key === "WHIP")) {
-      const perStartH = (components.HA || 0) / 30;
-      const perStartBB = (components.BBA || 0) / 30;
+    if (categories.some((c) => c.stat_key === "WHIP")) {
+      const perStartH = components.HA ?? 0;
+      const perStartBB = components.BBA ?? 0;
       const whip = perStartIP > 0 ? (perStartH + perStartBB) / perStartIP : 2.0;
       if (whip < 2.0) {
         score += (2.0 - whip) * 10;
@@ -385,17 +411,71 @@ export class StreamingPitcherAgent {
     return Math.min(score, 50); // Cap at 50 points
   }
 
-  private calculateOpponentScore(probable: ProbablePitcherInfo): number {
-    // Simplified opponent scoring
-    // Since we don't have opponent batting stats in DB, use basic heuristics
-
+  private calculateOpponentScore(probable: ProbablePitcherInfo): {
+    score: number;
+    context: "opponent_adjusted" | "schedule_only";
+  } {
     let score = 15; // Base score for being probable pitcher (announced)
-
-    // Home pitchers get a small bonus (home field advantage)
     if (probable.isHome) {
       score += 5;
     }
-
-    return Math.min(score, 30); // Cap at 30 points
+    const hasOpponentContext =
+      probable.opponentWoba !== undefined ||
+      probable.parkFactor !== undefined ||
+      probable.platoonAdvantage !== undefined;
+    if (probable.opponentWoba !== undefined) {
+      score += (0.32 - probable.opponentWoba) * 100;
+    }
+    if (probable.parkFactor !== undefined) {
+      score += (100 - probable.parkFactor) * 0.2;
+    }
+    if (probable.platoonAdvantage !== undefined) {
+      score += probable.platoonAdvantage * 5;
+    }
+    return {
+      score: Math.max(0, Math.min(score, 30)),
+      context: hasOpponentContext ? "opponent_adjusted" : "schedule_only",
+    };
   }
+}
+
+function pitcherIdentityKey(probable: ProbablePitcherInfo): string {
+  return probable.mlbPlayerId > 0
+    ? `mlb:${probable.mlbPlayerId}`
+    : `name:${normalizeName(probable.fullName)}`;
+}
+
+export function countProbablePitcherAppearances(
+  probablePitchers: ProbablePitcherInfo[],
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const probable of probablePitchers) {
+    const key = pitcherIdentityKey(probable);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function scalePitcherProjection(components: StatComponents): {
+  components: StatComponents;
+  basis: "per_start" | "per_appearance";
+} {
+  const projectedStarts = components.GS ?? 0;
+  const projectedAppearances = components.G ?? 0;
+  const basis = projectedStarts > 0 ? "per_start" : "per_appearance";
+  const opportunities =
+    projectedStarts > 0
+      ? projectedStarts
+      : projectedAppearances > 0
+        ? projectedAppearances
+        : Math.max(1, (components.IP ?? 0) / 5.5);
+  return {
+    components: Object.fromEntries(
+      Object.entries(components).map(([key, value]) => [
+        key,
+        value === undefined ? undefined : value / opportunities,
+      ]),
+    ) as StatComponents,
+    basis,
+  };
 }

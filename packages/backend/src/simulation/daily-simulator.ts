@@ -1,6 +1,7 @@
 import type { StatComponents } from "../../../shared/dist/index.js";
 import { combineComponents } from "../../../shared/dist/index.js";
 import { applyGsCap, scaleComponents } from "../projection/pitcher-scaling.js";
+import { canFillSlot } from "../projection/slot-eligibility.js";
 import { samplePlayerComponents } from "./opportunity.js";
 import {
   REPLACEMENT_HITTER_DAILY,
@@ -26,48 +27,76 @@ function addComp(target: StatComponents, source: StatComponents): void {
  * Estimate how many "active days" a player's prorated RoS components represent.
  * Used to scale bench contributions relative to missed starter days.
  */
-function estimateDays(components: StatComponents): number {
-  if ((components.IP ?? 0) > 0) return Math.max(1, (components.IP ?? 1) / 1.0);
-  if ((components.AB ?? 0) > 0)
-    return Math.max(1, (components.AB ?? 3.5) / 3.5);
-  return 1;
+function opportunityVolume(components: StatComponents): number {
+  return components.IP ?? components.AB ?? 0;
 }
 
 /**
  * Route missed starter days to bench players then replacement level.
  * Each bench player covers an equal share of missed days (CHURN-01).
  */
-function coverMissedDays(
+function coverMissedOpportunities(
   benchPlayers: PlayerOpportunity[],
-  missedDays: number,
+  demands: Array<{ volume: number; slot: string | null; gs?: number }>,
   replacementDaily: StatComponents,
   rng: Rng | null,
-): { components: StatComponents; benchDays: number; replacementDays: number } {
+): {
+  components: StatComponents;
+  benchVolume: number;
+  replacementVolume: number;
+} {
   const components: StatComponents = {};
+  const missedVolume = demands.reduce((sum, demand) => sum + demand.volume, 0);
 
-  if (missedDays <= 0) {
-    return { components, benchDays: 0, replacementDays: 0 };
+  if (missedVolume <= 0) {
+    return { components, benchVolume: 0, replacementVolume: 0 };
   }
 
-  let benchDays = 0;
+  const benchState = benchPlayers
+    .map((player) => ({
+      player,
+      sampled: scaleComponents(
+        samplePlayerComponents(player.rosComponents, rng),
+        Math.max(0, Math.min(1, player.availabilityRate)),
+      ),
+    }))
+    .map((state) => ({
+      ...state,
+      remaining: opportunityVolume(state.sampled),
+    }));
+  let benchVolume = 0;
+  let replacementVolume = 0;
+  const replacementUnit = opportunityVolume(replacementDaily) || 1;
 
-  if (benchPlayers.length > 0) {
-    const daysPerBenchPlayer = missedDays / benchPlayers.length;
-    for (const bench of benchPlayers) {
-      const sampled = samplePlayerComponents(bench.rosComponents, rng);
-      const daysTotal = estimateDays(bench.rosComponents);
-      const perDayFactor = daysTotal > 0 ? daysPerBenchPlayer / daysTotal : 0;
-      addComp(components, scaleComponents(sampled, perDayFactor));
-      benchDays += daysPerBenchPlayer;
+  for (const demand of demands) {
+    let remaining = demand.volume;
+    for (const bench of benchState) {
+      if (remaining <= 0) break;
+      if (bench.remaining <= 0) continue;
+      if (demand.slot && !canFillSlot(bench.player.positions, demand.slot))
+        continue;
+      const available = opportunityVolume(bench.sampled);
+      if (available <= 0) continue;
+      const used = Math.min(remaining, bench.remaining);
+      addComp(components, scaleComponents(bench.sampled, used / available));
+      bench.remaining -= used;
+      remaining -= used;
+      benchVolume += used;
+    }
+    if (remaining > 0) {
+      const replacement = scaleComponents(
+        replacementDaily,
+        remaining / replacementUnit,
+      );
+      if (demand.gs !== undefined && demand.volume > 0) {
+        replacement.GS = demand.gs * (remaining / demand.volume);
+      }
+      addComp(components, replacement);
+      replacementVolume += remaining;
     }
   }
 
-  const replacementDays = Math.max(0, missedDays - benchDays);
-  if (replacementDays > 0) {
-    addComp(components, scaleComponents(replacementDaily, replacementDays));
-  }
-
-  return { components, benchDays, replacementDays };
+  return { components, benchVolume, replacementVolume };
 }
 
 /**
@@ -91,19 +120,25 @@ export function simulateTeamRun(
   currentBatterComponents: StatComponents,
   currentPitcherComponents: StatComponents,
   gsUsed: number,
-  gsCap: number,
+  gsCap: number | null,
   rng: Rng | null,
 ): TeamRunResult {
   const { hitters, pitchers, bench } = stream;
 
   // ── Step 1+2: Sample + availability-scale hitters ────────────────────────
   const batterRoS: StatComponents = {};
-  let missedHitterDays = 0;
+  const missedHitterOpportunities: Array<{
+    volume: number;
+    slot: string | null;
+  }> = [];
 
   for (const h of hitters) {
     const sampled = samplePlayerComponents(h.rosComponents, rng);
     addComp(batterRoS, scaleComponents(sampled, h.availabilityRate));
-    missedHitterDays += 1 - h.availabilityRate;
+    missedHitterOpportunities.push({
+      volume: (h.rosComponents.AB ?? 0) * (1 - h.availabilityRate),
+      slot: h.activeSlot,
+    });
   }
 
   // ── Step 1+2: Sample + availability-scale pitchers (SP and RP) ───────────
@@ -118,31 +153,33 @@ export function simulateTeamRun(
       playerId: p.playerId,
       components: scaled,
       projectedGS: scaled.GS ?? null,
+      positions: p.positions,
     };
   });
 
-  // Step 5: Apply GS cap to SP totals (GS-01)
-  const { scaledProjections: cappedSPs } = applyGsCap(
-    gsUsed,
-    gsCap,
-    spProjections,
-  );
-
   const pitcherRoS: StatComponents = {};
-  for (const sp of cappedSPs) {
-    addComp(pitcherRoS, sp.scaledComponents);
-  }
-
-  let missedPitcherDays = 0;
-  for (const sp of spPlayers) {
-    missedPitcherDays += 1 - sp.availabilityRate;
-  }
+  const missedStarterOpportunities: Array<{
+    volume: number;
+    slot: string | null;
+    gs: number;
+  }> = spPlayers.map((sp) => ({
+    volume: (sp.rosComponents.IP ?? 0) * (1 - sp.availabilityRate),
+    slot: sp.activeSlot,
+    gs: (sp.rosComponents.GS ?? 0) * (1 - sp.availabilityRate),
+  }));
+  const missedRelieverOpportunities: Array<{
+    volume: number;
+    slot: string | null;
+  }> = [];
 
   // RP: no GS cap (GS-01: RP opportunity is distinct from SP pacing)
   for (const rp of rpPlayers) {
     const sampled = samplePlayerComponents(rp.rosComponents, rng);
     addComp(pitcherRoS, scaleComponents(sampled, rp.availabilityRate));
-    missedPitcherDays += 1 - rp.availabilityRate;
+    missedRelieverOpportunities.push({
+      volume: (rp.rosComponents.IP ?? 0) * (1 - rp.availabilityRate),
+      slot: rp.activeSlot,
+    });
   }
 
   // ── Step 3: Cover missed hitter days (CHURN-01) ───────────────────────────
@@ -150,31 +187,61 @@ export function simulateTeamRun(
   let benchDaysTotal = 0;
   let replacementDaysTotal = 0;
 
-  if (missedHitterDays > 0) {
-    const coverage = coverMissedDays(
+  if (missedHitterOpportunities.some((demand) => demand.volume > 0)) {
+    const coverage = coverMissedOpportunities(
       benchHitters,
-      missedHitterDays,
+      missedHitterOpportunities,
       REPLACEMENT_HITTER_DAILY,
       rng,
     );
     addComp(batterRoS, coverage.components);
-    benchDaysTotal += coverage.benchDays;
-    replacementDaysTotal += coverage.replacementDays;
+    benchDaysTotal += coverage.benchVolume / 3.5;
+    replacementDaysTotal += coverage.replacementVolume / 3.5;
   }
 
   // ── Step 4: Cover missed pitcher days (CHURN-01) ─────────────────────────
-  const benchPitchers = bench.filter((b) => (b.rosComponents.IP ?? 0) > 0);
-
-  if (missedPitcherDays > 0) {
-    const coverage = coverMissedDays(
-      benchPitchers,
-      missedPitcherDays,
+  const benchStarters = bench.filter(
+    (player) => player.isSP && (player.rosComponents.IP ?? 0) > 0,
+  );
+  if (missedStarterOpportunities.some((demand) => demand.volume > 0)) {
+    const starterCoverage = coverMissedOpportunities(
+      benchStarters,
+      missedStarterOpportunities,
       REPLACEMENT_PITCHER_DAILY,
       rng,
     );
-    addComp(pitcherRoS, coverage.components);
-    benchDaysTotal += coverage.benchDays;
-    replacementDaysTotal += coverage.replacementDays;
+    spProjections.push({
+      playerId: -1,
+      components: starterCoverage.components,
+      projectedGS: starterCoverage.components.GS ?? 0,
+      positions: ["SP"],
+    });
+    benchDaysTotal += starterCoverage.benchVolume;
+    replacementDaysTotal += starterCoverage.replacementVolume;
+  }
+
+  const { scaledProjections: cappedSPs } = applyGsCap(
+    gsUsed,
+    gsCap,
+    spProjections,
+  );
+  for (const sp of cappedSPs) {
+    addComp(pitcherRoS, sp.scaledComponents);
+  }
+
+  const benchRelievers = bench.filter(
+    (player) => !player.isSP && (player.rosComponents.IP ?? 0) > 0,
+  );
+  if (missedRelieverOpportunities.some((demand) => demand.volume > 0)) {
+    const relieverCoverage = coverMissedOpportunities(
+      benchRelievers,
+      missedRelieverOpportunities,
+      REPLACEMENT_PITCHER_DAILY,
+      rng,
+    );
+    addComp(pitcherRoS, relieverCoverage.components);
+    benchDaysTotal += relieverCoverage.benchVolume;
+    replacementDaysTotal += relieverCoverage.replacementVolume;
   }
 
   // ── Step 6: Combine RoS with season-to-date actuals ─────────────────────

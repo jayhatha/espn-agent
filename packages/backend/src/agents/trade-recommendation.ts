@@ -1,6 +1,7 @@
 import type { BaseLogger } from "pino";
 import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
+import { getGsCap, resolveSeasonDates } from "../utils/league-settings.js";
 import { SnapshotRepository } from "../db/snapshot-repository.js";
 import {
   type RosterValidationResult,
@@ -518,10 +519,18 @@ export class TradeRecommendationAgent {
       .where("snapshot_date", "=", snapshotDate)
       .execute();
 
-    // Build teamCategoryMap: teamId → categoryId → { value, components }
+    // Build teamCategoryMap from the stored allocator-backed baseline.
     const teamCategoryMap = new Map<
       number,
-      Map<string, { value: number; components?: any }>
+      Map<
+        string,
+        {
+          value: number;
+          components?: StatComponents;
+          rank?: number;
+          rotoPoints?: number;
+        }
+      >
     >();
     for (const proj of allTeamProjections) {
       if (!teamCategoryMap.has(proj.team_id)) {
@@ -529,9 +538,21 @@ export class TradeRecommendationAgent {
       }
       teamCategoryMap.get(proj.team_id)!.set(proj.category_id, {
         value: Number(proj.projected_value),
-        components: proj.projected_components_json,
+        components: proj.projected_components_json ?? undefined,
+        rank: proj.projected_rank,
+        rotoPoints: Number(proj.projected_roto_points),
       });
     }
+
+    const userAllocation = await this.buildAllocationSimulationData(
+      leagueId,
+      teamId,
+      snapshotDate,
+      snapshot.projections_run_id!,
+      roster,
+      trade.receivePlayers.map((p) => p.playerId),
+      settingsVersion.settings_json as Record<string, any>,
+    );
 
     // Run trade simulation via RosterSimulator
     const tradeCtx: TradeSimContext = {
@@ -539,6 +560,7 @@ export class TradeRecommendationAgent {
       teamCategoryMap,
       teamId,
       currentCategoryImpacts: currentStandings.categoryImpacts,
+      ...userAllocation,
     };
     const projectedStandings = this.simulator.simulateTrade(
       tradeCtx,
@@ -546,79 +568,16 @@ export class TradeRecommendationAgent {
       projections,
     );
 
-    // Build post-trade roster for gap detection
-    const rosterSlots =
-      (settingsVersion.settings_json as any).roster_slots || {};
     const givePlayerIds = new Set(trade.givePlayers.map((p) => p.playerId));
-    const postTradeRoster: Array<{
-      player_id: number;
-      positions: string[];
-      roster_status: string;
-    }> = roster.filter((p) => !givePlayerIds.has(p.player_id));
-
-    if (trade.receivePlayers.length > 0) {
-      const receiveIds = trade.receivePlayers.map((p) => p.playerId);
-      const receivedPlayers = await this.db
-        .selectFrom("player")
-        .select(["id", "positions"])
-        .where("id", "in", receiveIds)
-        .execute();
-      for (const rp of receivedPlayers) {
-        postTradeRoster.push({
-          player_id: rp.id,
-          positions: rp.positions as string[],
-          roster_status: "active",
-        });
-      }
-    }
-
-    // Fetch projections for post-trade players
-    const postTradePlayerIds = postTradeRoster.map((p) => p.player_id);
-    const projectionsByPlayerId = new Map<number, StatComponents>();
-    if (snapshot.projections_run_id && postTradePlayerIds.length > 0) {
-      const projs = await this.db
-        .selectFrom("player_projection")
-        .select(["player_id", "stat_components_json"])
-        .where("projections_run_id", "=", snapshot.projections_run_id)
-        .where("player_id", "in", postTradePlayerIds)
-        .execute();
-      for (const p of projs) {
-        projectionsByPlayerId.set(
-          p.player_id,
-          p.stat_components_json as StatComponents,
-        );
-      }
-    }
-
-    // Get GS data and projection date
-    const { gsUsed, gsCap } = await this.getGsData(leagueId, teamId);
-    let projectionAsOfDate = snapshotDate;
-    if (snapshot.projections_run_id) {
-      const run = await this.db
-        .selectFrom("projections_run")
-        .select("as_of_date")
-        .where("id", "=", snapshot.projections_run_id)
-        .executeTakeFirst();
-      if (run) projectionAsOfDate = run.as_of_date;
-    }
-
-    // Build allocation input and detect roster gaps
-    const rosterPlayers: RosteredPlayer[] = postTradeRoster.map((r) => ({
-      playerId: r.player_id,
-      positions: (r.positions as string[]) || [],
-      rosterStatus: (r.roster_status as "active" | "bench" | "il") || "active",
-      rosterSlot: null,
-      projectedComponents: null,
-    }));
-
     const rosterGaps = this.simulator.detectGaps({
-      roster: rosterPlayers,
-      rosterSlots,
-      projectionsByPlayerId,
-      gsUsed,
-      gsCap,
-      projectionAsOfDate,
-      snapshotDate,
+      ...userAllocation.allocationInput,
+      roster: userAllocation.allocationInput.roster
+        .filter((p) => !givePlayerIds.has(p.playerId))
+        .concat(
+          trade.receivePlayers
+            .map((p) => userAllocation.incomingPlayersById.get(p.playerId))
+            .filter((p): p is RosteredPlayer => p !== undefined),
+        ),
     });
 
     // Calculate fairness score and recommendation
@@ -675,6 +634,19 @@ export class TradeRecommendationAgent {
             teamCategoryMap,
             teamId: partnerRosterRow.team_id,
             currentCategoryImpacts: partnerCurrentStandings.categoryImpacts,
+            ...(await this.buildAllocationSimulationData(
+              leagueId,
+              partnerRosterRow.team_id,
+              snapshotDate,
+              snapshot.projections_run_id!,
+              await this.getTeamRoster(
+                leagueId,
+                partnerRosterRow.team_id,
+                snapshotDate,
+              ),
+              invertedTrade.receivePlayers.map((p) => p.playerId),
+              settingsVersion.settings_json as Record<string, any>,
+            )),
           };
           const partnerProjected = this.simulator.simulateTrade(
             partnerCtx,
@@ -1220,6 +1192,108 @@ export class TradeRecommendationAgent {
     return projMap;
   }
 
+  private async buildAllocationSimulationData(
+    leagueId: number,
+    teamId: number,
+    snapshotDate: string,
+    projectionsRunId: number,
+    roster: Awaited<ReturnType<TradeRecommendationAgent["getTeamRoster"]>>,
+    incomingPlayerIds: number[],
+    settings: Record<string, any>,
+  ): Promise<
+    Pick<
+      TradeSimContext,
+      "allocationInput" | "currentTotals" | "incomingPlayersById"
+    >
+  > {
+    const uniqueIncomingIds = [...new Set(incomingPlayerIds)];
+    const [
+      incomingRows,
+      projectionRows,
+      currentTotals,
+      run,
+      gsData,
+      league,
+      raw,
+    ] = await Promise.all([
+      uniqueIncomingIds.length > 0
+        ? this.db
+            .selectFrom("player")
+            .select(["id", "positions"])
+            .where("id", "in", uniqueIncomingIds)
+            .execute()
+        : [],
+      this.repo.getPlayerProjections(projectionsRunId, [
+        ...new Set([...roster.map((p) => p.player_id), ...uniqueIncomingIds]),
+      ]),
+      this.db
+        .selectFrom("team_daily_category_totals")
+        .select(["category_id", "value", "components_json"])
+        .where("league_id", "=", leagueId)
+        .where("snapshot_date", "=", snapshotDate)
+        .where("team_id", "=", teamId)
+        .execute(),
+      this.db
+        .selectFrom("projections_run")
+        .select("as_of_date")
+        .where("id", "=", projectionsRunId)
+        .executeTakeFirstOrThrow(),
+      this.getGsData(leagueId, teamId, settings, snapshotDate),
+      this.db
+        .selectFrom("league")
+        .select("season")
+        .where("id", "=", leagueId)
+        .executeTakeFirstOrThrow(),
+      this.repo.getHistoricalRawPayload(leagueId, snapshotDate),
+    ]);
+
+    const projectionsByPlayerId = new Map<number, StatComponents>();
+    for (const row of projectionRows) {
+      projectionsByPlayerId.set(
+        row.player_id,
+        row.stat_components_json as StatComponents,
+      );
+    }
+    const incomingPlayersById = new Map<number, RosteredPlayer>();
+    for (const row of incomingRows) {
+      incomingPlayersById.set(row.id, {
+        playerId: row.id,
+        positions: row.positions as string[],
+        rosterStatus: "active",
+        rosterSlot: null,
+        projectedComponents: null,
+      });
+    }
+    const rawPayload = raw?.response_json as any;
+    const seasonDates = resolveSeasonDates({
+      season: league.season,
+      settings,
+      schedule: rawPayload?.schedule,
+      status: rawPayload?.status,
+    });
+
+    return {
+      allocationInput: {
+        roster: roster.map((player) => ({
+          playerId: player.player_id,
+          positions: player.positions as string[],
+          rosterStatus: player.roster_status as RosteredPlayer["rosterStatus"],
+          rosterSlot: player.roster_slot,
+          projectedComponents: null,
+        })),
+        rosterSlots: settings.roster_slots ?? {},
+        projectionsByPlayerId,
+        gsUsed: gsData.gsUsed,
+        gsCap: gsData.gsCap,
+        projectionAsOfDate: run.as_of_date,
+        snapshotDate,
+        seasonEndDate: seasonDates.endDate,
+      },
+      currentTotals,
+      incomingPlayersById,
+    };
+  }
+
   private calculateFairnessScore(
     currentPoints: number,
     projectedPoints: number,
@@ -1325,27 +1399,10 @@ export class TradeRecommendationAgent {
   private async getGsData(
     leagueId: number,
     teamId: number,
-  ): Promise<{ gsUsed: number; gsCap: number }> {
-    const DEFAULT_GS_CAP = 200;
-
-    // Get GS cap from league settings
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .select("settings_json")
-      .where("league_id", "=", leagueId)
-      .orderBy("effective_date", "desc")
-      .executeTakeFirst();
-
-    let gsCap = DEFAULT_GS_CAP;
-    if (settings?.settings_json) {
-      const json = settings.settings_json as unknown as Record<string, unknown>;
-      const rosterSlots = json.roster_slots as
-        | Record<string, number>
-        | undefined;
-      if (rosterSlots?.GS_LIMIT !== undefined) {
-        gsCap = rosterSlots.GS_LIMIT;
-      }
-    }
+    settings: unknown,
+    snapshotDate: string,
+  ): Promise<{ gsUsed: number; gsCap: number | null }> {
+    const gsCap = getGsCap(settings);
 
     // Get GS used from ESPN raw payload
     const team = await this.db
@@ -1355,12 +1412,10 @@ export class TradeRecommendationAgent {
       .executeTakeFirst();
 
     if (team) {
-      const latestPayload = await this.db
-        .selectFrom("league_raw_payload")
-        .select(["response_json"])
-        .where("league_id", "=", leagueId)
-        .orderBy("fetched_at", "desc")
-        .executeTakeFirst();
+      const latestPayload = await this.repo.getHistoricalRawPayload(
+        leagueId,
+        snapshotDate,
+      );
 
       if (latestPayload) {
         const raw = latestPayload.response_json as any;

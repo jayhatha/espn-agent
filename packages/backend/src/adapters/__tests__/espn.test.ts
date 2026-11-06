@@ -80,11 +80,14 @@ describe("ESPNAdapter", () => {
       // The adapter will retry on 429 via axios-retry, which will eventually fail after retries exhausted
       // With fake timers, we need to advance through all retry attempts
       const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
+      const rejection = expect(promise).rejects.toThrow(
+        "Failed to fetch ESPN league data",
+      );
 
       // Error propagates immediately (vi.spyOn bypasses axiosRetry interceptors)
       await vi.advanceTimersByTimeAsync(120000);
 
-      await expect(promise).rejects.toThrow("Failed to fetch ESPN league data");
+      await rejection;
     }, 15000);
 
     it("should respect throttle across different fetch methods", async () => {
@@ -180,12 +183,13 @@ describe("ESPNAdapter", () => {
 
       // Start the fetch
       const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
+      const rejection = expect(promise).rejects.toThrow("Network error");
 
       // vi.spyOn bypasses axiosRetry interceptors, so error propagates immediately
       await vi.advanceTimersByTimeAsync(10000);
 
       // Network error propagates as-is (instanceof Error, re-thrown directly)
-      await expect(promise).rejects.toThrow("Network error");
+      await rejection;
       expect(mockClient).toHaveBeenCalledTimes(1);
     }, 10000);
 
@@ -202,40 +206,40 @@ describe("ESPNAdapter", () => {
 
       // Start the fetch
       const promise = adapter.fetchLeague({ leagueId: 123, season: 2026 });
+      const rejection = expect(promise).rejects.toThrow(
+        "Failed to fetch ESPN league data",
+      );
 
       // vi.spyOn bypasses axiosRetry interceptors, so error propagates immediately
       await vi.advanceTimersByTimeAsync(10000);
 
       // 429 error (non-Error object) gets wrapped in fetchLeague catch block
-      await expect(promise).rejects.toThrow("Failed to fetch ESPN league data");
+      await rejection;
       expect(mockClient).toHaveBeenCalledTimes(1);
     }, 10000);
   });
 
   describe("fetchPreDraftAuctionValues", () => {
-    it("should fetch auction values for 100+ players", async () => {
-      // This is an integration test - requires real ESPN league
-      // Skip in CI if ESPN credentials not available
-      const espnLeagueId = parseInt(process.env.TEST_ESPN_LEAGUE_ID || "0");
+    it.skipIf(
+      !(
+        process.env.TEST_ESPN_LEAGUE_ID &&
+        process.env.ESPN_SWID &&
+        process.env.ESPN_S2
+      ),
+    )("should fetch auction values for 100+ players", async () => {
+      const espnLeagueId = Number(process.env.TEST_ESPN_LEAGUE_ID);
       const season = 2026;
-
-      if (espnLeagueId === 0) {
-        console.log(
-          "Skipping fetchPreDraftAuctionValues test - set TEST_ESPN_LEAGUE_ID to run",
-        );
-        return;
-      }
 
       const adapter = new ESPNAdapter(mockLogger);
       const auth = {
-        SWID: process.env.ESPN_SWID || "",
-        espn_s2: process.env.ESPN_S2 || "",
+        SWID: process.env.ESPN_SWID!,
+        espn_s2: process.env.ESPN_S2!,
       };
 
       const result = await adapter.fetchPreDraftAuctionValues({
         leagueId: espnLeagueId,
         season,
-        auth: auth.SWID && auth.espn_s2 ? auth : undefined,
+        auth,
       });
 
       // Should return significantly more than 6 players

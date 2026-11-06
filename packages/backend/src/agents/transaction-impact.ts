@@ -1,9 +1,13 @@
 import type { BaseLogger } from "pino";
-import { type Kysely, sql } from "kysely";
+import type { Kysely } from "kysely";
 import type { Database } from "../db/schema.js";
 import type { MoveType } from "../../../shared/dist/index.js";
 import { calculateFinalRate } from "../../../shared/dist/index.js";
-import { assignRanksWithTies, computeOverallRotoPoints } from "../utils/roto-ranking.js";
+import { canFillSlot } from "../projection/slot-eligibility.js";
+import {
+  assignRanksWithTies,
+  computeOverallRotoPoints,
+} from "../utils/roto-ranking.js";
 
 /**
  * Transaction Impact Agent
@@ -20,6 +24,32 @@ interface CategoryConfig {
   formulaId?: string;
 }
 
+export function averageRosterBoundaryProduction(
+  players: Array<{ components: Record<string, number>; score: number }>,
+  sampleSize = 3,
+): Record<string, number> {
+  if (players.length === 0 || sampleSize <= 0) return {};
+
+  const boundaryPlayers = [...players]
+    .sort((a, b) => a.score - b.score)
+    .slice(0, sampleSize);
+  const replacementComponents: Record<string, number> = {};
+
+  for (const player of boundaryPlayers) {
+    for (const [key, value] of Object.entries(player.components)) {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        replacementComponents[key] = (replacementComponents[key] ?? 0) + value;
+      }
+    }
+  }
+
+  for (const key of Object.keys(replacementComponents)) {
+    replacementComponents[key] /= boundaryPlayers.length;
+  }
+
+  return replacementComponents;
+}
+
 export class TransactionImpactAgent {
   constructor(
     private db: Kysely<Database>,
@@ -32,7 +62,10 @@ export class TransactionImpactAgent {
    * Subsequent weeks: players appearing/disappearing → add/drop/trade.
    */
   async deriveRosterMoves(leagueId: number, season: number): Promise<number> {
-    this.logger?.info({ leagueId, season }, "Deriving roster moves from snapshot diffs");
+    this.logger?.info(
+      { leagueId, season },
+      "Deriving roster moves from snapshot diffs",
+    );
 
     // Get all snapshot dates for this league/season, ordered chronologically
     const startDate = `${season}-01-01`;
@@ -93,7 +126,15 @@ export class TransactionImpactAgent {
             .insertInto("roster_move")
             .values(draftRows.slice(k, k + 100))
             .onConflict((oc) =>
-              oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
+              oc
+                .columns([
+                  "league_id",
+                  "team_id",
+                  "player_id",
+                  "effective_date",
+                  "move_type",
+                ])
+                .doNothing(),
             )
             .execute();
         }
@@ -110,7 +151,10 @@ export class TransactionImpactAgent {
       const previousRoster = await this.getRosterByTeam(leagueId, previousDate);
 
       // For each team, find adds and drops
-      const allTeamIds = new Set([...currentRoster.keys(), ...previousRoster.keys()]);
+      const allTeamIds = new Set([
+        ...currentRoster.keys(),
+        ...previousRoster.keys(),
+      ]);
 
       // Track all player movements this week to detect trades
       const gained: Array<{ teamId: number; playerId: number }> = [];
@@ -142,13 +186,21 @@ export class TransactionImpactAgent {
       const tradeLosses = new Set<string>();
 
       // Build movement map: for each gained player, who lost them?
-      const movements: Array<{ gainTeam: number; loseTeam: number; playerId: number }> = [];
+      const movements: Array<{
+        gainTeam: number;
+        loseTeam: number;
+        playerId: number;
+      }> = [];
       for (const g of gained) {
         const lostByAnother = lost.find(
           (l) => l.playerId === g.playerId && l.teamId !== g.teamId,
         );
         if (lostByAnother) {
-          movements.push({ gainTeam: g.teamId, loseTeam: lostByAnother.teamId, playerId: g.playerId });
+          movements.push({
+            gainTeam: g.teamId,
+            loseTeam: lostByAnother.teamId,
+            playerId: g.playerId,
+          });
         }
       }
 
@@ -181,7 +233,15 @@ export class TransactionImpactAgent {
           .insertInto("roster_move")
           .values(gainedRows.slice(k, k + 100))
           .onConflict((oc) =>
-            oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
+            oc
+              .columns([
+                "league_id",
+                "team_id",
+                "player_id",
+                "effective_date",
+                "move_type",
+              ])
+              .doNothing(),
           )
           .execute();
       }
@@ -205,7 +265,15 @@ export class TransactionImpactAgent {
           .insertInto("roster_move")
           .values(lostRows.slice(k, k + 100))
           .onConflict((oc) =>
-            oc.columns(["league_id", "team_id", "player_id", "effective_date", "move_type"]).doNothing(),
+            oc
+              .columns([
+                "league_id",
+                "team_id",
+                "player_id",
+                "effective_date",
+                "move_type",
+              ])
+              .doNothing(),
           )
           .execute();
       }
@@ -215,7 +283,12 @@ export class TransactionImpactAgent {
       await this.pairMoves(leagueId, currentDate);
 
       this.logger?.debug(
-        { leagueId, date: currentDate, gained: gained.length, lost: lost.length },
+        {
+          leagueId,
+          date: currentDate,
+          gained: gained.length,
+          lost: lost.length,
+        },
         "Week roster diff processed",
       );
     }
@@ -292,19 +365,29 @@ export class TransactionImpactAgent {
       await pairGroup(tradeIns, tradeOuts);
 
       // Overflow: in unbalanced trades (e.g., 5-for-2), extra trade_ins pair with drops
-      const unpairedTradeIns = tradeIns.slice(Math.min(tradeIns.length, tradeOuts.length));
-      const unpairedTradeOuts = tradeOuts.slice(Math.min(tradeIns.length, tradeOuts.length));
+      const unpairedTradeIns = tradeIns.slice(
+        Math.min(tradeIns.length, tradeOuts.length),
+      );
+      const unpairedTradeOuts = tradeOuts.slice(
+        Math.min(tradeIns.length, tradeOuts.length),
+      );
       await pairGroup(unpairedTradeIns, drops);
       // Remaining drops after absorbing overflow trade_ins
-      const dropsAfterOverflow = drops.slice(Math.min(unpairedTradeIns.length, drops.length));
+      const dropsAfterOverflow = drops.slice(
+        Math.min(unpairedTradeIns.length, drops.length),
+      );
       await pairGroup(adds, dropsAfterOverflow);
       // Overflow trade_outs pair with remaining adds
-      const addsAfterDrops = adds.slice(Math.min(adds.length, dropsAfterOverflow.length));
+      const addsAfterDrops = adds.slice(
+        Math.min(adds.length, dropsAfterOverflow.length),
+      );
       await pairGroup(addsAfterDrops, unpairedTradeOuts);
     }
   }
 
-  private async getLeagueCategories(leagueId: number): Promise<CategoryConfig[]> {
+  private async getLeagueCategories(
+    leagueId: number,
+  ): Promise<CategoryConfig[]> {
     const settings = await this.db
       .selectFrom("league_settings_version")
       .select("settings_json")
@@ -323,7 +406,10 @@ export class TransactionImpactAgent {
     }));
   }
 
-  private async getFinalSnapshotDate(leagueId: number, season: number): Promise<string | null> {
+  private async getFinalSnapshotDate(
+    leagueId: number,
+    season: number,
+  ): Promise<string | null> {
     const row = await this.db
       .selectFrom("team_daily_category_totals")
       .select("snapshot_date")
@@ -371,7 +457,8 @@ export class TransactionImpactAgent {
     categories: CategoryConfig[],
     numTeams: number,
   ): Map<number, number> {
-    const categoryRankings: Array<{ teamId: number; rotoPoints: number }>[] = [];
+    const categoryRankings: Array<{ teamId: number; rotoPoints: number }>[] =
+      [];
 
     for (const cat of categories) {
       const teamValues: Array<{ teamId: number; value: number }> = [];
@@ -380,8 +467,14 @@ export class TransactionImpactAgent {
         let value = components[`_val_${cat.statKey}`] ?? 0;
 
         // For rate stats, recompute from components if we need counterfactual values
-        if (cat.type === "RATE" && cat.formulaId && !(`_val_${cat.statKey}` in components)) {
-          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        if (
+          cat.type === "RATE" &&
+          cat.formulaId &&
+          !(`_val_${cat.statKey}` in components)
+        ) {
+          const isPitchingRate = ["era", "whip", "k9"].includes(
+            cat.formulaId.toLowerCase(),
+          );
           if (isPitchingRate) {
             const pitchingComponents = {
               H: components.HA || 0,
@@ -402,7 +495,9 @@ export class TransactionImpactAgent {
       }
 
       teamValues.sort((a, b) =>
-        cat.direction === "LOWER_BETTER" ? a.value - b.value : b.value - a.value,
+        cat.direction === "LOWER_BETTER"
+          ? a.value - b.value
+          : b.value - a.value,
       );
 
       const ranked = assignRanksWithTies(teamValues, numTeams);
@@ -433,12 +528,21 @@ export class TransactionImpactAgent {
       for (const [teamId, components] of teamComponents) {
         let value = components[`_val_${cat.statKey}`] ?? 0;
 
-        if (cat.type === "RATE" && cat.formulaId && !(`_val_${cat.statKey}` in components)) {
-          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        if (
+          cat.type === "RATE" &&
+          cat.formulaId &&
+          !(`_val_${cat.statKey}` in components)
+        ) {
+          const isPitchingRate = ["era", "whip", "k9"].includes(
+            cat.formulaId.toLowerCase(),
+          );
           if (isPitchingRate) {
             const pc = {
-              H: components.HA || 0, BB: components.BBA || 0,
-              IP: components.IP || 0, ER: components.ER || 0, K: components.K || 0,
+              H: components.HA || 0,
+              BB: components.BBA || 0,
+              IP: components.IP || 0,
+              ER: components.ER || 0,
+              K: components.K || 0,
             };
             if (pc.IP > 0) value = calculateFinalRate(cat.formulaId, {}, pc);
           } else {
@@ -450,7 +554,9 @@ export class TransactionImpactAgent {
       }
 
       teamValues.sort((a, b) =>
-        cat.direction === "LOWER_BETTER" ? a.value - b.value : b.value - a.value,
+        cat.direction === "LOWER_BETTER"
+          ? a.value - b.value
+          : b.value - a.value,
       );
 
       const ranked = assignRanksWithTies(teamValues, numTeams);
@@ -540,7 +646,9 @@ export class TransactionImpactAgent {
       .where("snapshot_date", "<=", toDate)
       .execute();
 
-    return this.sumComponents(rows.map((r) => r.components_json as Record<string, number>));
+    return this.sumComponents(
+      rows.map((r) => r.components_json as Record<string, number>),
+    );
   }
 
   /**
@@ -562,10 +670,14 @@ export class TransactionImpactAgent {
       .where("snapshot_date", "<=", toDate)
       .execute();
 
-    return this.sumComponents(rows.map((r) => r.components_json as Record<string, number>));
+    return this.sumComponents(
+      rows.map((r) => r.components_json as Record<string, number>),
+    );
   }
 
-  private sumComponents(componentsList: Record<string, number>[]): Record<string, number> {
+  private sumComponents(
+    componentsList: Record<string, number>[],
+  ): Record<string, number> {
     const result: Record<string, number> = {};
     for (const components of componentsList) {
       for (const [key, val] of Object.entries(components)) {
@@ -600,21 +712,29 @@ export class TransactionImpactAgent {
 
     for (const cat of categories) {
       const actualValue = actualComponents[`_val_${cat.statKey}`] ?? 0;
-      const counterfactualValue = counterfactualComponents[`_val_${cat.statKey}`] ?? 0;
+      const counterfactualValue =
+        counterfactualComponents[`_val_${cat.statKey}`] ?? 0;
 
       // Compute roto points for this single category in both scenarios
       const actualCatPoints = this.computeSingleCategoryPoints(
-        teamId, cat, actualTeamComponents, numTeams,
+        teamId,
+        cat,
+        actualTeamComponents,
+        numTeams,
       );
       const counterfactualCatPoints = this.computeSingleCategoryPoints(
-        teamId, cat, counterfactualTeamComponents, numTeams,
+        teamId,
+        cat,
+        counterfactualTeamComponents,
+        numTeams,
       );
 
       result.push({
         categoryId: cat.statKey,
         actualValue: Math.round(actualValue * 1000) / 1000,
         counterfactualValue: Math.round(counterfactualValue * 1000) / 1000,
-        deltaRotoPoints: Math.round((actualCatPoints - counterfactualCatPoints) * 100) / 100,
+        deltaRotoPoints:
+          Math.round((actualCatPoints - counterfactualCatPoints) * 100) / 100,
       });
     }
 
@@ -661,8 +781,14 @@ export class TransactionImpactAgent {
         let value = components[`_val_${cat.statKey}`] ?? 0;
 
         // For rate stats, recompute if needed
-        if (cat.type === "RATE" && cat.formulaId && !(`_val_${cat.statKey}` in components)) {
-          const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        if (
+          cat.type === "RATE" &&
+          cat.formulaId &&
+          !(`_val_${cat.statKey}` in components)
+        ) {
+          const isPitchingRate = ["era", "whip", "k9"].includes(
+            cat.formulaId.toLowerCase(),
+          );
           if (isPitchingRate) {
             const pitchingComponents = {
               H: components.HA || 0,
@@ -700,7 +826,8 @@ export class TransactionImpactAgent {
         // For rate stats: standard deviation
         const mean = teamValues.reduce((a, b) => a + b, 0) / teamValues.length;
         const squaredDiffs = teamValues.map((v) => Math.pow(v - mean, 2));
-        const variance = squaredDiffs.reduce((a, b) => a + b, 0) / teamValues.length;
+        const variance =
+          squaredDiffs.reduce((a, b) => a + b, 0) / teamValues.length;
         const stdDev = Math.sqrt(variance);
         sgpFactors[cat.statKey] = Math.max(0.001, stdDev);
       } else {
@@ -713,7 +840,8 @@ export class TransactionImpactAgent {
 
   /**
    * Compute replacement-level production for a position.
-   * Replacement level = average production of players just outside rostered pool.
+   * Replacement level = average production of lowest-producing actual rostered
+   * players eligible at that position.
    */
   private async computeReplacementLevel(
     leagueId: number,
@@ -721,38 +849,43 @@ export class TransactionImpactAgent {
     finalSnapshotDate: string,
     position: string,
   ): Promise<Record<string, number>> {
-    // Get league settings to determine roster size at this position
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .select("settings_json")
+    const latestRosterSnapshot = await this.db
+      .selectFrom("team_roster_snapshot")
+      .select(({ fn }) => fn.max("snapshot_date").as("snapshot_date"))
       .where("league_id", "=", leagueId)
-      .orderBy("effective_date", "desc")
+      .where("snapshot_date", "<=", finalSnapshotDate)
       .executeTakeFirst();
 
-    if (!settings) return {};
+    if (!latestRosterSnapshot?.snapshot_date) return {};
 
-    const rosterSlots = settings.settings_json?.roster_slots || {};
-    const numTeams = await this.db
-      .selectFrom("team")
-      .where("league_id", "=", leagueId)
-      .execute()
-      .then((teams) => teams.length);
+    const rosteredPlayers = await this.db
+      .selectFrom("team_roster_snapshot as roster")
+      .innerJoin("player as p", "p.id", "roster.player_id")
+      .select(["roster.player_id", "p.positions"])
+      .where("roster.league_id", "=", leagueId)
+      .where("roster.snapshot_date", "=", latestRosterSnapshot.snapshot_date)
+      .where("roster.roster_status", "in", ["active", "bench", "il"])
+      .execute();
 
-    // Estimate rostered players at this position
-    const slotsPerTeam = rosterSlots[position] || 1;
-    const totalRostered = slotsPerTeam * numTeams;
+    const rosteredPlayerIds = [
+      ...new Set(
+        rosteredPlayers
+          .filter((player) => canFillSlot(player.positions, position))
+          .map((player) => player.player_id),
+      ),
+    ];
 
-    // Get all players at this position from player_period_stats
+    if (rosteredPlayerIds.length === 0) return {};
+
     const startDate = `${season}-01-01`;
 
     const playerTotals = await this.db
       .selectFrom("player_period_stats as pps")
-      .innerJoin("player as p", "p.id", "pps.player_id")
       .select(["pps.player_id", "pps.components_json"])
       .where("pps.league_id", "=", leagueId)
       .where("pps.snapshot_date", ">=", startDate)
       .where("pps.snapshot_date", "<=", finalSnapshotDate)
-      .where(({ eb }) => eb(sql`p.positions @> ARRAY[${position}]::text[]`, "=", sql`true`))
+      .where("pps.player_id", "in", rosteredPlayerIds)
       .execute();
 
     // Sum each player's total production
@@ -773,48 +906,32 @@ export class TransactionImpactAgent {
     if (playerProductionMap.size === 0) return {};
 
     // Sort players by counting stat production (R+HR+RBI for hitters, K+W+SV for pitchers)
-    const playerProduction = Array.from(playerProductionMap.entries()).map(([playerId, components]) => {
-      const isPitcher = (components.IP || 0) > 0;
-      const score = isPitcher
-        ? (components.K || 0) + (components.W || 0) + (components.SV || 0)
-        : (components.R || 0) + (components.HR || 0) + (components.RBI || 0);
-      return { playerId, components, score };
-    });
+    const playerProduction = Array.from(playerProductionMap.entries()).map(
+      ([playerId, components]) => {
+        const isPitcher = (components.IP || 0) > 0;
+        const score = isPitcher
+          ? (components.K || 0) + (components.W || 0) + (components.SV || 0)
+          : (components.R || 0) + (components.HR || 0) + (components.RBI || 0);
+        return { playerId, components, score };
+      },
+    );
 
-    playerProduction.sort((a, b) => b.score - a.score);
-
-    // Replacement level = average of players ranked just outside rostered pool
-    const replacementStart = Math.floor(totalRostered);
-    const replacementEnd = Math.min(replacementStart + 3, playerProduction.length);
-
-    if (replacementEnd <= replacementStart) return {};
-
-    const replacementPlayers = playerProduction.slice(replacementStart, replacementEnd);
-    const replacementComponents: Record<string, number> = {};
-
-    for (const player of replacementPlayers) {
-      for (const [key, val] of Object.entries(player.components)) {
-        if (typeof val === "number") {
-          replacementComponents[key] = (replacementComponents[key] || 0) + val;
-        }
-      }
-    }
-
-    // Average the components
-    const count = replacementPlayers.length;
-    for (const key of Object.keys(replacementComponents)) {
-      replacementComponents[key] /= count;
-    }
-
-    return replacementComponents;
+    return averageRosterBoundaryProduction(playerProduction);
   }
 
   /**
    * Compute Shapley-attributed impacts for all moves in a season.
    * Uses Monte Carlo sampling to estimate Shapley values.
    */
-  async computeShapleyImpacts(leagueId: number, season: number, numSamples = 500): Promise<number> {
-    this.logger?.info({ leagueId, season }, "Computing Shapley-based transaction impacts");
+  async computeShapleyImpacts(
+    leagueId: number,
+    season: number,
+    numSamples = 500,
+  ): Promise<number> {
+    this.logger?.info(
+      { leagueId, season },
+      "Computing Shapley-based transaction impacts",
+    );
 
     // Clear existing impacts (idempotent re-run)
     await this.db
@@ -837,13 +954,18 @@ export class TransactionImpactAgent {
     }
 
     // Get final team components
-    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
+    const teamFinalComponents = await this.getTeamFinalComponents(
+      leagueId,
+      finalSnapshotDate,
+    );
     const teamIds = Array.from(teamFinalComponents.keys());
     const numTeams = teamIds.length;
 
     // Compute actual roto points
     const actualRotoPoints = this.computeRotoPointsFromComponents(
-      teamFinalComponents, categories, numTeams,
+      teamFinalComponents,
+      categories,
+      numTeams,
     );
 
     // Compute SGP factors
@@ -876,7 +998,11 @@ export class TransactionImpactAgent {
       const emptyCoalition: Record<string, number> = {};
 
       // Compute Shapley values for this team
-      const { values: shapleyValues, standardErrors, categoryValues: shapleyCategoryValues } = await this.computeTeamShapleyValues(
+      const {
+        values: shapleyValues,
+        standardErrors,
+        categoryValues: shapleyCategoryValues,
+      } = await this.computeTeamShapleyValues(
         leagueId,
         teamId,
         movePairs,
@@ -900,20 +1026,33 @@ export class TransactionImpactAgent {
         const ciHigh = shapleyImpact + 1.96 * se;
         const crossesZero = ciLow < 0 && ciHigh > 0;
         const ciWidth = ciHigh - ciLow;
-        const isUncertain = crossesZero || (ciWidth > 2 * Math.abs(shapleyImpact) && Math.abs(shapleyImpact) > 0.1);
+        const isUncertain =
+          crossesZero ||
+          (ciWidth > 2 * Math.abs(shapleyImpact) &&
+            Math.abs(shapleyImpact) > 0.1);
 
         // Get gained and lost components for this move
         const gainedContribution = await this.sumPlayerContribution(
-          leagueId, pair.gainedPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
+          leagueId,
+          pair.gainedPlayerId,
+          teamId,
+          pair.effectiveDate,
+          finalSnapshotDate,
         );
 
         let lostCounterfactual: Record<string, number> | null = null;
         let isIncomplete = false;
         if (pair.lostPlayerId) {
           lostCounterfactual = await this.sumPlayerContributionAnywhere(
-            leagueId, pair.lostPlayerId, pair.effectiveDate, finalSnapshotDate,
+            leagueId,
+            pair.lostPlayerId,
+            pair.effectiveDate,
+            finalSnapshotDate,
           );
-          if (!lostCounterfactual || Object.keys(lostCounterfactual).length === 0) {
+          if (
+            !lostCounterfactual ||
+            Object.keys(lostCounterfactual).length === 0
+          ) {
             isIncomplete = true;
             lostCounterfactual = {};
           }
@@ -929,27 +1068,49 @@ export class TransactionImpactAgent {
             const counterfactual = { ...teamComps };
             if (gainedContribution) {
               for (const [key, val] of Object.entries(gainedContribution)) {
-                if (key in counterfactual && typeof val === "number") counterfactual[key] -= val;
+                if (key in counterfactual && typeof val === "number")
+                  counterfactual[key] -= val;
               }
             }
             for (const [key, val] of Object.entries(lostCounterfactual || {})) {
-              if (typeof val === "number") counterfactual[key] = (counterfactual[key] || 0) + val;
+              if (typeof val === "number")
+                counterfactual[key] = (counterfactual[key] || 0) + val;
             }
-            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
-            const buildArgs = (c: Record<string, number>) => isPitchingRate
-              ? { H: c.HA || 0, BB: c.BBA || 0, IP: c.IP || 0, ER: c.ER || 0, K: c.K || 0 }
-              : c;
-            const actualRate = calculateFinalRate(cat.formulaId, {}, buildArgs(teamComps));
-            const cfRate = calculateFinalRate(cat.formulaId, {}, buildArgs(counterfactual));
+            const isPitchingRate = ["era", "whip", "k9"].includes(
+              cat.formulaId.toLowerCase(),
+            );
+            const buildArgs = (c: Record<string, number>) =>
+              isPitchingRate
+                ? {
+                    H: c.HA || 0,
+                    BB: c.BBA || 0,
+                    IP: c.IP || 0,
+                    ER: c.ER || 0,
+                    K: c.K || 0,
+                  }
+                : c;
+            const actualRate = calculateFinalRate(
+              cat.formulaId,
+              {},
+              buildArgs(teamComps),
+            );
+            const cfRate = calculateFinalRate(
+              cat.formulaId,
+              {},
+              buildArgs(counterfactual),
+            );
             rawDelta = actualRate - cfRate;
           } else {
-            const gained = (gainedContribution && gainedContribution[cat.statKey]) || 0;
-            const lost = (lostCounterfactual && lostCounterfactual[cat.statKey]) || 0;
+            const gained =
+              (gainedContribution && gainedContribution[cat.statKey]) || 0;
+            const lost =
+              (lostCounterfactual && lostCounterfactual[cat.statKey]) || 0;
             rawDelta = gained - lost;
           }
           return {
             categoryId: cat.statKey,
-            shapleyDelta: Math.round((categoryShapley[cat.statKey] || 0) * 1000) / 1000,
+            shapleyDelta:
+              Math.round((categoryShapley[cat.statKey] || 0) * 1000) / 1000,
             rawDelta: Math.round(rawDelta * 1000) / 1000,
             sgpFactor: sgpFactors[cat.statKey] || 1.0,
           };
@@ -970,31 +1131,46 @@ export class TransactionImpactAgent {
           if (player && player.positions && player.positions.length > 0) {
             const position = player.positions[0];
             replacementLevelComponents = await this.computeReplacementLevel(
-              leagueId, season, finalSnapshotDate, position,
+              leagueId,
+              season,
+              finalSnapshotDate,
+              position,
             );
 
             if (Object.keys(replacementLevelComponents).length > 0) {
               // Build counterfactual with replacement level instead of this player
-              const replacementTeamComponents = { ...teamFinalComponents.get(teamId)! };
+              const replacementTeamComponents = {
+                ...teamFinalComponents.get(teamId)!,
+              };
 
               // Subtract gained player
-              for (const [key, val] of Object.entries(gainedContribution || {})) {
-                if (key in replacementTeamComponents && typeof replacementTeamComponents[key] === "number") {
+              for (const [key, val] of Object.entries(
+                gainedContribution || {},
+              )) {
+                if (
+                  key in replacementTeamComponents &&
+                  typeof replacementTeamComponents[key] === "number"
+                ) {
                   replacementTeamComponents[key] -= val;
                 }
               }
 
               // Add replacement level
-              for (const [key, val] of Object.entries(replacementLevelComponents)) {
+              for (const [key, val] of Object.entries(
+                replacementLevelComponents,
+              )) {
                 if (typeof val === "number") {
-                  replacementTeamComponents[key] = (replacementTeamComponents[key] || 0) + val;
+                  replacementTeamComponents[key] =
+                    (replacementTeamComponents[key] || 0) + val;
                 }
               }
 
               // Recompute rate stats
               for (const cat of categories) {
                 if (cat.type === "RATE" && cat.formulaId) {
-                  const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+                  const isPitchingRate = ["era", "whip", "k9"].includes(
+                    cat.formulaId.toLowerCase(),
+                  );
                   let value = 0;
                   if (isPitchingRate) {
                     const pitchingComponents = {
@@ -1005,26 +1181,42 @@ export class TransactionImpactAgent {
                       K: replacementTeamComponents.K || 0,
                     };
                     if (pitchingComponents.IP > 0) {
-                      value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+                      value = calculateFinalRate(
+                        cat.formulaId,
+                        {},
+                        pitchingComponents,
+                      );
                     }
                   } else {
-                    value = calculateFinalRate(cat.formulaId, {}, replacementTeamComponents);
+                    value = calculateFinalRate(
+                      cat.formulaId,
+                      {},
+                      replacementTeamComponents,
+                    );
                   }
                   replacementTeamComponents[`_val_${cat.statKey}`] = value;
                 } else if (cat.type === "COUNTING") {
-                  replacementTeamComponents[`_val_${cat.statKey}`] = replacementTeamComponents[cat.statKey] ?? 0;
+                  replacementTeamComponents[`_val_${cat.statKey}`] =
+                    replacementTeamComponents[cat.statKey] ?? 0;
                 }
               }
 
               // Compute roto points with replacement level
               const replacementLeagueComponents = new Map(teamFinalComponents);
-              replacementLeagueComponents.set(teamId, replacementTeamComponents);
-              const replacementRotoPoints = this.computeRotoPointsFromComponents(
-                replacementLeagueComponents, categories, numTeams,
+              replacementLeagueComponents.set(
+                teamId,
+                replacementTeamComponents,
               );
+              const replacementRotoPoints =
+                this.computeRotoPointsFromComponents(
+                  replacementLeagueComponents,
+                  categories,
+                  numTeams,
+                );
 
               const actualTeamPoints = actualRotoPoints.get(teamId) || 0;
-              const replacementTeamPoints = replacementRotoPoints.get(teamId) || 0;
+              const replacementTeamPoints =
+                replacementRotoPoints.get(teamId) || 0;
               replacementLevelImpact = actualTeamPoints - replacementTeamPoints;
             }
           }
@@ -1035,7 +1227,10 @@ export class TransactionImpactAgent {
         const counterfactualComponents = { ...actualComponents };
         if (gainedContribution) {
           for (const [key, val] of Object.entries(gainedContribution)) {
-            if (key in counterfactualComponents && typeof counterfactualComponents[key] === "number") {
+            if (
+              key in counterfactualComponents &&
+              typeof counterfactualComponents[key] === "number"
+            ) {
               counterfactualComponents[key] -= val;
             }
           }
@@ -1043,13 +1238,16 @@ export class TransactionImpactAgent {
         if (lostCounterfactual) {
           for (const [key, val] of Object.entries(lostCounterfactual)) {
             if (typeof val === "number") {
-              counterfactualComponents[key] = (counterfactualComponents[key] || 0) + val;
+              counterfactualComponents[key] =
+                (counterfactualComponents[key] || 0) + val;
             }
           }
         }
         for (const cat of categories) {
           if (cat.type === "RATE" && cat.formulaId) {
-            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            const isPitchingRate = ["era", "whip", "k9"].includes(
+              cat.formulaId.toLowerCase(),
+            );
             let value = 0;
             if (isPitchingRate) {
               const pitchingComponents = {
@@ -1060,29 +1258,49 @@ export class TransactionImpactAgent {
                 K: counterfactualComponents.K || 0,
               };
               if (pitchingComponents.IP > 0) {
-                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+                value = calculateFinalRate(
+                  cat.formulaId,
+                  {},
+                  pitchingComponents,
+                );
               }
             } else {
-              value = calculateFinalRate(cat.formulaId, {}, counterfactualComponents);
+              value = calculateFinalRate(
+                cat.formulaId,
+                {},
+                counterfactualComponents,
+              );
             }
             counterfactualComponents[`_val_${cat.statKey}`] = value;
           } else if (cat.type === "COUNTING") {
             // Adjust actual _val_ by the move's contribution instead of reading
             // from raw component key (which may differ from ESPN's reported total)
             const actualVal = actualComponents[`_val_${cat.statKey}`] ?? 0;
-            const gainedDelta = (gainedContribution && typeof gainedContribution[cat.statKey] === "number")
-              ? gainedContribution[cat.statKey] : 0;
-            const lostDelta = (lostCounterfactual && typeof lostCounterfactual[cat.statKey] === "number")
-              ? lostCounterfactual[cat.statKey] : 0;
-            counterfactualComponents[`_val_${cat.statKey}`] = actualVal - gainedDelta + lostDelta;
+            const gainedDelta =
+              gainedContribution &&
+              typeof gainedContribution[cat.statKey] === "number"
+                ? gainedContribution[cat.statKey]
+                : 0;
+            const lostDelta =
+              lostCounterfactual &&
+              typeof lostCounterfactual[cat.statKey] === "number"
+                ? lostCounterfactual[cat.statKey]
+                : 0;
+            counterfactualComponents[`_val_${cat.statKey}`] =
+              actualVal - gainedDelta + lostDelta;
           }
         }
 
         const counterfactualTeamComponents = new Map(teamFinalComponents);
         counterfactualTeamComponents.set(teamId, counterfactualComponents);
         const categoryImpacts = this.computeCategoryImpacts(
-          teamId, actualComponents, counterfactualComponents, categories, numTeams,
-          teamFinalComponents, counterfactualTeamComponents,
+          teamId,
+          actualComponents,
+          counterfactualComponents,
+          categories,
+          numTeams,
+          teamFinalComponents,
+          counterfactualTeamComponents,
         );
 
         // Insert into database
@@ -1093,14 +1311,23 @@ export class TransactionImpactAgent {
           player_gained_id: pair.gainedPlayerId,
           player_lost_id: pair.lostPlayerId,
           effective_date: pair.effectiveDate,
-          gained_components: gainedContribution ? JSON.stringify(gainedContribution) : null,
-          lost_components: lostCounterfactual ? JSON.stringify(lostCounterfactual) : null,
+          gained_components: gainedContribution
+            ? JSON.stringify(gainedContribution)
+            : null,
+          lost_components: lostCounterfactual
+            ? JSON.stringify(lostCounterfactual)
+            : null,
           impact_roto_points: Math.round(shapleyImpact * 100) / 100,
           shapley_impact: Math.round(shapleyImpact * 100) / 100,
           category_impacts: JSON.stringify(categoryImpacts),
           sgp_category_impacts: JSON.stringify(sgpCategoryImpacts),
-          replacement_level_components: replacementLevelComponents ? JSON.stringify(replacementLevelComponents) : null,
-          replacement_level_impact: replacementLevelImpact !== null ? Math.round(replacementLevelImpact * 100) / 100 : null,
+          replacement_level_components: replacementLevelComponents
+            ? JSON.stringify(replacementLevelComponents)
+            : null,
+          replacement_level_impact:
+            replacementLevelImpact !== null
+              ? Math.round(replacementLevelImpact * 100) / 100
+              : null,
           is_incomplete: isIncomplete,
           ci_low: Math.round(ciLow * 100) / 100,
           ci_high: Math.round(ciHigh * 100) / 100,
@@ -1111,21 +1338,29 @@ export class TransactionImpactAgent {
           .insertInto("transaction_impact")
           .values(insertValues as any)
           .onConflict((oc) =>
-            oc.columns(["league_id", "team_id", "player_gained_id", "effective_date"]).doUpdateSet({
-              gained_components: insertValues.gained_components as any,
-              lost_components: insertValues.lost_components as any,
-              impact_roto_points: insertValues.impact_roto_points,
-              shapley_impact: insertValues.shapley_impact,
-              category_impacts: insertValues.category_impacts as any,
-              sgp_category_impacts: insertValues.sgp_category_impacts as any,
-              replacement_level_components: insertValues.replacement_level_components as any,
-              replacement_level_impact: insertValues.replacement_level_impact,
-              is_incomplete: insertValues.is_incomplete,
-              ci_low: insertValues.ci_low,
-              ci_high: insertValues.ci_high,
-              is_uncertain: insertValues.is_uncertain,
-              computed_at: new Date(),
-            }),
+            oc
+              .columns([
+                "league_id",
+                "team_id",
+                "player_gained_id",
+                "effective_date",
+              ])
+              .doUpdateSet({
+                gained_components: insertValues.gained_components as any,
+                lost_components: insertValues.lost_components as any,
+                impact_roto_points: insertValues.impact_roto_points,
+                shapley_impact: insertValues.shapley_impact,
+                category_impacts: insertValues.category_impacts as any,
+                sgp_category_impacts: insertValues.sgp_category_impacts as any,
+                replacement_level_components:
+                  insertValues.replacement_level_components as any,
+                replacement_level_impact: insertValues.replacement_level_impact,
+                is_incomplete: insertValues.is_incomplete,
+                ci_low: insertValues.ci_low,
+                ci_high: insertValues.ci_high,
+                is_uncertain: insertValues.is_uncertain,
+                computed_at: new Date(),
+              }),
           )
           .execute();
 
@@ -1160,7 +1395,11 @@ export class TransactionImpactAgent {
     _actualRotoPoints: Map<number, number>,
     finalSnapshotDate: string,
     numSamples: number,
-  ): Promise<{ values: Map<number, number>; standardErrors: Map<number, number>; categoryValues: Map<number, Record<string, number>> }> {
+  ): Promise<{
+    values: Map<number, number>;
+    standardErrors: Map<number, number>;
+    categoryValues: Map<number, Record<string, number>>;
+  }> {
     // Pre-load all player contributions to avoid N*samples DB queries
     const playerContributions = new Map<string, Record<string, number>>();
 
@@ -1169,7 +1408,11 @@ export class TransactionImpactAgent {
       const gainedKey = `gained_${pair.gainedPlayerId}_${pair.effectiveDate}`;
       if (!playerContributions.has(gainedKey)) {
         const contribution = await this.sumPlayerContribution(
-          leagueId, pair.gainedPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
+          leagueId,
+          pair.gainedPlayerId,
+          teamId,
+          pair.effectiveDate,
+          finalSnapshotDate,
         );
         playerContributions.set(gainedKey, contribution);
       }
@@ -1182,7 +1425,11 @@ export class TransactionImpactAgent {
         const lostKey = `lost_${pair.lostPlayerId}_${pair.effectiveDate}`;
         if (!playerContributions.has(lostKey)) {
           const contribution = await this.sumPlayerContribution(
-            leagueId, pair.lostPlayerId, teamId, pair.effectiveDate, finalSnapshotDate,
+            leagueId,
+            pair.lostPlayerId,
+            teamId,
+            pair.effectiveDate,
+            finalSnapshotDate,
           );
           playerContributions.set(lostKey, contribution);
         }
@@ -1209,7 +1456,9 @@ export class TransactionImpactAgent {
       }
 
       // Walk through permutation, tracking marginal contribution of each move
-      const coalitionComponents: Record<string, number> = { ...draftComponents };
+      const coalitionComponents: Record<string, number> = {
+        ...draftComponents,
+      };
 
       for (let k = 0; k < indices.length; k++) {
         const moveIndex = indices[k];
@@ -1219,7 +1468,9 @@ export class TransactionImpactAgent {
         const withoutComponents = { ...coalitionComponents };
         for (const cat of categories) {
           if (cat.type === "RATE" && cat.formulaId) {
-            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            const isPitchingRate = ["era", "whip", "k9"].includes(
+              cat.formulaId.toLowerCase(),
+            );
             let value = 0;
             if (isPitchingRate) {
               const pitchingComponents = {
@@ -1230,20 +1481,29 @@ export class TransactionImpactAgent {
                 K: withoutComponents.K || 0,
               };
               if (pitchingComponents.IP > 0) {
-                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+                value = calculateFinalRate(
+                  cat.formulaId,
+                  {},
+                  pitchingComponents,
+                );
               }
             } else {
               value = calculateFinalRate(cat.formulaId, {}, withoutComponents);
             }
             withoutComponents[`_val_${cat.statKey}`] = value;
           } else if (cat.type === "COUNTING") {
-            withoutComponents[`_val_${cat.statKey}`] = withoutComponents[cat.statKey] ?? 0;
+            withoutComponents[`_val_${cat.statKey}`] =
+              withoutComponents[cat.statKey] ?? 0;
           }
         }
 
         const withoutLeague = new Map(teamFinalComponents);
         withoutLeague.set(teamId, withoutComponents);
-        const withoutBreakdown = this.computeRotoPointsWithBreakdown(withoutLeague, categories, numTeams);
+        const withoutBreakdown = this.computeRotoPointsWithBreakdown(
+          withoutLeague,
+          categories,
+          numTeams,
+        );
         const withoutEntry = withoutBreakdown.get(teamId) || { _overall: 0 };
         const withoutPoints = withoutEntry._overall;
 
@@ -1270,7 +1530,9 @@ export class TransactionImpactAgent {
         const withComponents = { ...coalitionComponents };
         for (const cat of categories) {
           if (cat.type === "RATE" && cat.formulaId) {
-            const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+            const isPitchingRate = ["era", "whip", "k9"].includes(
+              cat.formulaId.toLowerCase(),
+            );
             let value = 0;
             if (isPitchingRate) {
               const pitchingComponents = {
@@ -1281,20 +1543,29 @@ export class TransactionImpactAgent {
                 K: withComponents.K || 0,
               };
               if (pitchingComponents.IP > 0) {
-                value = calculateFinalRate(cat.formulaId, {}, pitchingComponents);
+                value = calculateFinalRate(
+                  cat.formulaId,
+                  {},
+                  pitchingComponents,
+                );
               }
             } else {
               value = calculateFinalRate(cat.formulaId, {}, withComponents);
             }
             withComponents[`_val_${cat.statKey}`] = value;
           } else if (cat.type === "COUNTING") {
-            withComponents[`_val_${cat.statKey}`] = withComponents[cat.statKey] ?? 0;
+            withComponents[`_val_${cat.statKey}`] =
+              withComponents[cat.statKey] ?? 0;
           }
         }
 
         const withLeague = new Map(teamFinalComponents);
         withLeague.set(teamId, withComponents);
-        const withBreakdown = this.computeRotoPointsWithBreakdown(withLeague, categories, numTeams);
+        const withBreakdown = this.computeRotoPointsWithBreakdown(
+          withLeague,
+          categories,
+          numTeams,
+        );
         const withEntry = withBreakdown.get(teamId) || { _overall: 0 };
         const withPoints = withEntry._overall;
 
@@ -1303,7 +1574,8 @@ export class TransactionImpactAgent {
         marginalContributions.get(moveIndex)!.push(marginal);
         const moveCatMap = marginalByCategory.get(moveIndex)!;
         for (const cat of categories) {
-          const catMarginal = (withEntry[cat.statKey] || 0) - (withoutEntry[cat.statKey] || 0);
+          const catMarginal =
+            (withEntry[cat.statKey] || 0) - (withoutEntry[cat.statKey] || 0);
           moveCatMap.get(cat.statKey)!.push(catMarginal);
         }
       }
@@ -1316,14 +1588,13 @@ export class TransactionImpactAgent {
     for (let i = 0; i < movePairs.length; i++) {
       const contributions = marginalContributions.get(i)!;
       const n = contributions.length;
-      const avg = n > 0
-        ? contributions.reduce((a, b) => a + b, 0) / n
-        : 0;
+      const avg = n > 0 ? contributions.reduce((a, b) => a + b, 0) / n : 0;
       shapleyValues.set(i, avg);
 
       // SE = std(samples) / sqrt(n)
       if (n > 1) {
-        const variance = contributions.reduce((sum, c) => sum + (c - avg) ** 2, 0) / (n - 1);
+        const variance =
+          contributions.reduce((sum, c) => sum + (c - avg) ** 2, 0) / (n - 1);
         standardErrors.set(i, Math.sqrt(variance / n));
       } else {
         standardErrors.set(i, 0);
@@ -1334,9 +1605,10 @@ export class TransactionImpactAgent {
       const moveCatMap = marginalByCategory.get(i)!;
       for (const cat of categories) {
         const catContribs = moveCatMap.get(cat.statKey)!;
-        catAvgs[cat.statKey] = catContribs.length > 0
-          ? catContribs.reduce((a, b) => a + b, 0) / catContribs.length
-          : 0;
+        catAvgs[cat.statKey] =
+          catContribs.length > 0
+            ? catContribs.reduce((a, b) => a + b, 0) / catContribs.length
+            : 0;
       }
       categoryValues.set(i, catAvgs);
     }
@@ -1363,7 +1635,11 @@ export class TransactionImpactAgent {
     leagueId: number,
     season: number,
     teamId: number,
-  ): Promise<{ netRosterValue: number; draftOnlyRotoPoints: number; actualRotoPoints: number } | null> {
+  ): Promise<{
+    netRosterValue: number;
+    draftOnlyRotoPoints: number;
+    actualRotoPoints: number;
+  } | null> {
     // 1. Get league categories
     const categories = await this.getLeagueCategories(leagueId);
     if (categories.length === 0) {
@@ -1379,13 +1655,18 @@ export class TransactionImpactAgent {
     }
 
     // 3. Get actual team final components for ALL teams
-    const teamFinalComponents = await this.getTeamFinalComponents(leagueId, finalSnapshotDate);
+    const teamFinalComponents = await this.getTeamFinalComponents(
+      leagueId,
+      finalSnapshotDate,
+    );
     const teamIds = Array.from(teamFinalComponents.keys());
     const numTeams = teamIds.length;
 
     // 4. Compute actual roto points for all teams
     const actualRotoPoints = this.computeRotoPointsFromComponents(
-      teamFinalComponents, categories, numTeams,
+      teamFinalComponents,
+      categories,
+      numTeams,
     );
 
     const actualTeamPoints = actualRotoPoints.get(teamId) || 0;
@@ -1410,7 +1691,10 @@ export class TransactionImpactAgent {
 
     for (const pick of draftPicks) {
       const contribution = await this.sumPlayerContributionAnywhere(
-        leagueId, pick.player_id, startDate, finalSnapshotDate,
+        leagueId,
+        pick.player_id,
+        startDate,
+        finalSnapshotDate,
       );
       // Sum contributions from all draft picks
       for (const [key, val] of Object.entries(contribution)) {
@@ -1423,7 +1707,9 @@ export class TransactionImpactAgent {
     // 7. Recompute rate stat values from draft-only components
     for (const cat of categories) {
       if (cat.type === "RATE" && cat.formulaId) {
-        const isPitchingRate = ["era", "whip", "k9"].includes(cat.formulaId.toLowerCase());
+        const isPitchingRate = ["era", "whip", "k9"].includes(
+          cat.formulaId.toLowerCase(),
+        );
         let value = 0;
         if (isPitchingRate) {
           const pitchingComponents = {
@@ -1441,7 +1727,8 @@ export class TransactionImpactAgent {
         }
         draftOnlyComponents[`_val_${cat.statKey}`] = value;
       } else if (cat.type === "COUNTING") {
-        draftOnlyComponents[`_val_${cat.statKey}`] = draftOnlyComponents[cat.statKey] ?? 0;
+        draftOnlyComponents[`_val_${cat.statKey}`] =
+          draftOnlyComponents[cat.statKey] ?? 0;
       }
     }
 
@@ -1451,7 +1738,9 @@ export class TransactionImpactAgent {
 
     // 9. Compute roto points with draft-only roster
     const counterfactualRotoPoints = this.computeRotoPointsFromComponents(
-      counterfactualTeamComponents, categories, numTeams,
+      counterfactualTeamComponents,
+      categories,
+      numTeams,
     );
 
     const draftOnlyTeamPoints = counterfactualRotoPoints.get(teamId) || 0;

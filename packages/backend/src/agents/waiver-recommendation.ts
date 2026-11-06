@@ -6,6 +6,7 @@ import type { Category, StatComponents } from "../../../shared/dist/index.js";
 import { StandingsProjectionAgent } from "./standings-projection.js";
 import { RosterSimulator, type AddDropSimContext } from "./roster-simulator.js";
 import { ESPNAdapter } from "../adapters/espn.js";
+import { getGsCap, resolveSeasonDates } from "../utils/league-settings.js";
 import type { RosteredPlayer, RosterGap } from "../projection/types.js";
 import type { ScenarioEvaluationAgent } from "./scenario-evaluation.js";
 
@@ -230,6 +231,37 @@ export class WaiverRecommendationAgent {
 
     const numTeams = new Set(allTeamsProjections.map((p) => p.team_id)).size;
 
+    const rosterSlots =
+      ((snapshot.settings_json as any).roster_slots as Record<
+        string,
+        number
+      >) || {};
+    const [gsData, projectionAsOfDate, currentTotals, league, raw] =
+      await Promise.all([
+        this.getGsData(leagueId, teamId, snapshot.settings_json, snapshotDate),
+        this.getProjectionAsOfDate(snapshotRow.projections_run_id),
+        this.db
+          .selectFrom("team_daily_category_totals")
+          .select(["category_id", "value", "components_json"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", snapshotDate)
+          .where("team_id", "=", teamId)
+          .execute(),
+        this.db
+          .selectFrom("league")
+          .select("season")
+          .where("id", "=", leagueId)
+          .executeTakeFirstOrThrow(),
+        this.repo.getHistoricalRawPayload(leagueId, snapshotDate),
+      ]);
+    const rawPayload = raw?.response_json as any;
+    const seasonDates = resolveSeasonDates({
+      season: league.season,
+      settings: snapshot.settings_json as Record<string, any>,
+      schedule: rawPayload?.schedule,
+      status: rawPayload?.status,
+    });
+
     // Pre-fetch all player projections in a single batch query
     const allPlayerIds = [...freeAgents, ...roster.map((r) => r.player_id)];
     const playerMap = new Map<
@@ -285,6 +317,40 @@ export class WaiverRecommendationAgent {
       allTeamsProjections,
       numTeams,
       teamId,
+      allocationInput: {
+        roster: roster.map((player) => ({
+          playerId: player.player_id,
+          positions: player.positions as string[],
+          rosterStatus: player.roster_status as RosteredPlayer["rosterStatus"],
+          rosterSlot: player.roster_slot,
+          projectedComponents: null,
+        })),
+        rosterSlots,
+        projectionsByPlayerId: new Map(
+          [...projectionMap.entries()].map(([playerId, projection]) => [
+            playerId,
+            projection.stat_components_json as StatComponents,
+          ]),
+        ),
+        gsUsed: gsData.gsUsed,
+        gsCap: gsData.gsCap,
+        projectionAsOfDate,
+        snapshotDate,
+        seasonEndDate: seasonDates.endDate,
+      },
+      currentTotals,
+      playersById: new Map(
+        [...playerMap.entries()].map(([playerId, player]) => [
+          playerId,
+          {
+            playerId,
+            positions: player.positions,
+            rosterStatus: "active" as const,
+            rosterSlot: null,
+            projectedComponents: null,
+          },
+        ]),
+      ),
     };
 
     for (const { id: addPlayerId } of scoredFreeAgents) {
@@ -359,16 +425,6 @@ export class WaiverRecommendationAgent {
     const topN = legalRecommendations.slice(0, maxRecommendations);
 
     // Detect roster gaps via allocateProjections for top-N recommendations
-    const rosterSlots =
-      ((snapshot.settings_json as any).roster_slots as Record<
-        string,
-        number
-      >) || {};
-    const [{ gsUsed, gsCap }, projectionAsOfDate] = await Promise.all([
-      this.getGsData(leagueId, teamId),
-      this.getProjectionAsOfDate(snapshotRow.projections_run_id),
-    ]);
-
     for (const rec of topN) {
       const postSwapPlayerIds = roster
         .map((r) => r.player_id)
@@ -403,10 +459,11 @@ export class WaiverRecommendationAgent {
         roster: rosterPlayers,
         rosterSlots,
         projectionsByPlayerId,
-        gsUsed,
-        gsCap,
+        gsUsed: gsData.gsUsed,
+        gsCap: gsData.gsCap,
         projectionAsOfDate,
         snapshotDate,
+        seasonEndDate: seasonDates.endDate,
       });
     }
 
@@ -419,26 +476,10 @@ export class WaiverRecommendationAgent {
   private async getGsData(
     leagueId: number,
     teamId: number,
-  ): Promise<{ gsUsed: number; gsCap: number }> {
-    const DEFAULT_GS_CAP = 200;
-
-    const settings = await this.db
-      .selectFrom("league_settings_version")
-      .select("settings_json")
-      .where("league_id", "=", leagueId)
-      .orderBy("effective_date", "desc")
-      .executeTakeFirst();
-
-    let gsCap = DEFAULT_GS_CAP;
-    if (settings?.settings_json) {
-      const json = settings.settings_json as unknown as Record<string, unknown>;
-      const rosterSlots = json.roster_slots as
-        | Record<string, number>
-        | undefined;
-      if (rosterSlots?.GS_LIMIT !== undefined) {
-        gsCap = rosterSlots.GS_LIMIT;
-      }
-    }
+    settings: unknown,
+    snapshotDate: string,
+  ): Promise<{ gsUsed: number; gsCap: number | null }> {
+    const gsCap = getGsCap(settings);
 
     const team = await this.db
       .selectFrom("team")
@@ -447,12 +488,10 @@ export class WaiverRecommendationAgent {
       .executeTakeFirst();
 
     if (team) {
-      const latestPayload = await this.db
-        .selectFrom("league_raw_payload")
-        .select(["response_json"])
-        .where("league_id", "=", leagueId)
-        .orderBy("fetched_at", "desc")
-        .executeTakeFirst();
+      const latestPayload = await this.repo.getHistoricalRawPayload(
+        leagueId,
+        snapshotDate,
+      );
 
       if (latestPayload) {
         const raw = latestPayload.response_json as any;

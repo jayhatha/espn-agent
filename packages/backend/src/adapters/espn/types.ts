@@ -101,7 +101,15 @@ export interface ESPNLeagueData {
     scoringFormat: string;
     categories: ESPNScoringCategory[];
     rosterSlots: Record<string, number>;
-    acquisitionRules: unknown;
+    acquisitionRules: {
+      waiver_type?: string | number;
+      acquisition_limit?: number;
+      trade_deadline?: string | number;
+      gs_cap: number | null;
+      faab_budget: number | null;
+    };
+    seasonStartDate: string;
+    seasonEndDate: string;
   };
   teams: ESPNTeamData[];
   standings: Array<{

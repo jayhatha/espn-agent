@@ -1,4 +1,8 @@
-import type { Category, StatComponents } from "../../../shared/dist/index.js";
+import type {
+  Category,
+  ScoringFormat,
+  StatComponents,
+} from "../../../shared/dist/index.js";
 import type { RosteredPlayer } from "../projection/types.js";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
@@ -15,8 +19,6 @@ export interface SimulationConfig {
   /** Enable replacement/availability churn layer (Phase 106) */
   enableChurn?: boolean;
 }
-
-export const DEFAULT_SEASON_END = "2026-09-28";
 
 // ─── Phase 103: Canonical Simulation State ────────────────────────────────────
 
@@ -40,9 +42,12 @@ export interface SimulationState {
   snapshotDate: string;
   projectionsRunId: number;
   categories: Category[];
+  scoringFormat: ScoringFormat | null;
   rosterSlots: Record<string, number>;
-  gsCap: number;
+  gsCap: number | null;
   projectionAsOfDate: string;
+  seasonStartDate: string;
+  seasonEndDate: string;
   /** Calendar days remaining in the regular season */
   daysRemaining: number;
   teams: TeamSimInput[];
@@ -57,6 +62,7 @@ export interface PlayerOpportunity {
   /** Prorated RoS components (remaining-season expected totals) */
   rosComponents: StatComponents;
   activeSlot: string | null;
+  positions: string[];
   isActive: boolean;
   /** True when in SP or P slot with GS starts (subject to GS cap) */
   isSP: boolean;
