@@ -200,6 +200,20 @@ export const api = {
     return fetchAPI(`/api/leagues/${leagueId}/standings/swing?${query}`);
   },
 
+  // Rolling window standings (last 15 / 30 days)
+  async getRollingStandings(
+    leagueId: number,
+    days: 15 | 30,
+    params?: { snapshotDate?: string },
+  ) {
+    const query = new URLSearchParams(
+      cleanParams({ ...(params || {}), days: String(days) }),
+    ).toString();
+    return fetchAPI(
+      `/api/leagues/${leagueId}/standings/rolling${query ? "?" + query : ""}`,
+    );
+  },
+
   // Free agents
   async getFreeAgents(
     leagueId: number,
@@ -638,16 +652,6 @@ export const api = {
 
   getChangeLogSSEUrl(leagueId: number): string {
     return `${API_URL}/api/leagues/${leagueId}/standings/live-log`;
-  },
-
-  // Phase 82: manual live refresh trigger
-  async triggerLiveRefresh(
-    leagueId: number,
-  ): Promise<{ polledAt: string; eventCount: number }> {
-    return fetchAPI(`/api/leagues/${leagueId}/live-refresh`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
   },
 
   // Phase 83: standings neighborhood

@@ -15,7 +15,7 @@ import {
 import type { TeamCategoryProjection } from "@espn-fantasy/shared";
 import { useLeagueTeam } from "@/lib/hooks";
 import { api } from "@/lib/api";
-import { useProjectedStandings } from "@/lib/hooks";
+import { useProjectedStandings, useRollingStandings } from "@/lib/hooks";
 import { Container } from "@/components/ui/Container";
 import { Card, CardHeader, CardContent } from "@/components/ui/Card";
 import { Heading } from "@/components/ui/Heading";
@@ -118,6 +118,32 @@ interface SwingAttributionData {
   }>;
 }
 
+interface RollingCategoryStanding {
+  team_id: number;
+  category_id: string;
+  value: number;
+  rank: number;
+  roto_points: number;
+  teamName: string;
+}
+
+interface RollingOverallStanding {
+  team_id: number;
+  overall_points: number;
+  overall_rank: number;
+  teamName: string;
+}
+
+interface RollingStandingsData {
+  windowDays: number;
+  snapshotDate: string;
+  windowStartDate: string | null;
+  dataAvailable: boolean;
+  categories: Category[];
+  categoryStandings: RollingCategoryStanding[];
+  overallStandings: RollingOverallStanding[];
+}
+
 interface StandingsData {
   snapshotDate: string;
   previousSnapshotDate: string | null;
@@ -153,7 +179,12 @@ interface SimulationResult {
   calibration: { deterministicRotoPoints: Record<number, number> };
 }
 
-type ViewMode = "current" | "projected" | "simulation";
+type ViewMode =
+  | "current"
+  | "rolling30"
+  | "rolling15"
+  | "projected"
+  | "simulation";
 
 export default function StandingsPage() {
   const params = useParams();
@@ -165,6 +196,13 @@ export default function StandingsPage() {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useProjectedStandings(leagueId);
+
+  const rollingWindowDays = viewMode === "rolling15" ? 15 : 30;
+  const { data: rollingData, isLoading: rollingLoading } = useRollingStandings(
+    leagueId,
+    rollingWindowDays,
+    viewMode === "rolling30" || viewMode === "rolling15",
+  ) as { data: RollingStandingsData | undefined; isLoading: boolean };
 
   // Fetch historical category-rank data as fallback when projected data unavailable
   const { data: categoryRankHistory } = useQuery({
@@ -276,6 +314,25 @@ export default function StandingsPage() {
       teamCategoryMap,
     };
   }, [data]);
+
+  const rollingMatrix = useMemo(() => {
+    if (!rollingData || !rollingData.dataAvailable) return null;
+    const { categories, categoryStandings, overallStandings } = rollingData;
+    if (!overallStandings || overallStandings.length === 0) return null;
+
+    const teamCategoryMap = new Map<
+      number,
+      Map<string, RollingCategoryStanding>
+    >();
+    for (const cs of categoryStandings) {
+      if (!teamCategoryMap.has(cs.team_id)) {
+        teamCategoryMap.set(cs.team_id, new Map());
+      }
+      teamCategoryMap.get(cs.team_id)!.set(cs.category_id, cs);
+    }
+
+    return { categories, overallStandings, teamCategoryMap };
+  }, [rollingData]);
 
   const projectedMatrix = useMemo(() => {
     if (!data) return null;
@@ -775,6 +832,28 @@ export default function StandingsPage() {
                   Current Standings
                 </button>
                 <button
+                  onClick={() => setViewMode("rolling30")}
+                  className={cn(
+                    "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
+                    viewMode === "rolling30"
+                      ? "border-accent dark:border-shell-accent text-content dark:text-shell-text"
+                      : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300",
+                  )}
+                >
+                  Past 30 Days
+                </button>
+                <button
+                  onClick={() => setViewMode("rolling15")}
+                  className={cn(
+                    "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
+                    viewMode === "rolling15"
+                      ? "border-accent dark:border-shell-accent text-content dark:text-shell-text"
+                      : "border-transparent text-content-secondary dark:text-shell-muted hover:text-content dark:hover:text-shell-text hover:border-neutral-300",
+                  )}
+                >
+                  Past 15 Days
+                </button>
+                <button
                   onClick={() => setViewMode("projected")}
                   className={cn(
                     "py-3 px-1 border-b-2 font-medium text-body-sm transition-colors",
@@ -847,6 +926,75 @@ export default function StandingsPage() {
                     label: "Go to Dashboard",
                     href: `/leagues/${leagueId}`,
                   }}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {(viewMode === "rolling30" || viewMode === "rolling15") &&
+          rollingLoading ? (
+            <LoadingSpinner quips />
+          ) : (viewMode === "rolling30" || viewMode === "rolling15") &&
+            rollingMatrix ? (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <Heading level={3}>
+                    Past {rollingWindowDays} Days Overall Standings
+                  </Heading>
+                  {rollingData?.windowStartDate && (
+                    <p className="text-body-sm text-content-tertiary dark:text-shell-muted mt-1">
+                      {new Date(rollingData.windowStartDate).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}{" "}
+                      –{" "}
+                      {new Date(rollingData.snapshotDate).toLocaleDateString(
+                        "en-US",
+                        { month: "short", day: "numeric", year: "numeric" },
+                      )}
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <StatsTable
+                    columns={overallColumns}
+                    data={rollingMatrix.overallStandings.map(
+                      (t: RollingOverallStanding) => ({
+                        ...t,
+                        rank: t.overall_rank,
+                        points: t.overall_points,
+                      }),
+                    )}
+                    rowKey="team_id"
+                    highlightRow={(row) => selectedTeamId === row.team_id}
+                  />
+                </CardContent>
+              </Card>
+
+              {renderCategoryBreakdown(
+                `Past ${rollingWindowDays} Days Category Breakdown`,
+                rollingMatrix.categories,
+                rollingMatrix.overallStandings,
+                rollingMatrix.teamCategoryMap,
+                "value",
+                "rank",
+                "roto_points",
+                "overall_points",
+                false,
+                false,
+              )}
+            </div>
+          ) : (viewMode === "rolling30" || viewMode === "rolling15") &&
+            !rollingMatrix ? (
+            <Card>
+              <CardContent className="py-4">
+                <ErrorAlert
+                  variant="info"
+                  message={`Not enough snapshot history yet to compute past ${rollingWindowDays}-day standings. Keep syncing daily snapshots and check back once the league has ${rollingWindowDays}+ days of data.`}
                 />
               </CardContent>
             </Card>

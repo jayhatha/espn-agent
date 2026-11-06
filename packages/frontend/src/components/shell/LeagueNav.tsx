@@ -41,7 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard", href: "", icon: LayoutDashboard },
       { label: "Standings", href: "/standings", icon: Trophy },
       { label: "Categories", href: "/trends", icon: BarChart3 },
-      { label: "Streaming Log", href: "/changelog", icon: ScrollText },
+      { label: "Live Results", href: "/changelog", icon: ScrollText },
     ],
   },
   {

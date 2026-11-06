@@ -5,13 +5,14 @@ import { parseIntParam } from "../utils/validation.js";
 import { monteCarloRotoPoints } from "../projection/variance.js";
 import type { TeamCategoryValue } from "../projection/variance.js";
 import { StandingsSwingAttributionAgent } from "../agents/standings-swing-attribution.js";
+import { assignRanksWithTies } from "../utils/roto-ranking.js";
+import { calculateFinalRate } from "../../../shared/dist/index.js";
 import {
   changeLogEmitter,
   CHANGE_LOG_EVENT,
   LIVE_POLL_EVENT,
   type LivePollSignal,
 } from "../utils/change-log-emitter.js";
-import { LivePollAgent } from "../agents/live-poll.js";
 
 /**
  * Time Series API Routes
@@ -534,6 +535,218 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           ...os,
           teamName: teamMap.get(os.team_id)?.name || `Team ${os.team_id}`,
         })),
+      };
+    },
+  );
+
+  // Rolling window standings (last 15 / 30 days) — team-level counting
+  // components summed directly from player_period_stats over the window,
+  // with rate stats recomputed from the summed raw components.
+  app.get<{
+    Params: { leagueId: string };
+    Querystring: { days?: string; snapshotDate?: string };
+  }>(
+    "/api/leagues/:leagueId/standings/rolling",
+    {
+      onRequest: [authenticate],
+      preHandler: [requireLeagueAccess],
+    },
+    async (request, reply) => {
+      const leagueId = parseIntParam(request.params.leagueId, "leagueId");
+      const days = parseInt(request.query.days || "30", 10);
+      if (days !== 15 && days !== 30) {
+        return reply.code(400).send({ error: "days must be 15 or 30" });
+      }
+
+      let targetDate = request.query.snapshotDate;
+      if (!targetDate) {
+        const latest = await db
+          .selectFrom("league_daily_snapshot")
+          .select("snapshot_date")
+          .where("league_id", "=", leagueId)
+          .orderBy("snapshot_date", "desc")
+          .executeTakeFirst();
+
+        if (!latest) {
+          return reply
+            .code(404)
+            .send({ error: "No snapshots found for this league" });
+        }
+        targetDate = latest.snapshot_date;
+      }
+
+      // Window is (targetDate - days, targetDate] — no need to locate a
+      // baseline snapshot; we just sum whatever daily period rows exist.
+      const cutoff = new Date(targetDate);
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffDateStr = cutoff.toISOString().split("T")[0];
+
+      const [teams, periodRows, snapshot] = await Promise.all([
+        db
+          .selectFrom("team")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .execute(),
+        db
+          .selectFrom("player_period_stats")
+          .select(["team_id", "components_json", "snapshot_date"])
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", ">", cutoffDateStr)
+          .where("snapshot_date", "<=", targetDate)
+          .execute(),
+        db
+          .selectFrom("league_daily_snapshot")
+          .selectAll()
+          .where("league_id", "=", leagueId)
+          .where("snapshot_date", "=", targetDate)
+          .executeTakeFirst(),
+      ]);
+
+      if (periodRows.length === 0) {
+        return {
+          windowDays: days,
+          snapshotDate: targetDate,
+          windowStartDate: null,
+          dataAvailable: false,
+          categories: [],
+          categoryStandings: [],
+          overallStandings: [],
+        };
+      }
+
+      const teamMap = new Map(teams.map((t) => [t.id, t]));
+      const numTeams = teams.length;
+
+      let categories: Array<{
+        category_id: string;
+        name?: string;
+        stat_key: string;
+        type: string;
+        direction: string;
+        formula_id?: string;
+      }> = [];
+      if (snapshot?.settings_version_id) {
+        const settings = await db
+          .selectFrom("league_settings_version")
+          .selectAll()
+          .where("id", "=", snapshot.settings_version_id)
+          .executeTakeFirst();
+        if (settings) {
+          categories = settings.settings_json.categories || [];
+        }
+      }
+
+      // Sum raw counting components per team across every day in the window.
+      const teamComponents = new Map<number, Record<string, number>>();
+      let windowStartDate: string | null = null;
+      for (const row of periodRows) {
+        const dateStr = String(row.snapshot_date).split("T")[0];
+        if (!windowStartDate || dateStr < windowStartDate) {
+          windowStartDate = dateStr;
+        }
+
+        const comps = (row.components_json || {}) as Record<string, number>;
+        const existing = teamComponents.get(row.team_id) ?? {};
+        for (const [k, v] of Object.entries(comps)) {
+          const num = Number(v);
+          if (isNaN(num)) continue;
+          existing[k] = (existing[k] || 0) + num;
+        }
+        teamComponents.set(row.team_id, existing);
+      }
+
+      // Windowed value per team per category: direct component sum for
+      // COUNTING stats, recomputed rate for RATE stats.
+      const windowValues = new Map<string, number>();
+      for (const category of categories) {
+        const formulaId =
+          category.formula_id || category.stat_key.toLowerCase();
+        for (const t of teams) {
+          const comps = teamComponents.get(t.id) ?? {};
+          const key = `${t.id}_${category.category_id}`;
+          if (category.type === "RATE") {
+            try {
+              windowValues.set(key, calculateFinalRate(formulaId, {}, comps));
+            } catch {
+              windowValues.set(key, 0);
+            }
+          } else {
+            windowValues.set(key, comps[category.stat_key] || 0);
+          }
+        }
+      }
+
+      // Rank teams per category and accumulate roto points
+      const teamOverallPoints = new Map<number, number>();
+      const categoryStandingsRows: Array<{
+        team_id: number;
+        category_id: string;
+        value: number;
+        rank: number;
+        roto_points: number;
+        teamName: string;
+      }> = [];
+
+      for (const category of categories) {
+        const values = teams.map((t) => ({
+          teamId: t.id,
+          value: windowValues.get(`${t.id}_${category.category_id}`) ?? 0,
+        }));
+
+        values.sort((a, b) =>
+          category.direction === "HIGHER_BETTER"
+            ? b.value - a.value
+            : a.value - b.value,
+        );
+
+        const ranked = assignRanksWithTies(values, numTeams);
+        const rankMap = new Map(ranked.map((r) => [r.teamId, r]));
+
+        for (const v of values) {
+          const r = rankMap.get(v.teamId)!;
+          teamOverallPoints.set(
+            v.teamId,
+            (teamOverallPoints.get(v.teamId) || 0) + r.rotoPoints,
+          );
+          categoryStandingsRows.push({
+            team_id: v.teamId,
+            category_id: category.category_id,
+            value: v.value,
+            rank: r.rank,
+            roto_points: r.rotoPoints,
+            teamName: teamMap.get(v.teamId)?.name || `Team ${v.teamId}`,
+          });
+        }
+      }
+
+      const overallSorted = teams
+        .map((t) => ({
+          teamId: t.id,
+          value: teamOverallPoints.get(t.id) || 0,
+        }))
+        .sort((a, b) => b.value - a.value);
+      const overallRanked = assignRanksWithTies(overallSorted, numTeams);
+      const overallRankMap = new Map(
+        overallRanked.map((r) => [r.teamId, r.rank]),
+      );
+
+      const overallStandingsRows = teams
+        .map((t) => ({
+          team_id: t.id,
+          overall_points: teamOverallPoints.get(t.id) || 0,
+          overall_rank: overallRankMap.get(t.id) ?? numTeams,
+          teamName: t.name,
+        }))
+        .sort((a, b) => a.overall_rank - b.overall_rank);
+
+      return {
+        windowDays: days,
+        snapshotDate: targetDate,
+        windowStartDate,
+        dataAvailable: true,
+        categories,
+        categoryStandings: categoryStandingsRows,
+        overallStandings: overallStandingsRows,
       };
     },
   );
@@ -1303,27 +1516,6 @@ export async function timeSeriesRoutes(app: FastifyInstance) {
           .execute();
 
         return { events };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        return reply.code(500).send({ error: msg });
-      }
-    },
-  );
-
-  // Phase 82: Manual live refresh trigger
-  app.post<{ Params: { leagueId: string } }>(
-    "/api/leagues/:leagueId/live-refresh",
-    {
-      onRequest: [authenticate],
-      preHandler: [requireLeagueAccess],
-    },
-    async (request, reply) => {
-      try {
-        const leagueId = parseIntParam(request.params.leagueId, "leagueId");
-        const today = new Date().toISOString().split("T")[0];
-        const agent = new LivePollAgent(db, request.log);
-        const eventCount = await agent.refresh(leagueId, today);
-        return reply.send({ polledAt: new Date().toISOString(), eventCount });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
         return reply.code(500).send({ error: msg });

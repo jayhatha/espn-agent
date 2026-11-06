@@ -9,3 +9,16 @@ export function useProjectedStandings(leagueId: string | number) {
     staleTime: 120_000,
   });
 }
+
+export function useRollingStandings(
+  leagueId: string | number,
+  days: 15 | 30,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: queryKeys.standings.rolling(leagueId, days),
+    queryFn: () => api.getRollingStandings(Number(leagueId), days),
+    enabled,
+    staleTime: 120_000,
+  });
+}

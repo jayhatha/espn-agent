@@ -4,17 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLeagueTeam } from "@/lib/hooks";
-import {
-  ScrollText,
-  TrendingUp,
-  TrendingDown,
-  Zap,
-  RefreshCw,
-} from "lucide-react";
+import { TrendingUp, TrendingDown, Zap } from "lucide-react";
 import { api } from "@/lib/api";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,7 +34,6 @@ function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-/** Maps verbose category names to compact stat abbreviations for event chips. */
 function statAbbrev(categoryName: string): string {
   const name = categoryName.toUpperCase();
   if (name === "HR" || name.includes("HOME RUN")) return "HR";
@@ -57,18 +52,12 @@ function statAbbrev(categoryName: string): string {
   if (name === "SV" || name.includes("SAVE")) return "SV";
   if (name === "HLD" || name.includes("HOLD")) return "HLD";
   if (name === "QS" || name.includes("QUALITY")) return "QS";
-  // fallback: first 4 chars uppercase
   return categoryName.slice(0, 4).toUpperCase();
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
-interface ProximateCause {
-  playerName: string;
-  stat: string;
-  value: number;
-  description: string;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ChangeEvent {
   id: number;
@@ -84,7 +73,13 @@ interface ChangeEvent {
   passed_team_id: number | null;
   passed_team_name: string | null;
   direction: "gained" | "lost";
-  proximate_cause: ProximateCause | null;
+  event_source: "snapshot" | "live";
+}
+
+interface PollGroup {
+  timestamp: Date;
+  netDelta: number;
+  events: ChangeEvent[];
 }
 
 interface NeighborhoodEntry {
@@ -93,170 +88,92 @@ interface NeighborhoodEntry {
   overallPoints: number;
   overallRank: number;
   isMyTeam: boolean;
-  projectedPoints: number | null;
-  projectedRank: number | null;
 }
 
-// ─── Event Card ───────────────────────────────────────────────────────────────
+// ─── Group events by poll run (events within 60s of the group start) ─────────
 
-function EventCard({
-  event,
-  teamName,
-  numTeams,
-}: {
-  event: ChangeEvent;
-  teamName: string;
-  numTeams: number;
-}) {
-  const gained = event.direction === "gained";
-  // Use Math.ceil so tied teams (fractional roto_pts like 8.5) map to the better
-  // of the two shared positions (4th rather than 5th in a 4th/5th tie).
-  const catRank = Math.ceil(numTeams - event.curr_roto_pts + 1);
-  const prevRank = Math.ceil(
-    numTeams - (event.curr_roto_pts - event.roto_delta) + 1,
-  );
-  const rankChanged = catRank !== prevRank;
-
-  const deltaStr = gained
-    ? `+${Number(event.roto_delta).toFixed(1)}`
-    : Number(event.roto_delta).toFixed(1);
-
-  const formattedTime = new Date(event.occurred_at).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-
-  // Build narrative lines
-  const lines: string[] = [];
-
-  if (event.proximate_cause?.description) {
-    lines.push(event.proximate_cause.description);
+function groupByPollRun(events: ChangeEvent[]): PollGroup[] {
+  // events are newest-first
+  const groups: PollGroup[] = [];
+  for (const evt of events) {
+    const t = new Date(evt.occurred_at).getTime();
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(t - last.timestamp.getTime()) <= 60_000) {
+      last.events.push(evt);
+    } else {
+      groups.push({
+        timestamp: new Date(evt.occurred_at),
+        netDelta: 0,
+        events: [evt],
+      });
+    }
   }
-
-  const passedText =
-    gained && event.passed_team_name
-      ? `, passing ${event.passed_team_name}`
-      : !gained && event.passed_team_name
-        ? `, passed by ${event.passed_team_name}`
-        : "";
-
-  if (rankChanged) {
-    lines.push(
-      `Now ${ordinal(catRank)} in ${event.category_name}${passedText}.`,
-    );
-  } else if (passedText) {
-    lines.push(`${ordinal(catRank)} in ${event.category_name}${passedText}.`);
-  }
-
-  return (
-    <div
-      className={cn(
-        "border rounded-lg p-4 transition-colors",
-        gained ? "border-positive/20" : "border-negative/20",
-        "bg-surface-1",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        {/* Left: icon + narrative */}
-        <div className="flex items-start gap-3 min-w-0">
-          <div
-            className={cn(
-              "mt-0.5 shrink-0 w-7 h-7 rounded-full flex items-center justify-center",
-              gained
-                ? "bg-positive/10 text-positive"
-                : "bg-negative/10 text-negative",
-            )}
-          >
-            {gained ? (
-              <TrendingUp className="w-3.5 h-3.5" />
-            ) : (
-              <TrendingDown className="w-3.5 h-3.5" />
-            )}
-          </div>
-
-          <div className="min-w-0">
-            {/* Category badge — abbreviated stat + full name */}
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs font-mono font-medium mb-1.5",
-                gained
-                  ? "bg-positive/10 text-positive"
-                  : "bg-negative/10 text-negative",
-              )}
-            >
-              <span>{statAbbrev(event.category_name)}</span>
-              <span className="opacity-60 font-normal text-[10px]">
-                {event.category_name}
-              </span>
-            </span>
-
-            {/* Narrative lines */}
-            {lines.map((line, i) => (
-              <p
-                key={i}
-                className={cn(
-                  "text-sm",
-                  i === 0 ? "text-content-primary" : "text-content-secondary",
-                )}
-              >
-                {line}
-              </p>
-            ))}
-          </div>
-        </div>
-
-        {/* Right: delta + time */}
-        <div className="shrink-0 text-right">
-          <span
-            className={cn(
-              "font-mono text-sm font-semibold",
-              gained ? "text-positive" : "text-negative",
-            )}
-          >
-            {deltaStr} pts
-          </span>
-          <p className="text-xs text-content-tertiary mt-0.5">
-            {formattedTime}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return groups.map((g) => ({
+    ...g,
+    netDelta: g.events.reduce((sum, e) => sum + Number(e.roto_delta), 0),
+  }));
 }
 
-// ─── Standings Neighborhood ──────────────────────────────────────────────────
+// ─── Summary Card ─────────────────────────────────────────────────────────────
 
-function StandingsNeighborhood({
+function SummaryCard({
   neighborhood,
+  liveDelta,
+  lastPolledAt,
+  snapshotDate,
 }: {
   neighborhood: NeighborhoodEntry[];
+  liveDelta: number;
+  lastPolledAt: Date | null;
+  snapshotDate: string;
 }) {
+  const myEntry = neighborhood.find((n) => n.isMyTeam);
   return (
     <div className="rounded-lg border border-shell-border overflow-hidden mb-6">
-      <div className="px-3 py-2 border-b border-shell-border bg-surface-1 flex items-center gap-2">
-        <span className="text-xs font-medium text-content-tertiary uppercase tracking-wider">
-          Live Standings
-        </span>
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-positive">
-          <span className="w-1.5 h-1.5 rounded-full bg-positive animate-pulse" />
-          live
-        </span>
-      </div>
+      {myEntry && (
+        <div className="px-4 py-3 bg-surface-1 border-b border-shell-border flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-semibold text-content-primary">
+              {ordinal(myEntry.overallRank)}
+            </span>
+            <span className="text-sm text-content-secondary">
+              {Number(myEntry.overallPoints).toFixed(1)} pts
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {liveDelta !== 0 && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 text-xs font-mono font-semibold px-2 py-0.5 rounded-full",
+                  liveDelta > 0
+                    ? "bg-positive/10 text-positive"
+                    : "bg-negative/10 text-negative",
+                )}
+              >
+                <Zap className="w-3 h-3" />
+                {liveDelta > 0 ? "+" : ""}
+                {liveDelta.toFixed(1)} today
+              </span>
+            )}
+            <span className="text-xs text-content-tertiary">
+              {lastPolledAt
+                ? `Updated ${formatRelativeTime(lastPolledAt)}`
+                : `As of ${snapshotDate}`}
+            </span>
+          </div>
+        </div>
+      )}
       <div className="divide-y divide-shell-border/50">
         {neighborhood.map((row) => (
           <div
             key={row.teamId}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5",
+              "flex items-center gap-3 px-4 py-2.5",
               row.isMyTeam
                 ? "bg-accent/5 border-l-2 border-accent"
                 : "bg-surface-0",
             )}
           >
-            {/* Rank */}
             <span
               className={cn(
                 "w-5 text-right font-mono text-sm tabular-nums",
@@ -267,8 +184,6 @@ function StandingsNeighborhood({
             >
               {row.overallRank}
             </span>
-
-            {/* Team name */}
             <span
               className={cn(
                 "flex-1 text-sm truncate",
@@ -284,8 +199,6 @@ function StandingsNeighborhood({
                 </span>
               )}
             </span>
-
-            {/* Points */}
             <span
               className={cn(
                 "font-mono text-sm tabular-nums",
@@ -302,10 +215,108 @@ function StandingsNeighborhood({
     </div>
   );
 }
+// ─── Poll Group Card ──────────────────────────────────────────────────────────
+
+function PollGroupCard({
+  group,
+  numTeams,
+}: {
+  group: PollGroup;
+  numTeams: number;
+}) {
+  const net = group.netDelta;
+  const netPositive = net >= 0;
+  const time = group.timestamp.toLocaleString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return (
+    <div className="border border-shell-border rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-surface-1 border-b border-shell-border">
+        <span className="text-xs text-content-tertiary">{time}</span>
+        {net !== 0 && (
+          <span
+            className={cn(
+              "font-mono text-sm font-semibold",
+              netPositive ? "text-positive" : "text-negative",
+            )}
+          >
+            {net > 0 ? "+" : ""}
+            {net.toFixed(1)} pts net
+          </span>
+        )}
+      </div>
+      <div className="divide-y divide-shell-border/30">
+        {group.events.map((evt) => {
+          const gained = evt.direction === "gained";
+          const delta = Number(evt.roto_delta);
+          const catRank = Math.ceil(numTeams - evt.curr_roto_pts + 1);
+          const prevRank = Math.ceil(
+            numTeams - (evt.curr_roto_pts - delta) + 1,
+          );
+          const rankChanged = catRank !== prevRank;
+
+          return (
+            <div
+              key={evt.id}
+              className="flex items-center gap-3 px-4 py-2.5 bg-surface-0"
+            >
+              <div
+                className={cn(
+                  "shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
+                  gained
+                    ? "bg-positive/10 text-positive"
+                    : "bg-negative/10 text-negative",
+                )}
+              >
+                {gained ? (
+                  <TrendingUp className="w-3 h-3" />
+                ) : (
+                  <TrendingDown className="w-3 h-3" />
+                )}
+              </div>
+              <span
+                className={cn(
+                  "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium shrink-0",
+                  gained
+                    ? "bg-positive/10 text-positive"
+                    : "bg-negative/10 text-negative",
+                )}
+              >
+                {statAbbrev(evt.category_name)}
+              </span>
+              <span className="flex-1 text-xs text-content-secondary">
+                {rankChanged
+                  ? `${ordinal(prevRank)} → ${ordinal(catRank)}`
+                  : ordinal(catRank)}
+                {evt.passed_team_name
+                  ? gained
+                    ? `, passed ${evt.passed_team_name}`
+                    : `, passed by ${evt.passed_team_name}`
+                  : ""}
+              </span>
+              <span
+                className={cn(
+                  "font-mono text-sm font-semibold tabular-nums shrink-0",
+                  gained ? "text-positive" : "text-negative",
+                )}
+              >
+                {delta > 0 ? "+" : ""}
+                {delta.toFixed(1)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function ChangeLogPage() {
+export default function LiveResultsPage() {
   const params = useParams();
   const leagueId = params.id as string;
   const leagueIdNum = parseInt(leagueId, 10);
@@ -314,12 +325,9 @@ export default function ChangeLogPage() {
   const [liveEvents, setLiveEvents] = useState<ChangeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [lastPolledAt, setLastPolledAt] = useState<Date | null>(null);
-  const [refreshError, setRefreshError] = useState(false);
-  // false on server; real value set after mount to avoid SSR/client hydration mismatch
   const [isGameTime, setIsGameTime] = useState(false);
   const seenIds = useRef(new Set<number>());
 
-  // Set real game-window value on mount (client only), then update every minute
   useEffect(() => {
     setIsGameTime(isGameWindow());
     const interval = setInterval(() => setIsGameTime(isGameWindow()), 60_000);
@@ -328,21 +336,6 @@ export default function ChangeLogPage() {
 
   const queryClient = useQueryClient();
 
-  // Manual refresh handler
-  const handleRefresh = useCallback(async () => {
-    setRefreshError(false);
-    try {
-      await api.triggerLiveRefresh(leagueIdNum);
-      setLastPolledAt(new Date());
-      queryClient.invalidateQueries({
-        queryKey: ["standings-neighborhood", leagueId],
-      });
-    } catch {
-      setRefreshError(true);
-    }
-  }, [leagueIdNum, leagueId, queryClient]);
-
-  // Fetch teams for name lookup
   const { data: teamsData } = useQuery({
     queryKey: ["league-teams", leagueId],
     queryFn: () =>
@@ -351,18 +344,14 @@ export default function ChangeLogPage() {
       }>,
   });
 
-  const teamMap = new Map(teamsData?.teams.map((t) => [t.id, t.name]) ?? []);
-
-  // Fetch history via REST on mount
   const { data: historyData, isLoading } = useQuery({
     queryKey: ["change-log-history", leagueId, "live"],
     queryFn: () =>
-      api.getChangeLogHistory(leagueIdNum, 50, "live") as Promise<{
+      api.getChangeLogHistory(leagueIdNum, 200, "live") as Promise<{
         events: ChangeEvent[];
       }>,
   });
 
-  // Fetch standings neighborhood (2 above + me + 2 below)
   const { data: neighborhoodData } = useQuery({
     queryKey: ["standings-neighborhood", leagueId, ourTeamId],
     queryFn: () =>
@@ -371,19 +360,18 @@ export default function ChangeLogPage() {
         snapshotDate: string;
       }>,
     enabled: ourTeamId != null,
-    refetchInterval: isGameTime ? 5 * 60 * 1000 : false, // only poll during game hours
+    refetchInterval: isGameTime ? 5 * 60 * 1000 : false,
     staleTime: 2 * 60 * 1000,
   });
 
-  // Deduplicated event merge (newest first).
-  // For events whose ID is already in the feed (intraday delta update), update in-place.
   const addEvents = useCallback((incoming: ChangeEvent[]) => {
+    const liveOnly = incoming.filter((e) => e.event_source === "live");
+    if (liveOnly.length === 0) return;
     setLiveEvents((prev) => {
       let updated = prev;
       const newOnes: ChangeEvent[] = [];
-      for (const evt of incoming) {
+      for (const evt of liveOnly) {
         if (seenIds.current.has(evt.id)) {
-          // Update the existing card in-place with the latest delta
           updated = updated.map((e) => (e.id === evt.id ? evt : e));
         } else {
           seenIds.current.add(evt.id);
@@ -395,7 +383,6 @@ export default function ChangeLogPage() {
     });
   }, []);
 
-  // Pre-populate seenIds and state from REST history
   useEffect(() => {
     if (historyData?.events) {
       for (const evt of historyData.events) seenIds.current.add(evt.id);
@@ -403,7 +390,6 @@ export default function ChangeLogPage() {
     }
   }, [historyData]);
 
-  // SSE subscription for live updates
   useEffect(() => {
     if (isNaN(leagueIdNum)) return;
     const url = api.getChangeLogSSEUrl(leagueIdNum);
@@ -420,7 +406,6 @@ export default function ChangeLogPage() {
         } else if (msg.type === "live_poll") {
           const d = msg.data as { polledAt: string };
           setLastPolledAt(new Date(d.polledAt));
-          // Refresh neighborhood standings immediately when live poll completes
           queryClient.invalidateQueries({
             queryKey: ["standings-neighborhood", leagueId],
           });
@@ -434,49 +419,32 @@ export default function ChangeLogPage() {
       es.close();
       setIsConnected(false);
     };
-  }, [leagueIdNum, addEvents]);
+  }, [leagueIdNum, addEvents, leagueId, queryClient]);
 
-  const myEvents = liveEvents.filter((e) => e.team_id === ourTeamId);
+  // Rolling 24h, my team only
+  const cutoff = Date.now() - TWENTY_FOUR_HOURS;
+  const myEvents = liveEvents.filter(
+    (e) =>
+      e.team_id === ourTeamId && new Date(e.occurred_at).getTime() >= cutoff,
+  );
+
+  const liveDelta = myEvents.reduce((sum, e) => sum + Number(e.roto_delta), 0);
+  const pollGroups = groupByPollRun(myEvents);
   const numTeams = teamsData?.teams.length ?? 10;
 
   return (
     <Container className="py-8">
       <PageHeader
-        title="Streaming Results"
+        title="Live Results"
         backLink={{ href: `/leagues/${leagueId}`, label: "Back to League" }}
         actions={
           <div className="flex items-center gap-2">
-            {/* Last polled timestamp */}
-            {lastPolledAt && (
-              <span className="text-xs text-content-tertiary hidden sm:inline">
-                Updated {formatRelativeTime(lastPolledAt)}
-              </span>
-            )}
-
-            {/* Games in progress indicator */}
             {isGameTime && (
               <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 Games live
               </span>
             )}
-
-            {/* Manual refresh button */}
-            <button
-              onClick={handleRefresh}
-              className={cn(
-                "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors",
-                refreshError
-                  ? "border-negative/40 text-negative"
-                  : "border-shell-border text-content-secondary hover:text-content-primary hover:border-accent",
-              )}
-              title={refreshError ? "Refresh failed — try again" : undefined}
-            >
-              <RefreshCw className="w-3 h-3" />
-              {refreshError ? "Failed" : "Refresh"}
-            </button>
-
-            {/* SSE connection dot */}
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full",
@@ -499,46 +467,40 @@ export default function ChangeLogPage() {
         }
       />
 
-      {/* Standings neighborhood panel */}
       {neighborhoodData?.neighborhood &&
         neighborhoodData.neighborhood.length > 0 && (
           <div className="mt-6">
-            <StandingsNeighborhood
+            <SummaryCard
               neighborhood={neighborhoodData.neighborhood}
+              liveDelta={liveDelta}
+              lastPolledAt={lastPolledAt}
+              snapshotDate={neighborhoodData.snapshotDate}
             />
           </div>
         )}
 
-      {/* Loading state */}
       {isLoading && (
         <div className="text-center py-16 text-content-tertiary text-sm">
-          Loading streaming results…
+          Loading live results…
         </div>
       )}
 
-      {/* Empty state — gate on ourTeamId being resolved to avoid flash before localStorage loads */}
       {!isLoading && ourTeamId != null && myEvents.length === 0 && (
         <div className="text-center py-16">
-          <ScrollText className="w-8 h-8 text-content-tertiary mx-auto mb-3" />
+          <Zap className="w-8 h-8 text-content-tertiary mx-auto mb-3" />
           <p className="text-content-secondary text-sm">
-            No changes affecting your team yet.
+            No live changes in the last 24 hours.
           </p>
           <p className="text-content-tertiary text-xs mt-1">
-            Changes appear here when your standing in any category shifts.
+            Updates appear here during game hours (1pm–midnight ET).
           </p>
         </div>
       )}
 
-      {/* Event feed — my team only */}
-      {myEvents.length > 0 && (
-        <div className="flex flex-col gap-3 mt-6">
-          {myEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              teamName={teamMap.get(event.team_id) ?? `Team ${event.team_id}`}
-              numTeams={numTeams}
-            />
+      {pollGroups.length > 0 && (
+        <div className="flex flex-col gap-3 mt-2">
+          {pollGroups.map((group, i) => (
+            <PollGroupCard key={i} group={group} numTeams={numTeams} />
           ))}
         </div>
       )}

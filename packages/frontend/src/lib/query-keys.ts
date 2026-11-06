@@ -32,6 +32,8 @@ export const queryKeys = {
       ["standings-projected", leagueId] as const,
     swing: (leagueId: string | number) =>
       ["standings-swing", leagueId] as const,
+    rolling: (leagueId: string | number, days: number) =>
+      ["standings-rolling", leagueId, days] as const,
   },
 
   // ── Timeseries ───────────────────────────────────────────────────────────
