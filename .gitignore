@@ -24,7 +24,6 @@ yarn-error.log*
 # Local env files
 .env
 .env*.local
-.env.railway
 
 # IDE
 .vscode/
@@ -37,3 +36,7 @@ yarn-error.log*
 *.db
 *.sqlite
 postgres-data/
+
+# Claude local
+.claude/worktrees/
+.claude/settings.local.json
