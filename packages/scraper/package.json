@@ -14,7 +14,7 @@
     "@espn-fantasy/shared": "workspace:*",
     "axios": "^1.7.0",
     "cheerio": "^1.0.0",
-    "fastify": "^4.26.0",
+    "fastify": "^5.12.6",
     "ioredis": "^5.9.3",
     "pino": "^9.0.0"
   },
