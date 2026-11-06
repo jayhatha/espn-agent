@@ -1214,7 +1214,7 @@ new LineupOptimizerAgent(
 
 ### Purpose
 
-Generates real-time auction draft narration using OpenAI, translating deterministic engine signals (alerts, inflation, budget pacing, scarcity, optimization) into human-readable commentary.
+Experimental stateless narration using OpenAI, translating draft-engine signals (alerts, inflation, budget pacing, scarcity, optimization) into human-readable commentary. Live extension delivery is not implemented.
 
 ### Constructor
 
@@ -1234,11 +1234,11 @@ Constructs a GPT-4o system prompt + user message from the structured `NarratorPa
 
 ### Inputs
 
-- `NarratorPayload` — summary signals from the Chrome extension's deterministic engine (no raw DB tables)
+- `NarratorPayload` — summary signals intended for a deterministic live-draft client (no raw DB tables); the Chrome extension client is not included in this repository
 
 ### Outputs
 
-- Plain text narration string (returned to caller; displayed in the extension overlay)
+- Plain text narration string (returned to caller; extension overlay delivery is not implemented)
 
 ### Dependencies
 

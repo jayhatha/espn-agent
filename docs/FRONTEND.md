@@ -38,7 +38,7 @@ All routes are under `packages/frontend/src/app/`. Every page is a Client Compon
 | `/admin`                    | `app/admin/page.tsx`                    | Admin panel — users, leagues, projections, backfill jobs                                         | Admin     |
 | `/admin/auction-validation` | `app/admin/auction-validation/page.tsx` | Auction value validation tool                                                                    | Admin     |
 | `/admin/draft-board`        | `app/admin/draft-board/page.tsx`        | Admin draft board view                                                                           | Admin     |
-| `/draft/live`               | `app/draft/live/page.tsx`               | Live draft companion — WebSocket connection to draft engine                                      | None      |
+| `/draft/live`               | `app/draft/live/page.tsx`               | Work-in-progress companion; WebSocket expects a separate extension publisher                    | None      |
 
 ### League Sub-Routes (`/leagues/[id]/...`)
 
@@ -57,9 +57,11 @@ All league sub-routes share the league shell layout (sidebar, top bar, signals p
 | `/leagues/[id]/streaming`              | `streaming/page.tsx`              | Pitching usage: GS pacing, sit/start recommendations, streaming candidates                 |
 | `/leagues/[id]/projections`            | `projections/page.tsx`            | Upload FanGraphs CSV projections (drag-and-drop or file picker)                            |
 | `/leagues/[id]/settings`               | `settings/page.tsx`               | Settings placeholder ("Coming soon")                                                       |
-| `/leagues/[id]/draft/auction`          | `draft/auction/page.tsx`          | Auction dollar valuations (VBD/SGP) with position filter and budget inputs                 |
-| `/leagues/[id]/draft/auction/validate` | `draft/auction/validate/page.tsx` | Auction value validation tool                                                              |
-| `/leagues/[id]/draft/rankings`         | `draft/rankings/page.tsx`         | Snake draft rankings by tier and SGP score                                                 |
+| `/leagues/[id]/draft/auction`          | `draft/auction/page.tsx`          | Experimental auction dollar valuations (VBD/SGP) with position filter and budget inputs   |
+| `/leagues/[id]/draft/auction/validate` | `draft/auction/validate/page.tsx` | Experimental auction value validation tool                                                |
+| `/leagues/[id]/draft/rankings`         | `draft/rankings/page.tsx`         | Experimental snake-draft rankings by tier and SGP score                                   |
+
+Draft pages are work in progress. This repository has no Chrome extension to detect ESPN draft pages or publish live draft state, so `/draft/live` cannot receive live data without an external WebSocket client.
 
 ### Dashboard Sections
 

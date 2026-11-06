@@ -10,7 +10,7 @@
 | Field | Value |
 |-------|-------|
 | **Product** | ESPN Fantasy Baseball Command Center |
-| **Type** | Web app + Chrome extension |
+| **Type** | Web app; Chrome extension is planned work |
 | **Platform** | Desktop browser (primary), mobile via responsive pages |
 | **League format** | Category-based roto (10-category: R, HR, RBI, SB, OBP, K, W, SV, ERA, WHIP) |
 | **Data sources** | ESPN Fantasy API (read-only, cookie auth), FanGraphs Depth Charts RoS projections (CSV upload) |
@@ -21,13 +21,14 @@
 - Takes daily snapshots of league standings, rosters, and transactions
 - Combines current stats with FanGraphs RoS projections using component-based math
 - Projects final standings, identifies roto-point opportunities, recommends waiver/trade moves
-- Overlays ESPN's live auction draft page with a deterministic draft engine
+- Provides experimental pre-draft auction valuations and snake rankings
+- Plans live ESPN draft-page assistance; integration is not implemented
 
 **What it does NOT do:**
 - Write to ESPN (no roster moves, no trade submissions — recommendations only)
 - Support points or head-to-head leagues
 - Auto-fetch projections (FanGraphs ToS requires manual CSV upload)
-- Support snake drafts (auction only)
+- Provide end-to-end live draft assistance for snake or auction drafts
 
 ---
 
@@ -37,7 +38,7 @@
 |----------|------|-----------------------|
 | **P0** | Know where I stand in the league at a glance | Dashboard with roto points, category ranks, projected finish |
 | **P0** | Find the best waiver pickup right now | AI recommendations ranked by net roto-point delta (add AND drop side) |
-| **P0** | Win the auction draft | Chrome extension with real-time bid guidance, inflation tracking, positional scarcity |
+| **P0 (WIP)** | Win the auction draft | Planned live draft integration with bid guidance, inflation tracking, positional scarcity |
 | **P1** | Identify which categories to target | Category opportunity map with gap-to-next-rank and difficulty ratings |
 | **P1** | Evaluate trades before proposing them | Trade impact analysis with per-category roto-point breakdown |
 | **P1** | Track FAAB budget and pitching usage | FAAB pace vs league, GS tracker with start/sit planner |
@@ -147,17 +148,15 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 | **Lineup efficiency** | Daily bench production (missed HR, SB, OPS from benched players) |
 | **Warning indicator** | Fires when a benched player outperformed a started player at the same position |
 
-### 4.8 Chrome Extension (Auction Draft)
+### 4.8 Draft Tools (Work in Progress)
 
 | Field | Value |
 |-------|-------|
-| **Overlay** | Injects into ESPN's live auction draft page |
-| **Draft engine** | Deterministic: inflation tracking, positional scarcity, category gap analysis, budget curves, roster optimization |
-| **Bid guidance** | Real-time bid/no-bid with ceiling price, driven by Monte Carlo simulation |
-| **Nomination strategy** | Priority-scored nomination queue (overpriced-first) |
-| **Displays** | Signal strip, category heatmap, projected standings, ideal roster, budget tracker |
-| **AI narrator** | Tactical commentary on picks, overpays, steals, positional runs |
-| **Mobile companion** | WebSocket-connected page with manual bid/nominate controls |
+| **Status** | Experimental; not available as an end-to-end live draft assistant |
+| **Implemented surfaces** | League-specific auction valuations, snake-draft rankings, and a mobile companion page |
+| **Missing integration** | No Chrome extension package, ESPN-page pick detection, or extension WebSocket publisher exists in this repository |
+| **Live companion** | `/draft/live` expects an external `role=extension` WebSocket publisher and cannot independently receive live draft state |
+| **Reliability** | Do not rely on draft tools during a live draft |
 
 ### 4.9 Projections Upload
 
@@ -235,14 +234,7 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 ### 5.5 Auction Draft (Extension)
 
 ```
-1. Open ESPN draft lobby in Chrome
-2. Extension auto-detects draft page, injects sidebar
-3. Pre-draft: upload FanGraphs CSV via extension popup, configure strategy
-4. Draft starts: extension tracks every pick, updates inflation + scarcity
-5. When nominated: sidebar shows bid/no-bid, ceiling price, category impact
-6. When nominating: extension suggests overpriced player from queue
-7. Throughout: AI narrator provides tactical commentary
-8. Mobile companion (separate browser): shows same data via WebSocket, manual bid/nominate buttons
+**Target workflow only — not currently available end-to-end.** Pre-draft web pages expose experimental rankings and auction values. Live ESPN page integration, pick tracking, bid guidance, nomination suggestions, and narrator delivery require a Chrome extension that is not present in this repository. The mobile companion also requires an external WebSocket publisher.
 ```
 
 ### 5.6 Mid-Season Category Targeting
@@ -309,7 +301,7 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 | `/leagues/[id]/lineup` | Lineup | TeamSelector, recommendation cards | Start/sit recommendations with projected gain |
 | `/leagues/[id]/settings` | Settings | Form inputs for ESPN auth cookies | SWID, espn_s2, league preferences |
 
-### Extension Views (Chrome overlay on ESPN draft page)
+### Planned Extension Views (Not Implemented)
 
 | Component | Location | Data displayed |
 |-----------|----------|----------------|
@@ -342,7 +334,7 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 
 | Constraint | Value |
 |------------|-------|
-| **Monorepo** | Turbo + pnpm workspaces (`packages/shared`, `packages/backend`, `packages/frontend`, `packages/extension`) |
+| **Monorepo** | Turbo + pnpm workspaces (`packages/shared`, `packages/backend`, `packages/frontend`, `packages/scraper`) |
 | **Rate stat math** | Component-based only (`shared/formulas.ts`) — never average rates |
 | **Roto scoring** | `numTeams - rank + 1` per category — must match backend `StandingsProjectionAgent` |
 | **ESPN API** | Read-only, undocumented, cookie auth — retry with exponential backoff |
@@ -373,39 +365,36 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 | 2 | PlayerIdentityResolution not wired into projections ingest | MEDIUM | Player matching is ILIKE-only — misses nicknames, accents, suffixes |
 | 3 | Projections require manual CSV upload | MEDIUM | FanGraphs ToS prevents automation — user must re-upload periodically |
 | 4 | No retry/backoff on ESPN API calls | MEDIUM | Single failure = failed snapshot |
-| 5 | ESPN auth cookies stored in plaintext | LOW | Design doc requires encrypted-at-rest |
-
 ### Computation
 
 | # | Pain point | Severity | Notes |
 |---|-----------|----------|-------|
-| 6 | Tie-breaking in roto rankings is arbitrary | LOW | Two teams with identical projected values get different ranks based on array position |
-| 7 | Marginal gain for rate stats shows raw gap only | LOW | "Gap = 0.15 ERA" but doesn't translate to actionable component changes (Phase 67 addressed labels, not component conversion) |
+| 5 | Tie-breaking in roto rankings is arbitrary | LOW | Two teams with identical projected values get different ranks based on array position |
+| 6 | Marginal gain for rate stats shows raw gap only | LOW | "Gap = 0.15 ERA" but doesn't translate to actionable component changes (Phase 67 addressed labels, not component conversion) |
 
 ### Frontend
 
 | # | Pain point | Severity | Notes |
 |---|-----------|----------|-------|
-| 8 | Frontend `api.ts` client exists but some pages still hardcode `localhost:3001` | LOW | Legacy inconsistency |
-| 9 | No shared component library — some UI duplicated per page | LOW | Accumulated tech debt from rapid phase execution |
-| 10 | Home page links to 404 routes | LOW | Links to `/projections`, `/waivers`, `/trends` but correct routes are under `/leagues/[id]/...` |
+| 7 | Frontend `api.ts` client exists but some pages still hardcode `localhost:3001` | LOW | Legacy inconsistency |
+| 8 | No shared component library — some UI duplicated per page | LOW | Accumulated tech debt from rapid phase execution |
+| 9 | Home page links to 404 routes | LOW | Links to `/projections`, `/waivers`, `/trends` but correct routes are under `/leagues/[id]/...` |
 
-### Extension
+### Draft Tooling (Work in Progress)
 
 | # | Pain point | Severity | Notes |
 |---|-----------|----------|-------|
-| 11 | No API token system for extension | MEDIUM | Extension uses session-based auth via browser cookies — works for local dev only |
-| 12 | ESPN DOM selectors are fragile | MEDIUM | ESPN can change DOM structure at any time — selectors verified via MCP but not monitored |
-| 13 | User team ID detection not implemented | LOW | Requires manual configuration in extension settings |
+| 10 | No Chrome extension implementation | HIGH | ESPN page integration, pick detection, and the extension WebSocket publisher are absent |
+| 11 | Live draft workflow is incomplete | HIGH | `/draft/live` requires an external publisher and cannot provide live data by itself |
 
 ### Architecture
 
 | # | Pain point | Severity | Notes |
 |---|-----------|----------|-------|
-| 14 | ESPN mRoster view field name for FAAB (`acquisitionBudgetRemaining`) is unverified | MEDIUM | Medium confidence — needs live API verification |
-| 15 | GS cap field in league settings JSONB unverified | MEDIUM | Needs ESPN API verification before GS pacing is trusted |
-| 16 | ESPN period stats endpoint for 7-day rolling windows unverified | MEDIUM | `player_period_stats` schema exists but ESPN feeding unconfirmed |
-| 17 | Single-user hardcoded league limits product to one user/league | LOW | Intentional for v4.0+ — multi-user deferred |
+| 12 | ESPN mRoster view field name for FAAB (`acquisitionBudgetRemaining`) is unverified | MEDIUM | Medium confidence — needs live API verification |
+| 13 | GS cap field in league settings JSONB unverified | MEDIUM | Needs ESPN API verification before GS pacing is trusted |
+| 14 | ESPN period stats endpoint for 7-day rolling windows unverified | MEDIUM | `player_period_stats` schema exists but ESPN feeding unconfirmed |
+| 15 | Single-user hardcoded league limits product to one user/league | LOW | Intentional for v4.0+ — multi-user deferred |
 
 ---
 
@@ -420,9 +409,9 @@ Player (1) ──── (N) RosterSnapshot (per team per snapshot)
 | TradeRecommendationAgent | Trade impact + candidate generation | Active |
 | LineupOptimizerAgent | Daily start/sit | Active |
 | StreamingPitcherAgent | Streaming SP candidates | Active |
-| DraftRankingsAgent | VBD/SGP draft rankings | Active |
-| AuctionValuationAgent | Auction dollar values | Active |
-| DraftNarratorAgent | AI draft commentary | Active |
+| DraftRankingsAgent | Pre-draft VBD/SGP rankings | Experimental |
+| AuctionValuationAgent | Pre-draft auction dollar values | Experimental |
+| DraftNarratorAgent | AI draft commentary; no live extension integration | Experimental |
 | GsPacingAgent | GS usage tracking | Active |
 | FaabTrackerAgent | FAAB budget tracking | Active |
 | TransactionImpactAgent | Move quality analysis | Active |

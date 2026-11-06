@@ -1180,6 +1180,8 @@ Daily lineup efficiency analysis: bench production totals and warnings for days 
 
 ## Draft
 
+Draft endpoints are experimental pre-draft tools. Live ESPN draft-page integration and the WebSocket publisher are not included in this repository.
+
 ### GET /api/leagues/:leagueId/draft/rankings
 
 Pre-draft VBD (Value Over Replacement) rankings scoped to a specific league's settings.

@@ -2,7 +2,7 @@
 
 A web app that connects to ESPN Fantasy Baseball leagues and provides:
 
-- Draft assistance (snake + auction)
+- Draft tools (work in progress)
 - Trade advice (impact + candidate generation)
 - Waiver wire suggestions (adds/drops + category targeting)
 - Rest-of-season (RoS) standings projections per category and overall
@@ -14,97 +14,19 @@ This is a monorepo containing:
 - **packages/backend**: Node.js/TypeScript backend with Fastify
 - **packages/frontend**: Next.js App Router frontend
 - **packages/shared**: Shared types and utilities
-- **packages/extension**: Chrome extension for live draft assistance
+- **packages/scraper**: Scraper utilities
 
-## ESPN Live Draft Assistant (Chrome Extension) 🎯
+## ESPN Draft Tools (Work in Progress)
 
-A Chrome extension that provides real-time draft recommendations directly on the ESPN Fantasy Baseball draft page.
+Draft support is experimental and not available end-to-end.
 
-### Features
+- Existing code includes league-specific auction valuations, snake-draft rankings, and a mobile draft companion page.
+- There is no `packages/extension` workspace or installable Chrome extension in this repository.
+- Live ESPN draft-page detection, pick ingestion, and the extension-to-companion WebSocket client are not implemented here.
+- The mobile companion expects a separate `role=extension` WebSocket publisher, so it cannot receive live draft data on its own.
+- Treat draft recommendations and draft companion workflows as works in progress; do not rely on them during a live draft.
 
-- **Snake Draft Support**
-  - Best Player Available (BPA) rankings with VBD scoring
-  - Position-based filtering and positional needs detection
-  - Snake turn pair recommendations for back-to-back picks
-  - Real-time roster summary with category totals
-
-- **Auction Draft Support**
-  - Budget pacing tracker (ahead/on-track/behind)
-  - Dollar value recommendations
-  - Recommended max bid calculations
-  - Affordability indicators and value badges
-
-- **Pick Value Tracking**
-  - Overpay/underpay indicators for all teams
-  - Team efficiency leaderboard
-  - Competitive intelligence on draft performance
-
-- **Shadow DOM UI**
-  - Style-isolated sidebar (doesn't conflict with ESPN)
-  - Collapsible interface (400px wide, right-aligned)
-  - Persistent across page scroll and updates
-
-### Quick Start
-
-1. **Build the Extension**
-   ```bash
-   cd packages/extension
-   pnpm install
-   pnpm build
-   ```
-
-2. **Load in Chrome**
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode" (toggle in top-right)
-   - Click "Load unpacked"
-   - Select `packages/extension/.output/chrome-mv3` directory
-
-3. **Use During Draft**
-   - Navigate to any ESPN Fantasy Baseball draft page
-   - The assistant sidebar will automatically appear on the right side
-   - Rankings load automatically from bundled baseline data
-   - Pick detection happens in real-time via DOM observation
-
-### Optional: Connect to Backend
-
-To use custom projections and league-specific rankings:
-
-1. **Start the backend server**
-   ```bash
-   # Using Docker
-   ./docker.sh dev-up
-
-   # Or manually
-   cd packages/backend && pnpm dev
-   ```
-
-2. **Generate an API token** (Coming soon)
-   - Feature is planned but not yet implemented
-   - Current workaround: Extension uses session-based auth from browser cookies
-   - Navigate to `http://localhost:3001` and sign in
-   - Extension will inherit your browser session automatically
-
-3. **Configure extension settings**
-   - Click extension icon in Chrome toolbar
-   - Set Backend URL (e.g., `http://localhost:3001`)
-   - Save settings (API token field optional until token system is implemented)
-
-4. **The extension will fetch:**
-   - League-specific rankings based on roster settings
-   - Custom player projections from FanGraphs uploads
-   - Real-time standings projections
-
-**Note:** Extension works standalone with bundled rankings if backend is not available.
-
-### Development
-
-```bash
-cd packages/extension
-pnpm dev    # Start development mode with hot reload
-pnpm build  # Build for production
-```
-
-See `packages/extension/README.md` for detailed extension development instructions.
+Pre-draft routes: `/leagues/[id]/draft/rankings` and `/leagues/[id]/draft/auction`. Live companion: `/draft/live`.
 
 ## Quick Start (Docker) 🐳
 
@@ -125,7 +47,7 @@ The easiest way to run the entire application:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:3001
 
-See [DOCKER.md](./DOCKER.md) for complete Docker documentation.
+See [Development Setup](./docs/DEVELOPMENT.md) for setup details.
 
 ## Manual Setup (Without Docker)
 
@@ -180,12 +102,12 @@ Create `.env` files in backend and frontend packages based on `.env.example`.
 
 ## Documentation
 
-- **[Docker Setup](./DOCKER.md)** - Complete Docker/Docker Compose guide
-- **[Getting Started](./GETTING_STARTED.md)** - Detailed setup and usage guide
-- **[Design Document](./# DESIGN_DOC.md)** - Full system design specification
-- **[Agents Architecture](./AGENTS.md)** - Multi-agent system details
-- **[Project Structure](./PROJECT_STRUCTURE.md)** - Codebase organization
-- **[Roadmap](./ROADMAP.md)** - Development roadmap and future features
+- [Development Setup](./docs/DEVELOPMENT.md)
+- [API Reference](./docs/API.md)
+- [ESPN API Notes](./docs/ESPN_API.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Database](./docs/DATABASE.md)
+- [Frontend](./docs/FRONTEND.md)
 
 ## Development Commands
 

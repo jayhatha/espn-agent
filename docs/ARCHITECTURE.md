@@ -47,7 +47,7 @@ cors          → cookie          → fastify-jwt (reads accessToken cookie)
 
 | Plugin                | Purpose                                                                                                  |
 | --------------------- | -------------------------------------------------------------------------------------------------------- |
-| `@fastify/cors`       | Allows `FRONTEND_URL`, `fantasy.espn.com`, private LAN IPs, and `chrome-extension://` origins            |
+| `@fastify/cors`       | Allows `FRONTEND_URL`, `fantasy.espn.com`, private LAN IPs, and planned `chrome-extension://` origins   |
 | `@fastify/cookie`     | Signed cookie parsing; secret from `COOKIE_SECRET` or `JWT_SECRET`                                       |
 | `@fastify/jwt`        | JWT auth; reads from `accessToken` cookie or `Authorization: Bearer` header; tokens expire in 15 minutes |
 | `@fastify/multipart`  | CSV upload (10 MB limit) for FanGraphs projections                                                       |
@@ -65,7 +65,7 @@ projectionsRoutes     /api/projections/*
 timeSeriesRoutes      /api/leagues/:id/timeseries/*
 recommendationsRoutes /api/leagues/:id/teams/:teamId/...
 draftRoutes           /api/leagues/:id/draft/*
-draftLiveRoutes       (WebSocket draft companion)
+draftLiveRoutes       (work-in-progress WebSocket draft companion; no extension client in this repository)
 lineupRoutes          /api/leagues/:id/teams/:teamId/lineup/*
 streamingRoutes       /api/leagues/:id/stream (SSE)
 adminRoutes           /api/admin/*

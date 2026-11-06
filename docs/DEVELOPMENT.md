@@ -24,7 +24,7 @@ cd espn-agent
 pnpm install
 ```
 
-`pnpm install` installs all workspace packages (`packages/backend`, `packages/frontend`, `packages/shared`, `packages/extension`) in one shot via the pnpm workspaces config in `pnpm-workspace.yaml`.
+`pnpm install` installs all workspace packages (`packages/backend`, `packages/frontend`, `packages/shared`, `packages/scraper`) in one shot via the pnpm workspaces config in `pnpm-workspace.yaml`. ESPN draft tooling is work in progress; this repository does not include a Chrome extension.
 
 ---
 
@@ -46,6 +46,7 @@ All variables defined in `packages/backend/.env.example`:
 | `DATABASE_URL`   | Yes      | `postgresql://localhost:5432/espn_fantasy` | PostgreSQL connection string                      |
 | `REDIS_URL`      | Yes      | `redis://localhost:6379`                   | Redis connection URL                              |
 | `LOG_LEVEL`      | No       | `info`                                     | Pino log level (`debug`, `info`, `warn`, `error`) |
+| `ENCRYPTION_KEY` | No       | _(empty)_                                  | 64-character hex key required to store encrypted ESPN cookies |
 | `OPENAI_API_KEY` | No       | _(empty)_                                  | OpenAI key used for draft narrator LLM calls      |
 
 The backend will fail to start if `DATABASE_URL` or `REDIS_URL` are unreachable. `OPENAI_API_KEY` is only required for the draft narrator feature; everything else works without it.
@@ -287,7 +288,7 @@ The `shared` package must be compiled before other packages can import from it. 
 
 ### ESPN auth cookies not working
 
-Private leagues require `SWID` and `espn_s2` cookies from your ESPN session. Set them via the `PATCH /api/leagues/:id/auth` endpoint. These are currently stored in plaintext in the database.
+Private leagues require `SWID` and `espn_s2` cookies from your ESPN session. Set them via the `PATCH /api/leagues/:id/auth` endpoint. The backend stores these credentials in encrypted columns; `ENCRYPTION_KEY` must be configured when using database-stored credentials.
 
 ### `PlayerIdentityResolutionAgent` not matching projections
 
